@@ -51,14 +51,23 @@ function normTitle(s: string): string {
 }
 
 /**
- * Auto-generated "Title by @user in #N" entry whose title equals the squash
- * commit subject. True by construction (GitHub generated it from the same
- * commits we check against), so it must not inflate the correctness score.
+ * Auto-generated notes entry that merely restates a commit — "Title by @user
+ * in #N" PR lists, or "<sha> subject" changelog lists. True by construction
+ * (generated from the same commits we check against), so it must not inflate
+ * the correctness score.
  */
 export function isGeneratedEntry(claim: Claim, commits: Commit[]): boolean {
-  if (!GENERATED_TAIL.test(claim.text)) return false;
-  const core = normTitle(coreText(claim));
-  return core.length > 0 && commits.some((c) => normTitle(c.subject) === core);
+  const core = normTitle(coreText(claim).replace(/\b[0-9a-f]{7,40}\b/g, ""));
+  if (!core) return false;
+  if (GENERATED_TAIL.test(claim.text)) {
+    return commits.some((c) => normTitle(c.subject) === core);
+  }
+  if (claim.shas.length) {
+    return commits.some(
+      (c) => claim.shas.some((s) => c.sha.startsWith(s)) && normTitle(c.subject) === core,
+    );
+  }
+  return false;
 }
 
 /** Claim whose text carries no verifiable content tokens ("Updates and fixes"). */
@@ -115,6 +124,17 @@ export async function verifyClaims(
     }
 
     const anchors = anchorMatch(claim, data.commits);
+    if (!anchors.commits.length && claim.prNumbers.length && data.resolvePr) {
+      // Squash-without-suffix repos: ask the forge which commit merged the PR.
+      for (const pr of claim.prNumbers.slice(0, 5)) {
+        const sha = await data.resolvePr(pr);
+        const commit = sha && data.commits.find((c) => sha.startsWith(c.sha) || c.sha.startsWith(sha));
+        if (commit && !anchors.commits.includes(commit)) {
+          anchors.commits.push(commit);
+          anchors.viaPr.push(pr);
+        }
+      }
+    }
     if (anchors.commits.length) {
       const fileLists = await Promise.all(
         anchors.commits.map((c) => data.commitFiles(c.sha)),
@@ -125,7 +145,7 @@ export async function verifyClaims(
       const bestSim = Math.max(
         ...anchors.commits.map((c) => similarity(coreText(claim), c.subject)),
       );
-      const methods: Evidence["methods"] = ["pr-anchor"];
+      const methods: Evidence["methods"] = [anchors.viaPr.length ? "pr-anchor" : "sha-anchor"];
       if (generated) methods.push("generated");
       if (lex.score > 0) methods.push("lexical");
       const evidence: Evidence = {

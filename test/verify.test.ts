@@ -33,6 +33,17 @@ test("isGeneratedEntry: PR-list boilerplate whose title equals the squash subjec
   assert.equal(isGeneratedEntry(c2, [commit("Actual subject (#7)", [7])]), false);
 });
 
+test("isGeneratedEntry: sha-list changelog entries restating the commit subject", () => {
+  const c = claim("f885d87827bcae30a07063f2723cd03458144a00 Fix invalid ip syntax");
+  c.shas = ["f885d87827bcae30a07063f2723cd03458144a00"];
+  const target = { sha: "f885d87827bcae30a07063f2723cd03458144a00", subject: "Fix invalid ip syntax", body: "", author: "dev", prNumbers: [] };
+  assert.equal(isGeneratedEntry(c, [target]), true);
+  // Same sha but diverging text stays a real (checkable) claim.
+  const diverging = claim("f885d87827bcae30a07063f2723cd03458144a00 Completely different statement");
+  diverging.shas = ["f885d87827bcae30a07063f2723cd03458144a00"];
+  assert.equal(isGeneratedEntry(diverging, [target]), false);
+});
+
 test("isVagueClaim: no content tokens beyond boilerplate", () => {
   assert.equal(isVagueClaim(claim("Updates and fixes by @BlackDex in #7235")), true);
   assert.equal(isVagueClaim(claim("Misc updates and fixes by @BlackDex in #7406")), true);

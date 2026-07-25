@@ -133,6 +133,20 @@ export async function loadGithubRelease(opts: {
     return p;
   };
 
+  const prCache = new Map<number, Promise<string | null>>();
+  const resolvePr = (n: number): Promise<string | null> => {
+    let p = prCache.get(n);
+    if (!p) {
+      p = ghJson<{ merge_commit_sha: string | null; merged_at: string | null }>(
+        `repos/${opts.repo}/pulls/${n}`,
+      )
+        .then((pr) => (pr.merged_at ? pr.merge_commit_sha : null))
+        .catch(() => null);
+      prCache.set(n, p);
+    }
+    return p;
+  };
+
   return {
     repoLabel: opts.repo,
     baseRef,
@@ -141,6 +155,7 @@ export async function loadGithubRelease(opts: {
     commits: cmp.commits,
     files: cmp.files,
     commitFiles,
+    resolvePr,
     warnings,
   };
 }

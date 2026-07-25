@@ -25,6 +25,11 @@ export interface ReleaseData {
   files: DiffFile[];
   /** Lazily resolve the per-commit diff (cached by the source). */
   commitFiles(sha: string): Promise<DiffFile[]>;
+  /**
+   * Resolve a PR number to its merge/squash commit sha — for repos that
+   * squash without a "(#N)" suffix, where message matching finds nothing.
+   */
+  resolvePr?(n: number): Promise<string | null>;
   warnings: string[];
 }
 
