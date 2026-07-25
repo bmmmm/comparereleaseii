@@ -14,6 +14,7 @@ import {
 import { parseClaims } from "./claims.ts";
 import { selectEngine, type JudgeEngine } from "./judge.ts";
 import { withVerdictCache } from "./cache.ts";
+import { commandExists } from "./util.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { computeMetrics } from "./metrics.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
@@ -110,6 +111,12 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  if (!values.local && !(await commandExists("gh"))) {
+    throw new Error(
+      "The GitHub CLI (gh) is required for GitHub sources — install it from https://cli.github.com and run `gh auth login`. Alternatively check a local clone with --local <path>.",
+    );
+  }
+
   console.error(`Loading release data${values.local ? ` from ${values.local}` : ` for ${positionals[0]}`}…`);
   let data;
   let context;
@@ -196,7 +203,21 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  let engine = judgeMode === "off" ? null : selectEngine({ engine: engineName, model: values.model });
+  let effectiveEngine = engineName;
+  if (judgeMode !== "off" && engineName === "claude-cli" && !(await commandExists("claude"))) {
+    if (process.env.ANTHROPIC_API_KEY) {
+      console.error("claude CLI not found — using the Anthropic API engine instead.");
+      effectiveEngine = "api";
+    } else {
+      console.error(
+        "claude CLI not found and ANTHROPIC_API_KEY is unset — running deterministic-only.\n" +
+          "For LLM-judged verdicts install Claude Code (https://code.claude.com) or export ANTHROPIC_API_KEY.",
+      );
+      effectiveEngine = "off";
+    }
+  }
+  let engine =
+    judgeMode === "off" ? null : selectEngine({ engine: effectiveEngine, model: values.model });
   if (engine && !values["no-cache"]) engine = withVerdictCache(engine);
   const baselineCount = Number(values.baseline);
   const baselinePromise =

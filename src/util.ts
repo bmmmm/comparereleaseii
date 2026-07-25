@@ -1,5 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { execFile } from "node:child_process";
+import { access, constants } from "node:fs/promises";
+import { delimiter, join } from "node:path";
+
+/** PATH lookup without spawning — instant, no side effects. */
+export async function commandExists(cmd: string): Promise<boolean> {
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (!dir) continue;
+    try {
+      await access(join(dir, cmd), constants.X_OK);
+      return true;
+    } catch {
+      // keep searching
+    }
+  }
+  return false;
+}
 
 export interface RunResult {
   stdout: string;

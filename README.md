@@ -2,6 +2,19 @@
 
 Fact-check release notes against the actual code diff.
 
+## Quick start
+
+```console
+$ git clone https://github.com/bmmmm/comparereleaseii && cd comparereleaseii
+$ pnpm install
+$ node src/cli.ts dani-garcia/vaultwarden --tag 1.37.0 --html report.html
+```
+
+Requires Node ≥ 24 and an authenticated [`gh`](https://cli.github.com). With
+the [`claude`](https://code.claude.com) CLI (or `ANTHROPIC_API_KEY`) you get
+LLM-judged verdicts; without either, the tool degrades gracefully to the
+deterministic stages. `--estimate` previews the effort before the first run.
+
 Release notes are claims. This tool verifies them: it takes a release, splits
 the notes into atomic claims, and checks each claim against the real diff
 between the release and its predecessor — plus the reverse direction: which
@@ -144,6 +157,11 @@ $ pnpm eval    # judge eval against the golden set (needs an engine)
 ```
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
+
+## Support
+
+If this tool is useful to you, you can support development at
+[ko-fi.com/bmabma](https://ko-fi.com/bmabma).
 
 ## License
 

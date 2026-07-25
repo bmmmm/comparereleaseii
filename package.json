@@ -5,7 +5,7 @@
   "type": "module",
   "license": "GPL-3.0-or-later",
   "bin": {
-    "comparerelease": "./src/cli.ts"
+    "comparerelease": "./bin/comparerelease.mjs"
   },
   "engines": {
     "node": ">=24"
