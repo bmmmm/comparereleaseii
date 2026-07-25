@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseClaims, cleanText } from "../src/claims.ts";
+
+const fixture = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "fixtures", "vaultwarden-1.37.0.md"),
+  "utf8",
+);
+
+test("parses all claims from the vaultwarden 1.37.0 notes", () => {
+  const claims = parseClaims(fixture);
+  assert.equal(claims.length, 45);
+});
+
+test("What's Changed bullets are change claims with PR anchors", () => {
+  const claims = parseClaims(fixture).filter((c) => c.section === "What's Changed");
+  assert.equal(claims.length, 27);
+  assert.ok(claims.every((c) => c.kind === "change"));
+  assert.deepEqual(claims[0].prNumbers, [6127]);
+  assert.equal(claims[0].author, "txase");
+});
+
+test("New Contributors section is all meta (6 bullets + Full Changelog line)", () => {
+  const claims = parseClaims(fixture).filter((c) => c.section === "New Contributors");
+  assert.equal(claims.length, 7);
+  assert.ok(claims.every((c) => c.kind === "meta"));
+  assert.deepEqual(claims[0].prNumbers, [7061]);
+});
+
+test("GHSA advisories are extracted", () => {
+  const ssrf = parseClaims(fixture).find((c) => c.text.includes("SSRF"));
+  assert.ok(ssrf);
+  assert.deepEqual(ssrf.advisories, ["GHSA-hw4g-2v3f-74x5", "GHSA-vh5m-fc9v-m84g"]);
+  assert.equal(ssrf.kind, "change");
+});
+
+test("security-process prose is meta, the Note paragraph is a change claim", () => {
+  const claims = parseClaims(fixture);
+  const intro = claims.find((c) => c.text.includes("strongly advice"));
+  assert.equal(intro?.kind, "meta");
+  const pending = claims.find((c) => c.text.includes("pending CVE"));
+  assert.equal(pending?.kind, "meta");
+  const note = claims.find((c) => c.text.includes("2026.7.0"));
+  assert.equal(note?.kind, "change");
+  assert.equal(note?.section, "Note");
+});
+
+test("cleanText unwraps links, keeps adjacent link texts separated", () => {
+  const cleaned = cleanText(
+    "Import [[GHSA-f3qw-qg77-hmm4]](https://x.example/a)[[GHSA-jq2g-h4xr-4mcr]](https://x.example/b)",
+  );
+  assert.equal(cleaned, "Import GHSA-f3qw-qg77-hmm4 GHSA-jq2g-h4xr-4mcr");
+});
+
+test("cleanText rewrites pull URLs to #N", () => {
+  assert.equal(
+    cleanText("Fix foo by @bar in https://github.com/o/r/pull/123"),
+    "Fix foo by @bar in #123",
+  );
+});

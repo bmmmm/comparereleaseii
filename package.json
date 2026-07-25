@@ -1,0 +1,24 @@
+{
+  "name": "comparereleaseii",
+  "version": "0.1.0",
+  "description": "Fact-check release notes against the actual code diff between two versions",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "bin": {
+    "comparerelease": "./src/cli.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.13.0",
+  "scripts": {
+    "preinstall": "node -e \"if(!/pnpm/.test(process.env.npm_config_user_agent||''))throw new Error('Use pnpm — npm/yarn are blocked in this repo')\"",
+    "check": "tsc --noEmit",
+    "test": "node --test 'test/*.test.ts'",
+    "start": "node src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
