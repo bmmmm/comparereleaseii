@@ -21,7 +21,11 @@ first, an LLM judge only for what remains unclear:
    path boost) to select the evidence worth judging.
 4. **LLM judge** — claim + top hunks go to a model (default: Haiku via the
    `claude` CLI) which rules `verified` / `partial` / `no_evidence` /
-   `contradicted`, citing concrete evidence lines.
+   `contradicted`, citing concrete evidence lines. The judge may request up
+   to three specific changed files once (bounded second retrieval round), and
+   verdicts that would fail a release (`no_evidence`, `contradicted`) are
+   confirmed by a 3-vote median. All verdicts land in an on-disk cache —
+   re-runs on unchanged data are free and bit-identical.
 
 The reverse (completeness) check flags commits whose changes no claim covers.
 Two refinements keep the check honest:
@@ -91,7 +95,14 @@ Options:
 --md / --json <f>   Write markdown / JSON reports
 --html <file>       Write a self-contained visual HTML report
 --fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
+--estimate          Print a cost/effort estimate instead of judging
+--no-cache          Bypass the on-disk verdict cache
 ```
+
+`--estimate` answers "how expensive will this be?" before the first real run:
+claims breakdown, planned LLM calls, input tokens, wall clock and API cost.
+A typical release (~45 claims, 90 files) needs 10–15 Haiku calls ≈ $0.07 via
+the API or 2–3 minutes via the claude CLI; cached re-runs take seconds.
 
 Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
 found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
@@ -129,6 +140,7 @@ claims are caught:
 $ pnpm install
 $ pnpm check   # tsc --noEmit
 $ pnpm test    # node:test unit tests
+$ pnpm eval    # judge eval against the golden set (needs an engine)
 ```
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.

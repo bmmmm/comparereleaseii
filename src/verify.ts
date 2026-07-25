@@ -4,9 +4,10 @@ import { anchorMatch, functionsOf, lexicalMatch, rankHunks, tokenize } from "./m
 import {
   buildJudgePrompt,
   buildSurplusPrompt,
-  parseJudgeOutput,
+  parseJudgeResponse,
   parseSurplusOutput,
   type JudgeEngine,
+  type JudgeVerdict,
 } from "./judge.ts";
 import type {
   Claim,
@@ -82,6 +83,22 @@ interface Pending {
   commits: Commit[];
   generated: boolean;
   fallback: { verdict: ClaimResult["verdict"]; confidence: number; reasoning: string };
+}
+
+const SEVERITY: Record<JudgeVerdict["verdict"], number> = {
+  verified: 0,
+  partial: 1,
+  skipped: 1,
+  "no-evidence": 2,
+  contradicted: 3,
+};
+
+/** Median by severity — one outlier vote cannot flip a release verdict. */
+export function medianVerdict(votes: JudgeVerdict[]): JudgeVerdict {
+  const sorted = [...votes].sort(
+    (a, b) => SEVERITY[a.verdict] - SEVERITY[b.verdict],
+  );
+  return sorted[Math.floor((sorted.length - 1) / 2)];
 }
 
 function capHunks(
@@ -243,19 +260,61 @@ export async function verifyClaims(
           .slice(0, opts.maxHunks)
           .map((f) => ({ path: f.path, hunk: f.patch!, score: 0 }));
       }
+      const promptFor = (
+        hunks: Array<{ path: string; hunk: string }>,
+        allowNeed: boolean,
+        suffix = "",
+      ): string =>
+        buildJudgePrompt({
+          repoLabel: data.repoLabel,
+          baseRef: data.baseRef,
+          headRef: data.headRef,
+          section: p.claim.section,
+          claimText: p.claim.text,
+          hunks,
+          commits: p.commits,
+          allPaths: data.files.map((f) => f.path),
+          allowNeed,
+        }) + suffix;
       const hunks = capHunks(ranked, opts.maxEvidenceChars);
-      const prompt = buildJudgePrompt({
-        repoLabel: data.repoLabel,
-        baseRef: data.baseRef,
-        headRef: data.headRef,
-        section: p.claim.section,
-        claimText: p.claim.text,
-        hunks,
-        commits: p.commits,
-        allPaths: data.files.map((f) => f.path),
-      });
       try {
-        const verdict = parseJudgeOutput(await engine.judge(prompt));
+        let finalHunks = hunks;
+        let response = parseJudgeResponse(await engine.judge(promptFor(hunks, true)));
+        if ("need" in response) {
+          // Bounded second retrieval round: hand over exactly the requested
+          // full file diffs, then demand a verdict.
+          const wanted = data.files.filter(
+            (f) => f.patch && (response as { need: string[] }).need.includes(f.path),
+          );
+          finalHunks = capHunks(
+            [
+              ...wanted.map((f) => ({ path: f.path, hunk: f.patch! })),
+              ...hunks,
+            ],
+            opts.maxEvidenceChars,
+          );
+          response = parseJudgeResponse(await engine.judge(promptFor(finalHunks, false)));
+          if ("need" in response) throw new Error("judge kept requesting files");
+        }
+        let verdict = response;
+        if (verdict.verdict === "no-evidence" || verdict.verdict === "contradicted") {
+          // Score-relevant verdicts get two more independent passes; the
+          // median wins, so a single outlier cannot fail a release.
+          const votes = [verdict];
+          for (const pass of [2, 3]) {
+            try {
+              const vote = parseJudgeResponse(
+                await engine.judge(
+                  promptFor(finalHunks, false, `\n(Independent verification pass ${pass} — judge from scratch.)`),
+                ),
+              );
+              if (!("need" in vote)) votes.push(vote);
+            } catch {
+              // a failed vote simply doesn't count
+            }
+          }
+          verdict = medianVerdict(votes);
+        }
         results.set(p.claim.id, {
           claim: p.claim,
           verdict: verdict.verdict,

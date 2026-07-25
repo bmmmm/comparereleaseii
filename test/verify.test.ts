@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isGeneratedEntry, isVagueClaim } from "../src/verify.ts";
+import { isGeneratedEntry, isVagueClaim, medianVerdict } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
-import { parseSurplusOutput } from "../src/judge.ts";
+import { parseSurplusOutput, parseJudgeResponse, type JudgeVerdict } from "../src/judge.ts";
+import { withVerdictCache } from "../src/cache.ts";
 import type { Claim, Commit } from "../src/types.ts";
 
 function claim(text: string, prNumbers: number[] = []): Claim {
@@ -67,6 +68,42 @@ test("hunkFunctions extracts declaration context from hunk headers", () => {
   assert.ok(fns.includes("handleClick"));
   assert.ok(fns.includes("ServeHTTP"), `Go method receiver: got ${fns.join(",")}`);
   assert.ok(!fns.includes("func"));
+});
+
+function vote(verdict: JudgeVerdict["verdict"]): JudgeVerdict {
+  return { verdict, confidence: 0.9, files: [], reasoning: verdict };
+}
+
+test("medianVerdict: one outlier cannot flip the result", () => {
+  assert.equal(medianVerdict([vote("no-evidence"), vote("verified"), vote("verified")]).verdict, "verified");
+  assert.equal(medianVerdict([vote("contradicted"), vote("contradicted"), vote("partial")]).verdict, "contradicted");
+  assert.equal(medianVerdict([vote("no-evidence")]).verdict, "no-evidence");
+  // Two votes: the milder one wins (flagging needs a majority).
+  assert.equal(medianVerdict([vote("contradicted"), vote("verified")]).verdict, "verified");
+});
+
+test("parseJudgeResponse: need-protocol and verdicts", () => {
+  const need = parseJudgeResponse('{"need":["src/a.rs","src/b.rs"]}');
+  assert.ok("need" in need);
+  assert.deepEqual((need as { need: string[] }).need, ["src/a.rs", "src/b.rs"]);
+  const verdict = parseJudgeResponse('{"verdict":"verified","confidence":0.8,"files":[],"reasoning":"x"}');
+  assert.ok(!("need" in verdict));
+});
+
+test("withVerdictCache: second call with the same prompt hits the disk", async () => {
+  let calls = 0;
+  const engine = withVerdictCache({
+    name: "test-stub",
+    judge: async () => {
+      calls++;
+      return `response-${calls}`;
+    },
+  });
+  const prompt = `cache-test-${process.pid}-${process.hrtime.bigint()}`;
+  const first = await engine.judge(prompt);
+  const second = await engine.judge(prompt);
+  assert.equal(first, second);
+  assert.equal(calls, 1);
 });
 
 test("parseSurplusOutput validates and caps items", () => {

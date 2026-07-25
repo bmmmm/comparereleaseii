@@ -15,6 +15,7 @@
     "preinstall": "node -e \"if(!/pnpm/.test(process.env.npm_config_user_agent||''))throw new Error('Use pnpm — npm/yarn are blocked in this repo')\"",
     "check": "tsc --noEmit",
     "test": "node --test 'test/*.test.ts'",
+    "eval": "node scripts/eval.ts",
     "start": "node src/cli.ts"
   },
   "devDependencies": {

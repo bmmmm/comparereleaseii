@@ -133,6 +133,40 @@ export async function localRepoContext(repo: string, head: string): Promise<Repo
   }
 }
 
+/** Commits, diff and per-commit patches for a ref range of a local checkout. */
+export async function loadLocalRange(
+  repo: string,
+  base: string,
+  head: string,
+): Promise<Pick<ReleaseData, "commits" | "files" | "commitFiles">> {
+  const [commits, diff] = await Promise.all([
+    loadCommits(repo, base, head),
+    git(repo, ["diff", "--patch", "--no-color", `${base}...${head}`]),
+  ]);
+  const commitCache = new Map<string, Promise<DiffFile[]>>();
+  const commitFiles = (sha: string): Promise<DiffFile[]> => {
+    let p = commitCache.get(sha);
+    if (!p) {
+      p = git(repo, ["show", "--patch", "--no-color", "--format=", sha]).then(
+        parseUnifiedDiff,
+      );
+      commitCache.set(sha, p);
+    }
+    return p;
+  };
+  return { commits, files: parseUnifiedDiff(diff), commitFiles };
+}
+
+/** Clone (or update) a partial mirror for API-truncation fallback. */
+export async function ensureClone(url: string, dir: string): Promise<void> {
+  try {
+    await git(dir, ["rev-parse", "--git-dir"]);
+    await git(dir, ["fetch", "--tags", "--force", "--quiet"]);
+  } catch {
+    await run("git", ["clone", "--quiet", "--filter=blob:none", url, dir]);
+  }
+}
+
 export async function loadLocalRelease(opts: {
   repo: string;
   head?: string;
@@ -169,31 +203,13 @@ export async function loadLocalRelease(opts: {
     notes = section;
   }
 
-  const [commits, diff] = await Promise.all([
-    loadCommits(opts.repo, base, head),
-    git(opts.repo, ["diff", "--patch", "--no-color", `${base}...${head}`]),
-  ]);
-
-  const commitCache = new Map<string, Promise<DiffFile[]>>();
-  const commitFiles = (sha: string): Promise<DiffFile[]> => {
-    let p = commitCache.get(sha);
-    if (!p) {
-      p = git(opts.repo, ["show", "--patch", "--no-color", "--format=", sha]).then(
-        parseUnifiedDiff,
-      );
-      commitCache.set(sha, p);
-    }
-    return p;
-  };
-
+  const range = await loadLocalRange(opts.repo, base, head);
   return {
     repoLabel: basename(opts.repo),
     baseRef: base,
     headRef: head,
     notes,
-    commits,
-    files: parseUnifiedDiff(diff),
-    commitFiles,
+    ...range,
     warnings,
   };
 }

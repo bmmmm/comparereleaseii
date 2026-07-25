@@ -366,5 +366,17 @@ export function computeMetrics(opts: {
   const order = { critical: 0, warn: 1, info: 2 };
   flags.sort((a, b) => order[a.severity] - order[b.severity]);
   const scores = computeScores(results, churnCoveredRatio, flags);
-  return { scores, flags, files, churnCoveredRatio, context };
+
+  let baseline: Metrics["baseline"] = null;
+  if (opts.baseline?.snapshots.length) {
+    const coverages = opts.baseline.snapshots
+      .map((s) => s.anchoredCoverage)
+      .sort((a, b) => a - b);
+    baseline = {
+      releases: opts.baseline.snapshots.length,
+      medianChurn: opts.baseline.medianChurn,
+      medianAnchoredCoverage: coverages[Math.floor(coverages.length / 2)],
+    };
+  }
+  return { scores, flags, files, churnCoveredRatio, context, baseline };
 }

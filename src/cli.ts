@@ -2,10 +2,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
-import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
+import {
+  loadLocalRelease,
+  loadLocalRange,
+  ensureClone,
+  localRepoContext,
+} from "./sources/local.ts";
 import { parseClaims } from "./claims.ts";
-import { selectEngine } from "./judge.ts";
+import { selectEngine, type JudgeEngine } from "./judge.ts";
+import { withVerdictCache } from "./cache.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { computeMetrics } from "./metrics.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
@@ -38,6 +46,8 @@ Options:
   --baseline <n>      Compare against the n previous releases for anomaly
                       detection (default: 5, GitHub source only; 0 disables)
   --history <n>       Print a release-history timeline instead of a check
+  --estimate          Print a cost/effort estimate instead of judging
+  --no-cache          Bypass the on-disk verdict cache
   -h, --help          Show this help
 
 Examples:
@@ -65,6 +75,8 @@ async function main(): Promise<number> {
       "no-reverse": { type: "boolean", default: false },
       baseline: { type: "string", default: "5" },
       history: { type: "string" },
+      estimate: { type: "boolean", default: false },
+      "no-cache": { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -120,6 +132,29 @@ async function main(): Promise<number> {
     data.notes = await readFile(values["notes-file"], "utf8");
   }
 
+  if (!values.local) {
+    const truncated = data.warnings.some((w) => w.includes("full coverage"));
+    if (truncated) {
+      console.error("Compare API truncated the diff — falling back to a partial clone…");
+      try {
+        const dir = join(tmpdir(), "comparereleaseii-cache", "clones", positionals[0].replace("/", "_"));
+        await ensureClone(`https://github.com/${positionals[0]}.git`, dir);
+        const range = await loadLocalRange(dir, data.baseRef, data.headRef);
+        data = {
+          ...data,
+          ...range,
+          warnings: data.warnings
+            .filter((w) => !w.includes("full coverage"))
+            .concat("Diff loaded from a local partial clone (compare API truncated)."),
+        };
+      } catch (err) {
+        data.warnings.push(
+          `Partial-clone fallback failed: ${(err as Error).message.slice(0, 120)}`,
+        );
+      }
+    }
+  }
+
   const claims = parseClaims(data.notes);
   if (!claims.length) {
     throw new Error("No claims found in the release notes — nothing to check.");
@@ -128,7 +163,41 @@ async function main(): Promise<number> {
     `${claims.length} claims parsed from the notes of ${data.headRef}; verifying against ${data.commits.length} commits…`,
   );
 
-  const engine = judgeMode === "off" ? null : selectEngine({ engine: engineName, model: values.model });
+  if (values.estimate) {
+    const est = { calls: 0, chars: 0 };
+    const stub: JudgeEngine = {
+      name: "estimate",
+      judge: async (p: string) => {
+        est.calls++;
+        est.chars += p.length;
+        return '{"verdict":"partial","confidence":0.5,"files":[],"reasoning":"(estimate)"}';
+      },
+    };
+    const results = await verifyClaims(data, claims, {
+      judgeMode: judgeMode === "off" ? "auto" : judgeMode,
+      engine: stub,
+      concurrency: 8,
+      maxHunks: 6,
+      maxEvidenceChars: 20000,
+    });
+    const change = results.filter((r) => r.claim.kind === "change");
+    const generated = results.filter((r) => r.generated).length;
+    const inTokens = Math.round(est.chars / 4);
+    const reserve = Math.ceil(est.calls * 0.5);
+    const timeMin = ((est.calls + reserve / 2) * 10) / Number(values.concurrency) / 60;
+    const apiCost = (inTokens / 1e6) * 1.0 + ((est.calls * 300) / 1e6) * 5.0;
+    console.log(`\nCost estimate — ${data.repoLabel} ${data.baseRef} → ${data.headRef}`);
+    console.log(`  Diff: ${data.commits.length} commits, ${data.files.length} files, ±${data.files.reduce((s, f) => s + f.additions + f.deletions, 0)} lines`);
+    console.log(`  Claims: ${results.length} total — ${change.length} checkable (${generated} generated), ${results.length - change.length} informational`);
+    console.log(`  LLM judge calls (auto): ${est.calls}, plus up to ${reserve} for retrieval rounds / second opinions`);
+    console.log(`  Est. input ~${(inTokens / 1000).toFixed(0)}k tokens · wall clock ~${timeMin < 1 ? "<1" : timeMin.toFixed(0)} min via claude-cli · API cost ≈ $${apiCost.toFixed(2)} (haiku)`);
+    console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * Number(values.baseline)} (compare, per-commit diffs, baseline)`);
+    console.log(`  Verdict cache: repeated runs on unchanged data are free and deterministic.`);
+    return 0;
+  }
+
+  let engine = judgeMode === "off" ? null : selectEngine({ engine: engineName, model: values.model });
+  if (engine && !values["no-cache"]) engine = withVerdictCache(engine);
   const baselineCount = Number(values.baseline);
   const baselinePromise =
     !values.local && baselineCount > 0

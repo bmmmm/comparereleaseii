@@ -138,6 +138,12 @@ export interface Metrics {
   files: FileInsight[];
   churnCoveredRatio: number | null;
   context: RepoContext;
+  /** Medians of the repo's own recent releases, for calibration. */
+  baseline: {
+    releases: number;
+    medianChurn: number;
+    medianAnchoredCoverage: number;
+  } | null;
 }
 
 export interface Report {

@@ -1,0 +1,106 @@
+[
+  {
+    "name": "toctou-atomic-update",
+    "section": "Security Fixes",
+    "claim": "Send Access-Count Bypass (Medium, 5.3)",
+    "hunks": [
+      {
+        "path": "src/db/models/send.rs",
+        "hunk": "@@ -210,8 +210,14 @@ impl Send {\n-    pub async fn increment_access(&mut self, conn: &DbConn) -> EmptyResult {\n-        self.access_count += 1;\n-        self.save(conn).await\n+    pub async fn register_access(uuid: &str, conn: &DbConn) -> Result<bool, Error> {\n+        // The check and the increment are a single statement, otherwise\n+        // concurrent accesses can both pass the check and exceed the limit.\n+        let updated = diesel::update(sends::table.filter(sends::uuid.eq(uuid))\n+            .filter(sends::max_access_count.is_null()\n+                .or(sends::access_count.lt(sends::max_access_count))))\n+            .set(sends::access_count.eq(sends::access_count + 1))\n+            .execute(conn).await?;\n+        Ok(updated == 1)\n     }"
+      }
+    ],
+    "expected": ["verified"]
+  },
+  {
+    "name": "authz-check-tightened",
+    "section": "Security Fixes",
+    "claim": "Cross-Organization Cipher Access (Medium, 5.9)",
+    "hunks": [
+      {
+        "path": "src/api/core/ciphers.rs",
+        "hunk": "@@ -480,7 +480,9 @@ async fn move_cipher_to_org(data: MoveData, headers: Headers, conn: DbConn) -> EmptyResult {\n-    if shared_to_collections.is_some() {\n+    // An empty collection list would skip the write-access validation below,\n+    // allowing a cipher to be moved into a foreign organization.\n+    if shared_to_collections.as_ref().is_some_and(|cols| !cols.is_empty()) {\n         validate_collection_write_access(&headers.user, &cols, &conn).await?;\n     }"
+      }
+    ],
+    "expected": ["verified"]
+  },
+  {
+    "name": "refactor-only-vs-security-claim",
+    "section": "Security Fixes",
+    "claim": "SSRF via the icon endpoint (Medium, 5.8)",
+    "hunks": [
+      {
+        "path": "src/api/icons.rs",
+        "hunk": "@@ -55,9 +55,7 @@ fn parse_icon_url(domain: &str) -> Result<Url, Error> {\n-    let url = match Url::parse(&format!(\"https://{}\", domain)) {\n-        Ok(u) => u,\n-        Err(e) => return Err(e.into()),\n-    };\n+    let url = Url::parse(&format!(\"https://{}\", domain))?;\n     let host = url.host_str().map(str::to_owned);"
+      }
+    ],
+    "expected": ["no-evidence", "partial"]
+  },
+  {
+    "name": "endpoint-still-present-vs-removal-claim",
+    "section": "What's Changed",
+    "claim": "The icon endpoint was removed entirely in this release",
+    "hunks": [
+      {
+        "path": "src/api/icons.rs",
+        "hunk": "@@ -20,8 +20,8 @@ pub fn routes() -> Vec<Route> {\n-    match CONFIG.icon_service() {\n-        IconService::Internal => routes![icon_internal],\n-        _ => routes![icon_external],\n-    }\n+    if CONFIG.icon_service() == IconService::Internal {\n+        routes![icon_internal]\n+    } else {\n+        routes![icon_external]\n+    }\n }"
+      }
+    ],
+    "expected": ["contradicted"]
+  },
+  {
+    "name": "fabricated-feature-vs-unrelated-migration",
+    "section": "What's Changed",
+    "claim": "Add native PostgreSQL 18 support with automatic migration",
+    "hunks": [
+      {
+        "path": "migrations/postgresql/2026-05-05-120000_sso_auth_error/up.sql",
+        "hunk": "@@ -0,0 +1,2 @@\n+ALTER TABLE sso_auth\n+ADD COLUMN code_response_error TEXT;"
+      },
+      {
+        "path": "Cargo.toml",
+        "hunk": "@@ -40,2 +40,2 @@ [dependencies]\n-tokio = \"1.52.1\"\n+tokio = \"1.52.3\""
+      }
+    ],
+    "expected": ["no-evidence"]
+  },
+  {
+    "name": "rate-limit-config-vs-flood-claim",
+    "section": "Security Fixes",
+    "claim": "Unauthenticated WebSocket Flooding DDOS (Medium, 5.3)",
+    "hunks": [
+      {
+        "path": ".env.template",
+        "hunk": "@@ -120,0 +121,4 @@\n+## Rate limiting for unauthenticated endpoints\n+# UNAUTHENTICATED_RATELIMIT_SECONDS=60\n+# UNAUTHENTICATED_RATELIMIT_MAX_BURST=15"
+      },
+      {
+        "path": "src/api/core/sends.rs",
+        "hunk": "@@ -310,6 +310,8 @@ async fn post_access(access_id: &str, conn: DbConn, ip: ClientIp) -> JsonResult {\n+    crate::ratelimit::check_limit_unauthenticated(&ip)?;\n+\n     let Some(send) = Send::find_by_access_id(access_id, &conn).await else {"
+      }
+    ],
+    "expected": ["verified", "partial"]
+  },
+  {
+    "name": "skip-invalid-paths",
+    "section": "Details",
+    "claim": "Skip inaccessible backup source paths: a path that could not be accessed was kept and produced an empty snapshot. Restic now skips any such path and aborts if none remain.",
+    "hunks": [
+      {
+        "path": "cmd/restic/cmd_backup.go",
+        "hunk": "@@ -404,12 +404,16 @@ func collectTargets(opts BackupOptions, args []string) (targets []string, err error) {\n-        if _, err := fs.Lstat(target); errors.Is(err, os.ErrNotExist) {\n-            continue\n+        if _, err := fs.Lstat(target); err != nil {\n+            Warnf(\"skipping %v: %v\\n\", target, err)\n+            continue\n         }\n         targets = append(targets, target)\n     }\n+    if len(targets) == 0 {\n+        return nil, errors.New(\"all source paths are inaccessible\")\n+    }\n     return targets, nil"
+      }
+    ],
+    "expected": ["verified"]
+  },
+  {
+    "name": "version-bump-vs-feature-claim",
+    "section": "What's Changed",
+    "claim": "Added a brand new S3-compatible storage backend",
+    "hunks": [
+      {
+        "path": "Cargo.toml",
+        "hunk": "@@ -33,1 +33,1 @@ [dependencies]\n-serde = \"1.0.219\"\n+serde = \"1.0.221\""
+      }
+    ],
+    "expected": ["no-evidence"]
+  }
+]

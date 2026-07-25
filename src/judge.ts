@@ -87,7 +87,9 @@ const VERDICTS: Record<string, Verdict> = {
   contradicted: "contradicted",
 };
 
-export function parseJudgeOutput(raw: string): JudgeVerdict {
+export type JudgeResponse = JudgeVerdict | { need: string[] };
+
+export function parseJudgeResponse(raw: string): JudgeResponse {
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
   if (start === -1 || end <= start) {
@@ -98,7 +100,11 @@ export function parseJudgeOutput(raw: string): JudgeVerdict {
     confidence?: number;
     files?: string[];
     reasoning?: string;
+    need?: string[];
   };
+  if (Array.isArray(parsed.need) && parsed.need.length && !parsed.verdict) {
+    return { need: parsed.need.slice(0, 3).map(String) };
+  }
   const verdict = VERDICTS[parsed.verdict ?? ""];
   if (!verdict) {
     throw new Error(`Judge returned unknown verdict "${parsed.verdict}"`);
@@ -120,9 +126,14 @@ export function buildJudgePrompt(opts: {
   hunks: Array<{ path: string; hunk: string }>;
   commits: Array<{ sha: string; subject: string; author: string }>;
   allPaths?: string[];
+  /** Offer the one-shot "need more files" escape hatch (first round only). */
+  allowNeed?: boolean;
 }): string {
   const pathBlock = opts.allPaths
     ? `\nAll files changed in this release (for orientation; their diffs may not be shown):\n${opts.allPaths.slice(0, 200).join("\n")}\n`
+    : "";
+  const needBlock = opts.allowNeed
+    ? `\nIf the shown evidence is insufficient to judge, but specific changed files from the list above would settle it, respond INSTEAD with exactly:\n{"need":["path1","path2"]}\n(max 3 paths, only from the changed-files list — you will then receive their full diffs)\n`
     : "";
   const hunkBlock = opts.hunks
     .map((h) => `--- ${h.path}\n${h.hunk}`)
@@ -150,7 +161,7 @@ Rules:
 - partial: related changes are present but incomplete, or only part of the claim is supported.
 - no_evidence: nothing in the evidence supports the claim.
 - contradicted: the evidence shows the opposite of the claim.
-
+${needBlock}
 Respond with ONLY this JSON object, no markdown fences, no extra prose:
 {"verdict":"verified|partial|no_evidence|contradicted","confidence":0.0,"files":["path"],"reasoning":"1-2 sentences citing concrete evidence lines"}`;
 }

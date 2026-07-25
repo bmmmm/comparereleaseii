@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { createHash } from "node:crypto";
 import { countVerdicts } from "./report.ts";
 import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
+
+/** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
+function diffAnchor(path: string): string {
+  return "diff-" + createHash("sha256").update(path).digest("hex");
+}
 
 function esc(s: string): string {
   return s
@@ -102,7 +108,7 @@ export function layoutTreemap(
   return out;
 }
 
-function treemapSvg(files: FileInsight[]): string {
+function treemapSvg(files: FileInsight[], compareUrl?: string): string {
   const MAX_TILES = 130;
   const sorted = [...files].sort((a, b) => b.churn - a.churn);
   const top = sorted.slice(0, MAX_TILES);
@@ -133,8 +139,13 @@ function treemapSvg(files: FileInsight[]): string {
     const title =
       `${f.path}\n±${f.churn} lines · ${f.coverage}` +
       `${f.sensitive ? ` · sensitive: ${f.sensitive}` : ""}` +
-      `${f.functions?.length ? `\nfns: ${f.functions.join(", ")}` : ""}`;
-    return `<g><rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" fill="${fill}" fill-opacity="0.82" stroke="${stroke}" stroke-width="${strokeW}"><title>${esc(title)}</title></rect>${label}</g>`;
+      `${f.functions?.length ? `\nfns: ${f.functions.join(", ")}` : ""}` +
+      (compareUrl ? "\n(click to open the diff on GitHub)" : "");
+    const tile = `<g><rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" fill="${fill}" fill-opacity="0.82" stroke="${stroke}" stroke-width="${strokeW}"><title>${esc(title)}</title></rect>${label}</g>`;
+    const linkable = compareUrl && !f.path.startsWith("(");
+    return linkable
+      ? `<a href="${compareUrl}#${diffAnchor(f.path)}" target="_blank" rel="noopener">${tile}</a>`
+      : tile;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Diff treemap">${parts.join("")}</svg>`;
 }
@@ -212,9 +223,18 @@ function claimsHtml(report: Report, linkBase?: string): string {
             r.evidence.functions?.length
               ? `<div class="files">fns: ${esc(r.evidence.functions.slice(0, 8).join(", "))}</div>`
               : ""
+          }${
+            r.surplus?.some((s) => s.notable)
+              ? `<div class="surplus">hides: ${esc(
+                  r.surplus
+                    .filter((s) => s.notable)
+                    .map((s) => `${s.description}${s.file ? ` (${s.file})` : ""}`)
+                    .join(" · "),
+                )}</div>`
+              : ""
           }${commits ? `<div class="files">commits: ${commits}</div>` : ""}</div>`;
     out.push(
-      `<details${r.verdict === "contradicted" || r.verdict === "no-evidence" ? " open" : ""}><summary><span class="chip" style="background:${color}">${r.verdict}</span> ${esc(r.claim.text)} <span class="conf">${r.verdict === "skipped" ? "" : r.confidence.toFixed(2)}</span></summary>${body}</details>`,
+      `<details data-v="${r.verdict}"${r.verdict === "contradicted" || r.verdict === "no-evidence" ? " open" : ""}><summary><span class="chip" style="background:${color}">${r.verdict}</span>${r.generated ? `<span class="gen">gen</span>` : ""} ${esc(r.claim.text)} <span class="conf">${r.verdict === "skipped" ? "" : r.confidence.toFixed(2)}</span></summary>${body}</details>`,
     );
   }
   if (section) out.push("</div>");
@@ -238,6 +258,9 @@ export function toHtml(report: Report): string {
         .map(([lang, bytes]) => `${lang} ${((bytes / (ctx.codeBytes || 1)) * 100).toFixed(0)}%`)
         .join(" · ")
     : "n/a";
+  const compareUrl = report.linkBase
+    ? `${report.linkBase}/compare/${report.baseRef}...${report.headRef}`
+    : undefined;
   const uncoveredRows = report.uncovered
     .map(
       (u) =>
@@ -273,7 +296,15 @@ svg{width:100%;height:auto;border-radius:8px}
 details{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:6px 10px;margin:5px 0}
 summary{cursor:pointer}
 .chip{color:#0d1117;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px}
+.gen{color:#8b949e;border:1px solid #30363d;font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
 .conf{color:#8b949e;font-size:12px}
+.surplus{color:#d29922;font-size:12px;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.toolbar button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:#30363d}
+.toolbar button.active{background:#1f6feb;border-color:#1f6feb}
+body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
+body[data-filter="handwritten"] details:has(.gen){display:none}
 .detail{margin:8px 0 4px 4px;color:#c9d1d9}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #21262d;padding:5px 8px;text-align:left;font-size:13px}th{color:#8b949e}
 .ok{color:#3fb950}
@@ -292,6 +323,10 @@ footer{margin-top:32px;color:#484f58;font-size:12px}
   </div>
   <div class="ctx">repo: ${esc(langs)}${ctx.codeBytes ? ` · ${fmtBytes(ctx.codeBytes)} code` : ""}${
     ctx.releaseCadenceDays ? `<br>release cadence ~${ctx.releaseCadenceDays} d` : ""
+  }${
+    m.baseline
+      ? `<br>baseline (${m.baseline.releases} rel.): median churn ±${m.baseline.medianChurn} · coverage ${Math.round(m.baseline.medianAnchoredCoverage * 100)}%`
+      : ""
   }</div>
 </div>
 
@@ -301,8 +336,8 @@ ${verdictBar(report)}
 <h2>Risk flags</h2>
 ${flagsHtml(m.flags, report.linkBase)}
 
-<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path</span></h2>
-${treemapSvg(m.files)}
+<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path${compareUrl ? ", click opens the diff" : ""}</span></h2>
+${treemapSvg(m.files, compareUrl)}
 <div class="legend">
   <span class="lg"><span class="dot" style="background:${COVERAGE_COLOR.evidence}"></span>cited as evidence</span>
   <span class="lg"><span class="dot" style="background:${COVERAGE_COLOR.covered}"></span>in documented commit</span>
@@ -312,6 +347,13 @@ ${treemapSvg(m.files)}
 </div>
 
 <h2>Claims in detail</h2>
+<div class="toolbar">
+  <button data-filter="all" class="active">All claims</button>
+  <button data-filter="issues">Issues only</button>
+  <button data-filter="handwritten">Handwritten only</button>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+</div>
 ${claimsHtml(report, report.linkBase)}
 
 <h2>Undocumented commits</h2>
@@ -325,5 +367,19 @@ ${
 
 ${report.warnings.length ? `<h2>Warnings</h2>${report.warnings.map((w) => `<div class="flag" style="border-left-color:#d29922">${esc(w)}</div>`).join("")}` : ""}
 <footer>generated by comparereleaseii</footer>
+<script>
+for (const b of document.querySelectorAll(".toolbar button[data-filter]")) {
+  b.addEventListener("click", () => {
+    document.body.dataset.filter = b.dataset.filter;
+    for (const o of document.querySelectorAll(".toolbar button[data-filter]")) o.classList.toggle("active", o === b);
+  });
+}
+document.getElementById("expand").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = true;
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = false;
+});
+</script>
 </body></html>`;
 }

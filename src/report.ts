@@ -99,6 +99,14 @@ export function printTerminal(report: Report): void {
         `correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
       ),
   );
+  const b = report.metrics.baseline;
+  if (b) {
+    console.log(
+      c.dim(
+        `Baseline (${b.releases} releases): median churn ±${b.medianChurn} · median note coverage ${Math.round(b.medianAnchoredCoverage * 100)}%`,
+      ),
+    );
+  }
   const ctx = report.metrics.context;
   if (ctx.languages) {
     const langs = Object.entries(ctx.languages)
