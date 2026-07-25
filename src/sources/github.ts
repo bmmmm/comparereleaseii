@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { run, pooled } from "../util.ts";
-import type { Commit, DiffFile, ReleaseData } from "../types.ts";
+import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
 async function ghJson<T>(path: string): Promise<T> {
   const { stdout } = await run("gh", ["api", path]);
@@ -137,4 +137,26 @@ export async function prefetchCommitFiles(
   concurrency = 6,
 ): Promise<void> {
   await pooled(data.commits, concurrency, (c) => data.commitFiles(c.sha));
+}
+
+/** Repo calibration data — best effort, never fails the run. */
+export async function fetchGithubContext(repo: string): Promise<RepoContext> {
+  try {
+    const [languages, releases] = await Promise.all([
+      ghJson<Record<string, number>>(`repos/${repo}/languages`),
+      ghJson<Array<{ published_at: string | null }>>(`repos/${repo}/releases?per_page=20`),
+    ]);
+    const codeBytes = Object.values(languages).reduce((s, b) => s + b, 0);
+    const dates = releases
+      .map((r) => (r.published_at ? Date.parse(r.published_at) : NaN))
+      .filter((d) => !Number.isNaN(d))
+      .sort((a, b) => b - a);
+    const releaseCadenceDays =
+      dates.length >= 2
+        ? Math.round((dates[0] - dates[dates.length - 1]) / (dates.length - 1) / 86_400_000)
+        : null;
+    return { languages, codeBytes, releaseCadenceDays };
+  } catch {
+    return { languages: null, codeBytes: null, releaseCadenceDays: null };
+  }
 }

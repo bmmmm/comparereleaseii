@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
-import { loadGithubRelease } from "./sources/github.ts";
-import { loadLocalRelease } from "./sources/local.ts";
+import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
+import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { parseClaims } from "./claims.ts";
 import { selectEngine } from "./judge.ts";
-import { verifyClaims, reverseCheck } from "./verify.ts";
+import { verifyClaims, computeCoverage } from "./verify.ts";
+import { computeMetrics } from "./metrics.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
+import { toHtml } from "./html.ts";
 import type { Report } from "./types.ts";
 
 const USAGE = `comparerelease — fact-check release notes against the actual code diff
@@ -28,6 +30,7 @@ Options:
   --model <model>     Judge model (default: haiku)
   --md <file>         Write a markdown report
   --json <file>       Write the full JSON report
+  --html <file>       Write a self-contained visual HTML report
   --concurrency <n>   Parallel judge calls (default: 4)
   --fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
   --no-reverse        Skip the completeness check (undocumented commits)
@@ -52,6 +55,7 @@ async function main(): Promise<number> {
       model: { type: "string" },
       md: { type: "string" },
       json: { type: "string" },
+      html: { type: "string" },
       concurrency: { type: "string", default: "4" },
       "fail-on": { type: "string", default: "no-evidence" },
       "no-reverse": { type: "boolean", default: false },
@@ -78,18 +82,22 @@ async function main(): Promise<number> {
   }
 
   console.error(`Loading release data${values.local ? ` from ${values.local}` : ` for ${positionals[0]}`}…`);
-  const data = values.local
-    ? await loadLocalRelease({
-        repo: values.local,
-        head: values.head,
-        base: values.base,
-        notesFile: values["notes-file"],
-      })
-    : await loadGithubRelease({
-        repo: positionals[0],
-        tag: values.tag,
-        base: values.base,
-      });
+  let data;
+  let context;
+  if (values.local) {
+    data = await loadLocalRelease({
+      repo: values.local,
+      head: values.head,
+      base: values.base,
+      notesFile: values["notes-file"],
+    });
+    context = await localRepoContext(values.local, data.headRef);
+  } else {
+    [data, context] = await Promise.all([
+      loadGithubRelease({ repo: positionals[0], tag: values.tag, base: values.base }),
+      fetchGithubContext(positionals[0]),
+    ]);
+  }
 
   if (values["notes-file"] && !values.local) {
     data.notes = await readFile(values["notes-file"], "utf8");
@@ -112,7 +120,8 @@ async function main(): Promise<number> {
     maxEvidenceChars: 20000,
   });
 
-  const uncovered = values["no-reverse"] ? [] : await reverseCheck(data, claims, results);
+  const coverage = values["no-reverse"] ? null : await computeCoverage(data, claims, results);
+  const metrics = computeMetrics({ data, results, coverage, context });
 
   const report: Report = {
     repoLabel: data.repoLabel,
@@ -125,10 +134,12 @@ async function main(): Promise<number> {
       deletions: data.files.reduce((s, f) => s + f.deletions, 0),
     },
     results,
-    uncovered,
+    uncovered: coverage?.uncovered ?? [],
     reverseChecked: !values["no-reverse"],
+    metrics,
     warnings: data.warnings,
     engine: engine ? engine.name : "off (deterministic only)",
+    linkBase: values.local ? undefined : `https://github.com/${positionals[0]}`,
   };
 
   printTerminal(report);
@@ -139,6 +150,10 @@ async function main(): Promise<number> {
   if (values.json) {
     await writeFile(values.json, JSON.stringify(report, null, 2));
     console.error(`JSON report written to ${values.json}`);
+  }
+  if (values.html) {
+    await writeFile(values.html, toHtml(report));
+    console.error(`HTML report written to ${values.html}`);
   }
   return exitCode(report, failOn);
 }

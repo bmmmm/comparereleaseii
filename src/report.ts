@@ -88,6 +88,38 @@ export function printTerminal(report: Report): void {
       ].join(", "),
   );
 
+  const s = report.metrics.scores;
+  const scoreColor = s.overall >= 85 ? c.green : s.overall >= 65 ? c.yellow : c.red;
+  console.log(
+    `${c.bold("Trust score:")} ${scoreColor(`${s.overall}/100 (${s.label})`)} — ` +
+      c.dim(
+        `correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
+      ),
+  );
+  const ctx = report.metrics.context;
+  if (ctx.languages) {
+    const langs = Object.entries(ctx.languages)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([l, b]) => `${l} ${((b / (ctx.codeBytes || 1)) * 100).toFixed(0)}%`)
+      .join(" · ");
+    console.log(
+      c.dim(
+        `Repo: ${langs} · ~${((ctx.codeBytes || 0) / 1_000_000).toFixed(1)} MB code` +
+          (ctx.releaseCadenceDays ? ` · release cadence ~${ctx.releaseCadenceDays} d` : ""),
+      ),
+    );
+  }
+  if (report.metrics.flags.length) {
+    console.log(c.bold("\nRisk flags:"));
+    for (const f of report.metrics.flags) {
+      const mark =
+        f.severity === "critical" ? c.red("‼") : f.severity === "warn" ? c.yellow("!") : c.cyan("i");
+      console.log(`  ${mark} ${f.message}`);
+      if (f.files.length) console.log(c.dim(`    ${f.files.slice(0, 4).join(", ")}`));
+    }
+  }
+
   if (!report.reverseChecked) {
     console.log(c.dim("\nCompleteness check skipped (--no-reverse)."));
   } else if (report.uncovered.length) {
@@ -113,11 +145,25 @@ export function printTerminal(report: Report): void {
 
 export function toMarkdown(report: Report): string {
   const counts = countVerdicts(report.results);
+  const s = report.metrics.scores;
   const lines: string[] = [
     `# Release-note fact check: ${report.repoLabel} ${report.baseRef} → ${report.headRef}`,
     "",
     `Judge engine: \`${report.engine}\` · ${report.stats.commits} commits, ${report.stats.files} files, +${report.stats.additions}/−${report.stats.deletions}`,
     "",
+    `**Trust score: ${s.overall}/100 (${s.label})** — correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
+    "",
+    ...(report.metrics.flags.length
+      ? [
+          "## Risk flags",
+          "",
+          ...report.metrics.flags.map(
+            (f) =>
+              `- **${f.severity}** ${f.message}${f.files.length ? ` (${f.files.slice(0, 4).join(", ")})` : ""}`,
+          ),
+          "",
+        ]
+      : []),
     "## Summary",
     "",
     "| Verdict | Count |",

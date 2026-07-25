@@ -74,6 +74,48 @@ export interface UncoveredCommit {
   fileCount: number;
 }
 
+export type FlagSeverity = "critical" | "warn" | "info";
+
+export interface RiskFlag {
+  severity: FlagSeverity;
+  kind: string;
+  message: string;
+  files: string[];
+  commitShas: string[];
+}
+
+export type FileCoverage = "evidence" | "covered" | "undocumented" | "unknown";
+
+export interface FileInsight {
+  path: string;
+  churn: number;
+  sensitive: string | null;
+  coverage: FileCoverage;
+}
+
+export interface RepoContext {
+  /** Bytes per language (GitHub languages API, or by-extension for local). */
+  languages: Record<string, number> | null;
+  codeBytes: number | null;
+  releaseCadenceDays: number | null;
+}
+
+export interface Scores {
+  correctness: number;
+  completeness: number | null;
+  risk: number;
+  overall: number;
+  label: string;
+}
+
+export interface Metrics {
+  scores: Scores;
+  flags: RiskFlag[];
+  files: FileInsight[];
+  churnCoveredRatio: number | null;
+  context: RepoContext;
+}
+
 export interface Report {
   repoLabel: string;
   baseRef: string;
@@ -82,6 +124,9 @@ export interface Report {
   results: ClaimResult[];
   uncovered: UncoveredCommit[];
   reverseChecked: boolean;
+  metrics: Metrics;
   warnings: string[];
   engine: string;
+  /** Web URL prefix for commit links, e.g. https://github.com/o/r — optional. */
+  linkBase?: string;
 }

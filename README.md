@@ -25,6 +25,19 @@ first, an LLM judge only for what remains unclear:
 
 The reverse (completeness) check flags commits whose changes no claim covers.
 
+On top of the per-claim verdicts, every run computes an explainable **trust
+score** (0–100) from three components:
+
+- **correctness** — share of change claims the diff supports
+- **completeness** — share of the churn (line-weighted) covered by the notes
+- **risk** — 100 minus penalties from risk flags: undocumented changes in
+  sensitive paths (auth/crypto, CI/build, dependency manifests), silently
+  added dependencies, binary/minified/opaque blobs, install-hook changes
+
+Contradicted claims or critical flags cap the overall score — a fake release
+cannot average itself back to green. Repo context (code size, language mix,
+release cadence) is shown for calibration.
+
 ## Requirements
 
 - Node.js ≥ 24 (runs TypeScript natively, no build step)
@@ -52,11 +65,18 @@ Options:
 --engine <engine>   claude-cli | api | off
 --model <model>     Judge model (default: haiku)
 --md / --json <f>   Write markdown / JSON reports
+--html <file>       Write a self-contained visual HTML report
 --fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
 ```
 
 Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
-found (CI gate) · `2` usage or data errors.
+found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
+lenient gate that tolerates unprovable claims (e.g. private advisories).
+
+The `--html` report is a single file with no external assets: trust-score
+ring, verdict bar, risk flags, and a treemap of the diff — tile size = changed
+lines, color = documentation status, amber border = sensitive path. An
+undocumented change in an auth path is one big red amber-bordered tile.
 
 ## Example
 

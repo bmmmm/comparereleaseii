@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { run } from "../util.ts";
 import { extractPrNumbers } from "./github.ts";
-import type { Commit, DiffFile, ReleaseData } from "../types.ts";
+import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
 function git(repo: string, args: string[]): Promise<string> {
   return run("git", ["-C", repo, ...args]).then((r) => r.stdout);
@@ -87,6 +87,50 @@ export function extractChangelogSection(changelog: string, tag: string): string 
     }
   }
   return lines.slice(start + 1, end).join("\n").trim();
+}
+
+const EXT_LANG: Record<string, string> = {
+  rs: "Rust", ts: "TypeScript", tsx: "TypeScript", js: "JavaScript", jsx: "JavaScript",
+  mjs: "JavaScript", py: "Python", go: "Go", rb: "Ruby", java: "Java", kt: "Kotlin",
+  c: "C", h: "C", cpp: "C++", cc: "C++", hpp: "C++", cs: "C#", php: "PHP",
+  swift: "Swift", sh: "Shell", bash: "Shell", sql: "SQL", html: "HTML", css: "CSS",
+  scss: "SCSS", vue: "Vue", svelte: "Svelte", hbs: "Handlebars", lua: "Lua", zig: "Zig",
+};
+
+/** Repo calibration data from the local checkout — best effort, never throws. */
+export async function localRepoContext(repo: string, head: string): Promise<RepoContext> {
+  try {
+    const tree = await git(repo, ["ls-tree", "-r", "-l", head]);
+    const languages: Record<string, number> = {};
+    let codeBytes = 0;
+    for (const line of tree.split("\n")) {
+      const m = line.match(/^\d+ blob \S+\s+(\d+)\t(.*)$/);
+      if (!m) continue;
+      const size = Number(m[1]);
+      const ext = m[2].split(".").pop() ?? "";
+      const lang = EXT_LANG[ext];
+      if (lang) {
+        languages[lang] = (languages[lang] ?? 0) + size;
+        codeBytes += size;
+      }
+    }
+    const tagDates = (
+      await git(repo, [
+        "for-each-ref", "--sort=-creatordate", "--count=20",
+        "--format=%(creatordate:unix)", "refs/tags",
+      ])
+    )
+      .split("\n")
+      .filter(Boolean)
+      .map(Number);
+    const releaseCadenceDays =
+      tagDates.length >= 2
+        ? Math.round((tagDates[0] - tagDates[tagDates.length - 1]) / (tagDates.length - 1) / 86_400)
+        : null;
+    return { languages, codeBytes, releaseCadenceDays };
+  } catch {
+    return { languages: null, codeBytes: null, releaseCadenceDays: null };
+  }
 }
 
 export async function loadLocalRelease(opts: {

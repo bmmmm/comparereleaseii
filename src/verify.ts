@@ -217,12 +217,19 @@ export async function verifyClaims(
   return claims.map((cl) => results.get(cl.id)!);
 }
 
+export interface Coverage {
+  uncovered: UncoveredCommit[];
+  coveredShas: Set<string>;
+  evidenceFiles: Set<string>;
+  commitFiles: Map<string, DiffFile[]>;
+}
+
 /** Completeness check: which commits are not covered by any release-note claim? */
-export async function reverseCheck(
+export async function computeCoverage(
   data: ReleaseData,
   claims: Claim[],
   results: ClaimResult[],
-): Promise<UncoveredCommit[]> {
+): Promise<Coverage> {
   const covered = new Set<string>();
   // Any anchor in any claim (incl. meta like "New Contributors") documents a commit.
   for (const claim of claims) {
@@ -242,17 +249,23 @@ export async function reverseCheck(
       .flatMap((r) => r.evidence.files),
   );
 
-  const uncovered: UncoveredCommit[] = [];
   const commitFileLists = await pooled(data.commits, 6, (c) =>
     data.commitFiles(c.sha).catch(() => [] as DiffFile[]),
   );
+  const commitFiles = new Map<string, DiffFile[]>();
+  data.commits.forEach((c, i) => commitFiles.set(c.sha, commitFileLists[i]));
+
+  const uncovered: UncoveredCommit[] = [];
   data.commits.forEach((commit, i) => {
     if (covered.has(commit.sha)) return;
     const files = commitFileLists[i];
     // A commit mostly touching files already cited as evidence counts as covered.
     if (files.length) {
       const hit = files.filter((f) => evidenceFiles.has(f.path)).length;
-      if (hit / files.length >= 0.5) return;
+      if (hit / files.length >= 0.5) {
+        covered.add(commit.sha);
+        return;
+      }
     }
     uncovered.push({
       commit,
@@ -261,7 +274,6 @@ export async function reverseCheck(
       fileCount: files.length,
     });
   });
-  return uncovered.sort(
-    (a, b) => b.additions + b.deletions - (a.additions + a.deletions),
-  );
+  uncovered.sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions));
+  return { uncovered, coveredShas: covered, evidenceFiles, commitFiles };
 }
