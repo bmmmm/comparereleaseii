@@ -130,6 +130,15 @@ function changedLines(patch: string): string {
     .join("\n");
 }
 
+/**
+ * Changelog files restate the claims we are checking — matching against them
+ * is circular ("the changelog proves the changelog") and must never count as
+ * code evidence.
+ */
+export function isChangelogPath(path: string): boolean {
+  return /(^|\/)changelogs?(\/|\.)|(^|\/)CHANGELOG/i.test(path);
+}
+
 export function lexicalMatch(claim: Claim, files: DiffFile[]): LexicalMatch {
   const identifiers = extractIdentifiers(claim);
   if (!identifiers.length) return { files: [], matchedTerms: [], score: 0 };
@@ -137,6 +146,7 @@ export function lexicalMatch(claim: Claim, files: DiffFile[]): LexicalMatch {
   const terms = new Set<string>();
   let score = 0;
   for (const file of files) {
+    if (isChangelogPath(file.path)) continue;
     const haystack = file.patch ? changedLines(file.patch) : "";
     for (const ident of identifiers) {
       const inPatch = haystack.includes(ident);
@@ -171,7 +181,7 @@ export function rankHunks(claim: Claim, files: DiffFile[], topK = 6): RankedHunk
   }
   const entries: HunkEntry[] = [];
   for (const file of files) {
-    if (!file.patch) continue;
+    if (!file.patch || isChangelogPath(file.path)) continue;
     const parts = file.patch.split(/^(?=@@)/m).filter((h) => h.startsWith("@@"));
     for (const hunk of parts) {
       // Include hunk-header function context: a claim naming a function should

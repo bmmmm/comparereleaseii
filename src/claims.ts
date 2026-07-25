@@ -35,11 +35,15 @@ export function cleanText(text: string): string {
     .trim();
 }
 
+const SETEXT_UNDERLINE = /^[=-]{3,}\s*$/;
+
 export function parseClaims(notes: string): Claim[] {
   const claims: Claim[] = [];
   let id = 0;
   let section = "Notes";
   let paragraph: string[] = [];
+  /** Open list item; indented follow-up lines are part of it (its anchors often live there). */
+  let bullet: string[] | null = null;
 
   const flushParagraph = (): void => {
     if (!paragraph.length) return;
@@ -61,35 +65,87 @@ export function parseClaims(notes: string): Claim[] {
     claims.push(claim);
   };
 
-  for (const line of notes.split("\n")) {
+  const flushBullet = (): void => {
+    if (!bullet) return;
+    const raw = bullet.join(" ");
+    bullet = null;
+    const text = cleanText(raw);
+    if (!text) return;
+    const isMeta = META_SECTION.test(section) || META_TEXT.test(text);
+    claims.push({
+      id: id++,
+      section,
+      text,
+      kind: isMeta ? "meta" : "change",
+      ...extract(raw),
+    });
+  };
+
+  // Summary/Details layouts (restic-style) restate every entry twice; the
+  // copy with fewer anchors would only dilute the score. Keep the richest.
+  const dedupe = (): void => {
+    // Group by overlapping reference numbers: the summary entry cites the
+    // issue, the details entry issue + fixing PR — any shared number links them.
+    const groups: Claim[][] = [];
+    for (const claim of claims) {
+      if (claim.kind !== "change" || !claim.prNumbers.length) continue;
+      const hit = groups.find((g) =>
+        g.some((other) => other.prNumbers.some((n) => claim.prNumbers.includes(n))),
+      );
+      if (hit) hit.push(claim);
+      else groups.push([claim]);
+    }
+    for (const group of groups) {
+      if (group.length < 2) continue;
+      const ranked = [...group].sort(
+        (a, b) => b.prNumbers.length - a.prNumbers.length || b.text.length - a.text.length,
+      );
+      for (const duplicate of ranked.slice(1)) duplicate.kind = "meta";
+    }
+  };
+
+  const lines = notes.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const heading = line.match(/^#{1,4}\s+(.*)/);
     if (heading) {
+      flushBullet();
       flushParagraph();
       section = heading[1].trim();
       continue;
     }
-    const bullet = line.match(/^\s*[*+-]\s+(.*)/);
-    if (bullet) {
+    // Setext heading: a non-indented text line underlined with === or ---.
+    // Indented lines stay list-item continuations even when followed by dashes.
+    if (line.trim() && !/^\s{2,}/.test(line) && SETEXT_UNDERLINE.test(lines[i + 1] ?? "")) {
+      flushBullet();
       flushParagraph();
-      const raw = bullet[1];
-      const text = cleanText(raw);
-      if (!text) continue;
-      const isMeta = META_SECTION.test(section) || META_TEXT.test(text);
-      claims.push({
-        id: id++,
-        section,
-        text,
-        kind: isMeta ? "meta" : "change",
-        ...extract(raw),
-      });
+      section = line.trim();
+      i++;
+      continue;
+    }
+    if (SETEXT_UNDERLINE.test(line)) continue;
+    const bulletMatch = line.match(/^\s*[*+-]\s+(.*)/);
+    if (bulletMatch) {
+      flushBullet();
+      flushParagraph();
+      bullet = [bulletMatch[1]];
       continue;
     }
     if (line.trim() === "") {
+      // Blank lines separate paragraphs but keep a list item open — its
+      // indented description and trailing anchor links follow after them.
       flushParagraph();
-    } else {
-      paragraph.push(line.trim());
+      continue;
     }
+    if (bullet && /^\s{2,}\S/.test(line)) {
+      bullet.push(line.trim());
+      continue;
+    }
+    flushBullet();
+    paragraph.push(line.trim());
   }
+  flushBullet();
   flushParagraph();
+  dedupe();
   return claims;
 }

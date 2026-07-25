@@ -32,6 +32,16 @@ test("newDependencies finds added deps, ignores version bumps and lockfiles", ()
   const lock = file("Cargo.lock", '@@ -1,1 +1,2 @@\n+name = "whatever"\n');
   assert.deepEqual(newDependencies(lock), []);
 
+  // go.mod bumps use "name vX.Y.Z" (no = or :) — must not read as new.
+  const goBump = file(
+    "go.mod",
+    "@@ -22,1 +22,1 @@ require (\n-\tgithub.com/klauspost/compress v1.18.4\n+\tgithub.com/klauspost/compress v1.18.6\n",
+  );
+  assert.deepEqual(newDependencies(goBump), []);
+
+  const goNew = file("go.mod", "@@ -22,0 +23,1 @@ require (\n+\tgithub.com/evil/backdoor v1.0.0\n");
+  assert.deepEqual(newDependencies(goNew), ["github.com/evil/backdoor"]);
+
   const pkg = file("package.json", '@@ -5,1 +5,2 @@\n   "dependencies": {\n+    "evil-pkg": "^2.0.0",\n');
   assert.deepEqual(newDependencies(pkg), ["evil-pkg"]);
 });

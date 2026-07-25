@@ -38,40 +38,44 @@ function addedLines(patch: string): string[] {
     .map((l) => l.slice(1));
 }
 
+/** Dependency name in a manifest line, per file format — null if none. */
+function depName(line: string, path: string): string | null {
+  const trimmed = line.trim();
+  if (/Cargo\.toml$/.test(path)) {
+    // Value must look like a version ("1.2", "^0.3") or a table with a
+    // version key — otherwise [lints.*] entries (pedantic = "warn") match.
+    return trimmed.match(/^([\w-]+)\s*=\s*(?:"[\^~=]?\d|\{.*version)/)?.[1] ?? null;
+  }
+  if (/package\.json$/.test(path)) {
+    return trimmed.match(/^"((?:@[\w.-]+\/)?[\w.-]+)"\s*:\s*"[^"]*\d/)?.[1] ?? null;
+  }
+  if (/go\.mod$/.test(path)) {
+    return trimmed.match(/^(?:require\s+)?([\w./-]+\.[\w./-]+)\s+v\d/)?.[1] ?? null;
+  }
+  if (/requirements[^/]*\.txt$/.test(path)) {
+    return trimmed.match(/^([\w.-]+)\s*[=<>~]/)?.[1] ?? null;
+  }
+  return null;
+}
+
 /** Heuristic: dependency names added to a manifest in this diff. */
 export function newDependencies(file: DiffFile): string[] {
   if (!file.patch || !DEP_MANIFEST.test(file.path)) return [];
   if (/\.(lock|sum)$|-lock\.(json|yaml)$|Pipfile\.lock$/.test(file.path)) return [];
-  const removed = new Set(
+  // A version bump shows the same dependency name on a removed line — parse
+  // both sides with the same format-aware extractor (a substring check misses
+  // go.mod's "name vX.Y.Z" layout and fabricates "new" dependencies).
+  const removedNames = new Set(
     file.patch
       .split("\n")
       .filter((l) => l.startsWith("-") && !l.startsWith("---"))
-      .map((l) => l.slice(1).trim()),
+      .map((l) => depName(l.slice(1), file.path))
+      .filter(Boolean),
   );
   const deps: string[] = [];
   for (const line of addedLines(file.patch)) {
-    const trimmed = line.trim();
-    // A pure version bump shows the same dep name in a removed line too.
-    const bumped = [...removed].some((r) => {
-      const name = trimmed.match(/^"?([@\w./-]+)"?\s*[=:]/)?.[1];
-      return name !== undefined && (r.startsWith(`${name} `) || r.startsWith(`"${name}"`) || r.startsWith(`${name}=`) || r.startsWith(`${name} =`));
-    });
-    if (bumped) continue;
-    let m: RegExpMatchArray | null;
-    if (/Cargo\.toml$/.test(file.path)) {
-      // Value must look like a version ("1.2", "^0.3") or a table with a
-      // version key — otherwise [lints.*] entries (pedantic = "warn") match.
-      m = trimmed.match(/^([\w-]+)\s*=\s*(?:"[\^~=]?\d|\{.*version)/);
-    } else if (/package\.json$/.test(file.path)) {
-      m = trimmed.match(/^"((?:@[\w.-]+\/)?[\w.-]+)"\s*:\s*"[^"]*\d/);
-    } else if (/go\.mod$/.test(file.path)) {
-      m = trimmed.match(/^(?:require\s+)?([\w./-]+\.[\w./-]+)\s+v\d/);
-    } else if (/requirements[^/]*\.txt$/.test(file.path)) {
-      m = trimmed.match(/^([\w.-]+)\s*[=<>~]/);
-    } else {
-      m = null;
-    }
-    if (m) deps.push(m[1]);
+    const name = depName(line, file.path);
+    if (name && !removedNames.has(name)) deps.push(name);
   }
   return [...new Set(deps)];
 }
@@ -349,6 +353,7 @@ export function computeMetrics(opts: {
     let total = 0;
     let covered = 0;
     for (const [sha, cfiles] of coverage.commitFiles) {
+      if (coverage.mergeShas.has(sha)) continue;
       const churn = cfiles.reduce((s, f) => s + f.additions + f.deletions, 0);
       total += churn;
       if (coverage.coveredShas.has(sha)) covered += churn;

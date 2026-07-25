@@ -295,6 +295,8 @@ export interface Coverage {
   coveredShas: Set<string>;
   evidenceFiles: Set<string>;
   commitFiles: Map<string, DiffFile[]>;
+  /** Merge commits — bundles of other commits, neutral for coverage math. */
+  mergeShas: Set<string>;
 }
 
 /** Completeness check: which commits are not covered by any release-note claim? */
@@ -328,9 +330,24 @@ export async function computeCoverage(
   const commitFiles = new Map<string, DiffFile[]>();
   data.commits.forEach((c, i) => commitFiles.set(c.sha, commitFileLists[i]));
 
+  // Cherry-pick workflows (patch-release branches) lose PR references in the
+  // commit message — cover commits whose subject clearly restates a claim.
+  const changeClaims = results
+    .filter((r) => r.claim.kind === "change")
+    .map((r) => r.claim.text.replace(/\bby @[\w-]+\b.*$/, ""));
+  const subjectCovered = (subject: string): boolean =>
+    changeClaims.some((text) => similarity(text, subject) >= 0.45);
+
+  // A merge commit bundles commits that are themselves in the range — counting
+  // it (and its aggregate diff) again would double every miss and every line.
+  const nonMerge = data.commits.filter((c) => !/^Merge (pull request|branch|remote)/i.test(c.subject));
+  const mergeShas = new Set(
+    nonMerge.length ? data.commits.filter((c) => !nonMerge.includes(c)).map((c) => c.sha) : [],
+  );
+
   const uncovered: UncoveredCommit[] = [];
   data.commits.forEach((commit, i) => {
-    if (covered.has(commit.sha)) return;
+    if (covered.has(commit.sha) || mergeShas.has(commit.sha)) return;
     const files = commitFileLists[i];
     // A commit mostly touching files already cited as evidence counts as covered.
     if (files.length) {
@@ -340,6 +357,10 @@ export async function computeCoverage(
         return;
       }
     }
+    if (subjectCovered(commit.subject)) {
+      covered.add(commit.sha);
+      return;
+    }
     uncovered.push({
       commit,
       additions: files.reduce((s, f) => s + f.additions, 0),
@@ -348,5 +369,5 @@ export async function computeCoverage(
     });
   });
   uncovered.sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions));
-  return { uncovered, coveredShas: covered, evidenceFiles, commitFiles };
+  return { uncovered, coveredShas: covered, evidenceFiles, commitFiles, mergeShas };
 }

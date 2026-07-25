@@ -62,3 +62,40 @@ test("cleanText rewrites pull URLs to #N", () => {
     "Fix foo by @bar in #123",
   );
 });
+
+const restic = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "fixtures", "restic-0.19.1.md"),
+  "utf8",
+);
+
+test("restic: setext headings become sections, underlines are not claims", () => {
+  const claims = parseClaims(restic);
+  const sections = new Set(claims.map((c) => c.section));
+  assert.ok(sections.has("Summary"));
+  assert.ok(sections.has("Details"));
+  assert.ok(!claims.some((c) => /^[=-]+$/.test(c.text.replace(/\s/g, ""))));
+  // The intro prose lives under the setext title heading and is informational.
+  const intro = claims.find((c) => c.text.startsWith("The following sections"));
+  assert.equal(intro?.kind, "meta");
+});
+
+test("restic: indented continuation lines merge into the bullet, PR anchors included", () => {
+  const claims = parseClaims(restic);
+  const detail = claims.find(
+    (c) => c.section === "Details" && c.text.includes("Prevent mounting over the repository"),
+  );
+  assert.ok(detail);
+  // #5234 is the issue, #5348 the fixing PR from the trailing anchor line.
+  assert.ok(detail.prNumbers.includes(5234));
+  assert.ok(detail.prNumbers.includes(5348), `anchors: ${detail.prNumbers.join(",")}`);
+  assert.ok(detail.text.includes("deadlocking the kernel"));
+  assert.equal(detail.kind, "change");
+});
+
+test("restic: details keep the nine fixes, summary duplicates are deduped", () => {
+  const claims = parseClaims(restic);
+  // Details entries carry more anchors (issue + fixing PR) and win the dedupe.
+  assert.equal(claims.filter((c) => c.section === "Details" && c.kind === "change").length, 9);
+  assert.equal(claims.filter((c) => c.section === "Summary" && c.kind === "change").length, 0);
+  assert.equal(claims.filter((c) => c.section === "Summary").length, 9);
+});
