@@ -55,7 +55,7 @@ test("opacityIssue flags binaries, minified blobs and install hooks", () => {
   );
 });
 
-function result(verdict: ClaimResult["verdict"]): ClaimResult {
+function result(verdict: ClaimResult["verdict"], generated = false): ClaimResult {
   return {
     claim: { id: 0, section: "s", text: "t", kind: "change", prNumbers: [], shas: [], advisories: [], codeSpans: [] },
     verdict,
@@ -63,6 +63,7 @@ function result(verdict: ClaimResult["verdict"]): ClaimResult {
     evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
     reasoning: "",
     judged: false,
+    generated,
   };
 }
 
@@ -78,6 +79,17 @@ test("computeScores caps overall on contradicted claims and critical flags", () 
   const critical: RiskFlag = { severity: "critical", kind: "x", message: "m", files: [], commitShas: [] };
   const flagged = computeScores([result("verified")], 1, [critical]);
   assert.ok(flagged.overall <= 45);
+});
+
+test("computeScores down-weights auto-generated entries", () => {
+  // 1 failing handwritten claim among 3 verified generated ones must hurt more
+  // than the raw 3/4 average.
+  const s = computeScores(
+    [result("verified", true), result("verified", true), result("verified", true), result("no-evidence")],
+    1,
+    [],
+  );
+  assert.ok(s.correctness < 50, `expected heavy penalty, got ${s.correctness}`);
 });
 
 test("layoutTreemap fills the viewport and preserves area proportions", () => {

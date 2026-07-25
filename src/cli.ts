@@ -10,6 +10,7 @@ import { verifyClaims, computeCoverage } from "./verify.ts";
 import { computeMetrics } from "./metrics.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
+import { buildSnapshots, summarizeBaseline, printTimeline } from "./history.ts";
 import type { Report } from "./types.ts";
 
 const USAGE = `comparerelease — fact-check release notes against the actual code diff
@@ -34,6 +35,9 @@ Options:
   --concurrency <n>   Parallel judge calls (default: 4)
   --fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
   --no-reverse        Skip the completeness check (undocumented commits)
+  --baseline <n>      Compare against the n previous releases for anomaly
+                      detection (default: 5, GitHub source only; 0 disables)
+  --history <n>       Print a release-history timeline instead of a check
   -h, --help          Show this help
 
 Examples:
@@ -59,6 +63,8 @@ async function main(): Promise<number> {
       concurrency: { type: "string", default: "4" },
       "fail-on": { type: "string", default: "no-evidence" },
       "no-reverse": { type: "boolean", default: false },
+      baseline: { type: "string", default: "5" },
+      history: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -79,6 +85,17 @@ async function main(): Promise<number> {
   const failOn = values["fail-on"] as "none" | "contradicted" | "no-evidence";
   if (!["none", "contradicted", "no-evidence"].includes(failOn)) {
     throw new Error(`--fail-on must be none, contradicted or no-evidence (got "${values["fail-on"]}")`);
+  }
+
+  if (values.history) {
+    if (values.local) throw new Error("--history works with the GitHub source only.");
+    const snapshots = await buildSnapshots(positionals[0], { count: Number(values.history) });
+    printTimeline(snapshots);
+    if (values.json) {
+      await writeFile(values.json, JSON.stringify(snapshots, null, 2));
+      console.error(`\nJSON timeline written to ${values.json}`);
+    }
+    return 0;
   }
 
   console.error(`Loading release data${values.local ? ` from ${values.local}` : ` for ${positionals[0]}`}…`);
@@ -112,16 +129,27 @@ async function main(): Promise<number> {
   );
 
   const engine = judgeMode === "off" ? null : selectEngine({ engine: engineName, model: values.model });
-  const results = await verifyClaims(data, claims, {
-    judgeMode,
-    engine,
-    concurrency: Number(values.concurrency),
-    maxHunks: 6,
-    maxEvidenceChars: 20000,
-  });
+  const baselineCount = Number(values.baseline);
+  const baselinePromise =
+    !values.local && baselineCount > 0
+      ? buildSnapshots(positionals[0], { count: baselineCount, before: data.headRef }).catch(
+          () => null,
+        )
+      : Promise.resolve(null);
+  const [results, baselineSnapshots] = await Promise.all([
+    verifyClaims(data, claims, {
+      judgeMode,
+      engine,
+      concurrency: Number(values.concurrency),
+      maxHunks: 6,
+      maxEvidenceChars: 20000,
+    }),
+    baselinePromise,
+  ]);
+  const baseline = baselineSnapshots?.length ? summarizeBaseline(baselineSnapshots) : null;
 
   const coverage = values["no-reverse"] ? null : await computeCoverage(data, claims, results);
-  const metrics = computeMetrics({ data, results, coverage, context });
+  const metrics = computeMetrics({ data, results, coverage, context, baseline });
 
   const report: Report = {
     repoLabel: data.repoLabel,

@@ -2,10 +2,11 @@
 import { run, pooled } from "../util.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
-async function ghJson<T>(path: string): Promise<T> {
+export async function ghApi<T>(path: string): Promise<T> {
   const { stdout } = await run("gh", ["api", path]);
   return JSON.parse(stdout) as T;
 }
+const ghJson = ghApi;
 
 interface GhRelease {
   tag_name: string;
@@ -57,6 +58,23 @@ function toDiffFile(f: GhFile): DiffFile {
   };
 }
 
+export async function fetchCompare(
+  repo: string,
+  base: string,
+  head: string,
+): Promise<{ commits: Commit[]; files: DiffFile[]; totalCommits: number }> {
+  const cmp = await ghJson<{
+    total_commits: number;
+    commits: GhCompareCommit[];
+    files: GhFile[];
+  }>(`repos/${repo}/compare/${base}...${head}`);
+  return {
+    commits: cmp.commits.map(toCommit),
+    files: cmp.files.map(toDiffFile),
+    totalCommits: cmp.total_commits,
+  };
+}
+
 async function findBaseTag(repo: string, tag: string): Promise<string> {
   const releases = await ghJson<GhRelease[]>(`repos/${repo}/releases?per_page=100`);
   const idx = releases.findIndex((r) => r.tag_name === tag);
@@ -90,15 +108,11 @@ export async function loadGithubRelease(opts: {
   const headRef = release.tag_name;
   const baseRef = opts.base ?? (await findBaseTag(opts.repo, headRef));
 
-  const cmp = await ghJson<{
-    total_commits: number;
-    commits: GhCompareCommit[];
-    files: GhFile[];
-  }>(`repos/${opts.repo}/compare/${baseRef}...${headRef}`);
+  const cmp = await fetchCompare(opts.repo, baseRef, headRef);
 
-  if (cmp.commits.length < cmp.total_commits) {
+  if (cmp.commits.length < cmp.totalCommits) {
     warnings.push(
-      `Compare API returned ${cmp.commits.length}/${cmp.total_commits} commits — use a local clone (--local) for full coverage.`,
+      `Compare API returned ${cmp.commits.length}/${cmp.totalCommits} commits — use a local clone (--local) for full coverage.`,
     );
   }
   if (cmp.files.length >= 300) {
@@ -124,8 +138,8 @@ export async function loadGithubRelease(opts: {
     baseRef,
     headRef,
     notes: release.body ?? "",
-    commits: cmp.commits.map(toCommit),
-    files: cmp.files.map(toDiffFile),
+    commits: cmp.commits,
+    files: cmp.files,
     commitFiles,
     warnings,
   };

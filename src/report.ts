@@ -33,6 +33,9 @@ function evidenceLine(r: ClaimResult): string {
     const more = r.evidence.files.length - 3;
     parts.push(shown + (more > 0 ? ` +${more} more` : ""));
   }
+  if (r.evidence.functions?.length) {
+    parts.push(`fns: ${r.evidence.functions.slice(0, 4).join(", ")}`);
+  }
   return parts.join(" · ");
 }
 

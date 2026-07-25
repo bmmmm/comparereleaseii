@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { pooled, truncate } from "./util.ts";
-import { anchorMatch, lexicalMatch, rankHunks, tokenize } from "./match.ts";
-import { buildJudgePrompt, parseJudgeOutput, type JudgeEngine } from "./judge.ts";
+import { anchorMatch, functionsOf, lexicalMatch, rankHunks, tokenize } from "./match.ts";
+import {
+  buildJudgePrompt,
+  buildSurplusPrompt,
+  parseJudgeOutput,
+  parseSurplusOutput,
+  type JudgeEngine,
+} from "./judge.ts";
 import type {
   Claim,
   ClaimResult,
@@ -34,11 +40,38 @@ function coreText(claim: Claim): string {
   return claim.text.replace(/\bby @[\w-]+\b.*$/, "").trim();
 }
 
+const GENERATED_TAIL = /\bby @[\w-]+\b.*#\d+\s*$/;
+
+function normTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\(#\d+\)/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Auto-generated "Title by @user in #N" entry whose title equals the squash
+ * commit subject. True by construction (GitHub generated it from the same
+ * commits we check against), so it must not inflate the correctness score.
+ */
+export function isGeneratedEntry(claim: Claim, commits: Commit[]): boolean {
+  if (!GENERATED_TAIL.test(claim.text)) return false;
+  const core = normTitle(coreText(claim));
+  return core.length > 0 && commits.some((c) => normTitle(c.subject) === core);
+}
+
+/** Claim whose text carries no verifiable content tokens ("Updates and fixes"). */
+export function isVagueClaim(claim: Claim): boolean {
+  return tokenize(coreText(claim)).length <= 1;
+}
+
 interface Pending {
   claim: Claim;
   evidence: Evidence;
   hunkPool: DiffFile[];
   commits: Commit[];
+  generated: boolean;
   fallback: { verdict: ClaimResult["verdict"]; confidence: number; reasoning: string };
 }
 
@@ -64,6 +97,7 @@ export async function verifyClaims(
 ): Promise<ClaimResult[]> {
   const results = new Map<number, ClaimResult>();
   const pending: Pending[] = [];
+  const surplusQueue: Array<{ claim: Claim; pool: DiffFile[] }> = [];
   const useJudge = opts.engine !== null && opts.judgeMode !== "off";
 
   for (const claim of claims) {
@@ -75,6 +109,7 @@ export async function verifyClaims(
         evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
         reasoning: "Informational entry, nothing to verify against the diff.",
         judged: false,
+        generated: false,
       });
       continue;
     }
@@ -85,22 +120,28 @@ export async function verifyClaims(
         anchors.commits.map((c) => data.commitFiles(c.sha)),
       );
       const pool = fileLists.flat();
+      const generated = isGeneratedEntry(claim, anchors.commits);
       const lex = lexicalMatch(claim, pool);
       const bestSim = Math.max(
         ...anchors.commits.map((c) => similarity(coreText(claim), c.subject)),
       );
+      const methods: Evidence["methods"] = ["pr-anchor"];
+      if (generated) methods.push("generated");
+      if (lex.score > 0) methods.push("lexical");
       const evidence: Evidence = {
         commitShas: anchors.commits.map((c) => c.sha),
         files: lex.files.map((f) => f.path),
         matchedTerms: lex.matchedTerms,
-        methods: lex.score > 0 ? ["pr-anchor", "lexical"] : ["pr-anchor"],
+        methods,
+        functions: functionsOf(pool),
       };
       const anchorLabel = anchors.viaPr.length
         ? `PR #${anchors.viaPr.join(", #")}`
         : `commit ${anchors.viaSha.join(", ")}`;
-      const strong = bestSim >= 0.5 || lex.score >= 2;
-      const detail =
-        lex.score >= 2
+      const strong = generated || bestSim >= 0.5 || lex.score >= 2;
+      const detail = generated
+        ? `auto-generated entry, title matches the squash commit`
+        : lex.score >= 2
           ? `identifiers ${lex.matchedTerms.slice(0, 4).join(", ")} appear in its diff`
           : `commit subject matches the claim (${Math.round(bestSim * 100)}%)`;
       const fallback = strong
@@ -114,10 +155,14 @@ export async function verifyClaims(
             confidence: 0.6,
             reasoning: `${anchorLabel} is in the release range, but the claim text could not be matched to its diff content.`,
           };
+      if (useJudge && isVagueClaim(claim)) {
+        // Reverse-direction audit: what does this vague note hide?
+        surplusQueue.push({ claim, pool });
+      }
       if (useJudge && (opts.judgeMode === "all" || !strong)) {
-        pending.push({ claim, evidence, hunkPool: pool, commits: anchors.commits, fallback });
+        pending.push({ claim, evidence, hunkPool: pool, commits: anchors.commits, generated, fallback });
       } else {
-        results.set(claim.id, { claim, ...fallback, evidence, judged: false });
+        results.set(claim.id, { claim, ...fallback, evidence, judged: false, generated });
       }
       continue;
     }
@@ -130,6 +175,7 @@ export async function verifyClaims(
       files: lex.files.map((f) => f.path),
       matchedTerms: lex.matchedTerms,
       methods: lex.score > 0 ? ["lexical"] : ["none"],
+      functions: functionsOf(lex.files),
     };
     const anchorNote = claim.prNumbers.length
       ? `Referenced PR #${claim.prNumbers.join(", #")} matches no commit message in the range. `
@@ -159,9 +205,9 @@ export async function verifyClaims(
         .sort((a, b) => b.s - a.s)
         .slice(0, 3)
         .map((x) => x.c);
-      pending.push({ claim, evidence, hunkPool: data.files, commits: related, fallback });
+      pending.push({ claim, evidence, hunkPool: data.files, commits: related, generated: false, fallback });
     } else {
-      results.set(claim.id, { claim, ...fallback, evidence, judged: false });
+      results.set(claim.id, { claim, ...fallback, evidence, judged: false, generated: false });
     }
   }
 
@@ -201,6 +247,7 @@ export async function verifyClaims(
           },
           reasoning: verdict.reasoning,
           judged: true,
+          generated: p.generated,
         });
       } catch (err) {
         results.set(p.claim.id, {
@@ -209,7 +256,33 @@ export async function verifyClaims(
           evidence: p.evidence,
           reasoning: `${p.fallback.reasoning} (LLM judge failed: ${(err as Error).message.slice(0, 120)})`,
           judged: false,
+          generated: p.generated,
         });
+      }
+    });
+  }
+
+  if (surplusQueue.length && opts.engine) {
+    const engine = opts.engine;
+    await pooled(surplusQueue, opts.concurrency, async (q) => {
+      const hunks = capHunks(
+        q.pool.filter((f) => f.patch).map((f) => ({ path: f.path, hunk: f.patch! })),
+        opts.maxEvidenceChars,
+      );
+      if (!hunks.length) return;
+      const prompt = buildSurplusPrompt({
+        repoLabel: data.repoLabel,
+        claimText: q.claim.text,
+        hunks,
+      });
+      try {
+        const surplus = parseSurplusOutput(await engine.judge(prompt));
+        if (surplus.length) {
+          const r = results.get(q.claim.id);
+          if (r) r.surplus = surplus;
+        }
+      } catch {
+        // Best-effort audit; the claim's own verdict already stands.
       }
     });
   }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { tmpdir } from "node:os";
 import { run } from "./util.ts";
-import type { Verdict } from "./types.ts";
+import type { SurplusItem, Verdict } from "./types.ts";
 
 export interface JudgeEngine {
   name: string;
@@ -153,4 +153,43 @@ Rules:
 
 Respond with ONLY this JSON object, no markdown fences, no extra prose:
 {"verdict":"verified|partial|no_evidence|contradicted","confidence":0.0,"files":["path"],"reasoning":"1-2 sentences citing concrete evidence lines"}`;
+}
+
+export function buildSurplusPrompt(opts: {
+  repoLabel: string;
+  claimText: string;
+  hunks: Array<{ path: string; hunk: string }>;
+}): string {
+  const hunkBlock = opts.hunks.map((h) => `--- ${h.path}\n${h.hunk}`).join("\n\n");
+  return `You are auditing a release of ${opts.repoLabel} for changes hidden behind a vague release note.
+The ONLY release-note text covering the commit diff below is:
+"${opts.claimText}"
+
+Commit diff:
+${hunkBlock}
+
+List changes in this diff that users would want explicitly documented but that this note does not convey: behavior changes, new/removed features or endpoints, new config options, security-relevant logic, added dependencies. Mark those as notable. Routine refactoring, version bumps, CI tweaks, comment/formatting changes are NOT notable.
+
+Respond with ONLY this JSON object, no markdown fences:
+{"surplus":[{"description":"…","file":"path","notable":true}],"reasoning":"1 sentence"}
+Use an empty surplus array if the note adequately covers everything.`;
+}
+
+export function parseSurplusOutput(raw: string): SurplusItem[] {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end <= start) {
+    throw new Error(`Surplus output contains no JSON object: ${raw.slice(0, 200)}`);
+  }
+  const parsed = JSON.parse(raw.slice(start, end + 1)) as { surplus?: unknown };
+  if (!Array.isArray(parsed.surplus)) return [];
+  return parsed.surplus
+    .filter((s): s is Record<string, unknown> => typeof s === "object" && s !== null)
+    .slice(0, 10)
+    .map((s) => ({
+      description: String(s.description ?? "").slice(0, 300),
+      file: String(s.file ?? ""),
+      notable: s.notable === true,
+    }))
+    .filter((s) => s.description);
 }

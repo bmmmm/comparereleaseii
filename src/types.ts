@@ -49,13 +49,27 @@ export type Verdict =
   | "contradicted"
   | "skipped";
 
-export type MatchMethod = "pr-anchor" | "sha-anchor" | "lexical" | "llm" | "none";
+export type MatchMethod =
+  | "pr-anchor"
+  | "sha-anchor"
+  | "lexical"
+  | "llm"
+  | "generated"
+  | "none";
 
 export interface Evidence {
   commitShas: string[];
   files: string[];
   matchedTerms: string[];
   methods: MatchMethod[];
+  /** Functions touched, extracted from unified-diff hunk headers. */
+  functions?: string[];
+}
+
+export interface SurplusItem {
+  description: string;
+  file: string;
+  notable: boolean;
 }
 
 export interface ClaimResult {
@@ -65,6 +79,10 @@ export interface ClaimResult {
   evidence: Evidence;
   reasoning: string;
   judged: boolean;
+  /** Auto-generated notes entry (PR-list boilerplate), down-weighted in scoring. */
+  generated: boolean;
+  /** Changes hidden behind a vague claim (reverse-direction audit). */
+  surplus?: SurplusItem[];
 }
 
 export interface UncoveredCommit {
@@ -91,6 +109,7 @@ export interface FileInsight {
   churn: number;
   sensitive: string | null;
   coverage: FileCoverage;
+  functions?: string[];
 }
 
 export interface RepoContext {

@@ -130,7 +130,10 @@ function treemapSvg(files: FileInsight[]): string {
             (f.path.split("/").pop() ?? f.path).slice(0, Math.floor(r.w / 6)),
           )}</text>`
         : "";
-    const title = `${f.path}\n±${f.churn} lines · ${f.coverage}${f.sensitive ? ` · sensitive: ${f.sensitive}` : ""}`;
+    const title =
+      `${f.path}\n±${f.churn} lines · ${f.coverage}` +
+      `${f.sensitive ? ` · sensitive: ${f.sensitive}` : ""}` +
+      `${f.functions?.length ? `\nfns: ${f.functions.join(", ")}` : ""}`;
     return `<g><rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" fill="${fill}" fill-opacity="0.82" stroke="${stroke}" stroke-width="${strokeW}"><title>${esc(title)}</title></rect>${label}</g>`;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Diff treemap">${parts.join("")}</svg>`;
@@ -204,6 +207,10 @@ function claimsHtml(report: Report, linkBase?: string): string {
         : `<div class="detail">${esc(r.reasoning)}${
             r.evidence.files.length
               ? `<div class="files">${esc(r.evidence.files.slice(0, 6).join(", "))}</div>`
+              : ""
+          }${
+            r.evidence.functions?.length
+              ? `<div class="files">fns: ${esc(r.evidence.functions.slice(0, 8).join(", "))}</div>`
               : ""
           }${commits ? `<div class="files">commits: ${commits}</div>` : ""}</div>`;
     out.push(

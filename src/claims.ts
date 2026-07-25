@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { extractIdentifiers } from "./match.ts";
 import type { Claim } from "./types.ts";
 
 const META_SECTION = /new contributors|credits|thanks|acknowledg/i;
@@ -46,14 +47,18 @@ export function parseClaims(notes: string): Claim[] {
     paragraph = [];
     const text = cleanText(raw);
     if (text.length < 15) return;
-    const isMeta = !PROSE_SECTION.test(section) || META_TEXT.test(text);
-    claims.push({
-      id: id++,
-      section,
-      text,
-      kind: isMeta ? "meta" : "change",
-      ...extract(raw),
-    });
+    const claim: Claim = { id: id++, section, text, kind: "change", ...extract(raw) };
+    // Prose is only verifiable when it names something concrete (identifier,
+    // PR, sha, advisory) — process talk and thank-yous are informational.
+    const verifiable =
+      claim.prNumbers.length > 0 ||
+      claim.shas.length > 0 ||
+      claim.advisories.length > 0 ||
+      extractIdentifiers(claim).length > 0;
+    if (!PROSE_SECTION.test(section) || META_TEXT.test(text) || !verifiable) {
+      claim.kind = "meta";
+    }
+    claims.push(claim);
   };
 
   for (const line of notes.split("\n")) {

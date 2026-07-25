@@ -88,6 +88,41 @@ export interface LexicalMatch {
   score: number;
 }
 
+/**
+ * Function context from unified-diff hunk headers ("@@ … @@ pub fn foo(…)").
+ * Git and the GitHub API both emit the enclosing declaration there — free
+ * symbol-level labels for what a change touched.
+ */
+export function hunkFunctions(patch: string): string[] {
+  const KEYWORDS = new Set(["func", "function", "if", "for", "while", "switch", "return", "type", "const", "let", "var"]);
+  const out = new Set<string>();
+  for (const m of patch.matchAll(/^@@[^@\n]*@@[ \t]+(.+)$/gm)) {
+    const ctx = m[1].trim();
+    const named =
+      // Go first: method receivers ("func (s *Server) Name(") hide the name.
+      ctx.match(/func\s+(?:\([^)]*\)\s+)?([\w$.]+)/)?.[1] ??
+      ctx.match(/(?:fn|def|function|class|impl|trait|interface|struct)\s+([\w:.$]+)/)?.[1] ??
+      ctx.match(/([\w$.]+)\s*(?:\(|=\s*(?:async\s*)?\()/)?.[1];
+    if (named && named.length >= 2 && !KEYWORDS.has(named)) {
+      out.add(named.replace(/[:.]+$/, ""));
+    }
+  }
+  return [...out];
+}
+
+/** Aggregate touched functions across files, capped for display. */
+export function functionsOf(files: DiffFile[], cap = 8): string[] {
+  const out = new Set<string>();
+  for (const f of files) {
+    if (!f.patch) continue;
+    for (const fn of hunkFunctions(f.patch)) {
+      out.add(fn);
+      if (out.size >= cap) return [...out];
+    }
+  }
+  return [...out];
+}
+
 function changedLines(patch: string): string {
   return patch
     .split("\n")
@@ -139,10 +174,12 @@ export function rankHunks(claim: Claim, files: DiffFile[], topK = 6): RankedHunk
     if (!file.patch) continue;
     const parts = file.patch.split(/^(?=@@)/m).filter((h) => h.startsWith("@@"));
     for (const hunk of parts) {
+      // Include hunk-header function context: a claim naming a function should
+      // rank its hunks even when the changed lines never repeat the name.
       entries.push({
         path: file.path,
         hunk,
-        tokens: new Set(tokenize(changedLines(hunk))),
+        tokens: new Set(tokenize(changedLines(hunk) + " " + hunkFunctions(hunk).join(" "))),
       });
     }
   }

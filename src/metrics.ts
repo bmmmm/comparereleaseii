@@ -11,6 +11,8 @@ import type {
   Scores,
 } from "./types.ts";
 import type { Coverage } from "./verify.ts";
+import type { Baseline } from "./history.ts";
+import { hunkFunctions } from "./match.ts";
 
 const DEP_MANIFEST =
   /(^|\/)(Cargo\.(toml|lock)|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|go\.(mod|sum)|requirements[^/]*\.txt|pyproject\.toml|Pipfile(\.lock)?|Gemfile(\.lock)?|composer\.(json|lock)|pom\.xml|build\.gradle(\.kts)?)$/;
@@ -165,6 +167,25 @@ function buildFlags(
     });
   }
 
+  // Reverse-direction audit results: notable changes hidden behind vague notes.
+  // Only auth/crypto surplus is critical — undocumented CI tweaks and
+  // dependency bumps behind a vague note are routine, not an attack signature.
+  for (const r of results) {
+    const notable = (r.surplus ?? []).filter((s) => s.notable);
+    if (!notable.length) continue;
+    const touchesAuth = notable.some((s) => sensitiveCategory(s.file) === "auth/crypto");
+    flags.push({
+      severity: touchesAuth ? "critical" : "warn",
+      kind: "vague-claim-surplus",
+      message: `Vague note "${r.claim.text.slice(0, 50)}" hides: ${notable
+        .map((s) => s.description)
+        .slice(0, 3)
+        .join("; ")}`,
+      files: [...new Set(notable.map((s) => s.file).filter(Boolean))].slice(0, 6),
+      commitShas: r.evidence.commitShas.slice(0, 3),
+    });
+  }
+
   // Undocumented changes in sensitive areas — the fake-release signature.
   const byCategory = new Map<string, string[]>();
   for (const f of files) {
@@ -173,8 +194,10 @@ function buildFlags(
     }
   }
   for (const [category, paths] of byCategory) {
+    // Changelogs routinely omit lockfile/CI churn (git-cliff even filters it
+    // by design) — only silent auth/crypto changes are an attack signature.
     flags.push({
-      severity: "critical",
+      severity: category === "auth/crypto" ? "critical" : "warn",
       kind: "undocumented-sensitive",
       message: `Undocumented changes in ${category} paths`,
       files: paths.slice(0, 8),
@@ -218,11 +241,17 @@ export function computeScores(
   flags: RiskFlag[],
 ): Scores {
   const change = results.filter((r) => r.claim.kind === "change");
+  // Auto-generated PR-list entries are true by construction (generated from
+  // the same commits we check) — they carry little weight; handwritten claims
+  // are where release notes can actually lie.
+  const weightOf = (r: ClaimResult): number => (r.generated ? 0.25 : 1);
+  const totalWeight = change.reduce((s, r) => s + weightOf(r), 0);
   const points = change.reduce(
-    (s, r) => s + (r.verdict === "verified" ? 1 : r.verdict === "partial" ? 0.5 : 0),
+    (s, r) =>
+      s + weightOf(r) * (r.verdict === "verified" ? 1 : r.verdict === "partial" ? 0.5 : 0),
     0,
   );
-  const correctness = change.length ? Math.round((points / change.length) * 100) : 100;
+  const correctness = totalWeight ? Math.round((points / totalWeight) * 100) : 100;
   const completeness =
     churnCoveredRatio === null ? null : Math.round(churnCoveredRatio * 100);
   const penalty = flags.reduce(
@@ -244,11 +273,66 @@ export function computeScores(
   return { correctness, completeness, risk, overall, label };
 }
 
+/** Anomalies relative to the repo's own release history. */
+export function baselineFlags(
+  data: ReleaseData,
+  coverage: Coverage | null,
+  baseline: Baseline,
+): RiskFlag[] {
+  const flags: RiskFlag[] = [];
+  if (baseline.snapshots.length < 3) return flags;
+  const n = baseline.snapshots.length;
+
+  const churn = data.files.reduce((s, f) => s + f.additions + f.deletions, 0);
+  if (baseline.medianChurn > 0 && churn > 3 * baseline.medianChurn) {
+    flags.push({
+      severity: "info",
+      kind: "size-anomaly",
+      message: `Release churn ±${churn} is ${(churn / baseline.medianChurn).toFixed(1)}× the median (±${baseline.medianChurn}) of the last ${n} releases`,
+      files: [],
+      commitShas: [],
+    });
+  }
+
+  if (coverage) {
+    const known = new Set(baseline.knownAuthors);
+    const suspects = data.commits.filter(
+      (commit) =>
+        !known.has(commit.author) &&
+        (coverage.commitFiles.get(commit.sha) ?? []).some((f) => sensitiveCategory(f.path)),
+    );
+    if (suspects.length) {
+      flags.push({
+        severity: "warn",
+        kind: "new-author-sensitive",
+        message: `First-time author(s) changing sensitive paths (not seen in the last ${n} releases): ${[
+          ...new Set(suspects.map((commit) => `@${commit.author}`)),
+        ].join(", ")}`,
+        files: [],
+        commitShas: suspects.map((commit) => commit.sha).slice(0, 5),
+      });
+    }
+  }
+
+  const binaries = data.files.filter((f) => opacityIssue(f) === "binary file");
+  if (binaries.length && !baseline.everBinary) {
+    flags.push({
+      severity: "critical",
+      kind: "first-binary",
+      message: `First binary artifact in the last ${n + 1} releases`,
+      files: binaries.map((f) => f.path).slice(0, 6),
+      commitShas: [],
+    });
+  }
+  return flags;
+}
+
 export function computeMetrics(opts: {
   data: ReleaseData;
   results: ClaimResult[];
   coverage: Coverage | null;
   context: RepoContext;
+  baseline?: Baseline | null;
 }): Metrics {
   const { data, results, coverage, context } = opts;
   const covMap = fileCoverageMap(data, coverage);
@@ -257,6 +341,7 @@ export function computeMetrics(opts: {
     churn: f.additions + f.deletions,
     sensitive: sensitiveCategory(f.path),
     coverage: covMap.get(f.path) ?? "unknown",
+    functions: f.patch ? hunkFunctions(f.patch).slice(0, 10) : undefined,
   }));
 
   let churnCoveredRatio: number | null = null;
@@ -272,6 +357,9 @@ export function computeMetrics(opts: {
   }
 
   const flags = buildFlags(data, results, coverage, files);
+  if (opts.baseline) flags.push(...baselineFlags(data, coverage, opts.baseline));
+  const order = { critical: 0, warn: 1, info: 2 };
+  flags.sort((a, b) => order[a.severity] - order[b.severity]);
   const scores = computeScores(results, churnCoveredRatio, flags);
   return { scores, flags, files, churnCoveredRatio, context };
 }

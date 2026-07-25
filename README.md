@@ -24,6 +24,17 @@ first, an LLM judge only for what remains unclear:
    `contradicted`, citing concrete evidence lines.
 
 The reverse (completeness) check flags commits whose changes no claim covers.
+Two refinements keep the check honest:
+
+- **Generated-entry detection** — auto-generated "Title by @user in #N" list
+  entries whose title equals the squash commit are true by construction and
+  carry only ¼ weight in the score; handwritten claims are where notes lie.
+- **Surplus audit** — vague claims ("Updates and fixes") flip the question:
+  the judge lists notable changes the note *hides* (new endpoints, behavior
+  changes, added dependencies) and flags them.
+
+Touched functions are extracted from unified-diff hunk headers and shown as
+evidence labels (`fns: register_access, should_block_host`).
 
 On top of the per-claim verdicts, every run computes an explainable **trust
 score** (0–100) from three components:
@@ -37,6 +48,19 @@ score** (0–100) from three components:
 Contradicted claims or critical flags cap the overall score — a fake release
 cannot average itself back to green. Repo context (code size, language mix,
 release cadence) is shown for calibration.
+
+With `--baseline <n>` (default 5, GitHub source) the previous releases become
+an anomaly baseline: unusual release size, first-time authors on sensitive
+paths, and first-ever binary artifacts are flagged relative to the repo's own
+history. `--history <n>` prints the release timeline instead of a check:
+
+```console
+$ node src/cli.ts dani-garcia/vaultwarden --history 6
+tag     date        commits  files  ±churn  claims  anchored  sensitive             deps+  bin
+1.37.0  2026-07-24  27       90     10385   45      100%      ci,dependencies,auth  4      0
+1.36.0  2026-05-03  18       54     1304    38      100%      ci,dependencies,auth  0      0
+…
+```
 
 ## Requirements
 

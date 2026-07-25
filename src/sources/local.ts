@@ -158,7 +158,9 @@ export async function loadLocalRelease(opts: {
         `No release notes: pass --notes-file <file> or add a CHANGELOG.md with a "${head}" section to the repo.`,
       );
     }
-    const section = extractChangelogSection(changelog, head);
+    const section =
+      extractChangelogSection(changelog, head) ??
+      extractChangelogSection(changelog, head.replace(/^v/, ""));
     if (!section) {
       throw new Error(
         `CHANGELOG.md has no section for "${head}". Pass --notes-file <file> instead.`,

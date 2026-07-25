@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { isGeneratedEntry, isVagueClaim } from "../src/verify.ts";
+import { hunkFunctions } from "../src/match.ts";
+import { parseSurplusOutput } from "../src/judge.ts";
+import type { Claim, Commit } from "../src/types.ts";
+
+function claim(text: string, prNumbers: number[] = []): Claim {
+  return {
+    id: 0,
+    section: "What's Changed",
+    text,
+    kind: "change",
+    prNumbers,
+    shas: [],
+    advisories: [],
+    codeSpans: [],
+  };
+}
+
+function commit(subject: string, prNumbers: number[] = []): Commit {
+  return { sha: "abc123def", subject, body: "", author: "dev", prNumbers };
+}
+
+test("isGeneratedEntry: PR-list boilerplate whose title equals the squash subject", () => {
+  const c1 = claim("OpenDAL S3 parameter support by @txase in #6127", [6127]);
+  assert.equal(isGeneratedEntry(c1, [commit("OpenDAL S3 parameter support (#6127)", [6127])]), true);
+  // Handwritten claim: no attribution tail.
+  assert.equal(isGeneratedEntry(claim("SSRF via the icon endpoint"), [commit("Fix icons")]), false);
+  // Attribution tail but the title diverges from the commit.
+  const c2 = claim("Something entirely different by @x in #7", [7]);
+  assert.equal(isGeneratedEntry(c2, [commit("Actual subject (#7)", [7])]), false);
+});
+
+test("isVagueClaim: no content tokens beyond boilerplate", () => {
+  assert.equal(isVagueClaim(claim("Updates and fixes by @BlackDex in #7235")), true);
+  assert.equal(isVagueClaim(claim("Misc updates and fixes by @BlackDex in #7406")), true);
+  assert.equal(isVagueClaim(claim("Reject unrecognised DATABASE_URL instead of silent SQLite fallback")), false);
+});
+
+test("hunkFunctions extracts declaration context from hunk headers", () => {
+  const patch = [
+    "@@ -10,4 +10,6 @@ pub async fn register_access(uuid: &str) -> Result<()> {",
+    "+    let x = 1;",
+    "@@ -50,2 +52,3 @@ impl SendHeaders",
+    "+    field: bool,",
+    "@@ -1,1 +1,2 @@ function handleClick(event) {",
+    "+  return;",
+    "@@ -7,1 +7,2 @@ func (s *Server) ServeHTTP(w http.ResponseWriter) {",
+    "+  x()",
+  ].join("\n");
+  const fns = hunkFunctions(patch);
+  assert.ok(fns.includes("register_access"));
+  assert.ok(fns.includes("SendHeaders"));
+  assert.ok(fns.includes("handleClick"));
+  assert.ok(fns.includes("ServeHTTP"), `Go method receiver: got ${fns.join(",")}`);
+  assert.ok(!fns.includes("func"));
+});
+
+test("parseSurplusOutput validates and caps items", () => {
+  const items = parseSurplusOutput(
+    'noise {"surplus":[{"description":"new endpoint /admin","file":"src/api.rs","notable":true},{"description":"comment fix","file":"a.rs","notable":false}],"reasoning":"x"} tail',
+  );
+  assert.equal(items.length, 2);
+  assert.equal(items[0].notable, true);
+  assert.equal(items[1].notable, false);
+  assert.deepEqual(parseSurplusOutput('{"surplus":[]}'), []);
+});
