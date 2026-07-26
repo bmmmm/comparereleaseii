@@ -70,6 +70,32 @@ export async function pooled<T, R>(
   return results;
 }
 
+/** Slice out one heading's body from markdown, matched by exact heading text. */
+export function extractMarkdownSection(markdown: string, heading: string): string | null {
+  const lines = markdown.split("\n");
+  const headingRe = /^(#{1,4})\s+(.*)$/;
+  let start = -1;
+  let level = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(headingRe);
+    if (m && m[2].trim() === heading) {
+      start = i;
+      level = m[1].length;
+      break;
+    }
+  }
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,4})\s/);
+    if (m && m[1].length <= level) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start + 1, end).join("\n").trim();
+}
+
 export function truncate(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   return text.slice(0, maxChars) + `\n… [truncated ${text.length - maxChars} chars]`;

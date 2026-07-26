@@ -29,7 +29,8 @@
   "files": [
     "bin/",
     "dist/",
-    "test/eval/golden.json"
+    "test/eval/golden.json",
+    "docs/writing-release-notes.md"
   ],
   "exports": {},
   "engines": {

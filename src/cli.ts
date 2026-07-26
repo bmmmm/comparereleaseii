@@ -20,6 +20,7 @@ import { toHtml } from "./html.ts";
 import { buildSnapshots, printTimeline } from "./history.ts";
 import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
 import { runWatch } from "./watch.ts";
+import { loadGuidelines } from "./guidelines.ts";
 import type { Report } from "./types.ts";
 
 const USAGE = `comparerelease — fact-check release notes against the actual code diff
@@ -28,6 +29,7 @@ Usage:
   comparerelease <owner/repo> [--tag <tag>] [--base <tag>]
   comparerelease --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
   comparerelease watch --config <file> [--notify <cmd>]
+  comparerelease guidelines [--full]
 
 Options:
   --tag <tag>         Release tag to check (default: latest release)
@@ -79,16 +81,25 @@ Watch mode (continuous release monitoring):
   A run only checks releases newer than the last run (state file) and
   regenerates <reports>/index.html; exit code is the worst of the batch.
 
+Guidelines (hand release-note writing rules to an LLM coding agent):
+  comparerelease guidelines >> AGENTS.md
+      --full   print the full writing-release-notes guide instead of the
+               condensed agent checklist
+
 Examples:
   comparerelease restic/restic --tag v0.19.1
   comparerelease juanfont/headscale --estimate
   comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
   comparerelease watch --config watch.json --notify 'ntfy publish releases'
+  comparerelease guidelines >> AGENTS.md
 `;
 
 async function main(): Promise<number> {
   if (process.argv[2] === "watch") {
     return runWatchCli(process.argv.slice(3));
+  }
+  if (process.argv[2] === "guidelines") {
+    return runGuidelinesCli(process.argv.slice(3));
   }
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -371,6 +382,22 @@ async function runWatchCli(argv: string[]): Promise<number> {
     reportsDir: values.reports,
     cache: !values["no-cache"],
   });
+}
+
+async function runGuidelinesCli(argv: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      full: { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  if (values.help) {
+    console.log(USAGE);
+    return 0;
+  }
+  console.log(await loadGuidelines({ full: values.full }));
+  return 0;
 }
 
 main()

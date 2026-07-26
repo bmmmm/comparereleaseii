@@ -7,6 +7,42 @@ to detect. Every rule below maps to something the checker actually measures
 (see [SCORING.md](../SCORING.md) for the exact formulas); this is that
 scoring logic read as instructions instead of as a grade.
 
+## Rules for AI coding agents
+
+Paste this section into your project's `AGENTS.md` or `CLAUDE.md` so any
+coding agent that touches release notes or a changelog follows it — or seed
+it directly:
+
+    comparerelease guidelines >> AGENTS.md
+
+When writing or editing a release note or changelog entry:
+
+- Name the mechanism, not just the outcome ("the count-and-increment in
+  `register_access()` is now a single atomic SQL UPDATE", not "fixed a
+  bypass").
+- Give any commit touching auth, crypto, CI/build config, or a dependency
+  manifest its own explicit line, even a one-sentence one, even if the diff
+  itself is small.
+- Never write a placeholder note ("misc fixes", "various improvements") for
+  a commit with any user-visible effect. A placeholder is only correct for
+  genuinely internal changes (formatting, comments, a behavior-preserving
+  refactor) — say that explicitly instead of being vague.
+- Before claiming something was removed, disabled, or no longer happens,
+  grep the code for it. A removal claim the diff contradicts is the most
+  damaging kind of release note there is.
+- Before considering the notes finished, run this tool against your own
+  diff and draft, and treat "Undocumented changes" in its output as
+  unfinished work, not as informational:
+
+      comparerelease --local . --base <previous-tag> --head <ref> \
+        --notes-file <your-draft> --suggest
+
+- Do not stop until that run reports zero undocumented commits on a
+  sensitive path (auth, crypto, CI/build, dependency manifests) and no
+  contradicted claims — both cap the trust score regardless of everything
+  else. Full rationale for each rule:
+  https://github.com/bmmmm/comparereleaseii/blob/main/docs/writing-release-notes.md
+
 ## 1. State the mechanism, not just the outcome
 
 The checker verifies a claim by finding diff evidence for it. A claim that

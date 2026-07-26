@@ -55,7 +55,12 @@ question — the judge lists notable changes the note *hides* and flags them.
 highest-churn undocumented commits, the judge drafts a release-note line from
 that commit's actual diff. See
 [docs/writing-release-notes.md](docs/writing-release-notes.md) for how to
-write notes that don't need this in the first place.
+write notes that don't need this in the first place — and hand the same
+rules to an LLM coding agent so it holds itself to them from the start:
+
+```console
+$ comparerelease guidelines >> AGENTS.md
+```
 
 Every run computes an explainable **trust score** (0–100, exact semantics in
 [SCORING.md](SCORING.md)) from three components:

@@ -70,3 +70,9 @@ Initial release.
   into concrete writing advice — what makes a claim verifiable, why vague
   entries hide surplus, and how to run the reverse check with `--suggest`
   before publishing.
+- `comparerelease guidelines` (`loadGuidelines`): prints a condensed,
+  agent-ready checklist extracted from writing-release-notes.md, meant to be
+  piped into a project's `AGENTS.md`/`CLAUDE.md` (`comparerelease guidelines
+  >> AGENTS.md`) so an LLM coding agent follows the same rules from the
+  start; `--full` prints the entire guide. One markdown file stays the
+  single source for both the human doc and the extracted checklist.
