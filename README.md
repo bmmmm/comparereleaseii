@@ -31,10 +31,12 @@ $ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine o
 - **Zero config**: `--model` is optional — the server's `/v1/models` list is
   queried and the model picked automatically (also in the fallback path when
   neither `claude` nor an API key is available but a local server is running).
-- **Calibrate YOUR model**: `--calibrate` runs the golden set against the
-  configured judge and tells you whether it is safe as a sole judge —
-  over-verification (rubber-stamping unsupported claims) is called out
-  explicitly.
+- **Calibrate YOUR model — or find your best one**: `--calibrate` runs the
+  golden set against the configured judge and tells you whether it is safe as
+  a sole judge — over-verification (rubber-stamping unsupported claims) is
+  called out explicitly. With `--engine openai` and no `--model`, every model
+  the server offers is calibrated sequentially and ranked (accuracy,
+  rubber-stamp risk, speed) with a "best local judge" recommendation.
 - **Escalation** (default `auto`): with a local primary judge,
   release-critical verdicts (`no_evidence`, `contradicted`, and `verified` on
   security claims) are independently reviewed by a stronger engine when one

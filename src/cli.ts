@@ -14,7 +14,13 @@ import {
 import { parseClaims } from "./claims.ts";
 import { selectEngine, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import { withVerdictCache } from "./cache.ts";
-import { runCalibration, printCalibration } from "./calibrate.ts";
+import {
+  runCalibration,
+  printCalibration,
+  calibrateModels,
+  printModelRanking,
+  rankCalibrations,
+} from "./calibrate.ts";
 import { commandExists } from "./util.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { computeMetrics } from "./metrics.ts";
@@ -47,7 +53,9 @@ Options:
                       primary judge is a local model (default: auto)
   --escalate-model <m> Model for the escalation engine
   --calibrate         Run the golden set against the configured judge and
-                      report whether YOUR model is good enough (no repo needed)
+                      report whether YOUR model is good enough (no repo needed).
+                      With --engine openai and no --model, ALL models on the
+                      server are calibrated and ranked to find the best judge
   --md <file>         Write a markdown report
   --json <file>       Write the full JSON report
   --html <file>       Write a self-contained visual HTML report
@@ -126,13 +134,32 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  const openaiBase =
+    values["openai-url"] ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
+
+  if (values.calibrate && engineName === "openai" && !values.model) {
+    // "Which of my local models is the best judge?" — calibrate them all.
+    const found = await discoverLocalModels(openaiBase);
+    if (found && !found.authRequired && found.models.length > 1) {
+      console.error(
+        `Found ${found.models.length} models on ${openaiBase} — calibrating all to find the best judge (sequential, one model at a time).`,
+      );
+      const cals = await calibrateModels(found.models, {
+        baseUrl: openaiBase,
+        apiKey: process.env.OPENAI_API_KEY,
+        cache: !values["no-cache"],
+      });
+      printModelRanking(cals);
+      const best = rankCalibrations(cals)[0];
+      return best && best.passed === best.outcomes.length ? 0 : 1;
+    }
+  }
+
   const { engine, escalate } = await buildEngines();
   async function buildEngines(): Promise<{ engine: JudgeEngine | null; escalate: JudgeEngine | null }> {
     if (judgeMode === "off") return { engine: null, escalate: null };
     let effective = engineName;
     let model = values.model;
-    const openaiBase =
-      values["openai-url"] ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
 
     if (effective === "claude-cli" && !(await commandExists("claude"))) {
       if (process.env.ANTHROPIC_API_KEY) {

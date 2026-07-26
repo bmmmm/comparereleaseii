@@ -134,6 +134,28 @@ test("selectEngine: openai needs an explicit model, then builds the engine", () 
   assert.equal(engine?.name, "openai/qwen3:8b@4096");
 });
 
+test("rankCalibrations: accuracy first, rubber-stamp risk second, speed last", async () => {
+  const { rankCalibrations } = await import("../src/calibrate.ts");
+  const cal = (model: string, passed: number, overVerified: number, avgMs: number | null) => ({
+    engine: `openai/${model}`,
+    model,
+    outcomes: new Array(8).fill({}),
+    passed,
+    overVerified,
+    avgMs,
+  });
+  const ranked = rankCalibrations([
+    cal("slow-accurate", 8, 0, 9000),
+    cal("fast-rubberstamp", 6, 2, 1000),
+    cal("fast-honest", 6, 0, 1000),
+    cal("cached-accurate", 8, 0, null),
+  ]);
+  assert.deepEqual(
+    ranked.map((r) => r.model),
+    ["slow-accurate", "cached-accurate", "fast-honest", "fast-rubberstamp"],
+  );
+});
+
 test("escalation engine overrides release-critical local verdicts", async () => {
   const data = {
     repoLabel: "t/t",
