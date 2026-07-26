@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { cacheDir, safeSegment } from "./paths.ts";
 import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
 import { ensureClone, loadLocalRange } from "./sources/local.ts";
 import { parseClaims, markCarriedOver } from "./claims.ts";
@@ -46,7 +46,11 @@ export async function loadGithubReleaseData(
   if (data.truncated) {
     console.error("Compare API truncated the diff — falling back to a partial clone…");
     try {
-      const dir = join(tmpdir(), "comparereleaseii-cache", "clones", repo.replace("/", "_"));
+      // A clone target in a shared temp dir is a symlink waiting to happen —
+      // git would happily follow it and write outside the cache.
+      const clones = await cacheDir("clones");
+      if (!clones) throw new Error("no private cache directory for the clone fallback");
+      const dir = join(clones, safeSegment(repo));
       await ensureClone(`https://github.com/${repo}.git`, dir);
       const range = await loadLocalRange(dir, data.baseRef, data.headRef);
       data = {

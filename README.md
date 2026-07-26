@@ -72,8 +72,10 @@ first, an LLM judge only for what remains unclear:
 4. **LLM judge** — claim + top hunks go to a model which rules `verified` /
    `partial` / `no-evidence` / `contradicted`, citing concrete evidence
    lines. Verdicts that would fail a release are confirmed by a 3-vote
-   median; all verdicts land in an on-disk cache — re-runs on unchanged data
-   are free and bit-identical.
+   median; all verdicts land in an on-disk cache
+   (`$XDG_CACHE_HOME/comparereleaseii`, else `~/.cache/comparereleaseii`,
+   mode 0700, keyed by tool version) — re-runs on unchanged data are free and
+   bit-identical. `--no-cache` skips it.
 
 The reverse (completeness) check flags commits whose changes no claim
 covers — auto-generated `Title by @user in #N` entries carry only ¼ weight

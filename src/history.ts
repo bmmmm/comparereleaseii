@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { cacheDir, safeSegment } from "./paths.ts";
 import { pooled, c } from "./util.ts";
 import { parseClaims } from "./claims.ts";
 import { anchorMatch, lexicalMatch } from "./match.ts";
@@ -48,24 +48,28 @@ interface GhRelease {
   draft: boolean;
 }
 
-const CACHE_DIR = join(tmpdir(), "comparereleaseii-cache");
-
 async function snapshotFor(
   repo: string,
   release: GhRelease,
   baseTag: string,
 ): Promise<ReleaseSnapshot> {
-  const cacheFile = join(
-    CACHE_DIR,
-    `${repo.replace(/\//g, "_")}-${baseTag}...${release.tag_name}.json`,
-  );
-  try {
-    const cached = JSON.parse(await readFile(cacheFile, "utf8")) as ReleaseSnapshot;
-    // Snapshots written before a field existed would silently read as
-    // undefined and skew every median built from them — rebuild instead.
-    if (typeof cached.lexicalCoverage === "number") return cached;
-  } catch {
-    // cache miss — build below
+  const dir = await cacheDir("snapshots");
+  // Tag names may contain slashes and dots — one path component, always.
+  const cacheFile = dir
+    ? join(
+        dir,
+        `${safeSegment(repo)}-${safeSegment(baseTag)}..${safeSegment(release.tag_name)}.json`,
+      )
+    : null;
+  if (cacheFile) {
+    try {
+      const cached = JSON.parse(await readFile(cacheFile, "utf8")) as ReleaseSnapshot;
+      // Snapshots written before a field existed would silently read as
+      // undefined and skew every median built from them — rebuild instead.
+      if (typeof cached.lexicalCoverage === "number") return cached;
+    } catch {
+      // cache miss — build below
+    }
   }
 
   const cmp = await fetchCompare(repo, baseTag, release.tag_name);
@@ -99,11 +103,12 @@ async function snapshotFor(
     newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, repo)))],
     authors: [...new Set(cmp.commits.map((commit) => commit.author))],
   };
-  try {
-    await mkdir(CACHE_DIR, { recursive: true });
-    await writeFile(cacheFile, JSON.stringify(snapshot));
-  } catch {
-    // cache is best-effort
+  if (cacheFile) {
+    try {
+      await writeFile(cacheFile, JSON.stringify(snapshot), { mode: 0o600 });
+    } catch {
+      // cache is best-effort
+    }
   }
   return snapshot;
 }
