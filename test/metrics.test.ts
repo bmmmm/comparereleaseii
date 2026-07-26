@@ -280,14 +280,17 @@ test("computeScores does not score unverifiable claims as false", () => {
   const sourceless = computeScores(claims, 0, [], true);
   assert.equal(sourceless.correctness, 100);
   assert.equal(sourceless.label, "unverified");
+  assert.ok(sourceless.overall <= 65);
 
   // Nothing was asserted at all — that is genuinely fine, not "unverified".
   assert.equal(computeScores([], 1, [], true).label, "solid");
 
-  // A claim that *was* checkable still counts, and its label is earned.
+  // A claim that *was* checkable still counts — but while others drop out of
+  // the ratio, the release reads as unverified, never as a clean bill.
   const mixed = computeScores([result("verified"), result("no-evidence")], 1, [], true);
   assert.equal(mixed.correctness, 100);
-  assert.equal(mixed.label, "solid");
+  assert.equal(mixed.label, "unverified");
+  assert.ok(mixed.overall <= 65, `capped, got ${mixed.overall}`);
   assert.equal(computeScores([result("verified"), result("no-evidence")], 1, []).correctness, 50);
 });
 
@@ -407,4 +410,65 @@ test("an undocumented auth path is critical only where the notes are otherwise c
   assert.equal(sev(0.5), "warn");
   // No reverse check ran — no basis to downgrade.
   assert.equal(sev(null), "critical");
+});
+
+test("machinery is source however its file is spelled", () => {
+  // requirements.txt ends in .txt and decides what runs on the next install;
+  // an SVG is markup that can carry <script>. Both used to make a release
+  // "sourceless", which waives the correctness ratio and the no-evidence gate.
+  for (const path of ["requirements.txt", "requirements-dev.txt", "assets/logo.svg"]) {
+    assert.equal(isSourceFile(path), true, path);
+  }
+  assert.equal(isSourcelessDiff([
+    { path: "requirements.txt", status: "modified", additions: 1, deletions: 0 },
+    { path: "CHANGELOG.md", status: "modified", additions: 3, deletions: 0 },
+  ]), false);
+  // Project metadata is still not code — and no longer "auth/crypto" either.
+  assert.equal(sensitiveCategory("AUTHORS"), null);
+  assert.equal(sensitiveCategory("CONTRIBUTORS"), null);
+  assert.equal(sensitiveCategory("requirements.txt"), "dependencies");
+});
+
+test("a critical finding outranks 'nothing here could be checked'", () => {
+  const data = releaseData(["docs/guide.md", "CHANGELOG.md"]);
+  const claims = [result("no-evidence")];
+  assert.equal(
+    classifyUnverifiable(data, claims, [], null)?.kind,
+    "sourceless",
+    "a genuine docs-only release still gets the carve-out",
+  );
+  const critical: RiskFlag[] = [
+    { severity: "critical", kind: "new-dependency", message: "new dependency", files: [], commitShas: [] },
+  ];
+  assert.equal(
+    classifyUnverifiable(data, claims, critical, null),
+    null,
+    "but not once this release itself tripped a critical flag",
+  );
+  assert.equal(
+    classifyUnverifiable(data, [result("contradicted")], [], null),
+    null,
+    "nor when a claim is contradicted",
+  );
+});
+
+test("an unprovable security claim is never excused by the repo's history", () => {
+  const data = releaseData(["src/app.js"]);
+  const baseline = {
+    snapshots: [0.1, 0.1, 0.2].map((lexicalCoverage) => ({
+      tag: "x", base: "y", date: null, commits: 1, files: 1, additions: 5, deletions: 5,
+      claims: 1, anchoredCoverage: 0.1, lexicalCoverage, sensitiveTouched: [], binaries: 0,
+      newDeps: [], authors: [],
+    })),
+    medianChurn: 10,
+    medianLexicalCoverage: 0.1,
+    knownAuthors: [],
+    everBinary: false,
+  };
+  const routine = [result("no-evidence"), result("no-evidence"), result("verified")];
+  assert.equal(classifyUnverifiable(data, routine, [], baseline)?.kind, "out-of-repo");
+
+  const security = [...routine];
+  security[0] = { ...security[0], claim: { ...security[0].claim, section: "Security fixes" } };
+  assert.equal(classifyUnverifiable(data, security, [], baseline), null);
 });

@@ -24,7 +24,9 @@ const AUTH_CRYPTO =
 const DOC_FILE = /\.(md|markdown|rst|txt|adoc|org)$/i;
 const TEST_FILE =
   /(^|\/)([\w-]*tests?|__tests__|spec|specs|testdata|fixtures)\/|_test\.[a-z0-9]+$|\.(test|spec)\.[a-z0-9]+$/i;
-const BENIGN_BINARY = /\.(png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot|pdf)$/i;
+// SVG is markup, not a picture: it carries <script> and event handlers, and a
+// site that ships one ships code. It belongs nowhere near "benign binary".
+const BENIGN_BINARY = /\.(png|jpe?g|gif|ico|webp|woff2?|ttf|eot|pdf)$/i;
 const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz|tar|7z)$/i;
 const SITE_METADATA = /(^|\/)(feed|atom|rss|sitemap)\.xml$|\.(rss|atom)$/i;
 const PROJECT_META =
@@ -36,6 +38,11 @@ const PROJECT_META =
  * them to anchor an identifier to.
  */
 export function isSourceFile(path: string): boolean {
+  // A dependency manifest, CI config or install hook is shipped machinery
+  // whatever its extension. requirements.txt ends in .txt and decides what
+  // code runs on the next install — calling that "no source in the diff"
+  // waived the check on the one file a supply-chain attack needs.
+  if (sensitiveCategory(path) !== null) return true;
   return !(
     DOC_FILE.test(path) ||
     isChangelogPath(path) ||
@@ -60,6 +67,13 @@ export function isSourcelessDiff(files: DiffFile[]): boolean {
  * path counts as a deliberate omission rather than one gap among many.
  */
 const WELL_DOCUMENTED = 0.6;
+
+/**
+ * Ceiling for a release whose claims dropped out of the correctness ratio.
+ * "Nobody could have checked this" is not a pass — it is the absence of one,
+ * and it must never read better than a release that was checked and had gaps.
+ */
+const UNVERIFIED_CAP = 65;
 
 /** A repo whose notes habitually describe code outside its own diff. */
 const OUT_OF_REPO_BASELINE = 0.25;
@@ -90,6 +104,13 @@ export function classifyUnverifiable(
   flags: RiskFlag[],
   baseline: Baseline | null,
 ): Unverifiable | null {
+  // These two guards belong in front of BOTH shapes. A docs-only diff that
+  // still adds a dependency, contradicts a claim or trips a critical flag is
+  // not "nothing to check here" — the finding is about this release, and it
+  // outranks any statement about the release's shape.
+  if (results.some((r) => r.verdict === "contradicted")) return null;
+  if (flags.some((f) => f.severity === "critical")) return null;
+
   if (isSourcelessDiff(data.files)) {
     return {
       kind: "sourceless",
@@ -97,13 +118,17 @@ export function classifyUnverifiable(
         "This release's diff contains no source-code changes — claims could not be checked against code.",
     };
   }
-  if (results.some((r) => r.verdict === "contradicted")) return null;
-  if (flags.some((f) => f.severity === "critical")) return null;
 
   const change = results.filter((r) => r.claim.kind === "change" && !r.claim.carriedOverFrom);
   if (!change.length) return null;
-  const missing = change.filter((r) => r.verdict === "no-evidence").length;
-  if (missing / change.length <= OUT_OF_REPO_RELEASE) return null;
+  const missing = change.filter((r) => r.verdict === "no-evidence");
+  if (missing.length / change.length <= OUT_OF_REPO_RELEASE) return null;
+  // "This repo publishes notes about code elsewhere" is a statement about
+  // routine releases. An unprovable *security* claim is never routine, and
+  // the baseline that would excuse it is written by the same publisher.
+  if (missing.some((r) => r.claim.advisories.length || /securit|vulnerab|cve/i.test(r.claim.section))) {
+    return null;
+  }
 
   // Same bar as the other baseline signals: fewer than 3 past releases is an
   // accident, not a pattern.
@@ -124,6 +149,9 @@ export function sensitiveCategory(path: string): string | null {
   // A markdown/rst file is never executable CI config or an install hook —
   // .github/CONTRIBUTING.md flagged as ci/build in the watchdog corpus.
   if (DOC_FILE.test(path)) return null;
+  // Nor is project metadata: AUTHORS matches the auth/crypto keyword list and
+  // an undocumented contributor-list change then fired a critical flag.
+  if (PROJECT_META.test(path) || SITE_METADATA.test(path) || isChangelogPath(path)) return null;
   if (CI_BUILD.test(path)) return "ci/build";
   // Tests about auth are not auth code (forwardauth_test.go would match the
   // keyword list and cap honest releases at "questionable" — release notes
@@ -567,12 +595,20 @@ export function computeScores(
   if (results.some((r) => r.verdict === "contradicted")) overall = Math.min(overall, 35);
   else if (flags.some((f) => f.severity === "critical")) overall = Math.min(overall, 45);
 
-  // Every checkable claim dropped out: correctness 100 means "nothing was
+  // Claims dropped out of the ratio: correctness then means "nothing was
   // found wrong", not "the notes were checked and hold". Calling that "solid"
   // would be the mirror of the bug this carve-out fixes — the score must read
-  // as unknown, not as a clean bill of health.
-  if (unverifiable && !change.length && all.length) {
-    return { correctness, completeness, risk, overall, label: "unverified" };
+  // as unknown, not as a clean bill of health. It is also the whole prize an
+  // attacker plays for: three cultivated releases with notes that miss their
+  // own diff turn a 25 into a 100 without touching this release at all.
+  if (unverifiable && all.length && change.length < all.length) {
+    return {
+      correctness,
+      completeness,
+      risk,
+      overall: Math.min(overall, UNVERIFIED_CAP),
+      label: "unverified",
+    };
   }
   const label =
     overall >= 85 ? "solid" : overall >= 65 ? "minor gaps" : overall >= 45 ? "questionable" : "suspicious";

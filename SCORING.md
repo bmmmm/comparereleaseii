@@ -135,7 +135,7 @@ construction.
 | 65–84 | minor gaps |
 | 45–64 | questionable |
 | < 45 | suspicious |
-| any | **unverified** — no claim could be checked here (below) |
+| ≤ 65 | **unverified** — claims dropped out of the ratio because they could not be checked here (below) |
 
 ## Unverified — releases that cannot be checked in this repo
 
@@ -152,7 +152,11 @@ In the JSON report this is one field: `metrics.unverifiable` is
 `{ kind, reason }` or `null`. Consumers branch on that, not on the score.
 
 The signal is the **diff's** file set, never the repo's language stats: a repo
-can be 80% Python and still ship a release that touches no source.
+can be 80% Python and still ship a release that touches no source. "Source"
+is decided by what the file *does*, not by its extension: a dependency
+manifest, CI config or install hook counts however it is spelled
+(`requirements.txt` decides what runs on the next install), and an SVG is
+markup that can carry a script, not a picture.
 
 `out-of-repo` deliberately costs more evidence, because "most claims miss" is
 also exactly what a fabricated release looks like. It is claimed only when all
@@ -162,17 +166,23 @@ of these hold:
 - the last ≥ 3 releases exist as a baseline, and their median **lexical
   coverage** (share of claims whose identifiers appear anywhere in that
   release's diff — deterministic, no judge) is ≤ 25 %
-- no claim is `contradicted` and no flag is `critical` — evidence *about this
-  release* outranks any pattern in the history
+- none of the missing claims is a security claim (an advisory ID, or a
+  section named for security): an unprovable security fix is never routine,
+  and the baseline that would excuse it is written by the same publisher
+
+Neither kind is claimed while this release itself disagrees with its notes:
+a `contradicted` claim or a `critical` flag blocks both, because evidence
+*about this release* outranks any statement about its shape.
 
 When either kind holds:
 
 - `no-evidence` claims leave the correctness ratio instead of scoring 0
 - the `unsupported-claim` **warn** flag becomes a `not-verifiable` **info**
   flag — no risk penalty
-- if that leaves *no* checkable claim, the label becomes `unverified`
-  regardless of the number — correctness 100 there means "nothing was found
-  wrong", not "the notes were checked and hold"
+- the label becomes `unverified` and the overall score is **capped at 65**.
+  Correctness 100 there means "nothing was found wrong", not "the notes were
+  checked and hold" — and a release nobody could check must never read better
+  than one that was checked and had gaps
 - reports (terminal, Markdown, JSON, HTML) carry the reason, and each affected
   claim says why it went unchecked
 - `--fail-on no-evidence` does not fail the build; the watch index tags the
