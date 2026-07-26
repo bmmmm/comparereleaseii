@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { assertCloneUrl, ensureClone, loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
 import { pickBaseRelease } from "./sources/github.ts";
@@ -21,7 +21,14 @@ import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
-import { buildSnapshots, printTimeline } from "./history.ts";
+import {
+  buildSnapshots,
+  cloneHistory,
+  githubHistory,
+  printTimeline,
+  type HistoryRelease,
+  type HistorySource,
+} from "./history.ts";
 import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
 import { runWatch } from "./watch.ts";
 import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
@@ -79,7 +86,9 @@ Options:
                       source-code changes — nothing could be checked there
   --no-reverse        Skip the completeness check (undocumented commits)
   --baseline <n>      Compare against the n previous releases for anomaly
-                      detection (default: 5, GitHub source only; 0 disables)
+                      detection (default: 5; 0 disables). Past releases come
+                      from the forge API, or from the tags the CHANGELOG
+                      documents when the host has none
   --suggest           Draft a release-note line for the highest-churn
                       undocumented commits (needs a judge engine)
   --suggest-limit <n> Max commits to draft for, highest churn first
@@ -189,11 +198,86 @@ async function main(): Promise<number> {
     throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
   }
 
-  if (values.history) {
-    if (values.local || values["repo-url"]) {
-      throw new Error("--history works with the GitHub source only.");
+  // Every forge speaks git, so a clone answers almost everything the check
+  // asks: diff, commits, subjects, authors, tags. Only the published notes and
+  // which tags are releases live on the forge, and one flat endpoint on
+  // Forgejo/Gitea and GitLab covers both. Without it — a plain git host, an
+  // air-gapped mirror, a token nobody exported — the CHANGELOG section is the
+  // fallback, which is what --local has always used.
+  let localPath = values.local;
+  let cloneUrl: string | undefined;
+  let forgeNotes: string | undefined;
+  let forgeBase: string | undefined;
+  let forgeLabel: string | undefined;
+  let forgeReleases: HistoryRelease[] | undefined;
+  if (values["repo-url"]) {
+    const url = assertCloneUrl(values["repo-url"]);
+    const clones = await cacheDir("clones");
+    if (!clones) {
+      throw new Error(
+        "--repo-url needs a private directory to clone into — set XDG_CACHE_HOME to a writable path.",
+      );
     }
-    const snapshots = await buildSnapshots(positionals[0], { count: Number(values.history) });
+    cloneUrl = url;
+    localPath = join(clones, safeSegment(url));
+    console.error(`Cloning ${url} (cached at ${localPath})…`);
+    await ensureClone(url, localPath);
+
+    const target = parseRepoUrl(url);
+    const forge = target && (await fetchForgeReleases(target));
+    if (target) forgeLabel = `${target.owner}/${target.repo}`;
+    if (forge) {
+      const wanted = values.tag ?? values.head;
+      const release = wanted
+        ? forge.releases.find((r) => r.tag_name === wanted)
+        : forge.releases.find((r) => !r.draft && !r.prerelease);
+      forgeReleases = forge.releases
+        .filter((r) => !r.draft && !r.prerelease)
+        .map((r) => ({
+          tag: r.tag_name,
+          notes: r.body,
+          date: r.published_at?.slice(0, 10) ?? null,
+        }));
+      if (release) {
+        forgeNotes = release.body;
+        forgeBase = pickBaseRelease(forge.releases, release.tag_name) ?? undefined;
+        values.head ??= release.tag_name;
+        console.error(
+          `Published notes for ${release.tag_name} from the ${forge.kind} API at ${target!.origin}.`,
+        );
+      } else if (wanted) {
+        console.error(
+          `${wanted} is not a published release on ${target!.origin} — falling back to the CHANGELOG section.`,
+        );
+      }
+    } else if (target) {
+      console.error(
+        `No Forgejo/Gitea or GitLab release API at ${target.origin} — using the CHANGELOG section for the notes.`,
+      );
+    }
+  }
+
+  // Where the baseline reads the repo's past releases. The clone answers the
+  // diffs either way; the notes come from the forge when it has an API and
+  // from the CHANGELOG when it does not.
+  const history: HistorySource | null = localPath
+    ? cloneHistory({
+        dir: localPath,
+        slug: forgeLabel ?? basename(localPath),
+        cacheKey: cloneUrl ?? `local:${localPath}`,
+        releases: forgeReleases,
+      })
+    : positionals[0]
+      ? githubHistory(positionals[0])
+      : null;
+
+  if (values.history) {
+    if (!history) {
+      throw new Error(
+        "--history needs a repository: pass owner/repo, --repo-url <url>, or --local <path>.",
+      );
+    }
+    const snapshots = await buildSnapshots(history, { count: Number(values.history) });
     printTimeline(snapshots);
     if (values.json) {
       await writeFile(values.json, JSON.stringify(snapshots, null, 2));
@@ -264,55 +348,6 @@ async function main(): Promise<number> {
       console.error(`JSON calibration written to ${values.json}`);
     }
     return cal.passed === cal.outcomes.length ? 0 : 1;
-  }
-
-  // Every forge speaks git, so a clone answers almost everything the check
-  // asks: diff, commits, subjects, authors, tags. Only the published notes and
-  // which tags are releases live on the forge, and one flat endpoint on
-  // Forgejo/Gitea and GitLab covers both. Without it — a plain git host, an
-  // air-gapped mirror, a token nobody exported — the CHANGELOG section is the
-  // fallback, which is what --local has always used.
-  let localPath = values.local;
-  let forgeNotes: string | undefined;
-  let forgeBase: string | undefined;
-  let forgeLabel: string | undefined;
-  if (values["repo-url"]) {
-    const url = assertCloneUrl(values["repo-url"]);
-    const clones = await cacheDir("clones");
-    if (!clones) {
-      throw new Error(
-        "--repo-url needs a private directory to clone into — set XDG_CACHE_HOME to a writable path.",
-      );
-    }
-    localPath = join(clones, safeSegment(url));
-    console.error(`Cloning ${url} (cached at ${localPath})…`);
-    await ensureClone(url, localPath);
-
-    const target = parseRepoUrl(url);
-    const forge = target && (await fetchForgeReleases(target));
-    if (target) forgeLabel = `${target.owner}/${target.repo}`;
-    if (forge) {
-      const wanted = values.tag ?? values.head;
-      const release = wanted
-        ? forge.releases.find((r) => r.tag_name === wanted)
-        : forge.releases.find((r) => !r.draft && !r.prerelease);
-      if (release) {
-        forgeNotes = release.body;
-        forgeBase = pickBaseRelease(forge.releases, release.tag_name) ?? undefined;
-        values.head ??= release.tag_name;
-        console.error(
-          `Published notes for ${release.tag_name} from the ${forge.kind} API at ${target!.origin}.`,
-        );
-      } else if (wanted) {
-        console.error(
-          `${wanted} is not a published release on ${target!.origin} — falling back to the CHANGELOG section.`,
-        );
-      }
-    } else if (target) {
-      console.error(
-        `No Forgejo/Gitea or GitLab release API at ${target.origin} — using the CHANGELOG section for the notes.`,
-      );
-    }
   }
 
   if (!localPath && !(await commandExists("gh"))) {
@@ -400,7 +435,13 @@ async function main(): Promise<number> {
     }
     console.log(`  LLM judge calls (auto): ${est.calls}, plus up to ${reserve} for retrieval rounds / second opinions`);
     console.log(`  Est. input ~${(inTokens / 1000).toFixed(0)}k tokens · wall clock ~${timeMin < 1 ? "<1" : timeMin.toFixed(0)} min via claude-cli · API cost ≈ $${apiCost.toFixed(2)} (haiku)`);
-    console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * Number(values.baseline)} (compare, per-commit diffs, baseline)`);
+    if (localPath) {
+      console.log(
+        `  Baseline: ${values.baseline} past release(s) diffed out of the clone — no API, but a blobless clone fetches their file contents on demand, so budget roughly one head-sized diff each.`,
+      );
+    } else {
+      console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * Number(values.baseline)} (compare, per-commit diffs, baseline)`);
+    }
     console.log(`  Verdict cache: repeated runs on unchanged data are free and deterministic.`);
     return 0;
   }
@@ -411,7 +452,8 @@ async function main(): Promise<number> {
     escalateEngine: escalate,
     concurrency: Number(values.concurrency),
     reverse: !values["no-reverse"],
-    baseline: localPath ? 0 : Number(values.baseline),
+    baseline: Number(values.baseline),
+    history,
     suggest: values.suggest,
     suggestLimit: Number(values["suggest-limit"]),
   };

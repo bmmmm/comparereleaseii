@@ -563,13 +563,32 @@ release notes, and which releases exist. So:
   public repos; a token env var per forge for private ones, never a config
   file.
   - **Landed 2026-07-26**, as `src/sources/forge.ts` — the whole non-git
-    surface, one file. Notes and base-picking work; **`--baseline` stays
-    GitHub-only** and that is the one part of this bullet not delivered:
-    `history.ts` builds its snapshots with `fetchCompare`, so making it
-    forge-agnostic means computing each past release's snapshot from the
-    clone. Doable with what is now in place, deliberately not done here.
+    surface, one file. Notes and base-picking worked; `--baseline` stayed
+    GitHub-only and was recorded here as the one part not delivered.
     Verified against gitea.com (`gitea/tea` v0.14.2): notes from the API,
     base `v0.14.1` from the release list, 15 of 24 claims anchored.
+  - **The baseline followed on 2026-07-27**, and the seam turned out to be one
+    interface rather than a second code path. A snapshot needs which tags are
+    releases plus their notes, and the diff of each against the one before —
+    GitHub answers both, which is why they had been one hardcoded pair of
+    calls. `HistorySource` splits them: `githubHistory()` keeps the API pair,
+    `cloneHistory()` takes the release list from the forge (or from the tags
+    the CHANGELOG documents, when the host has no API) and computes every
+    range with `loadLocalRange`. `--local` gained a baseline as a side effect,
+    and `--history` stopped being GitHub-only. Verified on gitea.com: five
+    releases of `gitea/tea`, dates from the API, diffs from the clone, and
+    the first-time-author flag firing off those snapshots.
+  - Two things worth keeping. `git for-each-ref` does **not** expand `%x1f` —
+    that escape belongs to `git log`, and the separator arrived as a literal
+    string, so the tag list parsed to nothing and the baseline was silently
+    empty rather than wrong. A refname cannot contain a space, so the date
+    goes first now and the first space separates. And a single release the
+    source cannot answer for used to cost the *whole* baseline: `snapshotFor`
+    threw up through `buildSnapshots` into a `.catch(() => null)` at the call
+    site, and the run continued with no baseline and nothing said. A clone
+    makes that ordinary — a tag the last fetch never got, a range whose blobs
+    the promisor remote refuses — so failures are now per snapshot, warned
+    about, and the rest survive.
   - Three failures only a live run produced. Node's `fetch` ignores
     `HTTP(S)_PROXY` unless `NODE_USE_ENV_PROXY=1` is set before startup — so
     behind a proxy `git` reaches the forge and the API does not, and the

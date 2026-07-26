@@ -120,6 +120,13 @@ integration. Private repos need a token in the environment —
 no such API answers, the notes fall back to `--notes-file` or the CHANGELOG
 section for the tag, and the run says which it used.
 
+`--baseline` and `--history` read that same list, so the anomaly baseline is
+not a GitHub feature either: past releases come from the forge API where there
+is one, and otherwise from the tags the CHANGELOG documents. Their diffs are
+computed from the clone. A blobless clone fetches file contents on demand, so
+budget roughly one head-sized diff per release in the baseline, or pass
+`--baseline 0`.
+
 > Behind an HTTP proxy, export `NODE_USE_ENV_PROXY=1` as well. Node only
 > honours `HTTP(S)_PROXY` for its own requests when that is set before it
 > starts, so otherwise `git` reaches the forge and the release API does not —

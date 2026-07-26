@@ -47,6 +47,8 @@ export interface GhRelease {
   body: string;
   prerelease: boolean;
   draft: boolean;
+  /** ISO timestamp; absent on sources that do not date their releases. */
+  published_at?: string | null;
 }
 
 interface GhCompareCommit {

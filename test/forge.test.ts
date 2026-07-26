@@ -78,7 +78,7 @@ test("fetchForgeReleases reads the Forgejo/Gitea shape", async () => {
       assert.equal(headers.Authorization, "token secret-forgejo");
       return {
         body: [
-          { tag_name: "v2.0.0", name: "v2.0.0", body: "## New\n- thing (#12)", draft: false, prerelease: false },
+          { tag_name: "v2.0.0", name: "v2.0.0", body: "## New\n- thing (#12)", draft: false, prerelease: false, published_at: "2026-05-04T09:00:00Z" },
           { tag_name: "v1.9.0", name: "v1.9.0", body: "older", draft: false, prerelease: false },
         ],
       };
@@ -90,6 +90,10 @@ test("fetchForgeReleases reads the Forgejo/Gitea shape", async () => {
         assert.equal(out?.kind, "forgejo");
         assert.deepEqual(out?.releases.map((r) => r.tag_name), ["v2.0.0", "v1.9.0"]);
         assert.match(out!.releases[0].body, /thing \(#12\)/);
+        // The baseline dates its snapshots from this — a release list without
+        // it would print a timeline of question marks.
+        assert.equal(out?.releases[0].published_at, "2026-05-04T09:00:00Z");
+        assert.equal(out?.releases[1].published_at, null);
       } finally {
         delete process.env.FORGEJO_TOKEN;
       }
@@ -105,7 +109,7 @@ test("fetchForgeReleases falls through to GitLab, which spells it differently", 
         assert.equal(headers["PRIVATE-TOKEN"], "secret-gitlab");
         return {
           body: [
-            { tag_name: "v3.1.0", name: "3.1", description: "- fixed (!44)", upcoming_release: false },
+            { tag_name: "v3.1.0", name: "3.1", description: "- fixed (!44)", upcoming_release: false, released_at: "2026-06-02T08:00:00Z" },
             { tag_name: "v3.2.0", name: "3.2", description: "planned", upcoming_release: true },
           ],
         };
@@ -117,9 +121,11 @@ test("fetchForgeReleases falls through to GitLab, which spells it differently", 
       try {
         const out = await fetchForgeReleases({ origin, owner: "group/sub", repo: "proj" });
         assert.equal(out?.kind, "gitlab");
-        // `description` is GitLab's `body`, `upcoming_release` its prerelease.
+        // `description` is GitLab's `body`, `upcoming_release` its prerelease,
+        // `released_at` its publication date.
         assert.equal(out?.releases[0].body, "- fixed (!44)");
         assert.equal(out?.releases[1].prerelease, true);
+        assert.equal(out?.releases[0].published_at, "2026-06-02T08:00:00Z");
         assert.ok(seen[0].includes("/api/v1/repos/"), "Forgejo shape tried first");
       } finally {
         delete process.env.GITLAB_TOKEN;

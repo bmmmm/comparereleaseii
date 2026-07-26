@@ -110,6 +110,62 @@ export function extractChangelogSection(changelog: string, tag: string): string 
   return lines.slice(start + 1, end).join("\n").trim();
 }
 
+/**
+ * Tag suffixes that mark something the maintainer did not consider finished.
+ * A baseline built from release candidates measures the churn of a repo's
+ * unfinished states, which is not the shape it is supposed to describe.
+ */
+const PRERELEASE_TAG = /-(?:alpha|beta|rc|pre|preview|dev|snapshot|nightly|next|canary)/i;
+
+/**
+ * The release history a clone can reconstruct without any forge: every tag
+ * the CHANGELOG documents, newest first.
+ *
+ * This is what `--local` gets, and what `--repo-url` falls back to on a host
+ * with no release API. It is deliberately the same text the check itself
+ * grades for these sources: a baseline built from published notes while the
+ * release under test is graded on its CHANGELOG section would measure the
+ * distance between two kinds of writing and report it as an anomaly.
+ *
+ * The tag scan is capped because the cost is one CHANGELOG search per tag,
+ * and a repo with thousands of tags would pay it for all of them to find five.
+ */
+export async function changelogReleases(
+  repo: string,
+  opts: { scanTags?: number } = {},
+): Promise<Array<{ tag: string; notes: string; date: string | null }>> {
+  let changelog: string;
+  try {
+    changelog = await readFile(join(repo, "CHANGELOG.md"), "utf8");
+  } catch {
+    return [];
+  }
+  // Date first, separated by a space: `for-each-ref` does not expand `%x1f`
+  // (that escape belongs to `git log`), and a refname cannot contain a space,
+  // so the first one is an unambiguous separator no tag name can fake.
+  const refs = await git(repo, [
+    "for-each-ref",
+    "--sort=-creatordate",
+    `--count=${opts.scanTags ?? 200}`,
+    "--format=%(creatordate:short) %(refname:short)",
+    "refs/tags",
+  ]);
+  const releases: Array<{ tag: string; notes: string; date: string | null }> = [];
+  for (const line of refs.split("\n").filter(Boolean)) {
+    const sep = line.indexOf(" ");
+    if (sep === -1) continue;
+    const date = line.slice(0, sep);
+    const tag = line.slice(sep + 1);
+    if (PRERELEASE_TAG.test(tag)) continue;
+    const notes =
+      extractChangelogSection(changelog, tag) ??
+      extractChangelogSection(changelog, tag.replace(/^v/, ""));
+    if (notes === null) continue;
+    releases.push({ tag, notes, date: date || null });
+  }
+  return releases;
+}
+
 const EXT_LANG: Record<string, string> = {
   rs: "Rust", ts: "TypeScript", tsx: "TypeScript", js: "JavaScript", jsx: "JavaScript",
   mjs: "JavaScript", py: "Python", go: "Go", rb: "Ruby", java: "Java", kt: "Kotlin",

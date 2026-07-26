@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { assertRepoSlug, ghApi } from "./sources/github.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
 import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
+import { githubHistory } from "./history.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
 import { safeSegment } from "./paths.ts";
@@ -538,6 +539,7 @@ export async function runWatch(
           concurrency: rc.concurrency ?? 4,
           reverse: true,
           baseline: rc.baseline ?? 5,
+          history: githubHistory(rc.repo),
         };
         const { data, context } = await loadGithubReleaseData(rc.repo, {
           tag: rel.tag,

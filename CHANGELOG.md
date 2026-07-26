@@ -35,6 +35,19 @@ tool is checked with the tool itself before it ships.
   and says which it used. Verified end to end against gitea.com — published
   notes for `gitea/tea` v0.14.2, base `v0.14.1` from the release list, 15 of
   24 claims anchored through Gitea's `/pulls/123` spelling.
+- **`--baseline` and `--history` work on any forge.** They were the one part
+  of `--repo-url` left behind: `history.ts` built every snapshot with GitHub's
+  compare API, so checking a Forgejo or GitLab release silently ran without the
+  anomaly baseline that catches unusual churn, first-time authors on sensitive
+  paths and first-ever binaries. A snapshot needs two things that do not come
+  from the same place — which tags are releases and what their notes say, and
+  the diff of each against the one before it. Splitting those apart is the
+  whole change: the notes half comes from the forge API, or from the tags the
+  CHANGELOG documents when the host has none; the diff half comes out of the
+  clone. `--local` gets a baseline for the first time as a result. Verified
+  against gitea.com: five past releases of `gitea/tea` with dates from the
+  Gitea API, diffs from the clone, and the first-time-author flag firing off
+  them.
 - Three things the live run found that no unit test would have:
   - **Node's `fetch` ignores `HTTP(S)_PROXY`** unless `NODE_USE_ENV_PROXY=1`
     is set before startup, and setting it from JS is too late. Behind a proxy

@@ -6,7 +6,9 @@ import { pooled, c } from "./util.ts";
 import { parseClaims } from "./claims.ts";
 import { anchorMatch, lexicalMatch } from "./match.ts";
 import { newDependencies, opacityIssue, sensitiveCategory } from "./metrics.ts";
-import { assertRepoSlug, ghApi, fetchCompare } from "./sources/github.ts";
+import { assertRepoSlug, ghApi, fetchCompare, type GhRelease } from "./sources/github.ts";
+import { changelogReleases, loadLocalRange } from "./sources/local.ts";
+import type { Commit, DiffFile } from "./types.ts";
 
 export interface ReleaseSnapshot {
   tag: string;
@@ -40,17 +42,78 @@ export interface Baseline {
   everBinary: boolean;
 }
 
-interface GhRelease {
-  tag_name: string;
-  body: string | null;
-  published_at: string | null;
-  prerelease: boolean;
-  draft: boolean;
+/** One past release, in the only shape a snapshot needs. */
+export interface HistoryRelease {
+  tag: string;
+  notes: string;
+  /** YYYY-MM-DD, or null when the source does not date its releases. */
+  date: string | null;
+}
+
+/**
+ * Where the baseline gets its history.
+ *
+ * A snapshot needs two things, and they do not come from the same place: which
+ * tags are releases and what their notes say, and the diff of each release
+ * against the one before it. GitHub answers both over its API, which is why
+ * this used to be one hardcoded pair of calls. Every other forge answers the
+ * first over its own API — or does not, and then the CHANGELOG in the clone
+ * does — while the diff comes out of the clone the check already made. The
+ * split is what lets --baseline leave GitHub.
+ */
+export interface HistorySource {
+  /**
+   * Namespaces the snapshot cache. Carries the host for anything but GitHub:
+   * two forges can each have an `owner/repo`, and those are not the same repo.
+   */
+  cacheKey: string;
+  /** owner/repo — the dependency heuristics use it to spot a repo's own packages. */
+  slug: string;
+  listReleases(): Promise<HistoryRelease[]>;
+  loadRange(base: string, head: string): Promise<{ commits: Commit[]; files: DiffFile[] }>;
+}
+
+/** History over the GitHub API: releases and compare, as before. */
+export function githubHistory(repo: string): HistorySource {
+  const slug = assertRepoSlug(repo);
+  return {
+    cacheKey: slug,
+    slug,
+    async listReleases() {
+      const releases = await ghApi<GhRelease[]>(`repos/${slug}/releases?per_page=100`);
+      return releases
+        .filter((r) => !r.draft && !r.prerelease)
+        .map((r) => ({
+          tag: r.tag_name,
+          notes: r.body ?? "",
+          date: r.published_at?.slice(0, 10) ?? null,
+        }));
+    },
+    loadRange: (base, head) => fetchCompare(slug, base, head),
+  };
+}
+
+/**
+ * History out of a git clone. `releases` is what a forge API answered, when one
+ * did; without it the clone's own tags and CHANGELOG are the release list.
+ */
+export function cloneHistory(opts: {
+  dir: string;
+  slug: string;
+  cacheKey: string;
+  releases?: HistoryRelease[];
+}): HistorySource {
+  return {
+    cacheKey: opts.cacheKey,
+    slug: opts.slug,
+    listReleases: async () => opts.releases ?? (await changelogReleases(opts.dir)),
+    loadRange: (base, head) => loadLocalRange(opts.dir, base, head),
+  };
 }
 
 async function snapshotFor(
-  repo: string,
-  release: GhRelease,
+  source: HistorySource,
+  release: HistoryRelease,
   baseTag: string,
 ): Promise<ReleaseSnapshot> {
   const dir = await cacheDir("snapshots");
@@ -58,7 +121,7 @@ async function snapshotFor(
   const cacheFile = dir
     ? join(
         dir,
-        `${safeSegment(repo)}-${safeSegment(baseTag)}..${safeSegment(release.tag_name)}.json`,
+        `${safeSegment(source.cacheKey)}-${safeSegment(baseTag)}..${safeSegment(release.tag)}.json`,
       )
     : null;
   if (cacheFile) {
@@ -72,8 +135,8 @@ async function snapshotFor(
     }
   }
 
-  const cmp = await fetchCompare(repo, baseTag, release.tag_name);
-  const claims = parseClaims(release.body ?? "");
+  const cmp = await source.loadRange(baseTag, release.tag);
+  const claims = parseClaims(release.notes);
   const covered = new Set<string>();
   for (const claim of claims) {
     for (const commit of anchorMatch(claim, cmp.commits).commits) covered.add(commit.sha);
@@ -88,9 +151,9 @@ async function snapshotFor(
     (claim) => lexicalMatch(claim, cmp.files).score > 0,
   ).length;
   const snapshot: ReleaseSnapshot = {
-    tag: release.tag_name,
+    tag: release.tag,
     base: baseTag,
-    date: release.published_at?.slice(0, 10) ?? null,
+    date: release.date,
     commits: cmp.commits.length,
     files: cmp.files.length,
     additions: cmp.files.reduce((s, f) => s + f.additions, 0),
@@ -100,7 +163,7 @@ async function snapshotFor(
     lexicalCoverage: changeClaims.length ? lexicalHits / changeClaims.length : 1,
     sensitiveTouched: [...categories],
     binaries: cmp.files.filter((f) => opacityIssue(f) === "binary file").length,
-    newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, repo)))],
+    newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, source.slug)))],
     authors: [...new Set(cmp.commits.map((commit) => commit.author))],
   };
   if (cacheFile) {
@@ -118,22 +181,34 @@ async function snapshotFor(
  * `before` restricts to releases strictly older than that tag (baseline use).
  */
 export async function buildSnapshots(
-  repo: string,
+  source: HistorySource,
   opts: { count: number; before?: string },
 ): Promise<ReleaseSnapshot[]> {
-  const releases = (await ghApi<GhRelease[]>(`repos/${assertRepoSlug(repo)}/releases?per_page=100`)).filter(
-    (r) => !r.draft && !r.prerelease,
-  );
+  const releases = await source.listReleases();
   let start = 0;
   if (opts.before) {
-    const i = releases.findIndex((r) => r.tag_name === opts.before);
+    const i = releases.findIndex((r) => r.tag === opts.before);
     if (i !== -1) start = i + 1;
   }
-  const pairs: Array<{ release: GhRelease; base: string }> = [];
+  const pairs: Array<{ release: HistoryRelease; base: string }> = [];
   for (let i = start; i < releases.length - 1 && pairs.length < opts.count; i++) {
-    pairs.push({ release: releases[i], base: releases[i + 1].tag_name });
+    pairs.push({ release: releases[i], base: releases[i + 1].tag });
   }
-  return pooled(pairs, 4, (p) => snapshotFor(repo, p.release, p.base));
+  const built = await pooled(pairs, 4, (p) =>
+    // One release the source cannot answer for used to cost the whole
+    // baseline: this threw all the way up into a `.catch(() => null)` at the
+    // call site, and the run continued with no baseline and nothing said. A
+    // clone makes that ordinary — a tag the fetch never got, a range whose
+    // blobs the promisor remote would not hand over.
+    snapshotFor(source, p.release, p.base).catch((err: Error) => {
+      console.error(
+        `warning: no baseline snapshot for ${p.release.tag} ` +
+          `(${err.message.split("\n")[0].slice(0, 120)}) — continuing without it.`,
+      );
+      return null;
+    }),
+  );
+  return built.filter((s): s is ReleaseSnapshot => s !== null);
 }
 
 function median(values: number[]): number {

@@ -8,7 +8,7 @@ import { parseClaims, markCarriedOver } from "./claims.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { computeMetrics } from "./metrics.ts";
-import { buildSnapshots, summarizeBaseline } from "./history.ts";
+import { buildSnapshots, summarizeBaseline, type HistorySource } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
 import type { ReleaseData, Report, RepoContext } from "./types.ts";
 
@@ -20,6 +20,8 @@ export interface CheckSettings {
   reverse: boolean;
   /** Number of previous releases for the anomaly baseline (0 disables). */
   baseline: number;
+  /** Where those releases come from — any forge, or null to skip the baseline. */
+  history?: HistorySource | null;
   /** Draft a release-note line for the highest-churn undocumented commits. */
   suggest?: boolean;
   /** Cap on how many uncovered commits get an LLM-drafted suggestion (cost bound). */
@@ -91,8 +93,8 @@ export async function analyzeRelease(
   );
 
   const baselinePromise =
-    repoSlug && s.baseline > 0
-      ? buildSnapshots(repoSlug, { count: s.baseline, before: data.headRef }).catch(() => null)
+    s.history && s.baseline > 0
+      ? buildSnapshots(s.history, { count: s.baseline, before: data.headRef }).catch(() => null)
       : Promise.resolve(null);
   const [results, baselineSnapshots] = await Promise.all([
     verifyClaims(data, claims, {

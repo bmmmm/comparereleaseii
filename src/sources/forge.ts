@@ -152,6 +152,7 @@ export async function fetchForgeReleases(
           body: r.body ?? "",
           draft: r.draft ?? false,
           prerelease: r.prerelease ?? false,
+          published_at: r.published_at ?? null,
         })),
     };
   }
@@ -174,6 +175,7 @@ export async function fetchForgeReleases(
           draft: false,
           // GitLab's scheduled-but-unpublished release is its prerelease.
           prerelease: r.upcoming_release ?? false,
+          published_at: r.released_at ?? null,
         })),
     };
   }
