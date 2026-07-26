@@ -6,6 +6,38 @@ tool is checked with the tool itself before it ships.
 
 ## Unreleased
 
+### Security
+
+- **The PR intake wrote the author's own claim text into the job summary.**
+  This repo keeps one rule for text written by the party under examination —
+  it is quoted, never rendered — and enforced it in the judge prompt and the
+  HTML report. The job summary was a third sink nobody had named. A claim
+  bullet is a single line and cannot open a heading, but the summary renders a
+  subset of HTML, so a pull request could place a table above the real verdict
+  rows and a reviewer would read "everything the review needs is here" off
+  markup the author supplied: the self-vouching this tool exists to catch,
+  aimed at the tool's own reviewer. Claims now sit in a fence that outgrows
+  the longest backtick run in them. This affects contributors to this repo,
+  not users of the tool — the workflow is `pull_request` with `contents: read`
+  and no secrets, so there is nothing to escalate and no advisory to file.
+  `AGENTS.md` now states that the list of untrusted-text sinks is open: a new
+  one inherits the rule instead of getting an exemption.
+- An unterminated `<!--` in a PR body survived comment stripping, so the
+  template's own guidance stayed in the section text that decides whether the
+  author filled the section in — the template answered for them. An
+  unterminated opener now swallows the rest, which reads as unanswered.
+
+### Fixed
+
+- Two documentation claims that the 0.1.2 audit itself had made false.
+  `AGENTS.md` still described the pre-audit verdict-cache key; the fix put the
+  tool version in front of it, so a release now invalidates the cache and
+  "reparsing does not" holds only within one version. And
+  `docs/local-models.md` contradicted itself in the space of ten lines —
+  "no absolute scores, because they don't transfer" directly above rows
+  carrying them. The scores are gone; what transfers (which case each model
+  missed, which it rubber-stamped, how slow it is) stays.
+
 ### Changed
 
 - `docs/local-models.md`: the local-judge table is re-measured against the
