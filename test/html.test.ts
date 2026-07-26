@@ -145,3 +145,34 @@ test("the watch index escapes a hostile tag, label and report path", () => {
   assertNoBreakout(html);
   assert.ok(!html.includes("<img/src=x"), "no payload became an element anywhere");
 });
+
+test("scoreRing gives unverified its own color, not the same bucket a genuine 65-84 gets", () => {
+  const genuine = toHtml(
+    report({
+      metrics: {
+        scores: { correctness: 70, completeness: 70, risk: 70, overall: 70, label: "minor gaps" },
+        flags: [],
+        files: [],
+        churnCoveredRatio: 1,
+        context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+        baseline: null,
+        unverifiable: null,
+      },
+    }),
+  );
+  const unverified = toHtml(
+    report({
+      metrics: {
+        scores: { correctness: 100, completeness: null, risk: 100, overall: 65, label: "unverified" },
+        flags: [],
+        files: [],
+        churnCoveredRatio: 1,
+        context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+        baseline: null,
+        unverifiable: { kind: "sourceless", reason: "no source" },
+      },
+    }),
+  );
+  const ringColor = (html: string) => html.match(/stroke="(#[0-9a-f]+)" stroke-width="10" stroke-linecap/)?.[1];
+  assert.notEqual(ringColor(unverified), ringColor(genuine));
+});

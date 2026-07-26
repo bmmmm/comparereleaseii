@@ -171,7 +171,18 @@ function scoreRing(score: number, label: string): string {
   const r = 52;
   const circ = 2 * Math.PI * r;
   const filled = (score / 100) * circ;
-  const color = score >= 85 ? "#3fb950" : score >= 65 ? "#d29922" : score >= 45 ? "#f0883e" : "#f85149";
+  // Unverified is its own color — a capped 65 must not read as the same
+  // "checked, minor gaps" yellow a genuinely-scored 65-84 gets.
+  const color =
+    label === "unverified"
+      ? "#a371f7"
+      : score >= 85
+        ? "#3fb950"
+        : score >= 65
+          ? "#d29922"
+          : score >= 45
+            ? "#f0883e"
+            : "#f85149";
   return `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="${r}" fill="none" stroke="#21262d" stroke-width="10"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" fill="#e6edf3">${score}</text><text x="60" y="80" text-anchor="middle" font-size="12" fill="#8b949e">${esc(label)}</text></svg>`;
 }
 

@@ -75,6 +75,37 @@ test("an unverifiable release is a category of its own, not suspicious", () => {
   assert.equal(normal.metrics.scores.label, "suspicious");
 });
 
+test("the note never disagrees with the score's own label", () => {
+  // Unverifiable classification held, but this particular claim still got
+  // real evidence (e.g. anchored by commit sha) — computeScores does not
+  // cap/label it "unverified" in that shape (see metrics.test.ts). The note
+  // must not claim otherwise: no "Not verifiable" banner next to a clean score.
+  const results = [claimResult("verified")];
+  const r: Report = {
+    repoLabel: "anthropics/claude-code",
+    baseRef: "v2.1.219",
+    headRef: "v2.1.220",
+    stats: { commits: 1, files: 2, additions: 12, deletions: 38 },
+    results,
+    uncovered: [],
+    reverseChecked: true,
+    metrics: {
+      scores: computeScores(results, 1, [], true),
+      flags: [],
+      files: [],
+      churnCoveredRatio: 1,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      baseline: null,
+      unverifiable: SOURCELESS,
+    },
+    warnings: [],
+    truncated: false,
+    engine: "off",
+  };
+  assert.notEqual(r.metrics.scores.label, "unverified");
+  assert.equal(unverifiableNote(r), null);
+});
+
 test("--fail-on no-evidence does not fail on an unverifiable release", () => {
   assert.equal(exitCode(report(SOURCELESS), "no-evidence"), 0);
   assert.equal(exitCode(report(OUT_OF_REPO), "no-evidence"), 0);

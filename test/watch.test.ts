@@ -120,6 +120,33 @@ test("toWatchIndexHtml distinguishes an unverifiable release from a score collap
   assert.equal(html.match(/class="tag"/g)?.length, 1, "only the fork row is tagged");
 });
 
+test("toWatchIndexHtml gives an unverified score its own bucket, not the same as a genuine mid score", () => {
+  const capped = checked("v2", 65, false);
+  capped.scoreLabel = "unverified";
+  capped.unverifiable = "sourceless";
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "sourceless/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v2",
+        latest: capped,
+        history: [capped],
+      },
+      // Same numeric range, but genuinely scored — different bucket.
+      "normal/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 70, false),
+        history: [checked("v1", 70, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z");
+  assert.ok(html.includes('class="score unverified"'), "capped score gets its own class");
+  assert.ok(html.includes('class="score mid"'), "genuinely-scored release keeps the numeric bucket");
+});
+
 test("toWatchIndexHtml marks flagged repos red and sorts them first", () => {
   const state: WatchState = {
     version: 1,

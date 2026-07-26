@@ -223,7 +223,10 @@ export function toWatchIndexHtml(
     });
   const pending = entries.filter((e) => !e.rs?.latest);
   const flaggedCount = withData.filter((e) => e.rs!.latest!.flagged).length;
-  const scoreClass = (s: number) => (s >= 85 ? "good" : s >= 65 ? "mid" : "bad");
+  // Unverified gets its own bucket, not folded into "mid" — a capped 65 for
+  // "could not be checked" must not look like a genuinely scored 65-84.
+  const scoreClass = (h: { score: number; scoreLabel: string }) =>
+    h.scoreLabel === "unverified" ? "unverified" : h.score >= 85 ? "good" : h.score >= 65 ? "mid" : "bad";
   const repoCell = (key: string, repo: string) =>
     repo.includes("/")
       ? `<a class="repo" href="https://github.com/${esc(repo)}" target="_blank" rel="noopener"${key === repo ? "" : ` title="${esc(repo)}"`}>${esc(key)}</a>`
@@ -241,7 +244,7 @@ export function toWatchIndexHtml(
               .slice(-6)
               .map(
                 (h) =>
-                  `<a href="${esc(h.report)}" title="${esc(h.tag)}: ${h.score}"><span class="dot ${scoreClass(h.score)}"></span></a>`,
+                  `<a href="${esc(h.report)}" title="${esc(h.tag)}: ${h.score}"><span class="dot ${scoreClass(h)}"></span></a>`,
               )
               .join("")
           : "";
@@ -256,7 +259,7 @@ export function toWatchIndexHtml(
 <td>${repoCell(key, repo)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
-<td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}${
+<td><span class="score ${scoreClass(l)}" title="judge: ${esc(l.engine)}${
         typeof l.scoreLevel === "number" ? ` · this repo's median: ${l.scoreLevel}` : ""
       }">${l.score}</span> ${esc(l.scoreLabel)}${
         typeof l.scoreLevel === "number" && l.score < l.scoreLevel - 20
@@ -305,10 +308,10 @@ tr.pending td{color:#59636e}
 .tag{display:inline-block;border:1px solid #58a6ff;color:#58a6ff;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .drop{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
 .level{color:#8b949e;font-size:.8em}
-.score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}
+.score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
 .comp{color:#59636e;white-space:nowrap}
 .dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:2px}
-.dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}
+.dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}.dot.unverified{background:#8250df}
 a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
 a.repo{color:inherit}a.ext{font-size:.85em}
 @media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}}

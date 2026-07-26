@@ -54,12 +54,16 @@ const CLAIM_NOTE: Record<UnverifiableKind, string> = {
  * Claims were made, but the release's shape means they could not be checked
  * here. Reported as its own category so a docs-only or fork release does not
  * read like a fabricated one. Null when the claims were genuinely checkable.
+ *
+ * Gated on the score's own label, not re-derived from claim kinds — the two
+ * must never disagree about whether this release is "unverified", or the
+ * report can show a clean score right next to a "not verifiable" note.
  */
 export function unverifiableNote(
   report: Report,
 ): { heading: string; reason: string; claimNote: string } | null {
   const u = report.metrics.unverifiable;
-  if (!u || !report.results.some((r) => r.claim.kind === "change")) return null;
+  if (!u || report.metrics.scores.label !== "unverified") return null;
   return { heading: HEADING[u.kind], reason: u.reason, claimNote: CLAIM_NOTE[u.kind] };
 }
 
@@ -136,7 +140,11 @@ export function printTerminal(report: Report): void {
   }
 
   const s = report.metrics.scores;
-  const scoreColor = s.overall >= 85 ? c.green : s.overall >= 65 ? c.yellow : c.red;
+  // Unverified gets its own color, never the same bucket a genuinely-scored
+  // 65-84 renders in — a capped "we don't know" must not read as "checked,
+  // minor gaps" just because it landed on the same number.
+  const scoreColor =
+    s.label === "unverified" ? c.cyan : s.overall >= 85 ? c.green : s.overall >= 65 ? c.yellow : c.red;
   console.log(
     `${c.bold("Trust score:")} ${scoreColor(`${s.overall}/100 (${s.label})`)} — ` +
       c.dim(
