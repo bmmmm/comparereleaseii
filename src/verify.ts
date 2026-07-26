@@ -22,9 +22,16 @@ import type {
 export interface VerifyOptions {
   judgeMode: "auto" | "all" | "off";
   engine: JudgeEngine | null;
+  /** Stronger second engine for release-critical verdicts (local-model setups). */
+  escalateEngine?: JudgeEngine | null;
   concurrency: number;
   maxHunks: number;
   maxEvidenceChars: number;
+}
+
+/** Claims where a wrong "verified" is most damaging (rubber-stamp risk). */
+function isSecuritySensitive(claim: Claim): boolean {
+  return claim.advisories.length > 0 || /securit|vulnerab|cve|advisor/i.test(claim.section);
 }
 
 function similarity(a: string, b: string): number {
@@ -297,9 +304,28 @@ export async function verifyClaims(
           if ("need" in response) throw new Error("judge kept requesting files");
         }
         let verdict = response;
-        if (verdict.verdict === "no-evidence" || verdict.verdict === "contradicted") {
-          // Score-relevant verdicts get two more independent passes; the
-          // median wins, so a single outlier cannot fail a release.
+        let escalated = false;
+        const severe = verdict.verdict === "no-evidence" || verdict.verdict === "contradicted";
+        const riskyVerified = verdict.verdict === "verified" && isSecuritySensitive(p.claim);
+        if (opts.escalateEngine && (severe || riskyVerified)) {
+          // Release-critical decision from a weaker primary engine: a stronger
+          // second engine reviews independently and its verdict wins.
+          try {
+            const second = parseJudgeResponse(
+              await opts.escalateEngine.judge(
+                promptFor(finalHunks, false, "\n(Escalation review by a second engine — judge independently.)"),
+              ),
+            );
+            if (!("need" in second)) {
+              verdict = second;
+              escalated = true;
+            }
+          } catch {
+            // keep the primary verdict if escalation fails
+          }
+        } else if (severe) {
+          // No escalation engine: two more independent passes; the median
+          // wins, so a single outlier cannot fail a release.
           const votes = [verdict];
           for (const pass of [2, 3]) {
             try {
@@ -322,7 +348,9 @@ export async function verifyClaims(
           evidence: {
             ...p.evidence,
             files: [...new Set([...p.evidence.files, ...verdict.files])],
-            methods: [...p.evidence.methods, "llm"],
+            methods: escalated
+              ? [...p.evidence.methods, "llm", "escalated"]
+              : [...p.evidence.methods, "llm"],
           },
           reasoning: verdict.reasoning,
           judged: true,

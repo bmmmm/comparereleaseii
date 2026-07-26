@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isGeneratedEntry, isVagueClaim, medianVerdict } from "../src/verify.ts";
+import { isGeneratedEntry, isVagueClaim, medianVerdict, verifyClaims } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
 import {
   parseSurplusOutput,
@@ -132,6 +132,45 @@ test("selectEngine: openai needs an explicit model, then builds the engine", () 
   assert.throws(() => selectEngine({ engine: "openai" }), /--model/);
   const engine = selectEngine({ engine: "openai", model: "qwen3:8b" });
   assert.equal(engine?.name, "openai/qwen3:8b@4096");
+});
+
+test("escalation engine overrides release-critical local verdicts", async () => {
+  const data = {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [],
+    files: [
+      {
+        path: "src/auth.rs",
+        status: "modified",
+        additions: 2,
+        deletions: 0,
+        patch: "@@ -1,1 +1,3 @@ fn check()\n+    validate_token();\n+    audit();\n",
+      },
+    ],
+    commitFiles: async () => [],
+    warnings: [],
+  };
+  const weak = {
+    name: "weak",
+    judge: async () =>
+      '{"verdict":"no_evidence","confidence":0.9,"files":[],"reasoning":"local model unsure"}',
+  };
+  const strong = {
+    name: "strong",
+    judge: async () =>
+      '{"verdict":"verified","confidence":0.95,"files":["src/auth.rs"],"reasoning":"token validation added"}',
+  };
+  const [result] = await verifyClaims(
+    data,
+    [claim("Add token validation to auth check")],
+    { judgeMode: "auto", engine: weak, escalateEngine: strong, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 },
+  );
+  assert.equal(result.verdict, "verified");
+  assert.ok(result.evidence.methods.includes("escalated"));
+  assert.equal(result.reasoning, "token validation added");
 });
 
 test("parseSurplusOutput validates and caps items", () => {

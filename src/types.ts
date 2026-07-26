@@ -59,6 +59,7 @@ export type MatchMethod =
   | "sha-anchor"
   | "lexical"
   | "llm"
+  | "escalated"
   | "generated"
   | "none";
 

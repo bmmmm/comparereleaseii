@@ -18,20 +18,33 @@ the [`claude`](https://code.claude.com) CLI (or `ANTHROPIC_API_KEY`) you get
 LLM-judged verdicts; without either, the tool degrades gracefully to the
 deterministic stages. `--estimate` previews the effort before the first run.
 
+### Local models
+
 Fully local judging works via any OpenAI-compatible server (Ollama, MLX,
-LM Studio, vLLM) — nothing leaves your machine:
+LM Studio, vLLM) — nothing leaves your machine, and no model is hardcoded:
 
 ```console
-$ node src/cli.ts owner/repo --engine openai --model qwen3:8b
-$ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine openai --model my-model
+$ node src/cli.ts owner/repo --engine openai            # auto-discovers the model
+$ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine openai
 ```
 
-Honest calibration: a local Qwen3.5-9B scores 6/8 on the golden set (`pnpm
-eval`) — fine for bulk verification, but it can over-verify subtle security
-claims where a refactor merely looks like a fix. For release-critical
-decisions prefer a stronger judge, or treat local `verified` on security
-claims with care. The parser tolerates small-model JSON quirks (unterminated
-objects are repaired).
+- **Zero config**: `--model` is optional — the server's `/v1/models` list is
+  queried and the model picked automatically (also in the fallback path when
+  neither `claude` nor an API key is available but a local server is running).
+- **Calibrate YOUR model**: `--calibrate` runs the golden set against the
+  configured judge and tells you whether it is safe as a sole judge —
+  over-verification (rubber-stamping unsupported claims) is called out
+  explicitly.
+- **Escalation** (default `auto`): with a local primary judge,
+  release-critical verdicts (`no_evidence`, `contradicted`, and `verified` on
+  security claims) are independently reviewed by a stronger engine when one
+  is available (`claude` CLI or `ANTHROPIC_API_KEY`). Disable with
+  `--escalate off`, or pin engine/model via `--escalate`/`--escalate-model`.
+- Small-model JSON quirks (unterminated objects, hidden thinking budgets)
+  are handled by the parser and request defaults.
+
+Reference point: a local Qwen3.5-9B scored 6/8 on the golden set — solid for
+bulk verification, with escalation covering exactly its weak spot.
 
 Release notes are claims. This tool verifies them: it takes a release, splits
 the notes into atomic claims, and checks each claim against the real diff

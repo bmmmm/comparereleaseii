@@ -12,8 +12,9 @@ import {
   localRepoContext,
 } from "./sources/local.ts";
 import { parseClaims } from "./claims.ts";
-import { selectEngine, type JudgeEngine } from "./judge.ts";
+import { selectEngine, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import { withVerdictCache } from "./cache.ts";
+import { runCalibration, printCalibration } from "./calibrate.ts";
 import { commandExists } from "./util.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { computeMetrics } from "./metrics.ts";
@@ -41,6 +42,12 @@ Options:
   --model <model>     Judge model (default: haiku; required for --engine openai)
   --openai-url <url>  Base URL for --engine openai
                       (default: $OPENAI_BASE_URL or http://127.0.0.1:11434/v1)
+  --escalate <what>   auto | off | claude-cli | api | openai — second, stronger
+                      engine that reviews release-critical verdicts when the
+                      primary judge is a local model (default: auto)
+  --escalate-model <m> Model for the escalation engine
+  --calibrate         Run the golden set against the configured judge and
+                      report whether YOUR model is good enough (no repo needed)
   --md <file>         Write a markdown report
   --json <file>       Write the full JSON report
   --html <file>       Write a self-contained visual HTML report
@@ -73,6 +80,9 @@ async function main(): Promise<number> {
       engine: { type: "string", default: "claude-cli" },
       model: { type: "string" },
       "openai-url": { type: "string" },
+      escalate: { type: "string", default: "auto" },
+      "escalate-model": { type: "string" },
+      calibrate: { type: "boolean", default: false },
       md: { type: "string" },
       json: { type: "string" },
       html: { type: "string" },
@@ -87,7 +97,7 @@ async function main(): Promise<number> {
     },
   });
 
-  if (values.help || (!positionals.length && !values.local)) {
+  if (values.help || (!positionals.length && !values.local && !values.calibrate)) {
     console.log(USAGE);
     return values.help ? 0 : 2;
   }
@@ -114,6 +124,105 @@ async function main(): Promise<number> {
       console.error(`\nJSON timeline written to ${values.json}`);
     }
     return 0;
+  }
+
+  const { engine, escalate } = await buildEngines();
+  async function buildEngines(): Promise<{ engine: JudgeEngine | null; escalate: JudgeEngine | null }> {
+    if (judgeMode === "off") return { engine: null, escalate: null };
+    let effective = engineName;
+    let model = values.model;
+    const openaiBase =
+      values["openai-url"] ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
+
+    if (effective === "claude-cli" && !(await commandExists("claude"))) {
+      if (process.env.ANTHROPIC_API_KEY) {
+        console.error("claude CLI not found — using the Anthropic API engine instead.");
+        effective = "api";
+      } else {
+        const found = await discoverLocalModels(openaiBase);
+        if (found && !found.authRequired && found.models.length) {
+          model ??= found.models[0];
+          console.error(
+            `claude CLI not found — using the local model server at ${openaiBase} (model ${model}).`,
+          );
+          effective = "openai";
+        } else {
+          console.error(
+            "claude CLI not found and ANTHROPIC_API_KEY is unset — running deterministic-only.\n" +
+              (found?.authRequired
+                ? `(A local server at ${openaiBase} responded but needs OPENAI_API_KEY.)\n`
+                : "") +
+              "For LLM-judged verdicts install Claude Code (https://code.claude.com), export ANTHROPIC_API_KEY, or start a local OpenAI-compatible server (Ollama/MLX).",
+          );
+          return { engine: null, escalate: null };
+        }
+      }
+    }
+
+    if (effective === "openai" && !model) {
+      const found = await discoverLocalModels(openaiBase);
+      if (found?.authRequired) {
+        throw new Error(`${openaiBase} requires an API key — export OPENAI_API_KEY.`);
+      }
+      if (!found?.models.length) {
+        throw new Error(
+          `No model server reachable at ${openaiBase} — start one (Ollama/MLX/vLLM) or pass --openai-url / --model.`,
+        );
+      }
+      model = found.models[0];
+      console.error(
+        `Local server: using model ${model}` +
+          (found.models.length > 1
+            ? ` (override with --model; also available: ${found.models.slice(1, 6).join(", ")})`
+            : "") +
+          ".",
+      );
+    }
+
+    let primary = selectEngine({ engine: effective, model, openaiUrl: values["openai-url"] });
+    if (primary && !values["no-cache"]) primary = withVerdictCache(primary);
+
+    const escOpt = values.escalate as "auto" | "off" | "claude-cli" | "api" | "openai";
+    if (!["auto", "off", "claude-cli", "api", "openai"].includes(escOpt)) {
+      throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
+    }
+    let second: JudgeEngine | null = null;
+    if (primary && escOpt !== "off") {
+      if (escOpt === "auto") {
+        // Only local primaries need a stronger reviewer by default.
+        if (effective === "openai") {
+          if (await commandExists("claude")) {
+            second = selectEngine({ engine: "claude-cli", model: values["escalate-model"] });
+          } else if (process.env.ANTHROPIC_API_KEY) {
+            second = selectEngine({ engine: "api", model: values["escalate-model"] });
+          }
+          if (second) {
+            console.error(
+              `Escalation engine for release-critical verdicts: ${second.name} (disable with --escalate off).`,
+            );
+          }
+        }
+      } else {
+        second = selectEngine({
+          engine: escOpt,
+          model: values["escalate-model"],
+          openaiUrl: values["openai-url"],
+        });
+      }
+      if (second && !values["no-cache"]) second = withVerdictCache(second);
+    }
+    return { engine: primary, escalate: second };
+  }
+
+  if (values.calibrate) {
+    if (!engine) {
+      throw new Error(
+        "--calibrate needs a judge engine (claude CLI, ANTHROPIC_API_KEY, or a local OpenAI-compatible server).",
+      );
+    }
+    const cal = await runCalibration(engine);
+    printCalibration(cal);
+    return cal.passed === cal.outcomes.length ? 0 : 1;
   }
 
   if (!values.local && !(await commandExists("gh"))) {
@@ -208,28 +317,6 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  let effectiveEngine = engineName;
-  if (judgeMode !== "off" && engineName === "claude-cli" && !(await commandExists("claude"))) {
-    if (process.env.ANTHROPIC_API_KEY) {
-      console.error("claude CLI not found — using the Anthropic API engine instead.");
-      effectiveEngine = "api";
-    } else {
-      console.error(
-        "claude CLI not found and ANTHROPIC_API_KEY is unset — running deterministic-only.\n" +
-          "For LLM-judged verdicts install Claude Code (https://code.claude.com) or export ANTHROPIC_API_KEY.",
-      );
-      effectiveEngine = "off";
-    }
-  }
-  let engine =
-    judgeMode === "off"
-      ? null
-      : selectEngine({
-          engine: effectiveEngine,
-          model: values.model,
-          openaiUrl: values["openai-url"],
-        });
-  if (engine && !values["no-cache"]) engine = withVerdictCache(engine);
   const baselineCount = Number(values.baseline);
   const baselinePromise =
     !values.local && baselineCount > 0
@@ -241,6 +328,7 @@ async function main(): Promise<number> {
     verifyClaims(data, claims, {
       judgeMode,
       engine,
+      escalateEngine: escalate,
       concurrency: Number(values.concurrency),
       maxHunks: 6,
       maxEvidenceChars: 20000,

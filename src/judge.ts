@@ -108,6 +108,33 @@ export function makeOpenAiEngine(model: string, baseUrl: string, apiKey?: string
   };
 }
 
+export interface LocalDiscovery {
+  models: string[];
+  authRequired: boolean;
+}
+
+/** Probe an OpenAI-compatible server for its model list (fast, best-effort). */
+export async function discoverLocalModels(baseUrl: string): Promise<LocalDiscovery | null> {
+  const url = `${baseUrl.replace(/\/+$/, "")}/models`;
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(1500),
+      headers: process.env.OPENAI_API_KEY
+        ? { authorization: `Bearer ${process.env.OPENAI_API_KEY}` }
+        : {},
+    });
+    if (res.status === 401 || res.status === 403) {
+      return { models: [], authRequired: true };
+    }
+    if (!res.ok) return null;
+    const data = (await res.json()) as { data?: Array<{ id?: string }> };
+    const models = (data.data ?? []).map((m) => m.id).filter((id): id is string => !!id);
+    return { models, authRequired: false };
+  } catch {
+    return null;
+  }
+}
+
 export function selectEngine(opts: {
   engine: "claude-cli" | "api" | "openai" | "off";
   model?: string;
