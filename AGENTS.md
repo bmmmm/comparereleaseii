@@ -70,16 +70,22 @@ not add a dependency, a build step, or a framework.
 - Comment only what the code cannot say — a constraint, a workaround, a
   surprising behaviour. The existing comments are the model: they explain *why*.
 - Match the surrounding style. No new abstraction layer for a single call site.
+- Push to `origin` (the private forge) as you go; push to the `github` remote
+  **only when cutting a release**. The public mirror is a record of releases,
+  not a live feed of work in progress — and every push to it is one more
+  chance for the pre-push leak gate to be the last line of defence rather
+  than a backstop. The gate is not a licence to push often.
 
 ## Traps
 
 - **Verdict spelling.** Internally and on the CLI it is `no-evidence`. The judge
   prompt asks the model for `no_evidence`, and `src/judge.ts` normalises both.
   This is intentional — do not "unify" it.
-- **The verdict cache.** The key is `sha256(engineName + prompt)`. Editing the
-  prompt invalidates entries automatically; changing how a *response is parsed*
-  does not, so old entries get re-read by your new parser. Verify parser changes
-  with `--no-cache`.
+- **The verdict cache.** The key is `sha256(version + engineName + prompt)`, and
+  the entry repeats all three so a stale file cannot be replayed under a new one.
+  Editing the prompt invalidates entries automatically, and so does a release;
+  changing how a *response is parsed* within one version does not, so old entries
+  get re-read by your new parser. Verify parser changes with `--no-cache`.
 - **Small-model tolerance.** The response parser deliberately accepts truncated
   and malformed JSON, and requests carry defaults for hidden thinking budgets.
   Tightening this breaks local models — read the comments in `src/judge.ts`
