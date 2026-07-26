@@ -356,6 +356,91 @@ tags (bitwarden — regression-covered in pickBaseRelease unit tests already).
   (the judge wanted to see whether the reader path took the lock too) — the
   fixture was incomplete, not the judge.
 
+## Iteration 4 — measure what 0.1.2 changed, then leave GitHub (2026-07-26)
+
+Two threads, deliberately in this order. The audit release moved every
+number the tool produces and nobody has seen what that does to real repos;
+and the tool still only speaks one forge, though its own data model has been
+forge-agnostic since day one.
+
+### 4.1 Re-run the watchlist under 0.1.2 — measure before building
+
+0.1.2 changed scoring in four ways that compound on real releases: a note
+echoing its own commit subject no longer settles a claim, an anchored claim
+without a judge tops out at `partial`, `judge-unavailable` is a new warn
+flag, and `watch` now flags a sliding level. Our own release check went 86 →
+82 from the anchored-path change alone. On an 11-repo watchlist of other
+people's projects that could read as sharper detection or as alert fatigue,
+and the two look identical from here.
+
+- Run the existing watchlist (`~/ops/release-watch/watch.json`, 11 repos,
+  `claude-cli`; state already holds 12 repos from the first run) against
+  0.1.2. **Set `XDG_CACHE_HOME` to a writable dir first** — without a usable
+  cache the judge varies between runs and none of the numbers below are
+  comparable (measured: 84 vs 90 on the same check).
+- For every repo, put the 0.1.2 score next to the one in the state file from
+  the first run, and attribute each move of more than 10 points to a cause:
+  which of the four changes did it, or is it genuine drift in that project's
+  notes? An unattributable move is the interesting finding.
+- Separate the two failure shapes explicitly: a repo that now scores lower
+  *and should* (the notes really do lean on commit-subject echo) versus one
+  that scores lower because the deterministic path got stricter while the
+  notes stayed honest. Only the second is a bug.
+- **Done when:** every repo's move is attributed, and the result says either
+  "the new defaults are right" or names the specific rule to soften — with
+  the release that proves it. That verdict is what Iteration 5 is built on,
+  the same way Iteration 3 came out of the first watchlist run.
+
+### 4.2 Forge-agnostic input: Forgejo, GitLab, and anything with git
+
+Today `owner/repo` means GitHub and nothing else, which rules out every
+self-hosted Forgejo and GitLab — including the forge this project's own
+`origin` lives on. The goal is that pointing the tool at a repository URL or
+a release URL does what it already does for GitHub.
+
+The cheap route is not one API adapter per forge. `ReleaseData`
+(`src/types.ts`) is already the forge-agnostic contract — `loadGithubRelease`
+and `loadLocalRelease` both satisfy it — and `ensureClone()`
+(`src/sources/local.ts`) already clones an arbitrary URL with
+`--filter=blob:none`. A clone answers almost every question the checker asks:
+diff, commits, subjects, authors, per-commit diffs, tags for the baseline,
+languages and cadence. Only two things genuinely live on the forge: the
+release notes, and which releases exist. So:
+
+- **4.2a — URL in, clone out, no new API.** `comparerelease --repo-url
+  <url> [--tag <t>]` clones (cached), resolves base/head from tags, and takes
+  notes from `--notes-file` or the CHANGELOG section, which `loadLocalRelease`
+  already does. This alone covers every forge on earth, including private and
+  air-gapped ones, and it ships without touching a single HTTP client. Worth
+  noting the clone diff is *better* than GitHub's: the API truncates large
+  compares (hence `truncated` in `ReleaseData`), a clone does not.
+- **4.2b — one endpoint per forge, only for notes and the release list.**
+  Forgejo/Gitea (`/api/v1/repos/{o}/{r}/releases`) and GitLab
+  (`/api/v4/projects/{id}/releases`) both expose a flat releases list. That
+  is the whole integration surface: notes text, tag name, published date —
+  enough for base-picking and the `--baseline` history. Compare, commits and
+  per-commit diffs stay on git. Auth: reuse whatever `git` already has for
+  public repos; a token env var per forge for private ones, never a config
+  file.
+- **4.2c — merge-request dialect.** `extractPrNumbers()` matches `(#123)` and
+  `Merge pull request #123`, both GitHub conventions. GitLab writes `!123`
+  and "See merge request group/proj!123"; Forgejo mostly follows GitHub.
+  Anchors are one of the deterministic verification stages, so a missing
+  dialect quietly costs evidence rather than erroring — needs a fixture per
+  forge in `test/fixtures/`.
+- **Stays GitHub-only, on purpose:** `watch init` builds its candidate list
+  from stars, watched repos and release notifications — inherently a GitHub
+  account feature. Other forges get repos via `watch add`, which is one line
+  and already forge-neutral once 4.2a lands.
+- **Done when:** the same release checks identically through `--repo-url`
+  against a self-hosted Forgejo repo and through `owner/repo` against its
+  GitHub mirror — this repo is its own fixture, since it is mirrored to both.
+
+**Why 4.1 first:** 4.2 widens the input surface. Widening it while the
+scoring behaviour underneath has just changed and has never been measured on
+real repos means any surprise afterwards has two possible causes instead of
+one.
+
 ## Order and why
 
 1 → 2 → 3. Distribution first because every later phase benefits from an
