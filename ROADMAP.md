@@ -135,6 +135,67 @@ change underneath us.
 
 ---
 
+## Iteration 2 — apply what the shakedown taught (2026-07-26)
+
+The phase-1–3 build validated the tool against 11 real repos and two judges;
+this iteration turns what that validation *found* into fixes. Priorities in
+order — each lands as its own commit series, validated the usual way.
+
+### 2.0 Consolidate the working tree (before anything else)
+The `--suggest` work in flight (suggest.ts plus changes across report/html/
+verify/cli) must be finished, tested and committed before new work starts —
+no feature work on a dirty tree. Going forward: one session per checkout,
+parallel sessions use worktrees.
+- **Done when:** `git status` clean, suite green, `--suggest` documented in
+  the README options table.
+
+### 2.1 Close the escalation gap — the highest-value 9B finding
+`isSecuritySensitive` escalates a local judge's `verified` only when the
+claim carries advisory anchors or sits in a Security-named section. The 9B
+rubber-stamped the setup.py install hook as verified under "Packaging
+cleanup" / "What's Changed" — production would NOT escalate that verdict.
+Extend the trigger: `verified` from a local primary also escalates when the
+matched evidence touches sensitive paths (dependency manifests, install
+hooks, lockfiles, auth/crypto — reuse `sensitiveCategory`).
+- **Done when:** a unit test proves the setup.py shape escalates, and every
+  attack-shape golden case routes through escalation with a local primary.
+
+### 2.2 Sharpen the need protocol; de-circularize changelog evidence
+Both judges dodge `need`: Haiku answered `partial` citing the CHANGELOG hunk
+(notes proving notes — circular), the 9B answered `no-evidence`. Two levers:
+tell the judge in the prompt when `need` is the right answer (claim names a
+file the hunks don't contain), and down-weight changelog/docs hunks as
+evidence for code claims.
+- **Done when:** Haiku passes the need case without regressing the rest,
+  and a changelog-only hunk no longer supports a code claim.
+
+### 2.3 Find the best local judge (issue #6, now unblocked)
+`--concurrency 1` made the full oMLX ranking runnable: 11 models × 20 cases,
+detached, roughly an hour. Include the #6 review list: need-misuse, timing
+skew, case validity.
+- **Done when:** the README reference point names the best local judge with
+  its score and #6 closes with the ranking table.
+
+### 2.4 False-positive sweep over the report corpus
+The watchdog shakedown caught two FP classes (docs and test files matching
+auth keywords) by reading real reports. tmp/watch-reports2 holds 11 of them
+— walk every flag, every FP becomes a class fix with a test; optionally
+widen the corpus to ~25 repos overnight.
+- **Done when:** every critical flag in the corpus is either true or fixed
+  as a class, and honest repos stay ≥ 65.
+
+### 2.5 Ship v0.1.0
+Run the local routine: `pnpm dogfood` → `--calibrate` → `pnpm publish` →
+push tags. The README's `uses: bmmmm/comparereleaseii@v0.1.0` becomes valid
+with the tag.
+- **Done when:** `pnpm dlx comparereleaseii` resolves from the registry and
+  the action ref works in a workflow.
+
+Process learnings applied outside the repo (global CLAUDE.md + project
+memory): clarify who releases from where BEFORE building release/CI infra;
+parallel sessions only in worktrees; `!`-handoff commands pinned (explicit
+`--model`) and detached.
+
 ## Order and why
 
 1 → 2 → 3. Distribution first because every later phase benefits from an
