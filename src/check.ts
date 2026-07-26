@@ -92,9 +92,19 @@ export async function analyzeRelease(
     `${claims.length} claims parsed from the notes of ${data.headRef}; verifying against ${data.commits.length} commits…`,
   );
 
+  // A single unbuildable snapshot already warns inside buildSnapshots; this
+  // catch is the wholesale failure (release listing down, clone unusable) —
+  // without a warning the report reads exactly like "too few releases".
   const baselinePromise =
     s.history && s.baseline > 0
-      ? buildSnapshots(s.history, { count: s.baseline, before: data.headRef }).catch(() => null)
+      ? buildSnapshots(s.history, { count: s.baseline, before: data.headRef }).catch(
+          (err: Error) => {
+            data.warnings.push(
+              `Baseline unavailable (${err.message.split("\n")[0].slice(0, 120)}) — anomaly comparison against past releases skipped.`,
+            );
+            return null;
+          },
+        )
       : Promise.resolve(null);
   const [results, baselineSnapshots] = await Promise.all([
     verifyClaims(data, claims, {
