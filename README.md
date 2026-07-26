@@ -45,9 +45,9 @@ Three ways to run it, the same CLI behind all of them:
 - **CI** — the repo doubles as a [GitHub Action](#run-it-continuously):
   `uses: bmmmm/comparereleaseii@v0.1.2`, nothing to clone.
 
-Requirements: Node ≥ 24, a judge, and an authenticated
-[`gh`](https://cli.github.com) for GitHub repos — `--repo-url` and `--local`
-use plain `git` and never call `gh`. As judge: the
+Requirements: Node ≥ 24, a judge, and whatever the source needs — see
+[Sources](#sources) below; GitHub wants an authenticated
+[`gh`](https://cli.github.com), everything else plain `git`. As judge: the
 [`claude`](https://code.claude.com) CLI (default), an `ANTHROPIC_API_KEY`, or
 any OpenAI-compatible server ([local models](docs/local-models.md)); without
 one, the tool degrades gracefully to the deterministic stages.
@@ -56,6 +56,46 @@ one, the tool degrades gracefully to the deterministic stages.
 the restic release above costs ~3 Haiku calls ≈ $0.01, a big one (vaultwarden
 1.37.0 — 45 claims across 90 files) ~13 calls ≈ $0.07. Re-runs hit the verdict
 cache and take seconds.
+
+## Sources
+
+| Source | How you name it | Published notes come from | Needs |
+|---|---|---|---|
+| GitHub | `owner/repo` | the GitHub release | authenticated `gh` |
+| Any other forge | `--repo-url <url>` | the forge's release API, else the CHANGELOG section for the tag | `git` |
+| A checkout you already have | `--local <path>` | the CHANGELOG section for the tag | `git` |
+
+`--notes-file` overrides all three, which is how you check a draft before it
+is published.
+
+**Why a clone is enough.** `--repo-url` clones the repository (cached, updated
+by fetch on later runs) and checks it exactly like `--local`, so Forgejo,
+GitLab, Gitea, a private server or an air-gapped mirror all work — a clone
+already answers the diff, the commits, the subjects, the authors and the tags.
+What a clone does *not* have is the published release notes and which tags are
+releases at all. One flat endpoint covers both — `/api/v1/repos/…/releases` on
+Forgejo/Gitea, `/api/v4/projects/…/releases` on GitLab — and that endpoint is
+the entire non-git integration. Private repos need a token in the environment
+(`FORGEJO_TOKEN`/`GITEA_TOKEN` or `GITLAB_TOKEN`, never a config file). Where
+no such API answers, the notes fall back to the CHANGELOG and the run says
+which it used.
+
+**`--baseline` and `--history` are not GitHub features either.** They read the
+same release list — the forge API where there is one, otherwise the tags the
+CHANGELOG documents — and compute each past release's diff from the clone. A
+blobless clone fetches file contents on demand, so budget roughly one
+head-sized diff per release in the baseline, or pass `--baseline 0`.
+
+> Behind an HTTP proxy, export `NODE_USE_ENV_PROXY=1` as well. Node only
+> honours `HTTP(S)_PROXY` for its own requests when that is set before it
+> starts, so otherwise `git` reaches the forge and the release API does not —
+> the run warns and falls back to the CHANGELOG rather than pretending.
+
+Checked against this repo, which is mirrored to both forges: `--repo-url`
+against the self-hosted Forgejo and `owner/repo` against the GitHub mirror
+return the same 25 commits, the same 35 files, the same verdicts and the same
+82/100. The clone path is also the *more* complete one — GitHub's compare API
+truncates large diffs at 300 files, a clone does not.
 
 ## How it works
 
@@ -84,10 +124,10 @@ fixes") flip the question: the judge lists what the note *hides*.
 
 Every run computes an explainable **trust score** (0–100) from correctness,
 completeness and risk. Contradicted claims or critical flags cap it — a fake
-release cannot average itself back to green. With `--baseline <n>` the
-repo's own release history becomes an anomaly baseline (unusual size,
-first-time authors on sensitive paths, first-ever binaries). Exact
-formulas, weights and flag severities: [SCORING.md](SCORING.md).
+release cannot average itself back to green. With `--baseline <n>` the repo's
+own release history becomes an anomaly baseline (unusual size, first-time
+authors on sensitive paths, first-ever binaries) — on any source, not just
+GitHub. Exact formulas, weights and flag severities: [SCORING.md](SCORING.md).
 
 Writing notes instead of checking them? `--suggest` drafts a line for each
 high-churn undocumented commit from its actual diff, and
@@ -108,46 +148,30 @@ $ gh comparereleaseii owner/repo --tag v2.0 --notes-file draft.md       # check 
 $ gh comparereleaseii --repo-url https://git.example.com/team/app.git --tag v1.3.0
 ```
 
-**Other forges.** `--repo-url` clones the repository (cached) and checks it
-exactly like `--local`, so Forgejo, GitLab, Gitea, a private server or an
-air-gapped mirror all work — a clone already answers the diff, the commits,
-the subjects, the authors and the tags. What a clone does not have is the
-*published* release notes and which tags are releases; one flat endpoint on
-Forgejo/Gitea (`/api/v1/repos/…/releases`) and GitLab
-(`/api/v4/projects/…/releases`) covers both, and is the entire non-git
-integration. Private repos need a token in the environment —
-`FORGEJO_TOKEN`/`GITEA_TOKEN` or `GITLAB_TOKEN`, never a config file. Where
-no such API answers, the notes fall back to `--notes-file` or the CHANGELOG
-section for the tag, and the run says which it used.
+Which release: `--tag` names it, `--base`/`--head` pin the range by hand, and
+without either it is the newest release. `--help` lists every option.
 
-`--baseline` and `--history` read that same list, so the anomaly baseline is
-not a GitHub feature either: past releases come from the forge API where there
-is one, and otherwise from the tags the CHANGELOG documents. Their diffs are
-computed from the clone. A blobless clone fetches file contents on demand, so
-budget roughly one head-sized diff per release in the baseline, or pass
-`--baseline 0`.
+### Reports
 
-> Behind an HTTP proxy, export `NODE_USE_ENV_PROXY=1` as well. Node only
-> honours `HTTP(S)_PROXY` for its own requests when that is set before it
-> starts, so otherwise `git` reaches the forge and the release API does not —
-> the run warns and falls back to the CHANGELOG rather than pretending.
+`--md`, `--json` and `--html`. The HTML report is a single file with no
+external assets: trust-score ring, verdict bar, risk flags, and a treemap of
+the diff — tile size is changed lines, color is documentation status, an
+amber border marks a sensitive path. An undocumented change in an auth path is
+one big red amber-bordered tile.
 
-Checked
-against this repo, which is mirrored to both forges: `--repo-url` against the
-self-hosted Forgejo and `owner/repo` against the GitHub mirror return the same
-25 commits, the same 35 files, the same verdicts and the same 82/100. The
-clone path is also the *more* complete one — GitHub's compare API truncates
-large diffs at 300 files, a clone does not.
+### Exit codes
 
-`--help` lists all options. Reports: `--md` / `--json` / `--html` — the HTML
-report is a single file with no external assets: trust-score ring, verdict
-bar, risk flags, and a treemap of the diff (tile size = changed lines, color
-= documentation status, amber border = sensitive path — an undocumented
-change in an auth path is one big red amber-bordered tile).
+| Code | Meaning |
+|---|---|
+| `0` | every claim supported |
+| `1` | unsupported or contradicted claims found — the CI gate |
+| `2` | usage or data error |
 
-Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
-found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
-lenient gate that tolerates unprovable claims (e.g. private advisories).
+`--fail-on contradicted` is the lenient gate: it tolerates claims the diff
+cannot prove (a private advisory, say) and fails only on ones the diff
+contradicts.
+
+### Releases that cannot be checked
 
 Not every release *can* be checked here: a docs-only bump, a changelog mirror
 of a closed-source product, a fork whose notes describe upstream code. Those
@@ -170,7 +194,9 @@ Details, calibration numbers and quirks: [docs/local-models.md](docs/local-model
 
 ## Run it continuously
 
-**On your machine — the release watchdog.** `watch init` builds the repo
+### On your machine — the release watchdog
+
+`watch init` builds the repo
 list from what your GitHub account already follows (watched, starred,
 release notifications), then `comparerelease watch --config watch.json`
 runs from cron/launchd: every new release is fact-checked the moment it
@@ -179,7 +205,9 @@ appears, per-repo state keeps re-runs cheap and alerts single-shot,
 releases to ntfy/mail/webhook. Config format, judge setup, cron/launchd
 snippets and a scheduled-CI variant: [docs/watchdog.md](docs/watchdog.md).
 
-**In CI — the GitHub Action.** The repo doubles as a composite action that
+### In CI — the GitHub Action
+
+The repo doubles as a composite action that
 checks a release's notes, writes the report to the step summary, uploads the
 HTML report as an artifact, and fails the job by the CLI's exit code:
 
@@ -247,6 +275,8 @@ $ pnpm eval    # judge eval against the golden set (needs an engine)
 ```
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
+
+### Releasing
 
 Releasing happens from a dev machine — no repo secrets, no CI involvement,
 the judge runs where it always runs for us: locally. Bump `package.json`
