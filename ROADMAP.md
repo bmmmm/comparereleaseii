@@ -148,6 +148,9 @@ no feature work on a dirty tree. Going forward: one session per checkout,
 parallel sessions use worktrees.
 - **Done when:** `git status` clean, suite green, `--suggest` documented in
   the README options table.
+- **Landed 2026-07-26:** consolidated as `4f80b6a` on top of the `--suggest`
+  series; suite green. `--suggest` is documented in `--help` and README
+  prose — the README options table no longer exists since the slim-down.
 
 ### 2.1 Close the escalation gap — the highest-value 9B finding
 `isSecuritySensitive` escalates a local judge's `verified` only when the
@@ -159,6 +162,9 @@ matched evidence touches sensitive paths (dependency manifests, install
 hooks, lockfiles, auth/crypto — reuse `sensitiveCategory`).
 - **Done when:** a unit test proves the setup.py shape escalates, and every
   attack-shape golden case routes through escalation with a local primary.
+- **Landed 2026-07-26:** `verified` from a local primary now also escalates
+  when the evidence paths hit a `sensitiveCategory`; setup.py unit test,
+  non-sensitive negative case, and an attack-shape golden sweep prove it.
 
 ### 2.2 Sharpen the need protocol; de-circularize changelog evidence
 Both judges dodge `need`: Haiku answered `partial` citing the CHANGELOG hunk

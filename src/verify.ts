@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { pooled, truncate } from "./util.ts";
 import { anchorMatch, functionsOf, lexicalMatch, rankHunks, tokenize } from "./match.ts";
+import { sensitiveCategory } from "./metrics.ts";
 import {
   buildJudgePrompt,
   buildSurplusPrompt,
@@ -306,7 +307,19 @@ export async function verifyClaims(
         let verdict = response;
         let escalated = false;
         const severe = verdict.verdict === "no-evidence" || verdict.verdict === "contradicted";
-        const riskyVerified = verdict.verdict === "verified" && isSecuritySensitive(p.claim);
+        // A security claim can hide under any section name ("Packaging
+        // cleanup"): a "verified" also escalates when the evidence behind it
+        // touches sensitive paths — install hooks, dependency manifests,
+        // lockfiles, auth/crypto — not only when the claim says "security".
+        const evidencePaths = [
+          ...finalHunks.map((h) => h.path),
+          ...verdict.files,
+          ...p.evidence.files,
+        ];
+        const riskyVerified =
+          verdict.verdict === "verified" &&
+          (isSecuritySensitive(p.claim) ||
+            evidencePaths.some((path) => sensitiveCategory(path) !== null));
         if (opts.escalateEngine && (severe || riskyVerified)) {
           // Release-critical decision from a weaker primary engine: a stronger
           // second engine reviews independently and its verdict wins.
