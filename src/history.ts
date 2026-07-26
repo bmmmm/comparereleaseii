@@ -6,7 +6,7 @@ import { pooled, c } from "./util.ts";
 import { parseClaims } from "./claims.ts";
 import { anchorMatch, lexicalMatch } from "./match.ts";
 import { newDependencies, opacityIssue, sensitiveCategory } from "./metrics.ts";
-import { ghApi, fetchCompare } from "./sources/github.ts";
+import { assertRepoSlug, ghApi, fetchCompare } from "./sources/github.ts";
 
 export interface ReleaseSnapshot {
   tag: string;
@@ -121,7 +121,7 @@ export async function buildSnapshots(
   repo: string,
   opts: { count: number; before?: string },
 ): Promise<ReleaseSnapshot[]> {
-  const releases = (await ghApi<GhRelease[]>(`repos/${repo}/releases?per_page=100`)).filter(
+  const releases = (await ghApi<GhRelease[]>(`repos/${assertRepoSlug(repo)}/releases?per_page=100`)).filter(
     (r) => !r.draft && !r.prerelease,
   );
   let start = 0;

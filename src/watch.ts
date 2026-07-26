@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
-import { ghApi } from "./sources/github.ts";
+import { assertRepoSlug, ghApi } from "./sources/github.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
 import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
 import { toMarkdown, exitCode } from "./report.ts";
@@ -460,7 +460,7 @@ export async function runWatch(
     try {
       const raw = await ghApi<
         Array<{ tag_name: string; published_at: string | null; prerelease: boolean; draft: boolean }>
-      >(`repos/${rc.repo}/releases?per_page=30`);
+      >(`repos/${assertRepoSlug(rc.repo)}/releases?per_page=30`);
       releases = raw.map((r) => ({
         tag: r.tag_name,
         publishedAt: r.published_at,

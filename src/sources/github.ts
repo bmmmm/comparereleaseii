@@ -8,6 +8,39 @@ export async function ghApi<T>(path: string): Promise<T> {
 }
 const ghJson = ghApi;
 
+const SLUG = /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/;
+
+/**
+ * API paths are built by concatenation, so anything interpolated into one
+ * decides which endpoint gets called. `gh api
+ * "repos/cli/cli/releases/tags/../../../../../user"` returns the
+ * authenticated user — under the caller's own token, into a report file.
+ */
+export function assertRepoSlug(repo: string): string {
+  if (!SLUG.test(repo) || repo.includes("..")) {
+    throw new Error(
+      `"${repo}" is not an owner/repo slug — expected something like cli/cli. Pass --local <path> to check a local checkout instead.`,
+    );
+  }
+  return repo;
+}
+
+/**
+ * A ref as path segments. Slashes stay: refs legitimately contain them
+ * (`release/1.0`) and both endpoints take them raw. Everything else that
+ * could re-shape the request is percent-encoded, and "." / ".." segments —
+ * which git forbids in a ref anyway — are refused.
+ */
+export function ref(value: string): string {
+  const parts = value.split("/");
+  if (parts.some((seg) => seg === "." || seg === "..")) {
+    throw new Error(
+      `"${value}" is not a usable ref: "." and ".." segments would walk the API path.`,
+    );
+  }
+  return parts.map(encodeURIComponent).join("/");
+}
+
 export interface GhRelease {
   tag_name: string;
   name: string;
@@ -67,7 +100,7 @@ export async function fetchCompare(
     total_commits: number;
     commits: GhCompareCommit[];
     files: GhFile[];
-  }>(`repos/${repo}/compare/${base}...${head}`);
+  }>(`repos/${assertRepoSlug(repo)}/compare/${ref(base)}...${ref(head)}`);
   return {
     commits: cmp.commits.map(toCommit),
     files: cmp.files.map(toDiffFile),
@@ -135,7 +168,7 @@ async function findBaseTag(
   repo: string,
   tag: string,
 ): Promise<{ tag: string; notes: string } | null> {
-  const releases = await ghJson<GhRelease[]>(`repos/${repo}/releases?per_page=100`);
+  const releases = await ghJson<GhRelease[]>(`repos/${assertRepoSlug(repo)}/releases?per_page=100`);
   const base = pickBaseRelease(releases, tag);
   if (!base) return null;
   // The list already carries every release's body — the carry-over check
@@ -153,7 +186,7 @@ async function findRootCommit(repo: string, ref: string): Promise<string | null>
   let sha = ref;
   for (let page = 0; page < 3; page++) {
     const commits = await ghJson<Array<{ sha: string; parents: Array<{ sha: string }> }>>(
-      `repos/${repo}/commits?sha=${sha}&per_page=100`,
+      `repos/${assertRepoSlug(repo)}/commits?sha=${encodeURIComponent(sha)}&per_page=100`,
     );
     if (!commits.length) return null;
     const oldest = commits[commits.length - 1];
@@ -174,9 +207,10 @@ export async function loadGithubRelease(opts: {
   base?: string;
 }): Promise<ReleaseData> {
   const warnings: string[] = [];
+  const repo = assertRepoSlug(opts.repo);
   const release = opts.tag
-    ? await ghJson<GhRelease>(`repos/${opts.repo}/releases/tags/${opts.tag}`)
-    : await ghJson<GhRelease>(`repos/${opts.repo}/releases/latest`);
+    ? await ghJson<GhRelease>(`repos/${repo}/releases/tags/${ref(opts.tag)}`)
+    : await ghJson<GhRelease>(`repos/${repo}/releases/latest`);
   const headRef = release.tag_name;
   let baseRef: string;
   let baseNotes: string | undefined;
@@ -184,16 +218,16 @@ export async function loadGithubRelease(opts: {
     baseRef = opts.base;
     // Explicit --base: fetch its notes on their own, best-effort (the ref may
     // be a plain commit or a tag without a release).
-    baseNotes = await ghJson<GhRelease>(`repos/${opts.repo}/releases/tags/${opts.base}`)
+    baseNotes = await ghJson<GhRelease>(`repos/${repo}/releases/tags/${ref(opts.base)}`)
       .then((r) => r.body ?? "")
       .catch(() => undefined);
   } else {
-    const base = await findBaseTag(opts.repo, headRef);
+    const base = await findBaseTag(repo, headRef);
     if (base) {
       baseRef = base.tag;
       baseNotes = base.notes;
     } else {
-      const root = await findRootCommit(opts.repo, headRef).catch(() => null);
+      const root = await findRootCommit(repo, headRef).catch(() => null);
       if (!root) {
         throw new Error(
           `${headRef} is ${opts.repo}'s first release, but no usable full-history base was found (single-commit history, unusual history shape, or a root deeper than ~300 commits). Pass --base <ref> explicitly or use a local clone (--local <path>).`,
@@ -206,7 +240,7 @@ export async function loadGithubRelease(opts: {
     }
   }
 
-  const cmp = await fetchCompare(opts.repo, baseRef, headRef);
+  const cmp = await fetchCompare(repo, baseRef, headRef);
 
   let truncated = false;
   if (cmp.commits.length < cmp.totalCommits) {
@@ -226,7 +260,7 @@ export async function loadGithubRelease(opts: {
   const commitFiles = (sha: string): Promise<DiffFile[]> => {
     let p = commitCache.get(sha);
     if (!p) {
-      p = ghJson<{ files: GhFile[] }>(`repos/${opts.repo}/commits/${sha}`).then((r) =>
+      p = ghJson<{ files: GhFile[] }>(`repos/${repo}/commits/${encodeURIComponent(sha)}`).then((r) =>
         r.files.map(toDiffFile),
       );
       commitCache.set(sha, p);
@@ -239,7 +273,7 @@ export async function loadGithubRelease(opts: {
     let p = prCache.get(n);
     if (!p) {
       p = ghJson<{ merge_commit_sha: string | null; merged_at: string | null }>(
-        `repos/${opts.repo}/pulls/${n}`,
+        `repos/${repo}/pulls/${encodeURIComponent(String(n))}`,
       )
         .then((pr) => (pr.merged_at ? pr.merge_commit_sha : null))
         .catch(() => null);
@@ -249,7 +283,7 @@ export async function loadGithubRelease(opts: {
   };
 
   return {
-    repoLabel: opts.repo,
+    repoLabel: repo,
     baseRef,
     headRef,
     notes: release.body ?? "",
@@ -275,8 +309,8 @@ export async function prefetchCommitFiles(
 export async function fetchGithubContext(repo: string): Promise<RepoContext> {
   try {
     const [languages, releases] = await Promise.all([
-      ghJson<Record<string, number>>(`repos/${repo}/languages`),
-      ghJson<Array<{ published_at: string | null }>>(`repos/${repo}/releases?per_page=20`),
+      ghJson<Record<string, number>>(`repos/${assertRepoSlug(repo)}/languages`),
+      ghJson<Array<{ published_at: string | null }>>(`repos/${assertRepoSlug(repo)}/releases?per_page=20`),
     ]);
     const codeBytes = Object.values(languages).reduce((s, b) => s + b, 0);
     const dates = releases

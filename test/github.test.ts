@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickBaseRelease, type GhRelease } from "../src/sources/github.ts";
+import { assertRepoSlug, pickBaseRelease, ref, type GhRelease } from "../src/sources/github.ts";
 
 function rel(tag_name: string, opts: { draft?: boolean; prerelease?: boolean } = {}): GhRelease {
   return { tag_name, name: tag_name, body: "", draft: opts.draft ?? false, prerelease: opts.prerelease ?? false };
@@ -74,4 +74,27 @@ test("pickBaseRelease: same-prefix candidates beyond a full page still resolve",
   // prefer returning it over the pass-the-page error.
   const releases = [rel("v3.0.0"), ...Array.from({ length: 99 }, (_, i) => rel(`v2.${99 - i}.0`))];
   assert.equal(pickBaseRelease(releases, "v3.0.0"), "v2.99.0");
+});
+
+test("API paths cannot be walked out of the repo they name", () => {
+  // `gh api "repos/cli/cli/releases/tags/../../../../../user"` returns the
+  // authenticated user — the path is concatenated, so whatever lands in it
+  // picks the endpoint. Refs cannot contain ".." (git forbids it), so this
+  // needs a hostile --base/--tag or a shared watch.json; the request still
+  // goes out under the caller's own token.
+  assert.throws(() => ref("../../../../../user"), /would walk the API path/);
+  assert.throws(() => ref("v1/./x"), /would walk the API path/);
+  assert.throws(() => assertRepoSlug("cli/cli/../.."), /owner\/repo slug/);
+  assert.throws(() => assertRepoSlug("../../etc"), /owner\/repo slug/);
+  assert.throws(() => assertRepoSlug("no-slash"), /owner\/repo slug/);
+  assert.throws(() => assertRepoSlug("a/b?x=1"), /owner\/repo slug/);
+
+  // Ordinary refs survive unchanged; slashes stay, the rest is encoded.
+  assert.equal(ref("v1.2.3"), "v1.2.3");
+  assert.equal(ref("release/1.0"), "release/1.0");
+  assert.equal(ref("cli-v2026.7.0"), "cli-v2026.7.0");
+  assert.equal(ref("v1 rc?x"), "v1%20rc%3Fx");
+  assert.equal(assertRepoSlug("cli/cli"), "cli/cli");
+  assert.equal(assertRepoSlug("zen-browser/desktop"), "zen-browser/desktop");
+  assert.equal(assertRepoSlug("user/repo.js"), "user/repo.js");
 });
