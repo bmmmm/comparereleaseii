@@ -30,19 +30,33 @@ explicitly.
 - Run calibration against single-model local servers with `--concurrency 1` —
   parallel prefills can trip their memory guards.
 
-Reference point: a local Qwen3.5-9B scored 13/20 on the golden set with 3
-rubber-stamps — all three on attack shapes (an install hook passed off as
-cleanup, a disabled-by-default lie, a refactor sold as a security fix). That
-is exactly the failure mode escalation exists for: fine for bulk
-verification, release-critical verdicts go to a stronger engine. (Haiku:
-19/20, zero rubber-stamps.)
+Reference point (full ranking of one MLX server's 11 models, 2026-07-26,
+`--concurrency 1`):
+
+| model | passed | over-verify | s/call |
+|---|---|---|---|
+| Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit | 19/20 | 0 | 46.3 |
+| gemma-4-12B-it 8bit | 19/20 | 1 | 10.4 |
+| Qwen3.6-35B-A3B 4bit-fp16 | 17/20 | 0 | 3.4 |
+| … | | | |
+| Qwen3.5-9B 4bit | 14/20 | 3 | 5.1 |
+
+The best local judge was the 27B distill — accurate but slow; the 35B MoE
+is the speed pick with zero rubber-stamps. The 9B's three rubber-stamps
+all hit attack shapes (an install hook passed off as cleanup, a
+disabled-by-default lie, a refactor sold as a security fix) — exactly the
+failure mode escalation exists for: fine for bulk verification,
+release-critical verdicts go to a stronger engine. (Haiku: 20/20, zero
+rubber-stamps — 6 cases ahead of the 9B, so the set discriminates.)
 
 ## Escalation
 
 With a local primary judge, `--escalate` (default `auto`) sends
-release-critical verdicts (`no-evidence`, `contradicted`, and `verified` on
-security claims) to a stronger engine for an independent review when one is
-available (`claude` CLI or `ANTHROPIC_API_KEY`). Disable with
+release-critical verdicts (`no-evidence`, `contradicted`, and `verified`
+where the claim or its evidence touches security-sensitive territory —
+advisories, Security sections, dependency manifests, lockfiles, install
+hooks, auth/crypto paths) to a stronger engine for an independent review
+when one is available (`claude` CLI or `ANTHROPIC_API_KEY`). Disable with
 `--escalate off`, or pin engine/model via `--escalate`/`--escalate-model`.
 
 ## Hosted aggregators (OpenRouter etc.)

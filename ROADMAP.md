@@ -186,6 +186,12 @@ detached, roughly an hour. Include the #6 review list: need-misuse, timing
 skew, case validity.
 - **Done when:** the README reference point names the best local judge with
   its score and #6 closes with the ranking table.
+- **Landed 2026-07-26:** full 11-model oMLX ranking ran post-2.2-prompts.
+  Best local judge: Qwen3.5-27B-Claude-4.6-Opus-Distilled (19/20,
+  over-verify 0, 46 s/call); speed pick Qwen3.6-35B-A3B fp16 (17/20, 0,
+  3.4 s/call); the 9B lands at 14/20 with 3 rubber-stamps. Haiku 20/20 —
+  6 cases ahead of the 9B. docs/local-models.md carries the table; #6
+  closes with it.
 
 ### 2.4 False-positive sweep over the report corpus
 The watchdog shakedown caught two FP classes (docs and test files matching
