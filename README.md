@@ -50,7 +50,7 @@ first, an LLM judge only for what remains unclear:
    are free and bit-identical.
 
 The reverse (completeness) check flags commits whose changes no claim
-covers — auto-generated "Title by @user in #N" entries carry only ¼ weight
+covers — auto-generated `Title by @user in #N` entries carry only ¼ weight
 (handwritten claims are where notes lie), and vague claims ("Updates and
 fixes") flip the question: the judge lists what the note *hides*.
 

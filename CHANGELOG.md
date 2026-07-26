@@ -31,8 +31,8 @@ Initial release.
 ### Added
 
 - Claim extraction: release notes are split into atomic claims by
-  `parseClaims`, with detection of auto-generated "Title by @user in #N" list
-  entries so handwritten claims carry the weight in scoring.
+  `parseClaims`, with detection of auto-generated `Title by @user in #N`
+  list entries so handwritten claims carry the weight in scoring.
 - Deterministic verification ladder in `verifyClaims`: PR/commit anchors are
   resolved against the release range, code identifiers from each claim are
   grepped in the changed lines, and a tf-idf hunk ranking selects the evidence
@@ -93,7 +93,8 @@ Initial release.
   before publishing.
 - `comparerelease guidelines` (`loadGuidelines`): prints a condensed,
   agent-ready checklist extracted from writing-release-notes.md, meant to be
-  piped into a project's `AGENTS.md`/`CLAUDE.md` (`comparerelease guidelines
-  >> AGENTS.md`) so an LLM coding agent follows the same rules from the
-  start; `--full` prints the entire guide. One markdown file stays the
-  single source for both the human doc and the extracted checklist.
+  piped into a project's `AGENTS.md`/`CLAUDE.md`
+  (`comparerelease guidelines >> AGENTS.md`) so an LLM coding agent follows
+  the same rules from the start; `--full` prints the entire guide. One
+  markdown file stays the single source for both the human doc and the
+  extracted checklist.

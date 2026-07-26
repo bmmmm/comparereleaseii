@@ -86,7 +86,7 @@ flags what should have been said and wasn't.
 
 ## 4. Auto-generated PR lists are a floor, not a ceiling
 
-GitHub's "Title by @user in #N" release-note generator produces claims that
+GitHub's `Title by @user in #N` release-note generator produces claims that
 are true by construction (they restate the commit they link), so the
 checker weights them at ¼ in the correctness score — they can't manufacture
 a high score by themselves. They're a fine starting point (they guarantee

@@ -40,7 +40,7 @@ value: verified = 1 · partial = 0.5 · no-evidence / contradicted = 0
 weight: handwritten claim = 1 · auto-generated entry = 0.25
 ```
 
-Auto-generated "Title by @user in #N" list entries are produced from the
+Auto-generated `Title by @user in #N` list entries are produced from the
 same commits we check them against — true by construction, so they carry ¼
 weight. Handwritten claims are where notes lie; they dominate this
 component. No checkable claims at all → correctness 100 (nothing asserted,
