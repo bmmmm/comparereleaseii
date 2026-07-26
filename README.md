@@ -130,10 +130,10 @@ repo's own release history to claim it:
 Any OpenAI-compatible server (Ollama, MLX, LM Studio, vLLM) works as judge —
 nothing leaves your machine, no model is hardcoded, `--model` is
 auto-discovered from `/v1/models`. `--calibrate` measures any candidate judge
-against a 23-case golden set (rubber-stamping is called out explicitly) and
-can rank every model your server offers; `--escalate auto` sends
-release-critical verdicts from a local judge to a stronger engine when one is
-available. Hosted aggregators (OpenRouter) work through the same engine.
+against a 25-case golden set (rubber-stamping and prompt injection are called
+out explicitly) and can rank every model your server offers; `--escalate auto`
+sends release-critical verdicts from a local judge to a stronger engine when
+one is available. Hosted aggregators (OpenRouter) work through the same engine.
 Details, calibration numbers and quirks: [docs/local-models.md](docs/local-models.md).
 
 ## Run it continuously
