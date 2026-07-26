@@ -16,6 +16,12 @@ tool is checked with the tool itself before it ships.
   A ```` ```sql ```` migration snippet under "Upgrade notes" produced
   fabricated change claims (and a `#` comment inside a fence even switched
   the section), each judging as no-evidence and dragging the score down.
+- **`--local`/`--repo-url` no longer diff a stable release against its own
+  release candidate.** The default base came from `git describe`, which
+  returns the nearest tag including `-rc`/`-beta` ones; the diff shrank to
+  rc..stable while the notes describe everything since the last stable, and
+  most claims read as unsupported. Prerelease tags are now skipped for
+  stable heads, matching what the GitHub path has always done.
 - **Changelog sections survive code fences.** A fenced example block whose
   lines start with `#` (a shell comment) ended the section early in both
   markdown extractors — for `--local`/`--repo-url` sources every claim after

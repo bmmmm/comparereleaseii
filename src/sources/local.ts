@@ -335,9 +335,18 @@ export async function loadLocalRelease(opts: {
   if (!base) {
     try {
       base = (await git(opts.repo, ["describe", "--tags", "--abbrev=0", `${head}^`])).trim();
+      // The GitHub path never baselines a stable release against an rc
+      // (pickBaseRelease skips prereleases for stable targets) — the clone
+      // path must not either, or the diff shrinks to rc..stable while the
+      // notes describe everything since the last stable.
+      if (!PRERELEASE_TAG.test(head)) {
+        while (PRERELEASE_TAG.test(base)) {
+          base = (await git(opts.repo, ["describe", "--tags", "--abbrev=0", `${base}^`])).trim();
+        }
+      }
     } catch {
       warnings.push(
-        `No tag before ${head} — treating it as the first release and checking against the full history.`,
+        `No ${PRERELEASE_TAG.test(head) ? "" : "stable "}tag before ${head} — treating it as the first release and checking against the full history.`,
       );
       base = EMPTY_TREE;
     }

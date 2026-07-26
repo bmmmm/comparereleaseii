@@ -225,3 +225,43 @@ test("a fetch that fails costs freshness, not the cached clone", async () => {
   const { stdout } = await exec("git", ["-C", clone, "tag", "-l"]);
   assert.match(stdout, /1\.0\.0/, "the cached clone survived and still answers");
 });
+
+test("loadLocalRelease skips prerelease tags when picking the base for a stable head", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
+  const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
+  await git("init", "-q");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(repo, "a.txt"), "one\n");
+  await git("add", "a.txt");
+  await git("commit", "-q", "-m", "first");
+  await git("tag", "v0.1.0");
+  await writeFile(join(repo, "b.txt"), "two\n");
+  await git("add", "b.txt");
+  await git("commit", "-q", "-m", "rc work");
+  await git("tag", "v0.2.0-rc1");
+  await writeFile(join(repo, "c.txt"), "three\n");
+  await git("add", "c.txt");
+  await git("commit", "-q", "-m", "stable work");
+  await git("tag", "v0.2.0");
+  await writeFile(
+    join(repo, "CHANGELOG.md"),
+    "# Changelog\n\n## 0.2.0\n\n- Added b.txt and c.txt support (#1)\n\n## 0.1.0\n\n- First\n",
+  );
+
+  // The GitHub path never baselines a stable release against an rc — the
+  // clone path must not either, or the diff shrinks to rc..stable while the
+  // notes describe everything since the last stable.
+  const data = await loadLocalRelease({ repo, head: "v0.2.0" });
+  assert.equal(data.baseRef, "v0.1.0");
+  assert.equal(data.commits.length, 2);
+
+  // A prerelease head keeps the nearest tag, prerelease or not — same as
+  // pickBaseRelease, which only filters prereleases for stable targets.
+  const rc = await loadLocalRelease({
+    repo,
+    head: "v0.2.0-rc1",
+    notesFile: join(repo, "CHANGELOG.md"),
+  });
+  assert.equal(rc.baseRef, "v0.1.0");
+});
