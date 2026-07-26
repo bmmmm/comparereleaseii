@@ -341,6 +341,20 @@ export async function runWatch(
   let checked = 0;
   let flaggedTotal = 0;
 
+  const configured: WatchedEntry[] = config.repos.map((entry) => {
+    const rc: WatchRepoConfig = { ...config.defaults, ...entry };
+    return { key: rc.label ?? rc.repo, repo: rc.repo };
+  });
+  // Regenerated after every check, not just at the end — a long first run
+  // over many repos should have a live dashboard, not a blank page.
+  const writeIndex = async () => {
+    await mkdir(reportsDir, { recursive: true });
+    await writeFile(
+      join(reportsDir, "index.html"),
+      toWatchIndexHtml(state, new Date().toISOString(), configured),
+    );
+  };
+
   for (const entry of config.repos) {
     const rc: WatchRepoConfig = { ...config.defaults, ...entry };
     const key = rc.label ?? rc.repo;
@@ -473,6 +487,7 @@ export async function runWatch(
         }
         // Persist after every successful check so a crash never re-alerts.
         await saveState(statePath, state);
+        await writeIndex();
       } catch (err) {
         console.error(`${key}: checking ${rel.tag} failed — ${(err as Error).message}`);
         codes.push(2);
@@ -481,15 +496,7 @@ export async function runWatch(
     }
   }
 
-  const configured: WatchedEntry[] = config.repos.map((entry) => {
-    const rc: WatchRepoConfig = { ...config.defaults, ...entry };
-    return { key: rc.label ?? rc.repo, repo: rc.repo };
-  });
-  await mkdir(reportsDir, { recursive: true });
-  await writeFile(
-    join(reportsDir, "index.html"),
-    toWatchIndexHtml(state, new Date().toISOString(), configured),
-  );
+  await writeIndex();
   await saveState(statePath, state);
   const exit = worstExit(codes);
   console.error(
