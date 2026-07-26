@@ -31,6 +31,8 @@ export interface ReleaseData {
    */
   resolvePr?(n: number): Promise<string | null>;
   warnings: string[];
+  /** Diff or commit list is incomplete (API caps) — a local clone would fix it. */
+  truncated?: boolean;
 }
 
 export type ClaimKind = "change" | "meta";

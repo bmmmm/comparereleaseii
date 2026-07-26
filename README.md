@@ -1,5 +1,7 @@
 # comparereleaseii
 
+[![release notes: checked](https://github.com/bmmmm/comparereleaseii/actions/workflows/check-release-notes.yml/badge.svg)](https://github.com/bmmmm/comparereleaseii/actions/workflows/check-release-notes.yml)
+
 Fact-check release notes against the actual code diff.
 
 Release notes are claims. This tool takes a release, splits the notes into
@@ -153,7 +155,7 @@ where everyone looks: `comment: true` appends the verdict to the release body
 API key. Checked releases can carry the badge:
 
 ```markdown
-[![release notes: checked](https://img.shields.io/badge/release_notes-checked-2da44e)](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml)
+[![release notes: checked](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml)
 ```
 
 ## Tested against release notes we admire

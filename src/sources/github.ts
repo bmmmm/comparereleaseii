@@ -8,7 +8,7 @@ export async function ghApi<T>(path: string): Promise<T> {
 }
 const ghJson = ghApi;
 
-interface GhRelease {
+export interface GhRelease {
   tag_name: string;
   name: string;
   body: string;
@@ -75,12 +75,19 @@ export async function fetchCompare(
   };
 }
 
-async function findBaseTag(repo: string, tag: string): Promise<string> {
-  const releases = await ghJson<GhRelease[]>(`repos/${repo}/releases?per_page=100`);
+/**
+ * Pick the base release from a (newest-first) release list, or null when the
+ * target is effectively the repo's first release: no earlier entry at all,
+ * only drafts (never published), or a stable following only prereleases
+ * (its notes describe everything since the last stable — which is nothing).
+ * Throws when the page is full — earlier releases may exist beyond it, so
+ * "first release" cannot be asserted.
+ */
+export function pickBaseRelease(releases: GhRelease[], tag: string): string | null {
   const idx = releases.findIndex((r) => r.tag_name === tag);
   if (idx === -1) {
     throw new Error(
-      `Release ${tag} not found among the latest 100 releases of ${repo}. Pass --base <tag> explicitly.`,
+      `Release ${tag} not found among the latest 100 releases. Pass --base <tag> explicitly.`,
     );
   }
   const target = releases[idx];
@@ -91,9 +98,43 @@ async function findBaseTag(repo: string, tag: string): Promise<string> {
     if (!target.prerelease && r.prerelease) continue;
     return r.tag_name;
   }
-  throw new Error(
-    `No previous release found before ${tag} in ${repo}. Pass --base <tag> explicitly.`,
-  );
+  if (releases.length >= 100) {
+    throw new Error(
+      `No usable base among the latest 100 releases before ${tag} — earlier ones may exist beyond the page. Pass --base <tag> explicitly.`,
+    );
+  }
+  return null;
+}
+
+/** Previous release tag, or null when this is the repo's first release. */
+async function findBaseTag(repo: string, tag: string): Promise<string | null> {
+  const releases = await ghJson<GhRelease[]>(`repos/${repo}/releases?per_page=100`);
+  return pickBaseRelease(releases, tag);
+}
+
+/**
+ * Root commit of the tag's history — the full-history base for a repo's
+ * first release (the compare API cannot diff against git's empty tree).
+ * Walks parents in 100-commit pages; the compare API caps at 250 commits
+ * anyway, so beyond ~300 the answer is "use --local".
+ */
+async function findRootCommit(repo: string, ref: string): Promise<string | null> {
+  let sha = ref;
+  for (let page = 0; page < 3; page++) {
+    const commits = await ghJson<Array<{ sha: string; parents: Array<{ sha: string }> }>>(
+      `repos/${repo}/commits?sha=${sha}&per_page=100`,
+    );
+    if (!commits.length) return null;
+    const oldest = commits[commits.length - 1];
+    if (!oldest.parents.length) {
+      // Root == the checked ref means a single-commit history — the compare
+      // API cannot diff a commit against nothing (no empty-tree endpoint).
+      if (page === 0 && commits.length === 1) return null;
+      return oldest.sha;
+    }
+    sha = oldest.parents[0].sha;
+  }
+  return null;
 }
 
 export async function loadGithubRelease(opts: {
@@ -106,16 +147,34 @@ export async function loadGithubRelease(opts: {
     ? await ghJson<GhRelease>(`repos/${opts.repo}/releases/tags/${opts.tag}`)
     : await ghJson<GhRelease>(`repos/${opts.repo}/releases/latest`);
   const headRef = release.tag_name;
-  const baseRef = opts.base ?? (await findBaseTag(opts.repo, headRef));
+  let baseRef = opts.base;
+  if (!baseRef) {
+    baseRef = (await findBaseTag(opts.repo, headRef)) ?? undefined;
+    if (!baseRef) {
+      const root = await findRootCommit(opts.repo, headRef).catch(() => null);
+      if (!root) {
+        throw new Error(
+          `${headRef} is ${opts.repo}'s first release, but no usable full-history base was found (single-commit history, unusual history shape, or a root deeper than ~300 commits). Pass --base <ref> explicitly or use a local clone (--local <path>).`,
+        );
+      }
+      warnings.push(
+        `No previous release before ${headRef} — treating it as the first release and checking against the full history (root ${root.slice(0, 10)}; the root commit itself is outside the compare range, use --local for full coverage).`,
+      );
+      baseRef = root;
+    }
+  }
 
   const cmp = await fetchCompare(opts.repo, baseRef, headRef);
 
+  let truncated = false;
   if (cmp.commits.length < cmp.totalCommits) {
+    truncated = true;
     warnings.push(
       `Compare API returned ${cmp.commits.length}/${cmp.totalCommits} commits — use a local clone (--local) for full coverage.`,
     );
   }
   if (cmp.files.length >= 300) {
+    truncated = true;
     warnings.push(
       `Compare API caps file lists at 300 — diff may be incomplete, use a local clone (--local) for full coverage.`,
     );
@@ -157,6 +216,7 @@ export async function loadGithubRelease(opts: {
     commitFiles,
     resolvePr,
     warnings,
+    truncated,
   };
 }
 

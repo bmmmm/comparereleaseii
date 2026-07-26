@@ -43,8 +43,7 @@ export async function loadGithubReleaseData(
     data.notes = await readFile(opts.notesFile, "utf8");
   }
 
-  const truncated = data.warnings.some((w) => w.includes("full coverage"));
-  if (truncated) {
+  if (data.truncated) {
     console.error("Compare API truncated the diff — falling back to a partial clone…");
     try {
       const dir = join(tmpdir(), "comparereleaseii-cache", "clones", repo.replace("/", "_"));
@@ -53,8 +52,9 @@ export async function loadGithubReleaseData(
       data = {
         ...data,
         ...range,
+        truncated: false,
         warnings: data.warnings
-          .filter((w) => !w.includes("full coverage"))
+          .filter((w) => !w.startsWith("Compare API"))
           .concat("Diff loaded from a local partial clone (compare API truncated)."),
       };
     } catch (err) {

@@ -4,6 +4,26 @@ All notable changes to comparereleaseii are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com); every release of this
 tool is checked with the tool itself before it ships.
 
+## Unreleased
+
+### Added
+
+- First-release fallback for the GitHub source: when a repo has no earlier
+  published release, the check now diffs against the root commit of the
+  tag's history (with a warning — the root commit itself sits outside the
+  compare range; `--local` covers it fully) instead of demanding `--base`.
+  A full 100-release page is not mistaken for a first release.
+- Dogfooding workflow `check-release-notes.yml`: every published release of
+  this repo is checked by the repo's own composite action, keyless
+  (`engine: "off"` — this repo carries no secrets); the README badge shows
+  the live status of that check.
+
+### Changed
+
+- Truncated API diffs are now signalled by an explicit `truncated` field on
+  the release data instead of substring-matching warning texts (which
+  misfired once a warning merely mentioned "full coverage").
+
 ## 0.1.0 — 2026-07-26
 
 Initial release.

@@ -1,0 +1,40 @@
+name: check-release-notes
+
+# Dogfooding our own gate: every published release of this repo is checked
+# by the composite action itself. Keyless by design (engine "off" — this
+# repo carries no secrets), so only the deterministic stages run: claim
+# anchoring, evidence matching, coverage and risk flags. The judged
+# red/green discrimination is validated locally before each release
+# (`pnpm dogfood`, see CHANGELOG). fail-on stays "contradicted" because
+# without a judge, honest-but-unproven handwritten claims must not fail
+# the job.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to check (default: latest release)"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        uses: ./
+        with:
+          tag: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+          engine: "off"
+          fail-on: contradicted
+          artifact-name: release-notes-report
+      - name: Show verdict
+        if: always()
+        env:
+          CODE: ${{ steps.check.outputs.exit-code }}
+          SCORE: ${{ steps.check.outputs.score }}
+        run: echo "score=$SCORE exit-code=$CODE"
