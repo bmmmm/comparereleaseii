@@ -4,7 +4,7 @@
 > packaging (the tarball ships compiled `dist/` because Node refuses to
 > strip types under `node_modules`; the roadmap's "ship src/" assumption was
 > wrong), the composite GitHub Action with a keyless smoke workflow, `watch`
-> mode with state/index/notify, the 23-case golden set, and SCORING.md.
+> mode with state/index/notify, the golden set, and SCORING.md.
 > One deliberate direction change against 1.1/3.2: this is a solo,
 > local-first project, so releasing is a local routine (`pnpm dogfood` gate
 > + `--calibrate` drift check + git tag + GitHub release) instead of a
@@ -229,7 +229,7 @@ with the tag.
   `tsconfig.build.json` cannot rot while unused. Verified end to end on
   2026-07-26 — `pnpm pack` → extract under `node_modules/` → run: help,
   `guidelines` (needs `docs/` from the tarball) and a full check all work,
-  the golden set resolves to 23 cases, and the report is byte-identical to
+  the golden set resolves from `dist/`, and the report is byte-identical to
   the same check run from `src/`.
 
 Process learnings applied outside the repo (global CLAUDE.md + project

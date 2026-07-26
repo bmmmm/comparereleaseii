@@ -45,6 +45,7 @@ that way — a dependency needs a strong argument.
 | `src/guidelines.ts` | `guidelines` — the agent checklist extracted from `docs/` |
 | `src/types.ts` | Data model — the `--json` schema lives here |
 | `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction |
+| `src/paths.ts` | Build version and the private cache/state directories |
 | `test/fixtures/*.md` | Real release notes, per dialect |
 | `test/eval/golden.json` | Judge cases with accepted verdicts |
 

@@ -45,6 +45,34 @@ test("copy-paste recipes pin the version in package.json", async () => {
   );
 });
 
+// The golden set's size is quoted as a selling point ("an N-case golden
+// set") and has drifted on every single change to the set so far, each time
+// leaving a doc behind. golden.json is the only source of truth for it.
+test("prose that counts golden cases matches golden.json", async () => {
+  const cases = JSON.parse(
+    await readFile(join(ROOT, "test/eval/golden.json"), "utf8"),
+  ) as unknown[];
+  const docs = (await readdir(join(ROOT, "docs")))
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => join("docs", f));
+
+  const counts: { file: string; said: string }[] = [];
+  for (const file of ["README.md", ...docs]) {
+    const text = await readFile(join(ROOT, file), "utf8");
+    // "23-case golden set" and "and 20\ngolden cases carry" both count.
+    for (const m of text.matchAll(/(\d+)[\s-]+(?:case\b|golden case)/gi)) {
+      counts.push({ file, said: m[1] as string });
+    }
+  }
+
+  assert.ok(counts.length >= 2, `expected the known counts, found ${counts.length}`);
+  assert.deepEqual(
+    counts.filter((c) => c.said !== String(cases.length)),
+    [],
+    `golden-case counts out of date — golden.json has ${cases.length}`,
+  );
+});
+
 // CONTRIBUTING.md and AGENTS.md are the map a contributor or coding agent
 // reads before touching anything. Both once listed 14 of 20 modules — watch
 // mode, --suggest and `guidelines` were invisible to whoever read them.

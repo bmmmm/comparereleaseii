@@ -40,6 +40,7 @@ not add a dependency, a build step, or a framework.
 | `src/watchlist.ts` | `watch init/add/remove/list` — repo list from your GitHub account |
 | `src/guidelines.ts` | `guidelines` — agent checklist extracted from `docs/` |
 | `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction |
+| `src/paths.ts` | Build version and the private cache/state directories |
 | `src/types.ts` | Data model — read this first |
 
 ## Rules
