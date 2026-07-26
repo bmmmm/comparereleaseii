@@ -214,8 +214,9 @@ $ pnpm eval    # judge eval against the golden set (needs an engine)
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
 
 Releasing happens from a dev machine — no repo secrets, no CI involvement,
-the judge runs where it always runs for us: locally. Bump `package.json`,
-write the version's [CHANGELOG.md](CHANGELOG.md) section, then:
+the judge runs where it always runs for us: locally. Bump `package.json`
+(`pnpm test` then names every recipe still pinning the old tag), write the
+version's [CHANGELOG.md](CHANGELOG.md) section, then:
 
 ```console
 $ pnpm dogfood                    # our notes checked by our own checker — < 90 blocks

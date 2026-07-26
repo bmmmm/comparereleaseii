@@ -22,6 +22,7 @@ not add a dependency, a build step, or a framework.
 | Path | Responsibility |
 |---|---|
 | `src/cli.ts` | Flags, orchestration, `--estimate` |
+| `src/check.ts` | One release end to end — shared by the CLI and watch mode |
 | `src/sources/github.ts` | Release data via `gh`, compare API, truncation fallback |
 | `src/sources/local.ts` | Local git ranges, CHANGELOG extraction, unified-diff parsing |
 | `src/claims.ts` | Notes → claims |
@@ -34,6 +35,11 @@ not add a dependency, a build step, or a framework.
 | `src/report.ts` | Terminal/markdown output, exit codes |
 | `src/html.ts` | HTML report |
 | `src/history.ts` | Timeline, baseline |
+| `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
+| `src/watch.ts` | Watch mode: state, per-repo runs, dashboard index, `--notify` |
+| `src/watchlist.ts` | `watch init/add/remove/list` — repo list from your GitHub account |
+| `src/guidelines.ts` | `guidelines` — agent checklist extracted from `docs/` |
+| `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction |
 | `src/types.ts` | Data model — read this first |
 
 ## Rules
@@ -41,7 +47,7 @@ not add a dependency, a build step, or a framework.
 - Start from `src/types.ts`. The data model is small and the whole pipeline is
   transformations over it.
 - Keep `// SPDX-License-Identifier: GPL-3.0-or-later` as the first line of every
-  source file.
+  source file — directly below the `#!` line where there is one.
 - Do not break the three public contracts: exit codes (`0`/`1`/`2`), the `--json`
   schema (`Report` in `src/types.ts`), and existing flag semantics. Additive is
   fine; removing, renaming or retyping is not.

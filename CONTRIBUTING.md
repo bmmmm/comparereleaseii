@@ -26,6 +26,7 @@ that way — a dependency needs a strong argument.
 | Path | Responsibility |
 |---|---|
 | `src/cli.ts` | Flags, orchestration, `--estimate` |
+| `src/check.ts` | One release end to end — shared by the CLI and watch mode |
 | `src/sources/github.ts` | Release data via `gh`, compare API, truncation fallback |
 | `src/sources/local.ts` | Local git ranges, CHANGELOG section extraction, unified-diff parsing |
 | `src/claims.ts` | Notes → claims (bullets, prose, sections, dedupe) |
@@ -38,6 +39,12 @@ that way — a dependency needs a strong argument.
 | `src/report.ts` | Terminal and markdown output, exit codes |
 | `src/html.ts` | Self-contained HTML report |
 | `src/history.ts` | Release timeline and anomaly baseline |
+| `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
+| `src/watch.ts` | Watch mode: state file, per-repo runs, dashboard index, `--notify` |
+| `src/watchlist.ts` | `watch init/add/remove/list` — build the repo list from your GitHub account |
+| `src/guidelines.ts` | `guidelines` — the agent checklist extracted from `docs/` |
+| `src/types.ts` | Data model — the `--json` schema lives here |
+| `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction |
 | `test/fixtures/*.md` | Real release notes, per dialect |
 | `test/eval/golden.json` | Judge cases with accepted verdicts |
 
