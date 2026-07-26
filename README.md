@@ -168,7 +168,7 @@ across that spread, it'll hold up on yours:
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 91 (solid) |
 | restic v0.19.1 | setext sections, issue anchors, cherry-picks | 90 (solid) |
 | vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (flags a few unprovable claims) |
-| vaultwarden 1.37.0, fabricated notes | — | 5 (suspicious), exit 1 |
+| negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 
 Checking vaultwarden 1.37.0 (45 claims, 27 commits, 90 files) shows the kind
 of value the checker adds: backing a terse security advisory with the actual

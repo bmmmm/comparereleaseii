@@ -401,6 +401,10 @@ export async function runWatch(
           notesFile: rc.notesFile ? resolve(configDir, rc.notesFile) : undefined,
         });
         const report = await analyzeRelease(data, context, rc.repo, settings);
+        // A labeled entry is not the repo's own release (e.g. a fabricated
+        // negative control, or draft notes) — say so in the report header
+        // instead of pinning the result on the innocent upstream repo.
+        if (rc.label) report.repoLabel = `${rc.repo} (${rc.label})`;
 
         const dir = join(reportsDir, key);
         await mkdir(dir, { recursive: true });

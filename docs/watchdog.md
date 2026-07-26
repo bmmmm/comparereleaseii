@@ -140,7 +140,10 @@ negative control — it must show up red in the index:
 ```
 
 (`label` keeps its state and reports separate from the honest vaultwarden
-entry; `notesFile` is resolved relative to the config file.)
+entry and is shown in the report header — `dani-garcia/vaultwarden
+(fabricated-control)` — so the red report can never be mistaken for
+vaultwarden's real release; `notesFile` is resolved relative to the config
+file.)
 
 ## Scheduling
 
