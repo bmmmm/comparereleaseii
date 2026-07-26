@@ -30,24 +30,38 @@ explicitly.
 - Run calibration against single-model local servers with `--concurrency 1` —
   parallel prefills can trip their memory guards.
 
-Reference point (full ranking of one MLX server's 11 models, 2026-07-26,
-`--concurrency 1`):
+```console
+$ node src/cli.ts --calibrate --engine openai \
+    --openai-url http://127.0.0.1:8010/v1 --concurrency 1
+```
 
-| model | passed | over-verify | s/call |
+## Which model should I pick? (community results)
+
+Rough direction only — no absolute scores, because they don't transfer:
+quantization, hardware and prompt versions all shift the numbers, and 20
+golden cases carry ±1–2 cases of noise. Run `--calibrate` against your own
+server for a real answer; the table below just saves you from starting
+blind.
+
+| model | verdict as judge | notes | reported |
 |---|---|---|---|
-| Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit | 19/20 | 0 | 46.3 |
-| gemma-4-12B-it 8bit | 19/20 | 1 | 10.4 |
-| Qwen3.6-35B-A3B 4bit-fp16 | 17/20 | 0 | 3.4 |
-| … | | | |
-| Qwen3.5-9B 4bit | 14/20 | 3 | 5.1 |
+| Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit | good — use with escalation | most accurate local judge tested, but slow (~45 s/call) | maintainer, 2026-07 |
+| Qwen3.6-35B-A3B MoE (4bit / fp16) | good — use with escalation | the speed pick: near-top accuracy at ~3–4 s/call | maintainer, 2026-07 |
+| gemma-4-12B-it 8bit | okay — escalation required | accurate but rubber-stamped an attack shape | maintainer, 2026-07 |
+| gpt-oss-20b (MXFP4-Q8 / OptiQ-4bit) | okay — escalation required | mid accuracy | maintainer, 2026-07 |
+| gemma-4-26b-a4b-it 4bit | okay — escalation required | mid accuracy, one rubber-stamp | maintainer, 2026-07 |
+| Qwen3.5-9B 4bit | avoid as sole judge | rubber-stamped three attack shapes (install hook as "cleanup", a disabled-by-default lie, a refactor sold as a security fix) | maintainer, 2026-07 |
+| gemma-4-e2b / e4b (edge) | avoid as sole judge | too small for verdict work | maintainer, 2026-07 |
+| MarkItDown | not a judge | document converter — listed to show the ranking flags non-LLMs instead of crashing | maintainer, 2026-07 |
 
-The best local judge was the 27B distill — accurate but slow; the 35B MoE
-is the speed pick with zero rubber-stamps. The 9B's three rubber-stamps
-all hit attack shapes (an install hook passed off as cleanup, a
-disabled-by-default lie, a refactor sold as a security fix) — exactly the
-failure mode escalation exists for: fine for bulk verification,
-release-critical verdicts go to a stronger engine. (Haiku: 20/20, zero
-rubber-stamps — 6 cases ahead of the 9B, so the set discriminates.)
+The pattern so far: dense ≥12B or MoE ≥30B works with escalation; below
+~10B the models rubber-stamp exactly the attack shapes the tool exists to
+catch. Escalation (below) covers that failure mode — the 9B is fine for
+bulk verification when release-critical verdicts go to a stronger engine.
+
+**Ran `--calibrate` on your own server? PRs welcome** — add a row with the
+model + quant, the verdict line the calibration printed, and anything
+surprising in notes. Misses are as useful as hits.
 
 ## Escalation
 

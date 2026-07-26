@@ -190,8 +190,9 @@ skew, case validity.
   Best local judge: Qwen3.5-27B-Claude-4.6-Opus-Distilled (19/20,
   over-verify 0, 46 s/call); speed pick Qwen3.6-35B-A3B fp16 (17/20, 0,
   3.4 s/call); the 9B lands at 14/20 with 3 rubber-stamps. Haiku 20/20 —
-  6 cases ahead of the 9B. docs/local-models.md carries the table; #6
-  closes with it.
+  6 cases ahead of the 9B. docs/local-models.md carries a coarse
+  community-results table (PRs welcome, no absolute scores — they don't
+  transfer); the exact dated ranking lives in #6.
 
 ### 2.4 False-positive sweep over the report corpus
 The watchdog shakedown caught two FP classes (docs and test files matching
