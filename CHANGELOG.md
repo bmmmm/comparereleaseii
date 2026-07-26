@@ -26,7 +26,14 @@ tool is checked with the tool itself before it ships.
   the model that obeys unfenced is the best judge on that server, and the 9B
   that rubber-stamps five ordinary attack shapes never obeyed at all. Noted
   against our own set: `injected-rules-override-in-hunk` was obeyed by nobody
-  in either arm, so it currently proves only that the set contains it.
+  in either arm, so it currently proves only that the set contains it. The
+  attempt to find a replacement is unresolved and the reason is worth keeping:
+  a sweep of six payload shapes returned zero obeyed across four models, but
+  its one known-working shape had been rebuilt from memory rather than reused —
+  payload after the code instead of before it, and the JSON it told the model
+  to emit elided to `{...}`, i.e. not copyable. With no working payload in the
+  set, "nothing obeyed" measured the harness. A test for injections needs a
+  positive control like any other.
 
 ## 0.1.2 — 2026-07-26
 
