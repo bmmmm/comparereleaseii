@@ -4,6 +4,22 @@ All notable changes to comparereleaseii are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com); every release of this
 tool is checked with the tool itself before it ships.
 
+## Unreleased
+
+### Changed
+
+- `docs/local-models.md`: the local-judge table is re-measured against the
+  golden set and the fenced prompt as of 0.1.2. The
+  Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit moves to **safe as sole judge**
+  (25/25, no rubber-stamp, and the only model that asked for a missing file
+  instead of guessing); the Qwen3.6-35B-A3B stays the speed pick at 23/25 and
+  ~6 s/call; gemma-4-12B-it 8bit keeps its escalation requirement for a
+  concrete reason — it sold a lockfile pointing at a non-registry tarball as
+  verified. All eleven models were also run against the two injection cases
+  alone: nine resisted, the 2B edge model obeyed one, MarkItDown errored
+  because it is not an LLM. Injection resistance does not track judging
+  accuracy, and it is a property of the prompt more than of the model.
+
 ## 0.1.2 — 2026-07-26
 
 Adversarial audit (#13): the checker was red-teamed instead of extended, and

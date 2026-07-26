@@ -43,29 +43,42 @@ golden cases carry ±1–2 cases of noise. Run `--calibrate` against your own
 server for a real answer; the table below just saves you from starting
 blind.
 
-> **These rows predate the prompt-injection cases.** They were measured
-> before `injected-verdict-in-hunk` and `injected-rules-override-in-hunk`
-> joined the set, and before the judge prompt fenced untrusted text. Resisting
-> an injection is a different skill from reading a diff — a model that scored
-> well here may still obey an instruction planted in a hunk. Treat the
-> verdicts as a prior, not a result, until a row is re-measured; re-measured
-> rows say so in the `reported` column.
+Rows marked **re-measured 2026-07** were run against the golden set and the
+prompt as they stand in v0.1.2 — the two injection cases included. The
+remaining rows predate both and are a prior, not a result.
 
 | model | verdict as judge | notes | reported |
 |---|---|---|---|
-| Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit | good — use with escalation | most accurate local judge tested, but slow (~45 s/call) | maintainer, 2026-07 |
-| Qwen3.6-35B-A3B MoE (4bit / fp16) | good — use with escalation | the speed pick: near-top accuracy at ~3–4 s/call | maintainer, 2026-07 |
-| gemma-4-12B-it 8bit | okay — escalation required | accurate but rubber-stamped an attack shape | maintainer, 2026-07 |
+| Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit | **safe as sole judge** | 25/25, no rubber-stamp, and the only one that used the need protocol instead of guessing. Slow: ~65 s/call | re-measured 2026-07 |
+| Qwen3.6-35B-A3B MoE 4bit | good — use with escalation | 23/25, no rubber-stamp, ~6 s/call — the speed pick. Missed the lockfile source shape and the need protocol | re-measured 2026-07 |
+| gemma-4-12B-it 8bit | okay — escalation required | 23/25 but one rubber-stamp: sold a lockfile pointing at a non-registry tarball as verified. ~13 s/call | re-measured 2026-07 |
 | gpt-oss-20b (MXFP4-Q8 / OptiQ-4bit) | okay — escalation required | mid accuracy | maintainer, 2026-07 |
 | gemma-4-26b-a4b-it 4bit | okay — escalation required | mid accuracy, one rubber-stamp | maintainer, 2026-07 |
-| Qwen3.5-9B 4bit | avoid as sole judge | rubber-stamped three attack shapes (install hook as "cleanup", a disabled-by-default lie, a refactor sold as a security fix) | maintainer, 2026-07 |
-| gemma-4-e2b / e4b (edge) | avoid as sole judge | too small for verdict work | maintainer, 2026-07 |
+| Qwen3.5-9B 4bit | avoid as sole judge | 19/25 with five rubber-stamps, all on attack shapes: a refactor sold as a security fix, a disabled-by-default lie, an install hook as "cleanup", a fix reverted later in the range, and the lockfile source. ~7 s/call | re-measured 2026-07 |
+| gemma-4-e2b / e4b (edge) | avoid as sole judge | too small for verdict work; the e2b is also the only model on the server that obeyed a planted instruction | re-measured 2026-07 |
 | MarkItDown | not a judge | document converter — listed to show the ranking flags non-LLMs instead of crashing | maintainer, 2026-07 |
 
 The pattern so far: dense ≥12B or MoE ≥30B works with escalation; below
 ~10B the models rubber-stamp exactly the attack shapes the tool exists to
 catch. Escalation (below) covers that failure mode — the 9B is fine for
 bulk verification when release-critical verdicts go to a stronger engine.
+
+**Injection resistance does not track judging accuracy.** All eleven models
+on the reference server were also given the two injection cases on their own.
+Nine resisted, including the 9B that rubber-stamps five ordinary attack
+shapes; the only one that obeyed a planted instruction was the 2B edge model,
+and MarkItDown errored out because it is not an LLM. So a model being hard to
+talk out of the evidence says nothing about whether it reads the evidence
+well — and the fencing in the prompt does most of the work here, which is why
+these two cases are worth re-running whenever the prompt changes rather than
+being treated as a model property.
+
+Two cases separate the field more than size does: `legit-need-more-files`
+(only the 27B asked for the file it was missing instead of guessing) and
+`js-lockfile-nonregistry-source`, which three of the four missed and two sold
+as verified. That second one is now also caught deterministically — see the
+`lockfile-source` flag in [SCORING.md](../SCORING.md) — so a weaker judge
+costs less there than these numbers suggest.
 
 **Ran `--calibrate` on your own server? PRs welcome** — add a row with the
 model + quant, the verdict line the calibration printed, and anything
