@@ -4,7 +4,7 @@ All notable changes to comparereleaseii are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com); every release of this
 tool is checked with the tool itself before it ships.
 
-## Unreleased
+## 0.2.0 — 2026-07-27
 
 ### Added
 
