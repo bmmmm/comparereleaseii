@@ -143,6 +143,12 @@ export interface Metrics {
   files: FileInsight[];
   churnCoveredRatio: number | null;
   context: RepoContext;
+  /**
+   * The diff touches no source file (docs/metadata only) — claims about
+   * behaviour could not be checked against code. Distinct from claims that
+   * were checked and found unsupported.
+   */
+  sourcelessDiff: boolean;
   /** Medians of the repo's own recent releases, for calibration. */
   baseline: {
     releases: number;

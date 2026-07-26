@@ -8,6 +8,16 @@ tool is checked with the tool itself before it ships.
 
 ### Added
 
+- **Not verifiable**: a release whose diff touches no source file (only docs,
+  changelogs, feeds, licence/project metadata, images) no longer scores like a
+  fabricated one. Its `no-evidence` claims leave the correctness ratio, the
+  `unsupported-claim` warn flag becomes a `not-verifiable` info flag, every
+  report format carries the explanation, and `--fail-on no-evidence` does not
+  fail the build. New `metrics.sourcelessDiff` boolean in the JSON report for
+  downstream consumers. `anthropics/claude-code` v2.1.219 → v2.1.220 went from
+  27/100 (suspicious) to 75/100 (minor gaps) plus an explicit not-verifiable
+  line. The signal is the diff's file set, not the repo's language stats.
+
 - `gh` extension as the install path: `gh extension install
   bmmmm/gh-comparereleaseii` — a SHA-pinned wrapper that follows releases
   via `gh extension upgrade`; the README quick start leads with it.

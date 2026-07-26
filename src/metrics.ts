@@ -12,7 +12,7 @@ import type {
 } from "./types.ts";
 import type { Coverage } from "./verify.ts";
 import type { Baseline } from "./history.ts";
-import { hunkFunctions } from "./match.ts";
+import { hunkFunctions, isChangelogPath } from "./match.ts";
 
 const DEP_MANIFEST =
   /(^|\/)(Cargo\.(toml|lock)|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|go\.(mod|sum)|requirements[^/]*\.txt|pyproject\.toml|Pipfile(\.lock)?|Gemfile(\.lock)?|composer\.(json|lock)|pom\.xml|build\.gradle(\.kts)?)$/;
@@ -25,6 +25,34 @@ const TEST_FILE =
   /(^|\/)([\w-]*tests?|__tests__|spec|specs|testdata|fixtures)\/|_test\.[a-z0-9]+$|\.(test|spec)\.[a-z0-9]+$/i;
 const BENIGN_BINARY = /\.(png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot|pdf)$/i;
 const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz|tar|7z)$/i;
+const SITE_METADATA = /(^|\/)(feed|atom|rss|sitemap)\.xml$|\.(rss|atom)$/i;
+const PROJECT_META =
+  /(^|\/)(LICEN[SC]E|COPYING|NOTICE|AUTHORS|CONTRIBUTORS|CODEOWNERS|VERSION)([.-][\w.]+)?$/;
+
+/**
+ * Can this file's diff carry evidence for a claim about behaviour? Docs,
+ * changelogs, feeds, project metadata and images cannot — there is no code in
+ * them to anchor an identifier to.
+ */
+export function isSourceFile(path: string): boolean {
+  return !(
+    DOC_FILE.test(path) ||
+    isChangelogPath(path) ||
+    SITE_METADATA.test(path) ||
+    PROJECT_META.test(path) ||
+    BENIGN_BINARY.test(path)
+  );
+}
+
+/**
+ * The release's diff touches no source file at all — a docs-only bump, or a
+ * repo that publishes notes without shipping the code they describe. Claims
+ * then *cannot* be checked; that is a property of the release, not evidence
+ * that the notes lie.
+ */
+export function isSourcelessDiff(files: DiffFile[]): boolean {
+  return !files.some((f) => isSourceFile(f.path));
+}
 
 /** Classify a path into a sensitivity category (checked in priority order). */
 export function sensitiveCategory(path: string): string | null {
@@ -197,6 +225,7 @@ function buildFlags(
   results: ClaimResult[],
   coverage: Coverage | null,
   files: FileInsight[],
+  sourceless: boolean,
 ): RiskFlag[] {
   const flags: RiskFlag[] = [];
   const shasFor = (paths: string[]): string[] => {
@@ -225,13 +254,26 @@ function buildFlags(
     (r) => r.verdict === "no-evidence" && r.claim.kind === "change",
   );
   if (noEvidence.length) {
-    flags.push({
-      severity: "warn",
-      kind: "unsupported-claim",
-      message: `${noEvidence.length} claim(s) with no supporting evidence in the diff`,
-      files: [],
-      commitShas: [],
-    });
+    // Without a single source file in the diff there is nothing the claims
+    // could have been checked against — reporting that as "unsupported" reads
+    // like a fabricated release.
+    flags.push(
+      sourceless
+        ? {
+            severity: "info",
+            kind: "not-verifiable",
+            message: `${noEvidence.length} claim(s) not checkable — this release's diff contains no source-code changes`,
+            files: [],
+            commitShas: [],
+          }
+        : {
+            severity: "warn",
+            kind: "unsupported-claim",
+            message: `${noEvidence.length} claim(s) with no supporting evidence in the diff`,
+            files: [],
+            commitShas: [],
+          },
+    );
   }
 
   // Reverse-direction audit results: notable changes hidden behind vague notes.
@@ -306,8 +348,14 @@ export function computeScores(
   results: ClaimResult[],
   churnCoveredRatio: number | null,
   flags: RiskFlag[],
+  sourceless = false,
 ): Scores {
-  const change = results.filter((r) => r.claim.kind === "change");
+  const all = results.filter((r) => r.claim.kind === "change");
+  // A diff without source files cannot support any claim about behaviour.
+  // Scoring those `no-evidence` verdicts as 0 — the same value a *contradicted*
+  // claim gets — would rank a closed-source or docs-only release exactly like a
+  // fabricated one. They drop out of the ratio instead of counting against it.
+  const change = sourceless ? all.filter((r) => r.verdict !== "no-evidence") : all;
   // Auto-generated PR-list entries are true by construction (generated from
   // the same commits we check) — they carry little weight; handwritten claims
   // are where release notes can actually lie.
@@ -424,11 +472,12 @@ export function computeMetrics(opts: {
     churnCoveredRatio = total ? covered / total : 1;
   }
 
-  const flags = buildFlags(data, results, coverage, files);
+  const sourcelessDiff = isSourcelessDiff(data.files);
+  const flags = buildFlags(data, results, coverage, files, sourcelessDiff);
   if (opts.baseline) flags.push(...baselineFlags(data, coverage, opts.baseline));
   const order = { critical: 0, warn: 1, info: 2 };
   flags.sort((a, b) => order[a.severity] - order[b.severity]);
-  const scores = computeScores(results, churnCoveredRatio, flags);
+  const scores = computeScores(results, churnCoveredRatio, flags, sourcelessDiff);
 
   let baseline: Metrics["baseline"] = null;
   if (opts.baseline?.snapshots.length) {
@@ -441,5 +490,5 @@ export function computeMetrics(opts: {
       medianAnchoredCoverage: coverages[Math.floor(coverages.length / 2)],
     };
   }
-  return { scores, flags, files, churnCoveredRatio, context, baseline };
+  return { scores, flags, files, churnCoveredRatio, context, baseline, sourcelessDiff };
 }

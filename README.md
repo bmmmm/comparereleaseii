@@ -91,6 +91,14 @@ Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
 found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
 lenient gate that tolerates unprovable claims (e.g. private advisories).
 
+A release whose diff contains no source file at all — a docs-only bump, or a
+closed-source product that publishes notes from a mirror repo — is reported
+as **not verifiable** rather than unsupported: its claims leave the
+correctness ratio, the risk flag drops to `info`, and `--fail-on no-evidence`
+does not fail the build. Consumers can branch on `metrics.sourcelessDiff` in
+the JSON report. The report says "unknown", not "fine" — details in
+[SCORING.md](SCORING.md).
+
 ## Judges: local models, calibration, escalation
 
 Any OpenAI-compatible server (Ollama, MLX, LM Studio, vLLM) works as judge —

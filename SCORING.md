@@ -46,6 +46,11 @@ weight. Handwritten claims are where notes lie; they dominate this
 component. No checkable claims at all → correctness 100 (nothing asserted,
 nothing wrong — completeness and risk still apply).
 
+**Exception — a diff with no source.** When the release's changed-file set
+contains no source file at all (only docs, changelogs, feeds, licence and
+project metadata, images), `no-evidence` claims drop *out of* the ratio
+instead of scoring 0. See "Not verifiable" below.
+
 ### completeness — do the notes cover what shipped?
 
 The **churn-weighted** share of commits covered by at least one claim:
@@ -72,7 +77,7 @@ risk = max(0, 100 − 25·critical − 10·warn − 0·info)
 |---|---|
 | **critical** | contradicted claims · undocumented auth/crypto changes · vague note hiding auth/crypto changes · undocumented new dependency · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
 | **warn** | unsupported change claims · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · first-time author on sensitive paths (baseline) |
-| **info** | documented new dependencies · release-size anomaly vs. baseline |
+| **info** | documented new dependencies · release-size anomaly vs. baseline · unchecked claims on a diff with no source ("not verifiable") |
 
 The asymmetry is deliberate: changelogs routinely omit lockfile and CI
 churn (some generators filter it by design) — that is a `warn`. Silent
@@ -101,6 +106,30 @@ construction.
 | 65–84 | minor gaps |
 | 45–64 | questionable |
 | < 45 | suspicious |
+
+## Not verifiable — releases whose diff holds no source
+
+Some releases cannot be checked at all: a closed-source product publishing
+notes from a mirror repo, a docs-only bump, a release whose whole diff is
+`CHANGELOG.md` and `feed.xml`. Lexical matching has nothing to anchor on, so
+every claim lands on `no-evidence` — the same verdict a fabricated release
+gets, for the opposite reason.
+
+The signal is the **diff's** file set, not the repo's language stats: a repo
+can be 80% Python and still ship a release that touches no source. When no
+changed file is a source file, the report sets `metrics.sourcelessDiff` and:
+
+- `no-evidence` claims leave the correctness ratio instead of scoring 0
+- the `unsupported-claim` **warn** flag becomes a `not-verifiable` **info**
+  flag — no risk penalty
+- reports (terminal, Markdown, JSON, HTML) carry the line *"This release's
+  diff contains no source-code changes — claims could not be checked against
+  code"*, and each affected claim says so too
+- `--fail-on no-evidence` does not fail the build
+
+What this deliberately does **not** do: claim the notes are true. The score
+still loses its completeness component if the docs churn is undocumented,
+and every risk flag still applies. The report says "unknown", not "fine".
 
 ## Reading a score
 

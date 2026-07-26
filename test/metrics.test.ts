@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sensitiveCategory, newDependencies, opacityIssue, computeScores } from "../src/metrics.ts";
+import {
+  sensitiveCategory,
+  newDependencies,
+  opacityIssue,
+  computeScores,
+  isSourceFile,
+  isSourcelessDiff,
+} from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
 import type { ClaimResult, DiffFile, FileInsight, RiskFlag } from "../src/types.ts";
 
@@ -151,6 +158,63 @@ test("computeScores down-weights auto-generated entries", () => {
     [],
   );
   assert.ok(s.correctness < 50, `expected heavy penalty, got ${s.correctness}`);
+});
+
+test("isSourceFile separates reviewable code from docs and metadata", () => {
+  for (const path of [
+    "src/cli.ts",
+    "Cargo.toml",
+    ".github/workflows/ci.yml",
+    "migrations/2026/up.sql",
+    "config/app.xml",
+    "Dockerfile",
+  ]) {
+    assert.equal(isSourceFile(path), true, path);
+  }
+  for (const path of [
+    "CHANGELOG.md",
+    "changelogs/unreleased/fix.yaml",
+    "docs/install.rst",
+    "README.md",
+    "feed.xml",
+    "site/atom.xml",
+    "LICENSE",
+    "LICENSE.txt",
+    "AUTHORS",
+    "docs/screenshot.png",
+  ]) {
+    assert.equal(isSourceFile(path), false, path);
+  }
+});
+
+test("isSourcelessDiff flags docs-only diffs, not diffs with any code", () => {
+  const diff = (...paths: string[]): DiffFile[] =>
+    paths.map((path) => ({ path, status: "modified", additions: 1, deletions: 1 }));
+
+  // anthropics/claude-code v2.1.219 → v2.1.220 shape: notes published without
+  // the source they describe.
+  assert.equal(isSourcelessDiff(diff("CHANGELOG.md", "feed.xml")), true);
+  assert.equal(isSourcelessDiff(diff("README.md")), true);
+  assert.equal(isSourcelessDiff(diff("CHANGELOG.md", "src/api.ts")), false);
+  assert.equal(isSourcelessDiff(diff("package.json")), false);
+});
+
+test("computeScores does not score unverifiable claims as false", () => {
+  const claims = [result("no-evidence"), result("no-evidence")];
+  // Normal diff: nothing supported the claims — that is a correctness failure.
+  assert.equal(computeScores(claims, 0, []).correctness, 0);
+  assert.equal(computeScores(claims, 0, []).label, "suspicious");
+
+  // Sourceless diff: the claims could not be checked at all, so they must not
+  // drag correctness to the level of a fabricated release.
+  const sourceless = computeScores(claims, 0, [], true);
+  assert.equal(sourceless.correctness, 100);
+  assert.notEqual(sourceless.label, "suspicious");
+
+  // A claim that *was* checkable still counts, sourceless or not.
+  const mixed = computeScores([result("verified"), result("no-evidence")], 1, [], true);
+  assert.equal(mixed.correctness, 100);
+  assert.equal(computeScores([result("verified"), result("no-evidence")], 1, []).correctness, 50);
 });
 
 test("layoutTreemap fills the viewport and preserves area proportions", () => {

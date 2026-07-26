@@ -64,6 +64,8 @@ Options:
   --html <file>       Write a self-contained visual HTML report
   --concurrency <n>   Parallel judge calls (default: 4)
   --fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
+                      no-evidence never fails a release whose diff contains no
+                      source-code changes — nothing could be checked there
   --no-reverse        Skip the completeness check (undocumented commits)
   --baseline <n>      Compare against the n previous releases for anomaly
                       detection (default: 5, GitHub source only; 0 disables)

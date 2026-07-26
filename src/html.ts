@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { createHash } from "node:crypto";
-import { countVerdicts } from "./report.ts";
+import { countVerdicts, isNotVerifiable, NOT_VERIFIABLE_NOTE } from "./report.ts";
 import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
 
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
@@ -312,6 +312,7 @@ body[data-filter="handwritten"] details:has(.gen){display:none}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #21262d;padding:5px 8px;text-align:left;font-size:13px}th{color:#8b949e}
 .ok{color:#3fb950}
 .note{color:#8b949e;font-size:12px}
+.banner{background:#161b22;border:1px solid #1f6feb;border-left:4px solid #1f6feb;border-radius:6px;padding:10px 12px;margin:14px 0}
 footer{margin-top:32px;color:#484f58;font-size:12px}
 </style></head><body>
 <h1>Release-note fact check — ${esc(report.repoLabel)}</h1>
@@ -332,7 +333,11 @@ footer{margin-top:32px;color:#484f58;font-size:12px}
       : ""
   }</div>
 </div>
-
+${
+  isNotVerifiable(report)
+    ? `<div class="banner"><strong>Not verifiable</strong> — ${esc(NOT_VERIFIABLE_NOTE)}</div>`
+    : ""
+}
 <h2>Claims at a glance</h2>
 ${verdictBar(report)}
 

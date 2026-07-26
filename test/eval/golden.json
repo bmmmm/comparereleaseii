@@ -263,5 +263,21 @@
       }
     ],
     "expected": ["verified"]
+  },
+  {
+    "name": "behaviour-claim-vs-sourceless-diff",
+    "section": "What's changed",
+    "claim": "Bug fixes and reliability improvements",
+    "hunks": [
+      {
+        "path": "CHANGELOG.md",
+        "hunk": "@@ -1,5 +1,9 @@\n # Changelog\n \n+## 2.1.220\n+\n+- Bug fixes and reliability improvements\n+\n ## 2.1.219\n"
+      },
+      {
+        "path": "feed.xml",
+        "hunk": "@@ -8,6 +8,11 @@\n   <title>Releases</title>\n+  <entry>\n+    <id>2.1.220</id>\n+    <title>2.1.220</title>\n+    <summary>Bug fixes and reliability improvements</summary>\n+  </entry>\n   <entry>\n"
+      }
+    ],
+    "expected": ["no-evidence"]
   }
 ]
