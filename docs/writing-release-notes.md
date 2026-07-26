@@ -17,6 +17,13 @@ it directly:
 
 When writing or editing a release note or changelog entry:
 
+- Write each bullet as a single unwrapped line, however long. GitHub's
+  renderer turns a soft line break inside a list item into a literal `<br>`,
+  so a bullet hard-wrapped across several source lines shows up on the
+  release page as a staccato run of short lines instead of a flowing
+  paragraph — a formatting bug invisible in the raw markdown and only
+  visible once published. Let your editor soft-wrap the display; don't
+  insert real newlines mid-paragraph.
 - Name the mechanism, not just the outcome ("the count-and-increment in
   `register_access()` is now a single atomic SQL UPDATE", not "fixed a
   bypass").
