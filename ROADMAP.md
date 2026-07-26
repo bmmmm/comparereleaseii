@@ -1,5 +1,15 @@
 # Roadmap — the next level
 
+> **Status 2026-07-26:** all three phases are implemented on `main` — npm
+> packaging with a release workflow (the tarball ships compiled `dist/`
+> because Node refuses to strip types under `node_modules`; the roadmap's
+> "ship src/" assumption was wrong), the composite GitHub Action with its
+> red/green validation workflow, the dogfood release gate, `watch` mode with
+> state/index/notify, the 20-case golden set with the monthly eval workflow,
+> and SCORING.md. Open: publishing v0.1.0 itself (needs the NPM_TOKEN and
+> ANTHROPIC_API_KEY repo secrets) and the local-9B separation run
+> ([#6](https://github.com/bmmmm/comparereleaseii/issues/6) territory).
+
 Status when this plan was written (2026-07-26): the CLI is feature-complete
 and validated — five release-note dialects checked against real releases
 (headscale 96, git-cliff 91, restic 90, vaultwarden 79, fabricated notes 5),

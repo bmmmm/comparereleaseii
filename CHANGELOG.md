@@ -46,3 +46,16 @@ Initial release.
 - Distribution: a `comparerelease` bin launcher, a compiled `dist/` build for
   the npm package, and a composite GitHub Action (`action.yml`) that writes
   the report to the step summary and uploads the HTML report as an artifact.
+- Watch mode (`comparerelease watch`, `runWatch`): continuous release
+  monitoring from a JSON config — a state file remembers the last checked
+  release per repo, new releases are checked and written to
+  `reports/<repo>/<tag>`, `reports/index.html` is regenerated as a dashboard
+  (`toWatchIndexHtml`), `--notify` runs an alert command exactly once per
+  flagged release, and the exit code is the worst of the batch.
+- SCORING.md freezes the trust-score semantics: component formulas, weights,
+  flag severities and hard caps, linked from the README and the HTML report
+  footer.
+- The golden set (`test/eval/golden.json`) covers 20 cases including
+  lockfile, install-hook, typosquat, revert and need-protocol shapes; a
+  monthly `eval.yml` workflow recalibrates the default judge and fails on
+  over-verification.
