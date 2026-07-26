@@ -80,6 +80,8 @@ export interface CheckedRelease {
    * a repo whose notes genuinely stopped matching its code.
    */
   unverifiable?: UnverifiableKind;
+  /** The repo's median score before this check — null until enough history. */
+  scoreLevel?: number | null;
   exitCode: number;
   criticalFlags: number;
   flagCount: number;
@@ -124,13 +126,43 @@ export function pickNewReleases(
   return eligible.filter((r) => r.publishedAt! > lastPublishedAt).slice(-cap);
 }
 
+/** Fewer than this many past checks is an accident, not a repo's normal level. */
+const BASELINE_MIN_CHECKS = 3;
+/** A drop this far below the repo's own median is the alarm. */
+const SCORE_DROP = 20;
+
+/**
+ * The repo's own normal score — median of its past checks, or null while
+ * there are too few to call it a level.
+ */
+export function scoreBaseline(history: Array<{ score: number }>): number | null {
+  if (history.length < BASELINE_MIN_CHECKS) return null;
+  const sorted = history.map((h) => h.score).sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+/**
+ * Alert-worthy? Exit code and critical flags always are. The score, though,
+ * is only meaningful against the repo's own level: traefik sits near 25 on
+ * every release because 9% churn coverage is its culture, and an absolute
+ * threshold turns that into a permanent alarm nobody reads. Once enough
+ * checks exist, the question becomes "did this release drop below what this
+ * repo normally does?" — until then the absolute `notifyBelow` stands in.
+ */
 export function isFlagged(
   score: number,
   exit: number,
   criticalFlags: number,
   notifyBelow = 65,
+  baseline: number | null = null,
 ): boolean {
-  return exit > 0 || criticalFlags > 0 || score < notifyBelow;
+  if (exit > 0 || criticalFlags > 0) return true;
+  // Once it exists, the repo's own level replaces the absolute bar rather
+  // than joining it: a repo normally at 25 stops crying wolf, and one
+  // normally at 95 now alerts at 70 — which no absolute default would catch.
+  if (baseline !== null) return score < baseline - SCORE_DROP;
+  return score < notifyBelow;
 }
 
 /** Worst exit code of the batch: 2 (errors) > 1 (failed gate) > 0. */
@@ -196,7 +228,15 @@ export function toWatchIndexHtml(
 <td>${repoCell(key, repo)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
-<td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}">${l.score}</span> ${esc(l.scoreLabel)}${
+<td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}${
+        typeof l.scoreLevel === "number" ? ` · this repo's median: ${l.scoreLevel}` : ""
+      }">${l.score}</span> ${esc(l.scoreLabel)}${
+        typeof l.scoreLevel === "number" && l.score < l.scoreLevel - 20
+          ? ` <span class="drop" title="down from this repo's median of ${l.scoreLevel}">&#8595;${l.scoreLevel - l.score}</span>`
+          : typeof l.scoreLevel === "number"
+            ? ` <span class="level" title="this repo's median is ${l.scoreLevel}">~median</span>`
+            : ""
+      }${
         l.unverifiable
           ? ` <span class="tag" title="${esc(UNVERIFIABLE_TITLE[l.unverifiable])}">${esc(UNVERIFIABLE_TAG[l.unverifiable])}</span>`
           : ""
@@ -235,6 +275,8 @@ tr.flagged[data-href]:hover{background:#ffe3e0}
 tr.pending td{color:#59636e}
 .score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
 .tag{display:inline-block;border:1px solid #58a6ff;color:#58a6ff;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.drop{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
+.level{color:#8b949e;font-size:.8em}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}
 .comp{color:#59636e;white-space:nowrap}
 .dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:2px}
@@ -467,7 +509,16 @@ export async function runWatch(
         // Critical flags and the score threshold still catch attack shapes.
         const ec = exitCode(report, rc.failOn ?? "contradicted");
         const critical = report.metrics.flags.filter((f) => f.severity === "critical").length;
-        const flagged = isFlagged(report.metrics.scores.overall, ec, critical, rc.notifyBelow);
+        // The repo's level comes from the checks BEFORE this one — including
+        // the current score would let a slow slide redefine "normal".
+        const scoreLevel = scoreBaseline(repoState.history);
+        const flagged = isFlagged(
+          report.metrics.scores.overall,
+          ec,
+          critical,
+          rc.notifyBelow,
+          scoreLevel,
+        );
         const verdicts = {
           verified: report.results.filter((r) => r.verdict === "verified").length,
           partial: report.results.filter((r) => r.verdict === "partial").length,
@@ -492,6 +543,7 @@ export async function runWatch(
           engine: report.engine,
           verdicts,
           unverifiable: report.metrics.unverifiable?.kind,
+          scoreLevel,
           report: `${key}/${base}.html`,
         };
         repoState.lastPublishedAt = rel.publishedAt;

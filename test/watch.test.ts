@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   pickNewReleases,
   isFlagged,
+  scoreBaseline,
   worstExit,
   toWatchIndexHtml,
   type ReleaseInfo,
@@ -225,4 +226,32 @@ test("toWatchIndexHtml: state entries dropped from the config are not rendered",
   ]);
   assert.ok(!html.includes("gone/repo"));
   assert.ok(html.includes("kept/repo"));
+});
+
+test("scoreBaseline needs three checks before it calls a level", () => {
+  assert.equal(scoreBaseline([{ score: 90 }, { score: 92 }]), null);
+  assert.equal(scoreBaseline([{ score: 90 }, { score: 92 }, { score: 88 }]), 90);
+  // Even count: rounded mean of the middle pair.
+  assert.equal(scoreBaseline([{ score: 20 }, { score: 30 }, { score: 40 }, { score: 50 }]), 35);
+});
+
+test("alerting reads the score against the repo's own level", () => {
+  // traefik: 9% churn coverage is its culture. Below the absolute default of
+  // 65 on every release — a permanent alarm nobody reads.
+  const traefik = [{ score: 25 }, { score: 27 }, { score: 24 }];
+  assert.equal(isFlagged(25, 0, 0, 65, scoreBaseline(traefik)), false);
+  // Until its baseline forms, the absolute threshold still stands in.
+  assert.equal(isFlagged(25, 0, 0, 65, scoreBaseline(traefik.slice(0, 2))), true);
+  // And a real collapse still alerts.
+  assert.equal(isFlagged(4, 0, 0, 65, scoreBaseline(traefik)), true);
+
+  // A repo normally at 95 dropping to 70 is the alarm no absolute default
+  // would catch — 70 sits above notifyBelow.
+  const solid = [{ score: 95 }, { score: 97 }, { score: 94 }];
+  assert.equal(isFlagged(70, 0, 0, 65, scoreBaseline(solid)), true);
+  assert.equal(isFlagged(90, 0, 0, 65, scoreBaseline(solid)), false);
+
+  // Findings about the release itself are never silenced by history.
+  assert.equal(isFlagged(25, 1, 0, 65, scoreBaseline(traefik)), true);
+  assert.equal(isFlagged(25, 0, 1, 65, scoreBaseline(traefik)), true);
 });
