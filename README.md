@@ -25,7 +25,7 @@ restic/restic  v0.19.0 → v0.19.1  (38 commits, 50 files, +826/−113)
 judge engine: claude-cli/haiku
 …
 Summary: 19 claims — 9 verified, 0 partial, 0 no-evidence, 0 contradicted, 10 skipped
-Trust score: 90/100 (solid) — correctness 100 · completeness 72 · risk 90
+Trust score: 90/100 (solid) — correctness 100 · completeness 71 · risk 90
 
 Risk flags:
   ! Undocumented changes in dependencies paths
@@ -187,8 +187,8 @@ across that spread, it'll hold up on yours:
 
 | Release | Notes style | Score (validation run, 2026-07) |
 |---|---|---|
-| headscale v0.29.2 | prose + full sha list | 96 (solid) |
-| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 91 (solid) |
+| headscale v0.29.2 | prose + full sha list | 100 (solid) |
+| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 89 (solid) |
 | restic v0.19.1 | setext sections, issue anchors, cherry-picks | 90 (solid) |
 | vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (flags a few unprovable claims) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
@@ -198,8 +198,11 @@ caught against the actual diff:
 
 ```
 ✘ The icon endpoint was removed entirely in this release
-  contradicted (0.90) — routes() still registers icon_internal and
-  icon_external; the diff shows refactoring, the endpoints remain active.
+  contradicted (0.95) · none+llm · src/api/icons.rs
+  The diff shows the routes() function still exists in src/api/icons.rs and
+  still registers icon routes via routes![icon_internal] and
+  routes![icon_external]. The endpoint registration is intact, directly
+  contradicting the claim of complete removal.
 ```
 
 ## Development

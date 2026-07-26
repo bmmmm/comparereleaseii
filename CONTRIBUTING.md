@@ -101,6 +101,11 @@ numbers in the PR. If you change how a judge *response is parsed*, re-verify
 with `--no-cache`: the cache key is derived from the prompt, so a parsing change
 leaves old entries in place and they will be re-read by your new parser.
 
+If you change scoring, re-measure the five releases in the README's validation
+table and update it in the same commit. Nothing automated can catch that one —
+it takes real judge runs — and a table the current code no longer reproduces is
+the drift this tool exists to find.
+
 ## Pull requests
 
 The template asks for claims, real command output, a failing test, contract

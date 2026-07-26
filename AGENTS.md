@@ -63,6 +63,10 @@ not add a dependency, a build step, or a framework.
   "obviously safe".
 - No claim may reach `verified` because the notes agree with the commit
   message. Both come from the same hand; only the diff is evidence.
+- Change scoring and you change the README's validation table. Re-measure the
+  five releases listed there and update it in the same commit — a table of
+  scores the current code no longer produces is exactly the drift this tool
+  exists to catch.
 - Comment only what the code cannot say — a constraint, a workaround, a
   surprising behaviour. The existing comments are the model: they explain *why*.
 - Match the surrounding style. No new abstraction layer for a single call site.
