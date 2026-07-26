@@ -305,10 +305,16 @@ $ pnpm eval    # judge eval against the golden set (needs an engine)
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
 
-Releasing: bump `package.json`, add the version's [CHANGELOG.md](CHANGELOG.md)
-section, publish a GitHub release. The release workflow first checks our own
-notes with the tool itself (trust score ≥ 90 or no publish — dogfooding as a
-gate), then publishes to npm with provenance.
+Releasing happens from a dev machine — no repo secrets, no CI involvement,
+the judge runs where it always runs for us: locally. Bump `package.json`,
+write the version's [CHANGELOG.md](CHANGELOG.md) section, then:
+
+```console
+$ pnpm dogfood                    # our notes checked by our own checker — < 90 blocks
+$ node src/cli.ts --calibrate     # judge drift check against the golden set
+$ pnpm publish                    # prepublishOnly runs check+test, prepack builds dist/
+$ git tag v0.1.0 && git push origin main --tags && git push github main --tags
+```
 
 ## Contributing
 

@@ -1,8 +1,10 @@
 name: action-test
 
-# Validates the composite action: mechanics without a key (smoke), and the
-# red/green discrimination proof when ANTHROPIC_API_KEY is configured —
-# green on restic v0.19.1, red on the fabricated vaultwarden notes.
+# Validates the composite action's mechanics without any secret: the CLI runs
+# from the action checkout, writes the step summary, uploads the artifact and
+# exposes its outputs. The judged red/green discrimination (green on real
+# notes, red on the fabricated fixture) is validated locally — see
+# docs/watchdog.md for the fabricated-control recipe.
 on:
   workflow_dispatch:
   pull_request:
@@ -37,44 +39,3 @@ jobs:
         run: |
           echo "exit-code=$CODE score=$SCORE"
           [ "$CODE" = "0" ] && [ -n "$SCORE" ]
-
-  key:
-    runs-on: ubuntu-latest
-    outputs:
-      has: ${{ steps.probe.outputs.has }}
-    steps:
-      - id: probe
-        env:
-          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: echo "has=${KEY:+true}" >> "$GITHUB_OUTPUT"
-
-  judged:
-    needs: key
-    if: needs.key.outputs.has == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Green on real restic notes
-        uses: ./
-        with:
-          repo: restic/restic
-          tag: v0.19.1
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          artifact-name: judged-green-report
-      - name: Red on fabricated vaultwarden notes
-        id: red
-        continue-on-error: true
-        uses: ./
-        with:
-          repo: dani-garcia/vaultwarden
-          tag: "1.37.0"
-          notes-file: test/fixtures/vaultwarden-1.37.0-fabricated.md
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          artifact-name: judged-red-report
-      - name: Assert the fabricated notes failed
-        env:
-          OUTCOME: ${{ steps.red.outcome }}
-          CODE: ${{ steps.red.outputs.exit-code }}
-        run: |
-          echo "outcome=$OUTCOME exit-code=$CODE"
-          [ "$OUTCOME" = "failure" ] && [ "$CODE" = "1" ]

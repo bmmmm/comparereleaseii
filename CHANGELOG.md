@@ -56,6 +56,7 @@ Initial release.
   flag severities and hard caps, linked from the README and the HTML report
   footer.
 - The golden set (`test/eval/golden.json`) covers 20 cases including
-  lockfile, install-hook, typosquat, revert and need-protocol shapes; a
-  monthly `eval.yml` workflow recalibrates the default judge and fails on
-  over-verification.
+  lockfile, install-hook, typosquat, revert and need-protocol shapes;
+  `--calibrate` doubles as the judge drift check in the local release
+  routine, and `pnpm dogfood` gates every release on our own notes scoring
+  at least 90 with our own checker.

@@ -1,13 +1,16 @@
 # Roadmap — the next level
 
 > **Status 2026-07-26:** all three phases are implemented on `main` — npm
-> packaging with a release workflow (the tarball ships compiled `dist/`
-> because Node refuses to strip types under `node_modules`; the roadmap's
-> "ship src/" assumption was wrong), the composite GitHub Action with its
-> red/green validation workflow, the dogfood release gate, `watch` mode with
-> state/index/notify, the 20-case golden set with the monthly eval workflow,
-> and SCORING.md. Open: publishing v0.1.0 itself (needs the NPM_TOKEN and
-> ANTHROPIC_API_KEY repo secrets) and the local-9B separation run
+> packaging (the tarball ships compiled `dist/` because Node refuses to
+> strip types under `node_modules`; the roadmap's "ship src/" assumption was
+> wrong), the composite GitHub Action with a keyless smoke workflow, `watch`
+> mode with state/index/notify, the 20-case golden set, and SCORING.md.
+> One deliberate direction change against 1.1/3.2: this is a solo,
+> local-first project, so releasing is a local routine (`pnpm dogfood` gate
+> + `--calibrate` drift check + `pnpm publish`) instead of a secret-carrying
+> CI pipeline — the repo needs no ANTHROPIC_API_KEY/NPM_TOKEN secrets and
+> stays judge-agnostic. Open: publishing v0.1.0 itself and the local-9B
+> rerun with `--concurrency 1`
 > ([#6](https://github.com/bmmmm/comparereleaseii/issues/6) territory).
 
 Status when this plan was written (2026-07-26): the CLI is feature-complete
