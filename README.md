@@ -24,7 +24,7 @@ SHA-pinned wrapper that follows releases via `gh extension upgrade`. For
 hacking on the source: `gh repo clone bmmmm/comparereleaseii` and run
 `node src/cli.ts` — no install or build step, Node ≥ 24 runs the TypeScript
 directly. To gate releases in CI without cloning anything, use the
-[GitHub Action](#run-it-continuously): `uses: bmmmm/comparereleaseii@v0.1.0`.)
+[GitHub Action](#run-it-continuously): `uses: bmmmm/comparereleaseii@v0.1.1`.)
 
 Requirements: Node ≥ 24, an authenticated [`gh`](https://cli.github.com), and
 a judge — the [`claude`](https://code.claude.com) CLI (default), an
@@ -108,7 +108,7 @@ report says "unknown", not "fine" — details in [SCORING.md](SCORING.md).
 Any OpenAI-compatible server (Ollama, MLX, LM Studio, vLLM) works as judge —
 nothing leaves your machine, no model is hardcoded, `--model` is
 auto-discovered from `/v1/models`. `--calibrate` measures any candidate judge
-against a 20-case golden set (rubber-stamping is called out explicitly) and
+against a 23-case golden set (rubber-stamping is called out explicitly) and
 can rank every model your server offers; `--escalate auto` sends
 release-critical verdicts from a local judge to a stronger engine when one is
 available. Hosted aggregators (OpenRouter) work through the same engine.
@@ -140,7 +140,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: bmmmm/comparereleaseii@v0.1.0
+      - uses: bmmmm/comparereleaseii@v0.1.1
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
