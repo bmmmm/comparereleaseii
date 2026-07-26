@@ -17,11 +17,16 @@ tool is checked with the tool itself before it ships.
   concrete reason — it sold a lockfile pointing at a non-registry tarball as
   verified. All eleven models were also run against the two injection cases
   alone: nine resisted, the 2B edge model obeyed one, MarkItDown errored
-  because it is not an LLM. Injection resistance does not track judging
-  accuracy — the 9B resists while rubber-stamping five ordinary attack shapes.
-  What produces the resistance is not yet known: there is no unfenced control
-  arm, and both payloads share one shape, so "the payloads are easy" fits the
-  data just as well.
+  because it is not an LLM. The control arm — the same models, the same
+  payloads, through the pre-0.1.2 unfenced prompt — puts numbers on it: 5 of
+  11 obeyed unfenced, 1 of 11 fenced. The fence flipped four models from
+  answering `verified` on a diff that supports nothing to answering
+  `no-evidence`, and it does not save the 2B, which obeys either way.
+  Injection resistance does not track judging accuracy in either direction:
+  the model that obeys unfenced is the best judge on that server, and the 9B
+  that rubber-stamps five ordinary attack shapes never obeyed at all. Noted
+  against our own set: `injected-rules-override-in-hunk` was obeyed by nobody
+  in either arm, so it currently proves only that the set contains it.
 
 ## 0.1.2 — 2026-07-26
 
