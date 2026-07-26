@@ -397,6 +397,103 @@ and the two look identical from here.
   "the new defaults are right" or names the specific rule to soften — with
   the release that proves it. That verdict is what Iteration 5 is built on,
   the same way Iteration 3 came out of the first watchlist run.
+- **Measured 2026-07-26.** Not through `watch` — the same 12 tags driven
+  through the CLI directly, once from a checkout of `v0.1.1` and once from
+  `v0.1.2`, separate writable cache dirs per arm (their key formats do not
+  collide anyway, `VERSION` is only in 0.1.2's). The state file's numbers are
+  kept as a third column but they are v0.1.0-era and were measured with a
+  cache that no longer exists; the A/B is the two fresh arms.
+
+  | repo | tag | v0.1.0-era | v0.1.1 | v0.1.2 | Δ |
+  |---|---|---|---|---|---|
+  | traefik/traefik | v3.7.9 | 25 suspicious | 45 questionable | 45 questionable | 0 |
+  | anthropics/claude-code | v2.1.220 | 27 suspicious | 75 unverified | 65 unverified | −10 |
+  | nextcloud/desktop | v4.0.11 | 37 suspicious | 69 minor gaps | 72 minor gaps | +3 |
+  | zed-industries/zed | v1.12.0 | 45 questionable | 72 minor gaps | 66 minor gaps | −6 |
+  | jundot/omlx | v0.5.3 | 45 questionable | 45 questionable | 45 questionable | 0 |
+  | GyulyVGC/sniffnet | v1.5.1 | 45 questionable | 45 questionable | 45 questionable | 0 |
+  | zen-browser/desktop | 1.21.9b | 62 questionable | 66 minor gaps | 65 unverified | −1 |
+  | dani-garcia/vaultwarden | 1.37.0 | 88 solid | 76 minor gaps | 91 solid | +15 |
+  | cjpais/Handy | v0.9.4 | 91 solid | 91 solid | 88 solid | −3 |
+  | bitwarden/clients | cli-v2026.7.0 | 91 solid | 85 solid | 84 minor gaps | −1 |
+  | anthropic-experimental/sandbox-runtime | v0.0.68 | 100 solid | 100 solid | 100 solid | 0 |
+  | soundcloud/api | 2026-07-19 | 100 solid | 100 solid | 100 solid | 0 |
+
+  **The plan's premise was wrong, and finding that out is the result.** It
+  asked to attribute every move over 10 points to one of four rules. Two of
+  the three moves that size are not rule changes at all: one is measurement
+  noise and one was a broken diff. The scoring changes themselves move real
+  repos by −6 to +3.
+
+  *Attributable, deterministic, deserved.* claude-code −10 is exactly
+  `UNVERIFIED_CAP`: nothing in that release was checkable, and 75 read better
+  than a release that was checked and had gaps. nextcloud +3 is one
+  `undocumented-sensitive` warn that stopped firing — `sensitiveCategory()`
+  no longer classifies project metadata as auth/crypto. Both are the fix
+  working.
+
+  *Attributable, and mostly a trade.* zed −6 and the internal moves on omlx
+  (correctness 91 → 82) and sniffnet (100 → 89) are all the anchored-path
+  change: a claim whose only support was its own commit subject is now
+  judged instead of settled. On zed that turned seven `verified` into
+  `partial`, and reading the judge's own reasoning, several of them say the
+  diff shows exactly what the note claims and then answer `partial` anyway —
+  the rule is right, the judge is conservative on the claims it never used
+  to see. The same change pays for itself elsewhere: sniffnet's completeness
+  went 10 → 34 because judging produces an evidence file list that anchoring
+  never did, so 11 latency commits stopped counting as undocumented. It also
+  caught a real error the old path rubber-stamped — sniffnet's notes claim
+  "Persian (#1196)" at a 100 % subject match, and the Persian translations
+  in that diff are commented out.
+
+  *Not attributable to any rule.* vaultwarden's +15 is noise. Run the same
+  tag against the same version with a fresh cache and it lands anywhere in
+  an 8-point band: `v0.1.1` scored 76, 83, 84 and `v0.1.2` scored 91, 79, 80
+  across three independent runs each. Judge *routing* is deterministic — all
+  three runs made the identical 10 (0.1.1) and 12 (0.1.2) calls, no failures
+  — only the answers differ. sniffnet is worse: three `v0.1.2` runs of the
+  Persian claim answered `partial`, `no-evidence` and `contradicted`, and
+  the third floors the whole release at 35 with a critical flag. **A
+  single-sample A/B on real repos cannot see an effect smaller than about 10
+  points.** The verdict cache makes a *re-run* free and identical, which is
+  what made this look reproducible; it does not make a first run a
+  measurement.
+
+  *Not a scoring change at all.* traefik, zed and bitwarden all exceed the
+  compare API's 300-file cap, and the partial-clone fallback cannot run in a
+  sandbox that denies writes to `.git/` — it fails, and the check proceeds on
+  18 % of bitwarden's diff. That alone read as bitwarden −10 (45 → 35) and
+  zed 45/45. Re-run with a working clone, the same two arms give bitwarden
+  85 → 84 and zed 72 → 66. The failure is in `warnings` and on stderr, so it
+  is not silent — but `watch.ts` does not carry warnings into the state or
+  the index, so a watchlist row shows `45 questionable` for a release that
+  scores 85 when the diff is complete.
+
+  **Verdict: the new defaults are right; three rules need softening, and one
+  of them is not a rule.**
+
+  1. `lockfile-source` must not fire on a git dependency pinned to a full
+     40-hex rev. Proof: cjpais/Handy v0.9.4 (`git+https://github.com/cjpais/
+     tao?rev=c3bee28c…` in `src-tauri/Cargo.lock`, −10 risk, 91 → 88) and the
+     same shape on zed (`zed-industries/trash-rs?rev=47761739…`). A full rev
+     is content-addressed; the hijack this flag exists for needs a *mutable*
+     ref or a foreign tarball.
+  2. `contradicted` is decided by one judge answer and is the only verdict
+     with a hard score floor *and* a critical flag. Proof: sniffnet's Persian
+     claim, 45/45/35 across three identical runs. The vote path already
+     exists — require two concordant votes for `contradicted` rather than a
+     median a tie can hand it.
+  3. The `out-of-repo` carve-out has no hysteresis. Proof: zen-browser
+     1.21.9b — one verdict moving `partial` → `no-evidence` takes the miss
+     ratio past the strict-majority bar, and the release goes from
+     `66 minor gaps` to `unverified 65` with a different story attached.
+  4. Not a rule: `watch` must carry `warnings` into the state and the index.
+     A score computed on a truncated diff should not sit in a table looking
+     like a score.
+
+  What Iteration 5 inherits is a method constraint, not just a fix list:
+  anything measured against real repos with an LLM judge needs repeated runs
+  with independent caches, and a delta under ~10 points is not evidence.
 
 ### 4.2 Forge-agnostic input: Forgejo, GitLab, and anything with git
 
