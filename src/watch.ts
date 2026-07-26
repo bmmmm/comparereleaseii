@@ -1,0 +1,419 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { ghApi } from "./sources/github.ts";
+import { resolveEngines, type EngineOptions } from "./judge.ts";
+import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
+import { toMarkdown, exitCode } from "./report.ts";
+import { toHtml } from "./html.ts";
+
+type FailOn = "none" | "contradicted" | "no-evidence";
+
+export interface WatchRepoConfig {
+  /** owner/repo on GitHub. */
+  repo: string;
+  /** State key and report directory — defaults to `repo`. Needed when the
+   * same repo appears twice (e.g. once with a notesFile override). */
+  label?: string;
+  /** Check this notes file instead of the published release notes. */
+  notesFile?: string;
+  judge?: "auto" | "all" | "off";
+  engine?: "claude-cli" | "api" | "openai" | "off";
+  model?: string;
+  openaiUrl?: string;
+  escalate?: "auto" | "off" | "claude-cli" | "api" | "openai";
+  escalateModel?: string;
+  failOn?: FailOn;
+  baseline?: number;
+  concurrency?: number;
+  includePrerelease?: boolean;
+  /** Trust score below which a release is flagged (default 65). */
+  notifyBelow?: number;
+}
+
+export interface WatchConfig {
+  repos: WatchRepoConfig[];
+  /** Options applied to every repo unless overridden per repo. */
+  defaults?: Partial<WatchRepoConfig>;
+  /** Default: "reports" next to the config file. */
+  reportsDir?: string;
+  /** Default: $XDG_STATE_HOME/comparereleaseii/watch-state.json. */
+  stateFile?: string;
+  /** Max new releases checked per repo per run (default 3). */
+  maxPerRun?: number;
+  /** Command run as `<cmd> <json-report-path>` for each flagged release. */
+  notify?: string;
+}
+
+export interface ReleaseInfo {
+  tag: string;
+  publishedAt: string | null;
+  prerelease: boolean;
+  draft: boolean;
+}
+
+export interface CheckedRelease {
+  tag: string;
+  publishedAt: string | null;
+  checkedAt: string;
+  score: number;
+  scoreLabel: string;
+  exitCode: number;
+  criticalFlags: number;
+  flagCount: number;
+  flagged: boolean;
+  engine: string;
+  verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
+  /** HTML report path relative to the reports directory. */
+  report: string;
+}
+
+interface RepoState {
+  lastPublishedAt: string | null;
+  lastTag: string | null;
+  latest?: CheckedRelease;
+  history: CheckedRelease[];
+}
+
+export interface WatchState {
+  version: 1;
+  repos: Record<string, RepoState>;
+}
+
+/** Releases to check: newer than the last checked one, oldest first. On the
+ * first run only the latest release is checked (no backfill surprise). */
+export function pickNewReleases(
+  releases: ReleaseInfo[],
+  lastPublishedAt: string | null,
+  opts: { includePrerelease?: boolean; cap?: number } = {},
+): ReleaseInfo[] {
+  const cap = opts.cap ?? 3;
+  const eligible = releases
+    .filter((r) => !r.draft && r.publishedAt && (opts.includePrerelease || !r.prerelease))
+    .sort((a, b) => a.publishedAt!.localeCompare(b.publishedAt!));
+  if (!eligible.length) return [];
+  if (!lastPublishedAt) return [eligible[eligible.length - 1]];
+  return eligible.filter((r) => r.publishedAt! > lastPublishedAt).slice(-cap);
+}
+
+export function isFlagged(
+  score: number,
+  exit: number,
+  criticalFlags: number,
+  notifyBelow = 65,
+): boolean {
+  return exit > 0 || criticalFlags > 0 || score < notifyBelow;
+}
+
+/** Worst exit code of the batch: 2 (errors) > 1 (failed gate) > 0. */
+export function worstExit(codes: number[]): number {
+  return codes.reduce((worst, c) => Math.max(worst, c), 0);
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** Self-contained watch overview: one row per watched repo, red rows first. */
+export function toWatchIndexHtml(state: WatchState, generatedAt: string): string {
+  const entries = Object.entries(state.repos)
+    .filter(([, rs]) => rs.latest)
+    .sort(([, a], [, b]) => {
+      const fa = a.latest!.flagged ? 0 : 1;
+      const fb = b.latest!.flagged ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return (b.latest!.checkedAt ?? "").localeCompare(a.latest!.checkedAt ?? "");
+    });
+  const flaggedCount = entries.filter(([, rs]) => rs.latest!.flagged).length;
+  const scoreClass = (s: number) => (s >= 85 ? "good" : s >= 65 ? "mid" : "bad");
+  const rows = entries
+    .map(([key, rs]) => {
+      const l = rs.latest!;
+      const v = l.verdicts;
+      const trend = rs.history
+        .slice(-6)
+        .map((h) => `<span class="dot ${scoreClass(h.score)}" title="${esc(h.tag)}: ${h.score}"></span>`)
+        .join("");
+      return `<tr class="${l.flagged ? "flagged" : ""}">
+<td>${l.flagged ? "&#9888;" : "&#10003;"}</td>
+<td>${esc(key)}</td>
+<td><a href="${esc(l.report)}">${esc(l.tag)}</a></td>
+<td><span class="score ${scoreClass(l.score)}">${l.score}</span> ${esc(l.scoreLabel)}</td>
+<td>${v.verified}&#10003; ${v.partial}&#9681; ${v.noEvidence}&#10007; ${v.contradicted}&#8856;</td>
+<td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
+<td>${trend}</td>
+<td title="${esc(l.checkedAt)}">${esc(l.checkedAt.slice(0, 10))}</td>
+</tr>`;
+    })
+    .join("\n");
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>comparereleaseii watch</title>
+<style>
+body{font:14px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:70rem;padding:0 1rem;color:#1f2328;background:#fff}
+h1{font-size:1.3rem} .sub{color:#59636e}
+table{border-collapse:collapse;width:100%;margin-top:1rem}
+th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid #d1d9e0}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:#59636e}
+tr.flagged{background:#fff1f0}
+.score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
+.score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}
+.dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:2px}
+.dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}
+a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
+@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}}
+</style></head><body>
+<h1>Release watch</h1>
+<p class="sub">${entries.length} repos watched · ${flaggedCount} flagged · generated ${esc(generatedAt)} by comparereleaseii</p>
+<table>
+<thead><tr><th></th><th>repo</th><th>release</th><th>trust score</th><th>verdicts</th><th>flags</th><th>trend</th><th>checked</th></tr></thead>
+<tbody>
+${rows}
+</tbody></table>
+</body></html>
+`;
+}
+
+function defaultStatePath(): string {
+  const stateHome =
+    process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state");
+  return join(stateHome, "comparereleaseii", "watch-state.json");
+}
+
+async function loadState(path: string): Promise<WatchState> {
+  try {
+    const state = JSON.parse(await readFile(path, "utf8")) as WatchState;
+    if (state.version !== 1 || typeof state.repos !== "object") {
+      throw new Error("unrecognized shape");
+    }
+    return state;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(
+        `State file ${path} is unreadable (${(err as Error).message}) — delete it to start fresh or pass --state <file>.`,
+      );
+    }
+    return { version: 1, repos: {} };
+  }
+}
+
+async function saveState(path: string, state: WatchState): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp`;
+  await writeFile(tmp, JSON.stringify(state, null, 2));
+  await rename(tmp, path);
+}
+
+function runNotify(cmd: string, jsonPath: string): Promise<void> {
+  return new Promise((done) => {
+    const child = spawn("sh", ["-c", `${cmd} "$1"`, "sh", jsonPath], {
+      stdio: ["ignore", "inherit", "inherit"],
+    });
+    child.on("close", (code) => {
+      if (code !== 0) console.error(`warning: notify command exited with ${code}`);
+      done();
+    });
+    child.on("error", (err) => {
+      console.error(`warning: notify command failed to start: ${err.message}`);
+      done();
+    });
+  });
+}
+
+function sanitizeTag(tag: string): string {
+  return tag.replace(/[^\w.@-]+/g, "_");
+}
+
+export async function runWatch(
+  config: WatchConfig,
+  opts: {
+    configPath: string;
+    notify?: string;
+    stateFile?: string;
+    reportsDir?: string;
+    cache: boolean;
+  },
+): Promise<number> {
+  if (!Array.isArray(config.repos) || !config.repos.length) {
+    throw new Error('Watch config needs a non-empty "repos" array — see docs/watchdog.md.');
+  }
+  for (const r of config.repos) {
+    if (!r.repo?.includes("/")) {
+      throw new Error(`Watch config: every repos[] entry needs "repo": "owner/name" (got ${JSON.stringify(r.repo)}).`);
+    }
+  }
+  // CLI overrides resolve against the working directory, config-file paths
+  // against the config file's own directory (stable under cron).
+  const configDir = dirname(resolve(opts.configPath));
+  const reportsDir = opts.reportsDir
+    ? resolve(opts.reportsDir)
+    : resolve(configDir, config.reportsDir ?? "reports");
+  const statePath = opts.stateFile
+    ? resolve(opts.stateFile)
+    : config.stateFile
+      ? resolve(configDir, config.stateFile)
+      : defaultStatePath();
+  const notifyCmd = opts.notify ?? config.notify;
+  const state = await loadState(statePath);
+
+  const engineCache = new Map<string, ReturnType<typeof resolveEngines>>();
+  const engines = (eo: EngineOptions) => {
+    const key = JSON.stringify(eo);
+    let p = engineCache.get(key);
+    if (!p) {
+      p = resolveEngines(eo);
+      engineCache.set(key, p);
+    }
+    return p;
+  };
+
+  const codes: number[] = [];
+  let checked = 0;
+  let flaggedTotal = 0;
+
+  for (const entry of config.repos) {
+    const rc: WatchRepoConfig = { ...config.defaults, ...entry };
+    const key = rc.label ?? rc.repo;
+    const repoState: RepoState = state.repos[key] ?? {
+      lastPublishedAt: null,
+      lastTag: null,
+      history: [],
+    };
+    let releases: ReleaseInfo[];
+    try {
+      const raw = await ghApi<
+        Array<{ tag_name: string; published_at: string | null; prerelease: boolean; draft: boolean }>
+      >(`repos/${rc.repo}/releases?per_page=30`);
+      releases = raw.map((r) => ({
+        tag: r.tag_name,
+        publishedAt: r.published_at,
+        prerelease: r.prerelease,
+        draft: r.draft,
+      }));
+    } catch (err) {
+      console.error(`${key}: listing releases failed — ${(err as Error).message}`);
+      codes.push(2);
+      continue;
+    }
+    const cap = config.maxPerRun ?? 3;
+    const fresh = pickNewReleases(releases, repoState.lastPublishedAt, {
+      includePrerelease: rc.includePrerelease,
+      cap,
+    });
+    if (!fresh.length) {
+      console.error(`${key}: up to date (${repoState.lastTag ?? "no releases"})`);
+      state.repos[key] = repoState;
+      continue;
+    }
+    const skipped =
+      repoState.lastPublishedAt === null
+        ? 0
+        : releases.filter(
+            (r) => !r.draft && r.publishedAt && r.publishedAt > repoState.lastPublishedAt!,
+          ).length - fresh.length;
+    if (skipped > 0) {
+      console.error(
+        `${key}: ${skipped} older new release(s) skipped (maxPerRun ${cap} — raise it to backfill).`,
+      );
+    }
+
+    for (const rel of fresh) {
+      console.error(`${key}: checking ${rel.tag}…`);
+      try {
+        const { engine, escalate } = await engines({
+          judgeMode: rc.judge ?? "auto",
+          engine: rc.engine ?? "claude-cli",
+          model: rc.model,
+          openaiUrl: rc.openaiUrl,
+          escalate: rc.escalate ?? "auto",
+          escalateModel: rc.escalateModel,
+          cache: opts.cache,
+        });
+        const settings: CheckSettings = {
+          judgeMode: rc.judge ?? "auto",
+          engine,
+          escalateEngine: escalate,
+          concurrency: rc.concurrency ?? 4,
+          reverse: true,
+          baseline: rc.baseline ?? 5,
+        };
+        const { data, context } = await loadGithubReleaseData(rc.repo, {
+          tag: rel.tag,
+          notesFile: rc.notesFile ? resolve(configDir, rc.notesFile) : undefined,
+        });
+        const report = await analyzeRelease(data, context, rc.repo, settings);
+
+        const dir = join(reportsDir, key);
+        await mkdir(dir, { recursive: true });
+        const base = sanitizeTag(rel.tag);
+        const jsonPath = join(dir, `${base}.json`);
+        await writeFile(jsonPath, JSON.stringify(report, null, 2));
+        await writeFile(join(dir, `${base}.md`), toMarkdown(report));
+        await writeFile(join(dir, `${base}.html`), toHtml(report));
+
+        // Watch default is lenient: honest releases often carry unprovable
+        // claims (private advisories) — alerting on every one is fatigue.
+        // Critical flags and the score threshold still catch attack shapes.
+        const ec = exitCode(report, rc.failOn ?? "contradicted");
+        const critical = report.metrics.flags.filter((f) => f.severity === "critical").length;
+        const flagged = isFlagged(report.metrics.scores.overall, ec, critical, rc.notifyBelow);
+        const verdicts = {
+          verified: report.results.filter((r) => r.verdict === "verified").length,
+          partial: report.results.filter((r) => r.verdict === "partial").length,
+          noEvidence: report.results.filter((r) => r.verdict === "no-evidence").length,
+          contradicted: report.results.filter((r) => r.verdict === "contradicted").length,
+        };
+        const checkedRelease: CheckedRelease = {
+          tag: rel.tag,
+          publishedAt: rel.publishedAt,
+          checkedAt: new Date().toISOString(),
+          score: report.metrics.scores.overall,
+          scoreLabel: report.metrics.scores.label,
+          exitCode: ec,
+          criticalFlags: critical,
+          flagCount: report.metrics.flags.length,
+          flagged,
+          engine: report.engine,
+          verdicts,
+          report: `${key}/${base}.html`,
+        };
+        repoState.lastPublishedAt = rel.publishedAt;
+        repoState.lastTag = rel.tag;
+        repoState.latest = checkedRelease;
+        repoState.history = [...repoState.history, checkedRelease].slice(-20);
+        state.repos[key] = repoState;
+        codes.push(ec);
+        checked++;
+        console.error(
+          `${key}: ${rel.tag} → score ${checkedRelease.score} (${checkedRelease.scoreLabel})` +
+            (flagged ? " — FLAGGED" : ""),
+        );
+        if (flagged) {
+          flaggedTotal++;
+          if (notifyCmd) await runNotify(notifyCmd, jsonPath);
+        }
+        // Persist after every successful check so a crash never re-alerts.
+        await saveState(statePath, state);
+      } catch (err) {
+        console.error(`${key}: checking ${rel.tag} failed — ${(err as Error).message}`);
+        codes.push(2);
+        break; // keep state before the failed release; retried next run
+      }
+    }
+  }
+
+  await mkdir(reportsDir, { recursive: true });
+  await writeFile(
+    join(reportsDir, "index.html"),
+    toWatchIndexHtml(state, new Date().toISOString()),
+  );
+  await saveState(statePath, state);
+  const exit = worstExit(codes);
+  console.error(
+    `watch: ${config.repos.length} repos · ${checked} new release(s) checked · ${flaggedTotal} flagged · index ${join(reportsDir, "index.html")} · exit ${exit}`,
+  );
+  return exit;
+}

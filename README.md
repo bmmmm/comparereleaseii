@@ -246,6 +246,19 @@ Checked releases can carry the badge:
 [![release notes: checked](https://img.shields.io/badge/release_notes-checked-2da44e)](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml)
 ```
 
+## Watch mode: a release watchdog
+
+`comparerelease watch --config watch.json` monitors a list of repos from
+cron/launchd: every new release gets a full check the moment it appears, no
+new releases is a cheap no-op, and `reports/index.html` becomes a one-page
+dashboard — red rows for releases that fail the gate, score a suspicious
+rating, or trip a critical risk flag. `--notify <cmd>` runs your alerting
+command (ntfy, mail, webhook, …) with the JSON report path for every flagged
+release, exactly once. The recommended judge setup is a local model with
+`escalate: auto` — bulk verification stays private and free, release-critical
+verdicts get a stronger second opinion. Full config format, self-test recipe
+and cron/launchd snippets: [docs/watchdog.md](docs/watchdog.md).
+
 ## Validated against real releases
 
 The checker is release-note-dialect agnostic — validated against GitHub's

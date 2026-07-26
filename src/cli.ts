@@ -2,18 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
-import {
-  loadLocalRelease,
-  loadLocalRange,
-  ensureClone,
-  localRepoContext,
-} from "./sources/local.ts";
+import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { parseClaims } from "./claims.ts";
-import { selectEngine, discoverLocalModels, type JudgeEngine } from "./judge.ts";
-import { withVerdictCache } from "./cache.ts";
+import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import {
   runCalibration,
   printCalibration,
@@ -22,11 +13,12 @@ import {
   rankCalibrations,
 } from "./calibrate.ts";
 import { commandExists } from "./util.ts";
-import { verifyClaims, computeCoverage } from "./verify.ts";
-import { computeMetrics } from "./metrics.ts";
+import { verifyClaims } from "./verify.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
-import { buildSnapshots, summarizeBaseline, printTimeline } from "./history.ts";
+import { buildSnapshots, printTimeline } from "./history.ts";
+import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
+import { runWatch } from "./watch.ts";
 import type { Report } from "./types.ts";
 
 const USAGE = `comparerelease — fact-check release notes against the actual code diff
@@ -34,6 +26,7 @@ const USAGE = `comparerelease — fact-check release notes against the actual co
 Usage:
   comparerelease <owner/repo> [--tag <tag>] [--base <tag>]
   comparerelease --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
+  comparerelease watch --config <file> [--notify <cmd>]
 
 Options:
   --tag <tag>         Release tag to check (default: latest release)
@@ -71,13 +64,27 @@ Options:
   --no-cache          Bypass the on-disk verdict cache
   -h, --help          Show this help
 
+Watch mode (continuous release monitoring):
+  comparerelease watch --config watch.json
+      --config <file>   JSON config: repos to watch + per-repo options
+      --notify <cmd>    Run <cmd> <json-report-path> for each flagged release
+      --state <file>    Override the state-file path from the config
+      --reports <dir>   Override the reports directory from the config
+      --no-cache        Bypass the on-disk verdict cache
+  A run only checks releases newer than the last run (state file) and
+  regenerates <reports>/index.html; exit code is the worst of the batch.
+
 Examples:
   comparerelease restic/restic --tag v0.19.1
   comparerelease juanfont/headscale --estimate
   comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
+  comparerelease watch --config watch.json --notify 'ntfy publish releases'
 `;
 
 async function main(): Promise<number> {
+  if (process.argv[2] === "watch") {
+    return runWatchCli(process.argv.slice(3));
+  }
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
@@ -123,6 +130,10 @@ async function main(): Promise<number> {
   const failOn = values["fail-on"] as "none" | "contradicted" | "no-evidence";
   if (!["none", "contradicted", "no-evidence"].includes(failOn)) {
     throw new Error(`--fail-on must be none, contradicted or no-evidence (got "${values["fail-on"]}")`);
+  }
+  const escalateOpt = values.escalate as "auto" | "off" | "claude-cli" | "api" | "openai";
+  if (!["auto", "off", "claude-cli", "api", "openai"].includes(escalateOpt)) {
+    throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
   }
 
   if (values.history) {
@@ -174,101 +185,15 @@ async function main(): Promise<number> {
     }
   }
 
-  const { engine, escalate } = await buildEngines();
-  async function buildEngines(): Promise<{ engine: JudgeEngine | null; escalate: JudgeEngine | null }> {
-    if (judgeMode === "off") return { engine: null, escalate: null };
-    let effective = engineName;
-    let model = values.model;
-
-    if (effective === "claude-cli" && !(await commandExists("claude"))) {
-      if (process.env.ANTHROPIC_API_KEY) {
-        console.error("claude CLI not found — using the Anthropic API engine instead.");
-        effective = "api";
-      } else {
-        const found = await discoverLocalModels(openaiBase);
-        if (found && !found.authRequired && found.models.length) {
-          model ??= found.models[0];
-          console.error(
-            `claude CLI not found — using the local model server at ${openaiBase} (model ${model}).`,
-          );
-          effective = "openai";
-        } else {
-          console.error(
-            "claude CLI not found and ANTHROPIC_API_KEY is unset — running deterministic-only.\n" +
-              (found?.authRequired
-                ? `(A local server at ${openaiBase} responded but needs OPENAI_API_KEY.)\n`
-                : "") +
-              "For LLM-judged verdicts install Claude Code (https://code.claude.com), export ANTHROPIC_API_KEY, or start a local OpenAI-compatible server (Ollama/MLX).",
-          );
-          return { engine: null, escalate: null };
-        }
-      }
-    }
-
-    if (model?.includes(",")) {
-      throw new Error(
-        'Comma-separated model lists are only for --calibrate ranking — pick ONE model for a check run.',
-      );
-    }
-    if (effective === "openai" && !model) {
-      const found = await discoverLocalModels(openaiBase);
-      if (found?.authRequired) {
-        throw new Error(`${openaiBase} requires an API key — export OPENAI_API_KEY.`);
-      }
-      if (!found?.models.length) {
-        throw new Error(
-          `No model server reachable at ${openaiBase} — start one (Ollama/MLX/vLLM) or pass --openai-url / --model.`,
-        );
-      }
-      if (found.models.length > 20) {
-        throw new Error(
-          `${openaiBase} offers ${found.models.length} models — that looks like an aggregator (OpenRouter?). Auto-picking would be arbitrary and possibly expensive; pass --model explicitly.`,
-        );
-      }
-      model = found.models[0];
-      console.error(
-        `Local server: using model ${model}` +
-          (found.models.length > 1
-            ? ` (override with --model; also available: ${found.models.slice(1, 6).join(", ")})`
-            : "") +
-          ".",
-      );
-    }
-
-    let primary = selectEngine({ engine: effective, model, openaiUrl: values["openai-url"] });
-    if (primary && !values["no-cache"]) primary = withVerdictCache(primary);
-
-    const escOpt = values.escalate as "auto" | "off" | "claude-cli" | "api" | "openai";
-    if (!["auto", "off", "claude-cli", "api", "openai"].includes(escOpt)) {
-      throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
-    }
-    let second: JudgeEngine | null = null;
-    if (primary && escOpt !== "off") {
-      if (escOpt === "auto") {
-        // Only local primaries need a stronger reviewer by default.
-        if (effective === "openai") {
-          if (await commandExists("claude")) {
-            second = selectEngine({ engine: "claude-cli", model: values["escalate-model"] });
-          } else if (process.env.ANTHROPIC_API_KEY) {
-            second = selectEngine({ engine: "api", model: values["escalate-model"] });
-          }
-          if (second) {
-            console.error(
-              `Escalation engine for release-critical verdicts: ${second.name} (disable with --escalate off).`,
-            );
-          }
-        }
-      } else {
-        second = selectEngine({
-          engine: escOpt,
-          model: values["escalate-model"],
-          openaiUrl: values["openai-url"],
-        });
-      }
-      if (second && !values["no-cache"]) second = withVerdictCache(second);
-    }
-    return { engine: primary, escalate: second };
-  }
+  const { engine, escalate } = await resolveEngines({
+    judgeMode,
+    engine: engineName,
+    model: values.model,
+    openaiUrl: values["openai-url"],
+    escalate: escalateOpt,
+    escalateModel: values["escalate-model"],
+    cache: !values["no-cache"],
+  });
 
   if (values.calibrate) {
     if (!engine) {
@@ -278,6 +203,10 @@ async function main(): Promise<number> {
     }
     const cal = await runCalibration(engine);
     printCalibration(cal);
+    if (values.json) {
+      await writeFile(values.json, JSON.stringify(cal, null, 2));
+      console.error(`JSON calibration written to ${values.json}`);
+    }
     return cal.passed === cal.outcomes.length ? 0 : 1;
   }
 
@@ -299,48 +228,18 @@ async function main(): Promise<number> {
     });
     context = await localRepoContext(values.local, data.headRef);
   } else {
-    [data, context] = await Promise.all([
-      loadGithubRelease({ repo: positionals[0], tag: values.tag, base: values.base }),
-      fetchGithubContext(positionals[0]),
-    ]);
+    ({ data, context } = await loadGithubReleaseData(positionals[0], {
+      tag: values.tag,
+      base: values.base,
+      notesFile: values["notes-file"],
+    }));
   }
-
-  if (values["notes-file"] && !values.local) {
-    data.notes = await readFile(values["notes-file"], "utf8");
-  }
-
-  if (!values.local) {
-    const truncated = data.warnings.some((w) => w.includes("full coverage"));
-    if (truncated) {
-      console.error("Compare API truncated the diff — falling back to a partial clone…");
-      try {
-        const dir = join(tmpdir(), "comparereleaseii-cache", "clones", positionals[0].replace("/", "_"));
-        await ensureClone(`https://github.com/${positionals[0]}.git`, dir);
-        const range = await loadLocalRange(dir, data.baseRef, data.headRef);
-        data = {
-          ...data,
-          ...range,
-          warnings: data.warnings
-            .filter((w) => !w.includes("full coverage"))
-            .concat("Diff loaded from a local partial clone (compare API truncated)."),
-        };
-      } catch (err) {
-        data.warnings.push(
-          `Partial-clone fallback failed: ${(err as Error).message.slice(0, 120)}`,
-        );
-      }
-    }
-  }
-
-  const claims = parseClaims(data.notes);
-  if (!claims.length) {
-    throw new Error("No claims found in the release notes — nothing to check.");
-  }
-  console.error(
-    `${claims.length} claims parsed from the notes of ${data.headRef}; verifying against ${data.commits.length} commits…`,
-  );
 
   if (values.estimate) {
+    const claims = parseClaims(data.notes);
+    if (!claims.length) {
+      throw new Error("No claims found in the release notes — nothing to check.");
+    }
     const est = { calls: 0, chars: 0 };
     const stub: JudgeEngine = {
       name: "estimate",
@@ -373,47 +272,20 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const baselineCount = Number(values.baseline);
-  const baselinePromise =
-    !values.local && baselineCount > 0
-      ? buildSnapshots(positionals[0], { count: baselineCount, before: data.headRef }).catch(
-          () => null,
-        )
-      : Promise.resolve(null);
-  const [results, baselineSnapshots] = await Promise.all([
-    verifyClaims(data, claims, {
-      judgeMode,
-      engine,
-      escalateEngine: escalate,
-      concurrency: Number(values.concurrency),
-      maxHunks: 6,
-      maxEvidenceChars: 20000,
-    }),
-    baselinePromise,
-  ]);
-  const baseline = baselineSnapshots?.length ? summarizeBaseline(baselineSnapshots) : null;
-
-  const coverage = values["no-reverse"] ? null : await computeCoverage(data, claims, results);
-  const metrics = computeMetrics({ data, results, coverage, context, baseline });
-
-  const report: Report = {
-    repoLabel: data.repoLabel,
-    baseRef: data.baseRef,
-    headRef: data.headRef,
-    stats: {
-      commits: data.commits.length,
-      files: data.files.length,
-      additions: data.files.reduce((s, f) => s + f.additions, 0),
-      deletions: data.files.reduce((s, f) => s + f.deletions, 0),
-    },
-    results,
-    uncovered: coverage?.uncovered ?? [],
-    reverseChecked: !values["no-reverse"],
-    metrics,
-    warnings: data.warnings,
-    engine: engine ? engine.name : "off (deterministic only)",
-    linkBase: values.local ? undefined : `https://github.com/${positionals[0]}`,
+  const settings: CheckSettings = {
+    judgeMode,
+    engine,
+    escalateEngine: escalate,
+    concurrency: Number(values.concurrency),
+    reverse: !values["no-reverse"],
+    baseline: values.local ? 0 : Number(values.baseline),
   };
+  const report: Report = await analyzeRelease(
+    data,
+    context,
+    values.local ? null : positionals[0],
+    settings,
+  );
 
   printTerminal(report);
   if (values.md) {
@@ -429,6 +301,44 @@ async function main(): Promise<number> {
     console.error(`HTML report written to ${values.html}`);
   }
   return exitCode(report, failOn);
+}
+
+async function runWatchCli(argv: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      config: { type: "string" },
+      notify: { type: "string" },
+      state: { type: "string" },
+      reports: { type: "string" },
+      "no-cache": { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  if (values.help || !values.config) {
+    console.log(USAGE);
+    return values.help ? 0 : 2;
+  }
+  const raw = await readFile(values.config, "utf8").catch((err) => {
+    throw new Error(
+      `Cannot read watch config ${values.config} (${(err as Error).message}) — see docs/watchdog.md for the format.`,
+    );
+  });
+  let config;
+  try {
+    config = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(
+      `Watch config ${values.config} is not valid JSON: ${(err as Error).message}`,
+    );
+  }
+  return runWatch(config, {
+    configPath: values.config,
+    notify: values.notify,
+    stateFile: values.state,
+    reportsDir: values.reports,
+    cache: !values["no-cache"],
+  });
 }
 
 main()

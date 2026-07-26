@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { tmpdir } from "node:os";
-import { run } from "./util.ts";
+import { commandExists, run } from "./util.ts";
+import { withVerdictCache } from "./cache.ts";
 import type { SurplusItem, Verdict } from "./types.ts";
 
 export interface JudgeEngine {
@@ -161,6 +162,118 @@ export function selectEngine(opts: {
     return makeOpenAiEngine(opts.model, baseUrl, process.env.OPENAI_API_KEY);
   }
   return makeClaudeCliEngine(opts.model ?? "haiku");
+}
+
+export interface EngineOptions {
+  judgeMode: "auto" | "all" | "off";
+  engine: "claude-cli" | "api" | "openai" | "off";
+  model?: string;
+  /** Explicit --openai-url flag value (undefined = env/default resolution). */
+  openaiUrl?: string;
+  escalate: "auto" | "off" | "claude-cli" | "api" | "openai";
+  escalateModel?: string;
+  cache: boolean;
+}
+
+/**
+ * Resolve the primary and escalation judge engines from CLI-shaped options,
+ * with graceful fallbacks: a missing claude CLI falls back to the API when a
+ * key is present, then to a discovered local server, then to deterministic
+ * only. Prints its decisions to stderr.
+ */
+export async function resolveEngines(
+  opts: EngineOptions,
+): Promise<{ engine: JudgeEngine | null; escalate: JudgeEngine | null }> {
+  if (opts.judgeMode === "off") return { engine: null, escalate: null };
+  const openaiBase =
+    opts.openaiUrl ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
+  let effective = opts.engine;
+  let model = opts.model;
+
+  if (effective === "claude-cli" && !(await commandExists("claude"))) {
+    if (process.env.ANTHROPIC_API_KEY) {
+      console.error("claude CLI not found — using the Anthropic API engine instead.");
+      effective = "api";
+    } else {
+      const found = await discoverLocalModels(openaiBase);
+      if (found && !found.authRequired && found.models.length) {
+        model ??= found.models[0];
+        console.error(
+          `claude CLI not found — using the local model server at ${openaiBase} (model ${model}).`,
+        );
+        effective = "openai";
+      } else {
+        console.error(
+          "claude CLI not found and ANTHROPIC_API_KEY is unset — running deterministic-only.\n" +
+            (found?.authRequired
+              ? `(A local server at ${openaiBase} responded but needs OPENAI_API_KEY.)\n`
+              : "") +
+            "For LLM-judged verdicts install Claude Code (https://code.claude.com), export ANTHROPIC_API_KEY, or start a local OpenAI-compatible server (Ollama/MLX).",
+        );
+        return { engine: null, escalate: null };
+      }
+    }
+  }
+
+  if (model?.includes(",")) {
+    throw new Error(
+      "Comma-separated model lists are only for --calibrate ranking — pick ONE model for a check run.",
+    );
+  }
+  if (effective === "openai" && !model) {
+    const found = await discoverLocalModels(openaiBase);
+    if (found?.authRequired) {
+      throw new Error(`${openaiBase} requires an API key — export OPENAI_API_KEY.`);
+    }
+    if (!found?.models.length) {
+      throw new Error(
+        `No model server reachable at ${openaiBase} — start one (Ollama/MLX/vLLM) or pass --openai-url / --model.`,
+      );
+    }
+    if (found.models.length > 20) {
+      throw new Error(
+        `${openaiBase} offers ${found.models.length} models — that looks like an aggregator (OpenRouter?). Auto-picking would be arbitrary and possibly expensive; pass --model explicitly.`,
+      );
+    }
+    model = found.models[0];
+    console.error(
+      `Local server: using model ${model}` +
+        (found.models.length > 1
+          ? ` (override with --model; also available: ${found.models.slice(1, 6).join(", ")})`
+          : "") +
+        ".",
+    );
+  }
+
+  let primary = selectEngine({ engine: effective, model, openaiUrl: opts.openaiUrl });
+  if (primary && opts.cache) primary = withVerdictCache(primary);
+
+  let second: JudgeEngine | null = null;
+  if (primary && opts.escalate !== "off") {
+    if (opts.escalate === "auto") {
+      // Only local primaries need a stronger reviewer by default.
+      if (effective === "openai") {
+        if (await commandExists("claude")) {
+          second = selectEngine({ engine: "claude-cli", model: opts.escalateModel });
+        } else if (process.env.ANTHROPIC_API_KEY) {
+          second = selectEngine({ engine: "api", model: opts.escalateModel });
+        }
+        if (second) {
+          console.error(
+            `Escalation engine for release-critical verdicts: ${second.name} (disable with --escalate off).`,
+          );
+        }
+      }
+    } else {
+      second = selectEngine({
+        engine: opts.escalate,
+        model: opts.escalateModel,
+        openaiUrl: opts.openaiUrl,
+      });
+    }
+    if (second && opts.cache) second = withVerdictCache(second);
+  }
+  return { engine: primary, escalate: second };
 }
 
 const VERDICTS: Record<string, Verdict> = {
