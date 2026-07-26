@@ -44,9 +44,8 @@ server for a real answer; the table below just saves you from starting
 blind.
 
 > **These rows predate the prompt-injection cases.** They were measured
-> against the 23-case set, before `injected-verdict-in-hunk` and
-> `injected-rules-override-in-hunk` existed and before the judge prompt fenced
-> untrusted text. Resisting an injection is a different skill from reading a
+> before `injected-verdict-in-hunk` and `injected-rules-override-in-hunk`
+> joined the set, and before the judge prompt fenced untrusted text. Resisting an injection is a different skill from reading a
 > diff — a model that scored well here may still obey an instruction planted
 > in a hunk. Treat the verdicts as a prior, not a result, until a row is
 > re-measured; re-measured rows say so in the `reported` column.

@@ -101,3 +101,18 @@ test("the module maps cover src/, and name nothing that is gone", async () => {
     );
   }
 });
+
+test("the module maps list each module once", async () => {
+  // Two sessions adding the same new module to the same table is how this
+  // happened; the coverage check above is satisfied by either copy.
+  for (const doc of MODULE_MAPS) {
+    const text = await readFile(join(ROOT, doc), "utf8");
+    const named = [...text.matchAll(/^\| `(src\/[\w/]+\.ts)` \|/gm)].map((m) => m[1] as string);
+    const seen = new Set<string>();
+    assert.deepEqual(
+      named.filter((m) => (seen.has(m) ? true : (seen.add(m), false))),
+      [],
+      `${doc} lists these modules more than once`,
+    );
+  }
+});
