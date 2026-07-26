@@ -66,6 +66,17 @@ tool is checked with the tool itself before it ships.
   to emit elided to `{...}`, i.e. not copyable. With no working payload in the
   set, "nothing obeyed" measured the harness. A test for injections needs a
   positive control like any other.
+- The follow-up settled it, and the dead golden case stays. Six replacement
+  payloads were measured against the models Arm A had shown actually bite —
+  the first panel had been picked by capability instead, so three known
+  obeyers never saw the new shapes and their zeros meant nothing. Of the six,
+  two landed a hit. One did not reproduce: a `verified` from the 27B came back
+  `contradicted` three times out of three with the verdict cache bypassed,
+  while the control answered identically three times out of three on the same
+  model. The other reproduces perfectly but is obeyed only by a model
+  `injected-verdict-in-hunk` already catches — a strict subset, so it would
+  add a case without adding coverage. `docs/local-models.md` now records the
+  bar a replacement has to clear: catch a model the existing case does not.
 
 ## 0.1.2 — 2026-07-26
 
