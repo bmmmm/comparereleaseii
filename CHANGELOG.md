@@ -4,6 +4,15 @@ All notable changes to comparereleaseii are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com); every release of this
 tool is checked with the tool itself before it ships.
 
+## Unreleased
+
+### Fixed
+
+- **Changelog sections survive code fences.** A fenced example block whose
+  lines start with `#` (a shell comment) ended the section early in both
+  markdown extractors — for `--local`/`--repo-url` sources every claim after
+  the block was silently dropped and its commits read as undocumented.
+
 ## 0.2.0 — 2026-07-27
 
 ### Added

@@ -37,3 +37,24 @@ test("extractMarkdownSection matches heading text exactly, not as a substring", 
   const md = "## Section A extended\n\nwrong one\n\n## Section A\n\nright one";
   assert.equal(extractMarkdownSection(md, "Section A"), "right one");
 });
+
+test("extractMarkdownSection ignores # lines inside fenced code blocks", () => {
+  const md = [
+    "## Section A",
+    "",
+    "before the fence",
+    "",
+    "```bash",
+    "# a shell comment, not a heading",
+    "echo hi",
+    "```",
+    "",
+    "after the fence",
+    "",
+    "## Section B",
+    "",
+    "b body",
+  ].join("\n");
+  const section = extractMarkdownSection(md, "Section A");
+  assert.ok(section?.includes("after the fence"), `section was cut at the fence: ${JSON.stringify(section)}`);
+});

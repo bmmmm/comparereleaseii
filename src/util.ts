@@ -70,13 +70,24 @@ export async function pooled<T, R>(
   return results;
 }
 
+/** A fenced-code-block delimiter line — between two of these, `#` is a
+ * comment, not a heading (a shell example in a changelog must not end the
+ * section). */
+export const FENCE_LINE = /^\s{0,3}(?:```|~~~)/;
+
 /** Slice out one heading's body from markdown, matched by exact heading text. */
 export function extractMarkdownSection(markdown: string, heading: string): string | null {
   const lines = markdown.split("\n");
   const headingRe = /^(#{1,4})\s+(.*)$/;
   let start = -1;
   let level = 0;
+  let inFence = false;
   for (let i = 0; i < lines.length; i++) {
+    if (FENCE_LINE.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const m = lines[i].match(headingRe);
     if (m && m[2].trim() === heading) {
       start = i;
@@ -86,7 +97,13 @@ export function extractMarkdownSection(markdown: string, heading: string): strin
   }
   if (start === -1) return null;
   let end = lines.length;
+  inFence = false;
   for (let i = start + 1; i < lines.length; i++) {
+    if (FENCE_LINE.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const m = lines[i].match(/^(#{1,4})\s/);
     if (m && m[1].length <= level) {
       end = i;

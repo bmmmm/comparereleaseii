@@ -70,6 +70,34 @@ test("extractChangelogSection returns null for unknown tags", () => {
   assert.equal(extractChangelogSection(CHANGELOG, "9.9.9"), null);
 });
 
+test("extractChangelogSection keeps content after a fenced block with # lines", () => {
+  const changelog = [
+    "# Changelog",
+    "",
+    "## 0.2.0 — 2026-07-26",
+    "",
+    "- Added the frobnicator (#12)",
+    "",
+    "Example upgrade:",
+    "",
+    "```bash",
+    "# install the new version",
+    "brew upgrade foo",
+    "```",
+    "",
+    "- Second real entry after the code block (#13)",
+    "",
+    "## 0.1.0 — 2026-07-01",
+    "",
+    "- Initial release",
+    "",
+  ].join("\n");
+  const section = extractChangelogSection(changelog, "0.2.0");
+  assert.ok(section?.includes("Second real entry"), `section cut at the fence: ${JSON.stringify(section)}`);
+  assert.ok(section?.includes("# install the new version"));
+  assert.ok(!section?.includes("Initial release"));
+});
+
 test("extractChangelogSection matches bare and v-prefixed headings", () => {
   const bare = "# Changelog\n\n## 0.1.0 — 2026-07-26\n\n- Initial release\n";
   assert.ok(extractChangelogSection(bare, "0.1.0")?.includes("Initial release"));

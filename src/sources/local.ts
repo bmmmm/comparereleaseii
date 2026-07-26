@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { run } from "../util.ts";
+import { FENCE_LINE, run } from "../util.ts";
 import { extractPrNumbers } from "./github.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
@@ -90,7 +90,13 @@ export function extractChangelogSection(changelog: string, tag: string): string 
   const headingRe = new RegExp(`^(#{1,4})\\s+(?:.*[^\\w.])?${escaped}(?:[^\\w.]|$)`);
   let start = -1;
   let level = 0;
+  let inFence = false;
   for (let i = 0; i < lines.length; i++) {
+    if (FENCE_LINE.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const m = lines[i].match(headingRe);
     if (m) {
       start = i;
@@ -100,7 +106,13 @@ export function extractChangelogSection(changelog: string, tag: string): string 
   }
   if (start === -1) return null;
   let end = lines.length;
+  inFence = false;
   for (let i = start + 1; i < lines.length; i++) {
+    if (FENCE_LINE.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const m = lines[i].match(/^(#{1,4})\s/);
     if (m && m[1].length <= level) {
       end = i;
