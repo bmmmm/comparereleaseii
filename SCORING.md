@@ -38,6 +38,15 @@ normal one, not the fallback. If a pass fails and the votes come out even,
 the stricter middle wins: a lone lenient vote must not be what clears a
 release.
 
+`contradicted` is the one exception to that, in the other direction: it needs
+a second voter who read the diff the same way. It is the only verdict that
+both floors the score at 35 and raises a critical flag, and the even-vote rule
+handed it to a single voice. Asked the same question three times, the judge
+does not always answer the same thing — sniffnet v1.5.1's "Persian (#1196)"
+came back `partial`, `no-evidence` and `contradicted` on three identical runs.
+Unseconded, the claim is reported as the milder reading the other passes
+agree on, and the reasoning says a pass dissented.
+
 ## The three components
 
 ### correctness — do the notes tell the truth?
@@ -134,7 +143,12 @@ asking for an ordinary package while the lockfile points the download at
 someone else's host. Added lines introducing a non-registry source — a
 tarball URL outside the known registries, or a `git`/`ssh`/`file`/`link`
 reference — raise their own flag. Cargo's `registry+https://github.com/
-rust-lang/crates.io-index` is the index, not a hijack, and is exempt.
+rust-lang/crates.io-index` is the index, not a hijack, and is exempt. So is a
+git source carrying its resolved 40-hex commit: what the flag looks for is a
+source whose content can change after review, and a commit id *is* the
+content. A branch, a moving tag, a short rev and a tarball URL all still
+count — as does the arrival of a new supplier, which is the
+new-dependency check's job.
 
 **New dependencies mean new suppliers.** A second line for a supplier already
 in the manifest is not one: a Go major bump (`lego/v4` → `/v5`), a submodule
@@ -191,7 +205,14 @@ markup that can carry a script, not a picture.
 also exactly what a fabricated release looks like. It is claimed only when all
 of these hold:
 
-- a strict majority of this release's `change` claims are `no-evidence`
+- **more than two thirds** of this release's `change` claims are
+  `no-evidence`. A bare majority sat inside the judge's own spread:
+  zen-browser 1.21.9b produced 5 and then 6 misses out of 10 checkable claims
+  on two runs of the same tag, and a bar at one half is what separates those.
+  The bar errs toward not claiming the carve-out, for the reason in the
+  paragraph above — which also means a fork release sitting just under it
+  reads `questionable` rather than `unverified`, and zen-browser 1.21.9b now
+  does
 - the last ≥ 3 releases exist as a baseline, and their median **lexical
   coverage** (share of claims whose identifiers appear anywhere in that
   release's diff — deterministic, no judge) is ≤ 25 %

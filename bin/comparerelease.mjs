@@ -12,6 +12,10 @@ if (major < 24) {
 }
 // The published tarball ships compiled dist/ — Node refuses to strip types
 // under node_modules — while a git clone runs the src/ TypeScript directly.
+// src/ wins when both exist, and only a clone has both: the tarball's `files`
+// whitelist has no src/. The other order let a dist/ left over from an old
+// `pnpm build` shadow the working tree silently — a checkout of this commit
+// answered with v0.1.1's scoring rules, and nothing said so.
 const { existsSync } = await import("node:fs");
-const dist = new URL("../dist/cli.js", import.meta.url);
-await import(existsSync(dist) ? dist.href : new URL("../src/cli.ts", import.meta.url).href);
+const src = new URL("../src/cli.ts", import.meta.url);
+await import(existsSync(src) ? src.href : new URL("../dist/cli.js", import.meta.url).href);

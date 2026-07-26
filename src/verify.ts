@@ -115,6 +115,35 @@ export function medianVerdict(votes: JudgeVerdict[]): JudgeVerdict {
   return sorted[Math.ceil((sorted.length - 1) / 2)];
 }
 
+/**
+ * The median, except that `contradicted` needs a second voter who saw the
+ * same thing.
+ *
+ * It is the only verdict that both floors the score at 35 and raises a
+ * critical flag, and the stricter-middle rule hands it to a single voice as
+ * soon as one verification pass fails and leaves two votes. That is not
+ * theoretical: GyulyVGC/sniffnet v1.5.1's "Persian (#1196)" came back
+ * `partial`, `no-evidence` and `contradicted` across three identical runs,
+ * and the third run alone dropped the release from 45 to 35. One dissenting
+ * reading supports "unproven", which is what the next-strictest vote says.
+ */
+export function resolveVotes(votes: JudgeVerdict[]): JudgeVerdict {
+  const median = medianVerdict(votes);
+  if (median.verdict !== "contradicted") return median;
+  const seconded = votes.filter((v) => v.verdict === "contradicted").length >= 2;
+  if (seconded) return median;
+  const others = votes
+    .filter((v) => v.verdict !== "contradicted")
+    .sort((a, b) => SEVERITY[b.verdict] - SEVERITY[a.verdict]);
+  if (!others.length) return median;
+  return {
+    ...others[0],
+    reasoning:
+      `${others[0].reasoning} (One of ${votes.length} verification passes read this as contradicted, ` +
+      "the rest did not — reported as the milder reading they agree on.)",
+  };
+}
+
 export function capHunks(
   hunks: Array<{ path: string; hunk: string }>,
   maxChars: number,
@@ -392,7 +421,7 @@ export async function verifyClaims(
               // a failed vote simply doesn't count
             }
           }
-          verdict = medianVerdict(votes);
+          verdict = resolveVotes(votes);
         }
         results.set(p.claim.id, {
           claim: p.claim,

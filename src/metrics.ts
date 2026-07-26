@@ -77,8 +77,26 @@ const UNVERIFIED_CAP = 65;
 
 /** A repo whose notes habitually describe code outside its own diff. */
 const OUT_OF_REPO_BASELINE = 0.25;
-/** …and a release that follows that pattern: a strict majority of misses. */
-const OUT_OF_REPO_RELEASE = 0.5;
+/**
+ * …and a release that follows that pattern. A bare majority sat inside the
+ * judge's own spread: zen-browser 1.21.9b produced 5 and then 6 misses out of
+ * 10 checkable claims on two runs of the same tag, and the bar at one half is
+ * exactly what separates those — the release read `minor gaps` once and
+ * `unverified` the other time on a single verdict. This carve-out replaces
+ * the whole story of a release, so it wants a clear majority, not a coin's
+ * width of one, and it errs toward not claiming: "most claims miss" is also
+ * what a fabricated release looks like, so a false carve-out costs more than
+ * a missed one. zen-browser at 6 of 10 now reads `questionable` instead.
+ *
+ * The obvious way out — decide this on the deterministic `lexicalCoverage`
+ * the baseline already uses, and keep the judge out of the gate entirely —
+ * was measured and does not work. That number tracks note *style*, not where
+ * the code lives: GyulyVGC/sniffnet scores 0.15 and dani-garcia/vaultwarden
+ * 0.31 on releases that are neither forks nor distribution repos, because
+ * short bullets and generated PR lists carry no identifiers to match. The
+ * judge's own misses are what makes this gate mean anything.
+ */
+const OUT_OF_REPO_RELEASE = 2 / 3;
 
 /**
  * Why — if at all — this release's claims could not be checked against its own
@@ -367,6 +385,13 @@ const KNOWN_REGISTRY =
 const CARGO_INDEX = "registry+https://github.com/rust-lang/crates.io-index";
 
 /**
+ * A git source resolved to a full commit id. Cargo and npm both append the
+ * resolved sha as the URL fragment, so this is the lockfile saying "and this
+ * is the exact tree I got".
+ */
+const PINNED_COMMIT = /#[0-9a-f]{40}(?![0-9a-f])/i;
+
+/**
  * Resolution sources a lockfile introduces that are not a package registry:
  * a tarball on someone's own host, a git or filesystem reference.
  *
@@ -375,6 +400,14 @@ const CARGO_INDEX = "registry+https://github.com/rust-lang/crates.io-index";
  * keeps asking for an ordinary package and the lockfile points the download
  * somewhere else, which left the deterministic supply-chain check blind to
  * the shape it exists for.
+ *
+ * A git source carrying its resolved commit is not that shape. What the flag
+ * is looking for is a source whose *content can change after review* — a
+ * branch, a moving tag, a tarball URL. A 40-hex commit is the content, so the
+ * only thing left to notice is a new supplier, which is `newDependencies()`'s
+ * job. Vendoring a forked crate pinned by rev is ordinary in Rust and Tauri
+ * projects, and flagging it cost cjpais/Handy v0.9.4 ten risk points for
+ * `git+https://github.com/cjpais/tao?rev=…`, one of its own repositories.
  */
 export function lockfileSources(file: DiffFile): string[] {
   if (!file.patch || !LOCKFILE.test(file.path)) return [];
@@ -383,11 +416,11 @@ export function lockfileSources(file: DiffFile): string[] {
     if (line.includes(CARGO_INDEX)) continue;
     const proto = line.match(/\b(git\+[a-z]+|git|ssh|file|link|portal):(\/\/)?[^\s"',;)}\]]+/i);
     if (proto && !/^https?:$/i.test(proto[1])) {
-      found.add(proto[0].slice(0, 80));
+      if (!PINNED_COMMIT.test(proto[0])) found.add(proto[0].slice(0, 80));
       continue;
     }
     for (const m of line.matchAll(/https?:\/\/([^/\s"',;)}\]]+)[^\s"',;)}\]]*/gi)) {
-      if (!KNOWN_REGISTRY.test(m[1])) found.add(m[0].slice(0, 80));
+      if (!KNOWN_REGISTRY.test(m[1]) && !PINNED_COMMIT.test(m[0])) found.add(m[0].slice(0, 80));
     }
   }
   return [...found].slice(0, 6);

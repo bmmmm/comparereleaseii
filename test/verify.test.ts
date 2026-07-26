@@ -4,7 +4,14 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { computeCoverage, isGeneratedEntry, isVagueClaim, medianVerdict, verifyClaims } from "../src/verify.ts";
+import {
+  computeCoverage,
+  isGeneratedEntry,
+  isVagueClaim,
+  medianVerdict,
+  resolveVotes,
+  verifyClaims,
+} from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
 import {
   buildJudgePrompt,
@@ -94,6 +101,35 @@ test("medianVerdict: one outlier cannot flip the result", () => {
   assert.equal(medianVerdict([vote("contradicted"), vote("verified")]).verdict, "contradicted");
   assert.equal(medianVerdict([vote("no-evidence"), vote("verified")]).verdict, "no-evidence");
   assert.equal(medianVerdict([vote("verified"), vote("verified")]).verdict, "verified");
+});
+
+test("resolveVotes: contradicted needs a second voter", () => {
+  // The shape that measured 45/45/35 on sniffnet v1.5.1 across three
+  // identical runs: one pass failed, and the surviving pair let a single
+  // "contradicted" floor the release and raise a critical flag.
+  const demoted = resolveVotes([vote("contradicted"), vote("no-evidence")]);
+  assert.equal(demoted.verdict, "no-evidence");
+  assert.match(demoted.reasoning, /one of 2 verification passes/i);
+  // The milder reading they agree on — not "partial" because one voter was
+  // lenient, and not "verified" either.
+  assert.equal(resolveVotes([vote("contradicted"), vote("partial")]).verdict, "partial");
+  assert.equal(resolveVotes([vote("contradicted"), vote("verified")]).verdict, "verified");
+  // Seconded, so it stands, with its own reasoning untouched.
+  const seconded = resolveVotes([vote("contradicted"), vote("contradicted")]);
+  assert.equal(seconded.verdict, "contradicted");
+  assert.equal(seconded.reasoning, "contradicted");
+  assert.equal(
+    resolveVotes([vote("contradicted"), vote("contradicted"), vote("verified")]).verdict,
+    "contradicted",
+  );
+  // A lone vote is not a majority of anything, so it cannot be one either.
+  assert.equal(resolveVotes([vote("contradicted")]).verdict, "contradicted");
+  // Everything below contradicted resolves exactly as before.
+  assert.equal(resolveVotes([vote("no-evidence"), vote("verified")]).verdict, "no-evidence");
+  assert.equal(
+    resolveVotes([vote("no-evidence"), vote("verified"), vote("verified")]).verdict,
+    "verified",
+  );
 });
 
 test("parseJudgeResponse: need-protocol and verdicts", () => {

@@ -120,6 +120,38 @@ test("toWatchIndexHtml distinguishes an unverifiable release from a score collap
   assert.equal(html.match(/class="tag"/g)?.length, 1, "only the fork row is tagged");
 });
 
+test("toWatchIndexHtml marks a score the check could not fully see", () => {
+  // Measured on bitwarden/clients cli-v2026.7.0: the compare API truncated
+  // the diff, the clone fallback failed, and 18 % of the diff scored 45 where
+  // the whole diff scores 85. The report said so; the index did not.
+  const partial = checked("v2", 45, true);
+  partial.warnings = [
+    "Compare API caps file lists at 300 — diff may be incomplete, use a local clone (--local) for full coverage.",
+    "Partial-clone fallback failed: git clone --quiet --filter=blob:none… failed",
+  ];
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "big/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v2",
+        latest: partial,
+        history: [partial],
+      },
+      "small/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 45, true),
+        history: [checked("v1", 45, true)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z");
+  assert.equal(html.match(/class="incomplete"/g)?.length, 1, "only the truncated row is marked");
+  assert.ok(html.includes("partial data"), "the badge says what is wrong");
+  assert.ok(html.includes("Partial-clone fallback failed"), "the title carries the reason");
+});
+
 test("toWatchIndexHtml gives an unverified score its own bucket, not the same as a genuine mid score", () => {
   const capped = checked("v2", 65, false);
   capped.scoreLabel = "unverified";

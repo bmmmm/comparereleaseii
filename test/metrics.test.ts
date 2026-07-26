@@ -326,7 +326,7 @@ test("classifyUnverifiable: a docs-only diff needs no history", () => {
 test("classifyUnverifiable: out-of-repo needs the repo's own history to agree", () => {
   // A fork: real code in the diff, but the notes describe upstream features.
   const fork = releaseData(["src/browser.ts", "config/prefs.js"]);
-  const missing = [result("no-evidence"), result("no-evidence"), result("verified")];
+  const missing = [result("no-evidence"), result("no-evidence"), result("no-evidence")];
 
   assert.equal(classifyUnverifiable(fork, missing, [], baselineOf(0.05))?.kind, "out-of-repo");
 
@@ -341,6 +341,15 @@ test("classifyUnverifiable: out-of-repo needs the repo's own history to agree", 
     classifyUnverifiable(fork, [result("verified"), result("no-evidence")], [], baselineOf(0.05)),
     null,
   );
+  // A bare majority is not enough either. Measured on zen-browser 1.21.9b:
+  // the same tag produced 5 and then 6 misses out of 10 on two runs, so a bar
+  // at one half decides this repo's label by coin flip.
+  const tenClaims = (misses: number) => [
+    ...Array.from({ length: misses }, () => result("no-evidence")),
+    ...Array.from({ length: 10 - misses }, () => result("verified")),
+  ];
+  assert.equal(classifyUnverifiable(fork, tenClaims(6), [], baselineOf(0.05)), null);
+  assert.equal(classifyUnverifiable(fork, tenClaims(7), [], baselineOf(0.05))?.kind, "out-of-repo");
 });
 
 test("classifyUnverifiable: evidence about this release outranks the pattern", () => {
@@ -466,7 +475,7 @@ test("an unprovable security claim is never excused by the repo's history", () =
     knownAuthors: [],
     everBinary: false,
   };
-  const routine = [result("no-evidence"), result("no-evidence"), result("verified")];
+  const routine = [result("no-evidence"), result("no-evidence"), result("no-evidence")];
   assert.equal(classifyUnverifiable(data, routine, [], baseline)?.kind, "out-of-repo");
 
   const security = [...routine];
@@ -533,6 +542,43 @@ test("a resolution hijack in a lockfile is not invisible", () => {
       patch: '@@ -1,2 +1,3 @@\n+      "resolved": "git+ssh://git@github.com/evil/pkg.git#abc",\n',
     }),
     ["git+ssh://git@github.com/evil/pkg.git#abc"],
+  );
+  // …unless it carries the resolved commit. Vendoring a forked crate by rev
+  // is ordinary, the content cannot change under you, and flagging it cost
+  // cjpais/Handy v0.9.4 ten risk points on one of its own repositories.
+  assert.deepEqual(
+    lockfileSources({
+      path: "src-tauri/Cargo.lock", status: "modified", additions: 1, deletions: 0,
+      patch:
+        '@@ -1,2 +1,3 @@\n+source = "git+https://github.com/cjpais/tao?rev=c3bee28c1d446d95f08c95c3b6f8d4bde052b876#c3bee28c1d446d95f08c95c3b6f8d4bde052b876"\n',
+    }),
+    [],
+  );
+  // A moving ref on the same host still is one: that content can change
+  // after review, which is the whole shape this flag exists for.
+  assert.deepEqual(
+    lockfileSources({
+      path: "src-tauri/Cargo.lock", status: "modified", additions: 1, deletions: 0,
+      patch: '@@ -1,2 +1,3 @@\n+source = "git+https://github.com/cjpais/tao?branch=main"\n',
+    }),
+    ["git+https://github.com/cjpais/tao?branch=main"],
+  );
+  // Nor does a short rev pin anything — it is a prefix, not the content.
+  assert.deepEqual(
+    lockfileSources({
+      path: "package-lock.json", status: "modified", additions: 1, deletions: 0,
+      patch: '@@ -1,2 +1,3 @@\n+      "resolved": "git+https://github.com/evil/pkg.git#c3bee28",\n',
+    }),
+    ["git+https://github.com/evil/pkg.git#c3bee28"],
+  );
+  // And a tarball is not made safe by a sha-shaped query parameter.
+  assert.deepEqual(
+    lockfileSources({
+      path: "package-lock.json", status: "modified", additions: 1, deletions: 0,
+      patch:
+        '@@ -1,2 +1,3 @@\n+      "resolved": "https://cdn.attacker.example/pkg.tgz?v=c3bee28c1d446d95f08c95c3b6f8d4bde052b876",\n',
+    }),
+    ["https://cdn.attacker.example/pkg.tgz?v=c3bee28c1d446d95f08c95c3b6f8d4bde052b876"],
   );
   // A URL in ordinary source code is not this check's business.
   assert.deepEqual(

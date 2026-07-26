@@ -87,6 +87,14 @@ export interface CheckedRelease {
   criticalFlags: number;
   flagCount: number;
   flagged: boolean;
+  /**
+   * Whatever the check could not see. A score computed on a diff the compare
+   * API truncated and the clone fallback then failed to complete is not a
+   * score, and the index is the one place where that is invisible: measured
+   * on bitwarden/clients cli-v2026.7.0, 18 % of the diff scored 45 where the
+   * full diff scores 85.
+   */
+  warnings?: string[];
   engine: string;
   verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
   /** HTML report path relative to the reports directory. */
@@ -271,6 +279,10 @@ export function toWatchIndexHtml(
         l.unverifiable
           ? ` <span class="tag" title="${esc(UNVERIFIABLE_TITLE[l.unverifiable])}">${esc(UNVERIFIABLE_TAG[l.unverifiable])}</span>`
           : ""
+      }${
+        l.warnings?.length
+          ? ` <span class="incomplete" title="${esc(l.warnings.join(" · "))}">&#9888; partial data</span>`
+          : ""
       }</td>
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
@@ -307,6 +319,7 @@ tr.pending td{color:#59636e}
 .score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
 .tag{display:inline-block;border:1px solid #58a6ff;color:#58a6ff;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .drop{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
+.incomplete{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .level{color:#8b949e;font-size:.8em}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
 .comp{color:#59636e;white-space:nowrap}
@@ -314,7 +327,7 @@ tr.pending td{color:#59636e}
 .dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}.dot.unverified{background:#8250df}
 a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
 a.repo{color:inherit}a.ext{font-size:.85em}
-@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}}
+@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}.incomplete{border-color:#d29922;color:#d29922}}
 </style></head><body>
 <h1>Release watch</h1>
 <p class="sub">${entries.length} repos watched · ${flaggedCount} flagged · generated ${esc(generatedAt)} by comparereleaseii</p>
@@ -574,6 +587,7 @@ export async function runWatch(
           criticalFlags: critical,
           flagCount: report.metrics.flags.length,
           flagged,
+          ...(report.warnings.length ? { warnings: report.warnings } : {}),
           engine: report.engine,
           verdicts,
           unverifiable: report.metrics.unverifiable?.kind,

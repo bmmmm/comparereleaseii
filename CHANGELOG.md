@@ -8,6 +8,49 @@ tool is checked with the tool itself before it ships.
 
 ### Changed
 
+- **The A/B against 0.1.1 on twelve real releases, and the four fixes it
+  bought.** The same 12 tags were checked from a `v0.1.1` checkout and from a
+  `v0.1.2` one (ROADMAP 4.1). The scoring changes move real repos by −6 to
+  +3; the two double-digit moves that looked like scoring turned out to be a
+  judge that answers differently on every cold run (vaultwarden 1.37.0 lands
+  76, 83, 84 under one unchanged version) and a partial-clone fallback that
+  could not write `.git/` and quietly checked bitwarden on 18 % of its diff.
+  What that measurement changed:
+  - `lockfile-source` no longer fires on a git dependency carrying its
+    resolved 40-hex commit. That source's content cannot change after review,
+    which is the only shape the flag exists for; a branch, a moving tag, a
+    short rev and a foreign tarball all still fire. It cost cjpais/Handy
+    v0.9.4 ten risk points for `git+https://github.com/cjpais/tao?rev=…`, one
+    of its own repositories, and zed the same for `trash-rs`.
+  - **`contradicted` needs a second voter.** It is the only verdict that both
+    floors the score at 35 and raises a critical flag, and the stricter-middle
+    tie-break handed it to one voice whenever a verification pass failed and
+    left two votes. GyulyVGC/sniffnet v1.5.1's "Persian (#1196)" answered
+    `partial`, `no-evidence` and `contradicted` across three identical runs;
+    the third alone dropped the release from 45 to 35. Unseconded, it now
+    reports the milder reading the other passes agree on, and says so.
+  - **The `out-of-repo` carve-out wants a clear majority, not a bare one.**
+    The bar moves from one half to two thirds of checkable claims. zen-browser
+    1.21.9b produced 5 and then 6 misses out of 10 on two runs of the same
+    tag, and a bar at one half is exactly what separates those — the release
+    read `minor gaps` once and `unverified` the other time, with a different
+    story attached, on one verdict. This is a trade, not a free fix: the bar
+    errs toward not claiming the carve-out, because a false one reads exactly
+    like a fabricated release excused, so zen-browser 1.21.9b itself now lands
+    at `64 questionable`. Deciding it on the deterministic `lexicalCoverage`
+    instead was measured and rejected — that number tracks note style, not
+    where the code lives, and it would sweep in sniffnet (0.15) and
+    vaultwarden (0.31), neither of which is a fork.
+  - **The launcher no longer lets a stale `dist/` shadow the working tree.**
+    `bin/comparerelease.mjs` preferred `dist/` whenever it existed, and only
+    the published tarball ships without `src/` — so in a checkout, a `dist/`
+    left over from an older `pnpm build` silently *was* the tool. It ran
+    v0.1.1's scoring rules from a checkout of 0.1.2 and reported the numbers
+    without a word. `src/` now wins when both are present.
+  - **`watch` carries the check's warnings into its state and index.** A score
+    computed on a truncated diff was indistinguishable from a score, in the
+    one view built for skimming. The row now carries a `partial data` badge
+    with the reason; the report always said it, the index never did.
 - `docs/local-models.md`: the local-judge table is re-measured against the
   golden set and the fenced prompt as of 0.1.2. The
   Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit moves to **safe as sole judge**
