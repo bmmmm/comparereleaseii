@@ -12,6 +12,10 @@ tool is checked with the tool itself before it ships.
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number
   silently turned their feature off. All four now exit 2 with a message.
+- **A verdict cache that cannot be written warns instead of staying silent.**
+  Failing cache writes (permissions, quota) made every run re-judge — slower
+  and nondeterministic — with no indication; the first failed write now
+  prints a warning naming the cause.
 - **Snapshot cache entries are stamped with the tool version.** Baseline
   snapshots cached by an older version were served into the medians even
   after a scoring-formula change; like the verdict cache (since 0.1.2), a

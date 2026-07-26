@@ -17,6 +17,8 @@ interface CacheEntry {
   response?: string;
 }
 
+let writeWarned = false;
+
 /**
  * Same prompt + same engine + same tool version → same answer, from disk.
  * Makes re-runs deterministic and free; LLM nondeterminism only ever happens
@@ -52,8 +54,16 @@ export function withVerdictCache(engine: JudgeEngine): JudgeEngine {
             JSON.stringify({ version: VERSION, engine: engine.name, response }),
             { mode: 0o600 },
           );
-        } catch {
-          // cache write is best-effort
+        } catch (err) {
+          // Best-effort, but never silent: a cache that stops persisting
+          // makes every future run re-judge — slower and nondeterministic —
+          // and that has been misread as a scoring regression before.
+          if (!writeWarned) {
+            writeWarned = true;
+            console.error(
+              `warning: could not write the verdict cache (${(err as Error).message.slice(0, 120)}) — verdicts will be re-judged on every run until this is fixed.`,
+            );
+          }
         }
       }
       return response;
