@@ -6,6 +6,7 @@ import { hunkFunctions } from "../src/match.ts";
 import {
   parseSurplusOutput,
   parseJudgeResponse,
+  extractJsonObject,
   selectEngine,
   type JudgeVerdict,
 } from "../src/judge.ts";
@@ -111,10 +112,26 @@ test("withVerdictCache: second call with the same prompt hits the disk", async (
   assert.equal(calls, 1);
 });
 
+test("extractJsonObject repairs unterminated small-model output", () => {
+  // Qwen3.5 pattern: closes the reasoning string but drops the final brace.
+  const noBrace = parseJudgeResponse(
+    '{"verdict":"verified","confidence":0.9,"files":["a.rs"],"reasoning":"fix confirmed."',
+  );
+  assert.ok(!("need" in noBrace));
+  assert.equal(noBrace.verdict, "verified");
+  assert.equal(noBrace.reasoning, "fix confirmed.");
+  // Harder: stops mid-string inside a nested array.
+  const midString = extractJsonObject('{"surplus":[{"description":"new endpo') as {
+    surplus: Array<{ description: string }>;
+  };
+  assert.equal(midString.surplus[0].description, "new endpo");
+  assert.throws(() => extractJsonObject("no json here"), /no JSON object/);
+});
+
 test("selectEngine: openai needs an explicit model, then builds the engine", () => {
   assert.throws(() => selectEngine({ engine: "openai" }), /--model/);
   const engine = selectEngine({ engine: "openai", model: "qwen3:8b" });
-  assert.equal(engine?.name, "openai/qwen3:8b");
+  assert.equal(engine?.name, "openai/qwen3:8b@4096");
 });
 
 test("parseSurplusOutput validates and caps items", () => {

@@ -68,8 +68,12 @@ export function makeApiEngine(model: string, apiKey: string): JudgeEngine {
  */
 export function makeOpenAiEngine(model: string, baseUrl: string, apiKey?: string): JudgeEngine {
   const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  // Reasoning models spend max_tokens on hidden thinking before the JSON —
+  // 1024 truncated Qwen3.5 answers mid-object. Budget is part of the cache
+  // identity so a budget change invalidates previously truncated responses.
+  const maxTokens = 4096;
   return {
-    name: `openai/${model}`,
+    name: `openai/${model}@${maxTokens}`,
     async judge(prompt: string): Promise<string> {
       const res = await fetch(url, {
         method: "POST",
@@ -80,8 +84,11 @@ export function makeOpenAiEngine(model: string, baseUrl: string, apiKey?: string
         body: JSON.stringify({
           model,
           temperature: 0,
-          max_tokens: 1024,
+          max_tokens: maxTokens,
           messages: [{ role: "user", content: prompt }],
+          // Reasoning models (Qwen3.x) otherwise emit <think> blocks that can
+          // break strict-JSON parsing; unknown fields are ignored elsewhere.
+          chat_template_kwargs: { enable_thinking: false },
         }),
       }).catch((err: Error) => {
         throw new Error(
@@ -139,13 +146,51 @@ const VERDICTS: Record<string, Verdict> = {
 
 export type JudgeResponse = JudgeVerdict | { need: string[] };
 
-export function parseJudgeResponse(raw: string): JudgeResponse {
+/**
+ * Parse a JSON object out of model output, repairing unterminated tails.
+ * Small models (Qwen3.5-9B) routinely emit `{"…":"…"` and then stop without
+ * the closing braces — close open strings/brackets before giving up.
+ */
+export function extractJsonObject(raw: string): unknown {
   const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end <= start) {
-    throw new Error(`Judge output contains no JSON object: ${raw.slice(0, 200)}`);
+  if (start === -1) {
+    throw new Error(`output contains no JSON object: ${raw.slice(0, 200)}`);
   }
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as {
+  const end = raw.lastIndexOf("}");
+  if (end > start) {
+    try {
+      return JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      // fall through to repair
+    }
+  }
+  const fragment = raw.slice(start);
+  let inString = false;
+  let escaped = false;
+  const stack: string[] = [];
+  for (const ch of fragment) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = inString;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+  return JSON.parse(fragment + (inString ? '"' : "") + stack.reverse().join(""));
+}
+
+export function parseJudgeResponse(raw: string): JudgeResponse {
+  const parsed = extractJsonObject(raw) as {
     verdict?: string;
     confidence?: number;
     files?: string[];
@@ -210,7 +255,8 @@ Rules:
 - verified: the diff clearly implements what the claim states.
 - partial: related changes are present but incomplete, or only part of the claim is supported.
 - no_evidence: nothing in the evidence supports the claim.
-- contradicted: the evidence shows the opposite of the claim.
+- contradicted: the evidence shows the opposite of the claim — e.g. the claim
+  says something was removed/disabled but the code still registers or uses it.
 ${needBlock}
 Respond with ONLY this JSON object, no markdown fences, no extra prose:
 {"verdict":"verified|partial|no_evidence|contradicted","confidence":0.0,"files":["path"],"reasoning":"1-2 sentences citing concrete evidence lines"}`;
@@ -237,12 +283,7 @@ Use an empty surplus array if the note adequately covers everything.`;
 }
 
 export function parseSurplusOutput(raw: string): SurplusItem[] {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end <= start) {
-    throw new Error(`Surplus output contains no JSON object: ${raw.slice(0, 200)}`);
-  }
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as { surplus?: unknown };
+  const parsed = extractJsonObject(raw) as { surplus?: unknown };
   if (!Array.isArray(parsed.surplus)) return [];
   return parsed.surplus
     .filter((s): s is Record<string, unknown> => typeof s === "object" && s !== null)

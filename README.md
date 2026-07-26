@@ -26,6 +26,13 @@ $ node src/cli.ts owner/repo --engine openai --model qwen3:8b
 $ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine openai --model my-model
 ```
 
+Honest calibration: a local Qwen3.5-9B scores 6/8 on the golden set (`pnpm
+eval`) — fine for bulk verification, but it can over-verify subtle security
+claims where a refactor merely looks like a fix. For release-critical
+decisions prefer a stronger judge, or treat local `verified` on security
+claims with care. The parser tolerates small-model JSON quirks (unterminated
+objects are repaired).
+
 Release notes are claims. This tool verifies them: it takes a release, splits
 the notes into atomic claims, and checks each claim against the real diff
 between the release and its predecessor — plus the reverse direction: which
