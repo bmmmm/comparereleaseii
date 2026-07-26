@@ -261,6 +261,13 @@ leave correctness (like meta claims) instead of drowning the score in
 no-evidence.
 - **Done when:** omlx v0.5.3 re-checks solid, carried-over claims listed
   separately in terminal/HTML/markdown.
+- **Landed 2026-07-26:** 48 of omlx's 59 claims recognised as standing text;
+  correctness now measures the 11 real ones (82). Not "solid" — what caps it
+  at 45 is a genuine undocumented minified `tailwind.css`, no longer drowned
+  claims. The base notes cost no extra request (the release list fetched to
+  pick the base already carries every body); only an explicit `--base` does.
+  Guards against neutralising a claim by repeating it: full-text match, and
+  lines under four words exempt.
 
 ### 3.3 Out-of-repo releases: say it, don't insinuate
 zen-browser ships upstream Firefox features whose code never appears in the
@@ -295,6 +302,11 @@ median" is the alarm. Absolute `notifyBelow` stays as the fallback for the
 first checks.
 - **Done when:** a repo with a stable low score stops alerting after its
   baseline forms, and a synthetic score drop on a stable-high repo alerts.
+- **Landed 2026-07-26:** after three checks the repo's median *replaces* the
+  absolute `notifyBelow` rather than joining it — otherwise a stable-high repo
+  would still be measured against 65 and its drop to 70 would stay silent. The
+  level is taken from the checks before the current one, so a slow slide
+  cannot redefine "normal". Index shows `~median` or a red drop arrow.
 
 ### 3.5 Risk-flag specificity on large releases
 zed (158 commits) and nextcloud (676) each collected 2 criticals — at that
@@ -306,6 +318,17 @@ releases whose churn is within the repo's norm.
 - **Done when:** honest large releases in the corpus stop hitting the risk
   floor while the fabricated control and the golden attack shapes keep
   their criticals.
+- **Landed 2026-07-26:** a fresh 10-repo corpus (`tmp/corpus3`) confirmed the
+  hypothesis — no release under 100 commits produced a single critical.
+  Reading the flags first found three FP classes, fixed before any threshold
+  moved: Cargo parsed without section context (`version` under `[package]`),
+  `workspace = true` refs counted as new suppliers, and go.mod self-modules /
+  same-supplier second lines. zed 5 criticals → 1. The remaining one needed no
+  threshold but a definition: the attack signature is "notes read as a full
+  account, but the auth change is missing", so `undocumented-sensitive` stays
+  critical only above 60 % documented churn. zed 45 → 69, traefik keeps its
+  earned critical (`gonginx` arrives undocumented), fabricated control stays
+  suspicious at 22.
 
 ### 3.6 Golden set: add the real-world shapes
 The set validates judges against attack shapes; the watchlist showed the
@@ -314,6 +337,15 @@ out-of-repo notes (zen), thin-notes culture (traefik), monorepo product
 tags (bitwarden — regression-covered in pickBaseRelease unit tests already).
 - **Done when:** calibration distinguishes a judge that handles these
   shapes from one that panics on them.
+- **Landed 2026-07-26:** golden set 20 → 23 with the benign shapes: a
+  docs-only diff, a fork claiming an upstream feature, and a thin note against
+  a large unrelated diff. Each tests that the judge answers `no-evidence` or
+  `verified` instead of reaching for `contradicted`. Cumulative notes needed
+  no case — carried-over claims are filtered deterministically before the
+  judge sees them (3.2), and are covered by unit tests. Haiku 23/23,
+  over-verify 0. The thin-note case first failed with a legitimate `need`
+  (the judge wanted to see whether the reader path took the lock too) — the
+  fixture was incomplete, not the judge.
 
 ## Order and why
 

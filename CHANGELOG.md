@@ -25,12 +25,18 @@ tool is checked with the tool itself before it ships.
   "nothing was found wrong", not "the notes were checked and hold" — a fork
   release reading "96/100 solid" would have been the mirror of the bug the
   carve-out fixes.
-- `out-of-repo` is decided from the repo's own history, never one release:
-  release snapshots gained a deterministic `lexicalCoverage` (share of claims
-  whose identifiers appear in that release's diff, no judge), and the baseline
-  its median. It is refused outright when a claim is contradicted or a flag is
-  critical — evidence about this release outranks any pattern. `--history`
-  shows the new column.
+- Carried-over claims: text repeating the base release's notes verbatim is
+  reported as standing text and leaves the correctness ratio, instead of
+  drowning cumulative notes in `no-evidence` (omlx: 48 of 59 claims). The base
+  notes come free from the release list already fetched to pick the base.
+- Watch alerting reads a repo's own level: once three checks exist, its median
+  score replaces the absolute `notifyBelow`. A repo normally at 25 (traefik)
+  stops crying wolf; one normally at 95 now alerts at 70, which no absolute
+  default would catch. Exit codes and critical flags are never silenced.
+- Golden set at 23 cases: added the benign real-world shapes the watchlist
+  surfaced — a docs-only diff, a fork's upstream-feature claim, and a thin note
+  against a large unrelated diff. All three test that the judge answers
+  `no-evidence`/`verified` rather than panicking into `contradicted`.
 
 - `gh` extension as the install path: `gh extension install
   bmmmm/gh-comparereleaseii` — a SHA-pinned wrapper that follows releases
@@ -49,6 +55,14 @@ tool is checked with the tool itself before it ships.
 
 ### Changed
 
+- `out-of-repo` is decided from the repo's own history, never one release:
+  release snapshots gained a deterministic `lexicalCoverage` (share of claims
+  whose identifiers appear in that release's diff, no judge), and the baseline
+  its median. It is refused outright when a claim is contradicted or a flag is
+  critical — evidence about this release outranks any pattern. `--history`
+  shows the new column.
+
+
 - The base release must come from the same product line: same tag prefix
   (monorepos tagging `cli-v…` / `browser-v…` per product) and preferably
   the same major line (parallel maintenance lines like a v2.11.x backport
@@ -64,6 +78,19 @@ tool is checked with the tool itself before it ships.
 
 ### Fixed
 
+- `undocumented-sensitive` on auth/crypto paths is critical only where the
+  release is otherwise well documented (≥ 60 % of churn). Past ~150 commits
+  some undocumented sensitive path is near-certain, so the unconditional
+  critical measured release size, not risk — zed 45 (questionable) → 69 (minor
+  gaps), traefik keeps the one critical it earns.
+- Cargo manifests are parsed with section context like `package.json`:
+  `version = "0.1.0"` under `[package]` no longer reads as a dependency named
+  "version", which fired a critical on every new crate in a workspace.
+  `foo.workspace = true` names the root manifest's existing declaration, not a
+  new supplier.
+- `go.mod`: the project's own modules (`replace … => ./path`) and second lines
+  for a supplier already present (major bumps, submodules) are no longer
+  reported as new dependencies.
 - Release-notes markdown that GitHub's release renderer broke: a code span
   wrapped across a line break rendered its continuation as a blockquote.
 

@@ -46,6 +46,13 @@ weight. Handwritten claims are where notes lie; they dominate this
 component. No checkable claims at all → correctness 100 (nothing asserted,
 nothing wrong — completeness and risk still apply).
 
+**Carried-over claims.** Cumulative or recap-style notes repeat their
+predecessor verbatim — standing intros, whole feature lists. Text that already
+stood in the base release's notes describes the product, not this release; it
+is reported separately and leaves the ratio the way meta claims do. Lines
+under four words are exempt: "Bug fixes" recurs everywhere and still asserts
+something each time.
+
 **Exception — releases that cannot be checked here.** When the release's own
 shape explains the misses (no source file in the diff at all, or a fork whose
 notes describe upstream code), `no-evidence` claims drop *out of* the ratio
@@ -75,14 +82,30 @@ risk = max(0, 100 − 25·critical − 10·warn − 0·info)
 
 | Severity | Flags |
 |---|---|
-| **critical** | contradicted claims · undocumented auth/crypto changes · vague note hiding auth/crypto changes · undocumented new dependency · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
-| **warn** | unsupported change claims · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · first-time author on sensitive paths (baseline) |
+| **critical** | contradicted claims · undocumented auth/crypto changes *in an otherwise well-documented release* · vague note hiding auth/crypto changes · undocumented new dependency · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
+| **warn** | unsupported change claims · undocumented auth/crypto changes where under 60 % of the churn is documented · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · first-time author on sensitive paths (baseline) |
 | **info** | documented new dependencies · release-size anomaly vs. baseline · unchecked claims on a release that cannot be checked here ("not verifiable") |
 
 The asymmetry is deliberate: changelogs routinely omit lockfile and CI
 churn (some generators filter it by design) — that is a `warn`. Silent
 changes to auth/crypto code and silently added dependencies are the
 signature of a compromised release — those are `critical`.
+
+**Why the auth/crypto critical needs a well-documented release.** The
+signature is "the notes read as a full account, but the auth change is
+missing" — not "the notes cover a fraction of the release and auth happens to
+be in the rest". Past ~150 commits some undocumented sensitive path is
+near-certain, so an unconditional critical there measures release size rather
+than risk (zed and traefik each sat on the risk floor for it). Below 60 %
+documented churn the flag drops to `warn` and names the completeness gap as
+the finding — completeness already charges for it. Without a reverse check
+there is no basis to downgrade, so it stays `critical`.
+
+**New dependencies mean new suppliers.** A second line for a supplier already
+in the manifest is not one: a Go major bump (`lego/v4` → `/v5`), a submodule
+of a dependency already present (`gateway-api/conformance`), a Cargo member
+crate picking up a `workspace = true` declaration, or the project's own local
+modules (`replace … => ./path`). None of those raise the flag.
 
 ## Overall
 

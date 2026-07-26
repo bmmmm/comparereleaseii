@@ -279,5 +279,41 @@
       }
     ],
     "expected": ["no-evidence"]
+  },
+  {
+    "name": "upstream-feature-claim-in-fork",
+    "section": "What's new",
+    "claim": "HDR video playback is now supported on compatible displays",
+    "hunks": [
+      {
+        "path": "src/browser/base/content/zen-styles/zen-tabs.css",
+        "hunk": "@@ -44,6 +44,10 @@ .tab-background {\n-  border-radius: 4px;\n+  border-radius: var(--zen-tab-radius, 6px);\n+}\n+\n+.tab-background[selected] {\n+  box-shadow: 0 0 0 1px var(--zen-primary-color);\n }"
+      },
+      {
+        "path": "build/scripts/generate-l10n.sh",
+        "hunk": "@@ -12,3 +12,5 @@ set -eu\n-for locale in en-US de; do\n+for locale in $(cat locales.txt); do\n+  echo \"generating $locale\"\n   ./mach l10n --locale \"$locale\"\n done"
+      }
+    ],
+    "expected": ["no-evidence"]
+  },
+  {
+    "name": "thin-note-vs-large-unrelated-diff",
+    "section": "Bug fixes",
+    "claim": "Fix panic when the routing table is reloaded while a request is in flight",
+    "hunks": [
+      {
+        "path": "pkg/server/router.go",
+        "hunk": "@@ -88,6 +88,11 @@ func (r *Router) Reload(cfg *Config) {\n-\tr.routes = build(cfg)\n+\tr.mu.Lock()\n+\tdefer r.mu.Unlock()\n+\t// Swapping the map while ServeHTTP ranges over it panicked under load.\n+\tnext := build(cfg)\n+\tr.routes = next\n }\n@@ -140,6 +145,8 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {\n+\tr.mu.RLock()\n+\tdefer r.mu.RUnlock()\n \tfor _, route := range r.routes {\n \t\tif route.Match(req) {"
+      },
+      {
+        "path": "pkg/metrics/collector.go",
+        "hunk": "@@ -30,4 +30,8 @@ func NewCollector() *Collector {\n+\tc.histogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{\n+\t\tName: \"request_duration_seconds\",\n+\t}, []string{\"code\"})\n \treturn c\n }"
+      },
+      {
+        "path": "integration/healthcheck_test.go",
+        "hunk": "@@ -210,3 +210,20 @@ func TestHealthcheck(t *testing.T) {\n+func TestHealthcheckTimeout(t *testing.T) {\n+\tt.Parallel()\n+\tsrv := newTestServer(t)\n+\trequire.Eventually(t, srv.Ready, time.Second, 10*time.Millisecond)\n+}"
+      }
+    ],
+    "expected": ["verified"]
   }
 ]
