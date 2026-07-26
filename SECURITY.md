@@ -21,11 +21,16 @@ servers. Anything that turns that input into more than text is in scope:
   or `claude` subprocess arguments.
 - Path traversal via file names from a diff, or through `--notes-file`,
   `--md`, `--json`, `--html` output paths.
-- Script injection in the `--html` report — release notes are attacker-controlled
-  text and must always be escaped.
+- Script injection in the `--html` report — release notes, file paths, tags and
+  refs are all attacker-controlled text and must always be escaped, in element
+  content and in attribute values alike.
+- Prompt injection: text from a release steering the judge's verdict instead of
+  being judged.
 - Leaking `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `gh` credentials into output,
   reports, the on-disk cache or error messages.
-- Reading or writing outside the cache directory in `tmpdir()`.
+- Reading or writing outside the cache directory
+  (`$XDG_CACHE_HOME/comparereleaseii`, else `~/.cache/comparereleaseii`), or
+  trusting a cache entry another user could have planted.
 - A crafted release that makes the tool report a green verdict on notes it
   should flag — a correctness bug in a security tool is a security bug.
 

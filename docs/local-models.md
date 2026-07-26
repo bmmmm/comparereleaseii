@@ -43,6 +43,14 @@ golden cases carry ±1–2 cases of noise. Run `--calibrate` against your own
 server for a real answer; the table below just saves you from starting
 blind.
 
+> **These rows predate the prompt-injection cases.** They were measured
+> against the 23-case set, before `injected-verdict-in-hunk` and
+> `injected-rules-override-in-hunk` existed and before the judge prompt fenced
+> untrusted text. Resisting an injection is a different skill from reading a
+> diff — a model that scored well here may still obey an instruction planted
+> in a hunk. Treat the verdicts as a prior, not a result, until a row is
+> re-measured; re-measured rows say so in the `reported` column.
+
 | model | verdict as judge | notes | reported |
 |---|---|---|---|
 | Qwen3.5-27B-Claude-4.6-Opus-Distilled 4bit | good — use with escalation | most accurate local judge tested, but slow (~45 s/call) | maintainer, 2026-07 |
@@ -72,6 +80,11 @@ advisories, Security sections, dependency manifests, lockfiles, install
 hooks, auth/crypto paths) to a stronger engine for an independent review
 when one is available (`claude` CLI or `ANTHROPIC_API_KEY`). Disable with
 `--escalate off`, or pin engine/model via `--escalate`/`--escalate-model`.
+
+When no second engine is available — which is the case for a *non*-local
+primary under `--escalate auto` — the same verdicts get two more independent
+passes from the primary instead, and the median decides. If one pass fails
+and the votes come out even, the stricter middle wins.
 
 ## Hosted aggregators (OpenRouter etc.)
 

@@ -31,6 +31,7 @@ not add a dependency, a build step, or a framework.
 | `src/judge.ts` | Engines, prompt construction, response parsing |
 | `src/calibrate.ts` | Golden set against the configured judge |
 | `src/cache.ts` | Verdict cache |
+| `src/paths.ts` | Cache location and vetting, tool version, path-segment sanitizer |
 | `src/metrics.ts` | Score, risk flags, per-file coverage |
 | `src/report.ts` | Terminal/markdown output, exit codes |
 | `src/html.ts` | HTML report |
@@ -55,6 +56,14 @@ not add a dependency, a build step, or a framework.
 - With `--judge off` the tool must be fully deterministic: identical input,
   identical output. Never introduce time, randomness or map-iteration order into
   a deterministic stage.
+- Every field a prompt or a report quotes from a release — notes, section
+  headings, commit subjects, file paths, diff hunks, tags, refs — is written by
+  the party under examination. In a prompt it goes inside the untrusted markers
+  (`untrustedBlock` in `src/judge.ts`); in HTML it goes through `esc()`, and in
+  an `href` through the URL helpers as well. There is no field here that is
+  "obviously safe".
+- No claim may reach `verified` because the notes agree with the commit
+  message. Both come from the same hand; only the diff is evidence.
 - Comment only what the code cannot say — a constraint, a workaround, a
   surprising behaviour. The existing comments are the model: they explain *why*.
 - Match the surrounding style. No new abstraction layer for a single call site.
