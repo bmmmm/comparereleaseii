@@ -110,16 +110,17 @@ Details, calibration numbers and quirks: [docs/local-models.md](docs/local-model
 
 ## Run it continuously
 
-**On your machine — the release watchdog.** `comparerelease watch --config
-watch.json` is built for local use: it monitors a list of repos from
-cron/launchd, fact-checks every new release the moment it appears (no new
-releases = cheap no-op), keeps per-repo state so nothing is checked or
-alerted twice, and renders `reports/index.html` as a dashboard with red rows
-for flagged releases. `--notify <cmd>` pipes every flagged release to your
-alerting command (ntfy, mail, webhook). The recommended setup is a local
-model with `escalate: auto` — bulk verification stays private and free,
-release-critical verdicts get a stronger second opinion. Config format,
-self-test recipe and cron/launchd snippets: [docs/watchdog.md](docs/watchdog.md).
+**On your machine — the release watchdog.** Watch the repos *you* depend on:
+`watch init` builds the list interactively from what your GitHub account
+already follows (watched repos, stars, release notifications), `watch add
+owner/repo` extends it, and `comparerelease watch --config watch.json` runs
+from cron/launchd — every new release is fact-checked the moment it appears,
+no new releases is a cheap no-op, per-repo state means nothing is checked or
+alerted twice, and `reports/index.html` is a dashboard with red rows for
+flagged releases. `--notify <cmd>` pipes every flagged release to your
+alerting command (ntfy, mail, webhook). Judge setup, config format, self-test
+recipe, cron/launchd snippets and a scheduled-CI variant for machines that
+aren't always on: [docs/watchdog.md](docs/watchdog.md).
 
 **In CI — the GitHub Action.** The repo doubles as a composite action that
 checks a release's notes, writes the report to the step summary, uploads the

@@ -31,6 +31,40 @@ A state file remembers the last checked release per repo (default:
 - State is saved after every successful check, so a crash never loses or
   repeats work.
 
+## Building the repo list
+
+Your GitHub account already knows which repos you care about — `watch init`
+turns that into a config interactively:
+
+```console
+$ comparerelease watch init
+Repos from your GitHub account (watched, starred, notifications):
+
+   1  anomalyco/opencode      2026-07  starred   AI coding agent, built for the terminal
+   2  zed-industries/zed      2026-07  starred   Code at the speed of thought
+   …
+Watch which repos? numbers/ranges ("1,3-5"), "a" for all, empty to cancel: 1,4-6
+4 repo(s) added to watch.json (created) — 4 watched total.
+```
+
+Sources (`--from`, default all three): `watched` — repos you subscribed to,
+`starred` — your stars, `notifications` — repos whose release notifications
+you actually received. Archived repos and repos already in the config are
+filtered out; the list is sorted by recent activity.
+
+For scripts and CI, or one-off changes:
+
+```console
+$ comparerelease watch add restic/restic      # validates the repo exists
+$ comparerelease watch remove restic/restic
+$ comparerelease watch list
+```
+
+All list commands default to `./watch.json`; pass `--config <file>` to use
+another path. They only touch the `repos` array — `defaults`, `notify` and
+every other setting survive edits. `add` and `remove` are idempotent:
+re-adding a present repo or removing an absent one is a no-op, exit 0.
+
 ## Config format
 
 ```json
@@ -139,3 +173,75 @@ cron's minimal PATH — hence the PATH prefix.
 `sh -lc` pulls in your login PATH so `comparerelease`, `gh` and the judge
 engine are found. Point a static file server (or just your browser) at the
 reports directory — `index.html` is the dashboard.
+
+### GitHub Actions (scheduled)
+
+No always-on machine? A scheduled workflow runs the same watchdog in CI.
+Commit your `watch.json` to the repo that hosts the workflow, and set
+`engine` to `api` (with an `ANTHROPIC_API_KEY` secret) or `off` — the
+`claude` CLI is not available on runners:
+
+A flagged release makes the watch step exit 1 on purpose — the workflow must
+still save the state and upload the reports on exactly those runs, hence
+`continue-on-error` + explicit cache save/restore + the final gate step
+(a plain `actions/cache` step skips its save when the job failed, which
+would re-judge and re-alert the same release on every schedule):
+
+```yaml
+name: release-watch
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/cache/restore@v6
+        with:
+          path: ~/.local/state/comparereleaseii
+          key: watch-state-${{ github.run_id }}
+          restore-keys: watch-state-
+      - id: watch
+        continue-on-error: true
+        run: pnpm dlx comparereleaseii watch --config watch.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: actions/cache/save@v6
+        if: always()
+        with:
+          path: ~/.local/state/comparereleaseii
+          key: watch-state-${{ github.run_id }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: watch-reports
+          path: reports
+      - name: Surface the watch verdict
+        if: steps.watch.outcome == 'failure'
+        run: exit 1
+```
+
+Caveats, honestly:
+
+- **Cache eviction** (~7 days unused, size pressure) resets the state — the
+  next run behaves like a first run and re-checks each repo's latest
+  release, so in the worst case one release is re-alerted once. If that
+  matters, commit the state file to a branch instead.
+- **`github.token` is scoped to the hosting repo**: it cannot read private
+  repos in the watch list, and its rate limit (1,000 requests/hour) can run
+  out mid-batch — one checked release costs roughly `3 + commits +
+  2×baseline` API calls. For private repos or busy lists use a fine-grained
+  PAT in a secret, and consider a lower `baseline`.
+- A red run means a flagged release — wire a notification onto workflow
+  failure, or use `--notify` with something reachable from CI.

@@ -20,6 +20,7 @@ import { toHtml } from "./html.ts";
 import { buildSnapshots, printTimeline } from "./history.ts";
 import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
 import { runWatch } from "./watch.ts";
+import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
 import { loadGuidelines } from "./guidelines.ts";
 import type { Report } from "./types.ts";
 
@@ -29,6 +30,7 @@ Usage:
   comparerelease <owner/repo> [--tag <tag>] [--base <tag>]
   comparerelease --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
   comparerelease watch --config <file> [--notify <cmd>]
+  comparerelease watch init|add|remove|list [--config <file>]
   comparerelease guidelines [--full]
 
 Options:
@@ -81,6 +83,14 @@ Watch mode (continuous release monitoring):
   A run only checks releases newer than the last run (state file) and
   regenerates <reports>/index.html; exit code is the worst of the batch.
 
+  Building the repo list (--config defaults to ./watch.json here):
+  comparerelease watch init [--from watched,starred,notifications]
+      Pick repos interactively from what YOUR GitHub account already follows:
+      watched repos, stars, and repos whose release notifications you got.
+  comparerelease watch add <owner/repo>     add one repo (scripts/CI-friendly)
+  comparerelease watch remove <owner/repo>  drop a repo from the config
+  comparerelease watch list                 show the watched repos
+
 Guidelines (hand release-note writing rules to an LLM coding agent):
   comparerelease guidelines >> AGENTS.md
       --full   print the full writing-release-notes guide instead of the
@@ -90,6 +100,7 @@ Examples:
   comparerelease restic/restic --tag v0.19.1
   comparerelease juanfont/headscale --estimate
   comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
+  comparerelease watch init
   comparerelease watch --config watch.json --notify 'ntfy publish releases'
   comparerelease guidelines >> AGENTS.md
 `;
@@ -347,6 +358,9 @@ async function main(): Promise<number> {
 }
 
 async function runWatchCli(argv: string[]): Promise<number> {
+  if (["init", "add", "remove", "list"].includes(argv[0])) {
+    return runWatchListCli(argv[0] as "init" | "add" | "remove" | "list", argv.slice(1));
+  }
   const { values } = parseArgs({
     args: argv,
     options: {
@@ -382,6 +396,44 @@ async function runWatchCli(argv: string[]): Promise<number> {
     reportsDir: values.reports,
     cache: !values["no-cache"],
   });
+}
+
+async function runWatchListCli(
+  cmd: "init" | "add" | "remove" | "list",
+  argv: string[],
+): Promise<number> {
+  const options: Record<string, { type: "string" | "boolean"; short?: string; default?: string | boolean }> = {
+    config: { type: "string", default: "watch.json" },
+    help: { type: "boolean", short: "h", default: false },
+  };
+  if (cmd === "init") {
+    options.from = { type: "string", default: "watched,starred,notifications" };
+  }
+  const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options });
+  if (values.help) {
+    console.log(USAGE);
+    return 0;
+  }
+  if (!(await commandExists("gh"))) {
+    throw new Error(
+      "The GitHub CLI (gh) is required — install it from https://cli.github.com and run `gh auth login`.",
+    );
+  }
+  const configPath = values.config as string;
+  if (cmd === "init" || cmd === "list") {
+    if (positionals.length) {
+      throw new Error(`watch ${cmd} takes no arguments (got "${positionals.join(" ")}").`);
+    }
+    return cmd === "init"
+      ? runWatchInit({ configPath, from: values.from as string })
+      : runWatchList({ configPath });
+  }
+  if (positionals.length !== 1) {
+    throw new Error(`watch ${cmd} needs exactly one repo: comparerelease watch ${cmd} owner/repo`);
+  }
+  return cmd === "add"
+    ? runWatchAdd({ configPath, repo: positionals[0] })
+    : runWatchRemove({ configPath, repo: positionals[0] });
 }
 
 async function runGuidelinesCli(argv: string[]): Promise<number> {
