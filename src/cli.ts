@@ -24,14 +24,17 @@ import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watch
 import { loadGuidelines } from "./guidelines.ts";
 import type { Report } from "./types.ts";
 
-const USAGE = `comparerelease — fact-check release notes against the actual code diff
+// Wrappers (e.g. the gh extension) set this so help and errors show the
+// command the user actually typed instead of the bare bin name.
+const PROG = process.env.COMPARERELEASE_PROG ?? "comparerelease";
+const USAGE = `${PROG} — fact-check release notes against the actual code diff
 
 Usage:
-  comparerelease <owner/repo> [--tag <tag>] [--base <tag>]
-  comparerelease --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
-  comparerelease watch --config <file> [--notify <cmd>]
-  comparerelease watch init|add|remove|list [--config <file>]
-  comparerelease guidelines [--full]
+  ${PROG} <owner/repo> [--tag <tag>] [--base <tag>]
+  ${PROG} --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
+  ${PROG} watch --config <file> [--notify <cmd>]
+  ${PROG} watch init|add|remove|list [--config <file>]
+  ${PROG} guidelines [--full]
 
 Options:
   --tag <tag>         Release tag to check (default: latest release)
@@ -74,7 +77,7 @@ Options:
   -h, --help          Show this help
 
 Watch mode (continuous release monitoring):
-  comparerelease watch --config watch.json
+  ${PROG} watch --config watch.json
       --config <file>   JSON config: repos to watch + per-repo options
       --notify <cmd>    Run <cmd> <json-report-path> for each flagged release
       --state <file>    Override the state-file path from the config
@@ -84,25 +87,25 @@ Watch mode (continuous release monitoring):
   regenerates <reports>/index.html; exit code is the worst of the batch.
 
   Building the repo list (--config defaults to ./watch.json here):
-  comparerelease watch init [--from watched,starred,notifications]
+  ${PROG} watch init [--from watched,starred,notifications]
       Pick repos interactively from what YOUR GitHub account already follows:
       watched repos, stars, and repos whose release notifications you got.
-  comparerelease watch add <owner/repo>     add one repo (scripts/CI-friendly)
-  comparerelease watch remove <owner/repo>  drop a repo from the config
-  comparerelease watch list                 show the watched repos
+  ${PROG} watch add <owner/repo>     add one repo (scripts/CI-friendly)
+  ${PROG} watch remove <owner/repo>  drop a repo from the config
+  ${PROG} watch list                 show the watched repos
 
 Guidelines (hand release-note writing rules to an LLM coding agent):
-  comparerelease guidelines >> AGENTS.md
+  ${PROG} guidelines >> AGENTS.md
       --full   print the full writing-release-notes guide instead of the
                condensed agent checklist
 
 Examples:
-  comparerelease restic/restic --tag v0.19.1
-  comparerelease juanfont/headscale --estimate
-  comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
-  comparerelease watch init
-  comparerelease watch --config watch.json --notify 'ntfy publish releases'
-  comparerelease guidelines >> AGENTS.md
+  ${PROG} restic/restic --tag v0.19.1
+  ${PROG} juanfont/headscale --estimate
+  ${PROG} --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
+  ${PROG} watch init
+  ${PROG} watch --config watch.json --notify 'ntfy publish releases'
+  ${PROG} guidelines >> AGENTS.md
 `;
 
 async function main(): Promise<number> {
@@ -429,7 +432,7 @@ async function runWatchListCli(
       : runWatchList({ configPath });
   }
   if (positionals.length !== 1) {
-    throw new Error(`watch ${cmd} needs exactly one repo: comparerelease watch ${cmd} owner/repo`);
+    throw new Error(`watch ${cmd} needs exactly one repo: ${PROG} watch ${cmd} owner/repo`);
   }
   return cmd === "add"
     ? runWatchAdd({ configPath, repo: positionals[0] })
