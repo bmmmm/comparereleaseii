@@ -38,7 +38,7 @@ $ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine o
   the server offers is calibrated sequentially and ranked (accuracy,
   rubber-stamp risk, speed) with a "best local judge" recommendation.
 - **Escalation** (default `auto`): with a local primary judge,
-  release-critical verdicts (`no_evidence`, `contradicted`, and `verified` on
+  release-critical verdicts (`no-evidence`, `contradicted`, and `verified` on
   security claims) are independently reviewed by a stronger engine when one
   is available (`claude` CLI or `ANTHROPIC_API_KEY`). Disable with
   `--escalate off`, or pin engine/model via `--escalate`/`--escalate-model`.
@@ -82,10 +82,10 @@ first, an LLM judge only for what remains unclear:
 3. **Ranking** — the diff's hunks are ranked against the claim (tiny tf-idf +
    path boost) to select the evidence worth judging.
 4. **LLM judge** — claim + top hunks go to a model (default: Haiku via the
-   `claude` CLI) which rules `verified` / `partial` / `no_evidence` /
+   `claude` CLI) which rules `verified` / `partial` / `no-evidence` /
    `contradicted`, citing concrete evidence lines. The judge may request up
    to three specific changed files once (bounded second retrieval round), and
-   verdicts that would fail a release (`no_evidence`, `contradicted`) are
+   verdicts that would fail a release (`no-evidence`, `contradicted`) are
    confirmed by a 3-vote median. All verdicts land in an on-disk cache —
    re-runs on unchanged data are free and bit-identical.
 
@@ -133,8 +133,8 @@ tag     date        commits  files  ±churn  claims  anchored  sensitive        
 - Node.js ≥ 24 (runs TypeScript natively, no build step)
 - [`gh`](https://cli.github.com/) (authenticated) for the GitHub source
 - [`claude`](https://code.claude.com/) CLI for the default judge engine, or an
-  `ANTHROPIC_API_KEY` with `--engine api`, or `--judge off` for
-  deterministic-only checks
+  `ANTHROPIC_API_KEY` with `--engine api`, or any OpenAI-compatible server with
+  `--engine openai`, or `--judge off` for deterministic-only checks
 
 ## Usage
 
@@ -147,19 +147,34 @@ $ node src/cli.ts owner/repo --tag v2.0 --notes-file draft-notes.md   # check a 
 Options:
 
 ```
---tag <tag>         Release tag to check (default: latest release)
---base <ref>        Base tag/ref to diff against (default: previous release)
---local <path>      Use a local git repo instead of the GitHub API
---notes-file <file> Check this notes file instead of the published notes
---judge <mode>      auto | all | off   (auto: LLM only for unclear claims)
---engine <engine>   claude-cli | api | off
---model <model>     Judge model (default: haiku)
---md / --json <f>   Write markdown / JSON reports
---html <file>       Write a self-contained visual HTML report
---fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
---estimate          Print a cost/effort estimate instead of judging
---no-cache          Bypass the on-disk verdict cache
+--tag <tag>          Release tag to check (default: latest release)
+--base <ref>         Base tag/ref to diff against (default: previous release/tag)
+--local <path>       Use a local git repo instead of the GitHub API
+--head <ref>         Head ref for --local (default: latest tag)
+--notes-file <file>  Check this notes file instead of the published notes
+                     (for --local the default is the CHANGELOG.md section)
+--judge <mode>       auto | all | off   (auto: LLM only for unclear claims)
+--engine <engine>    claude-cli | api | openai | off (default: claude-cli)
+--model <model>      Judge model (default: haiku; required for --engine openai)
+--openai-url <url>   Base URL for --engine openai
+                     (default: $OPENAI_BASE_URL or http://127.0.0.1:11434/v1)
+--escalate <what>    auto | off | claude-cli | api | openai (default: auto)
+--escalate-model <m> Model for the escalation engine
+--calibrate          Check the configured judge against the golden set; with
+                     --engine openai and no --model, rank every model offered
+--md / --json <f>    Write markdown / JSON reports
+--html <file>        Write a self-contained visual HTML report
+--concurrency <n>    Parallel judge calls (default: 4)
+--fail-on <what>     none | contradicted | no-evidence (default: no-evidence)
+--no-reverse         Skip the completeness check (undocumented commits)
+--baseline <n>       Compare against the n previous releases (default: 5,
+                     GitHub source only; 0 disables)
+--history <n>        Print a release-history timeline instead of a check
+--estimate           Print a cost/effort estimate instead of judging
+--no-cache           Bypass the on-disk verdict cache
 ```
+
+`--help` prints the authoritative list — this table is a copy and can lag.
 
 `--estimate` answers "how expensive will this be?" before the first real run:
 claims breakdown, planned LLM calls, input tokens, wall clock and API cost.
