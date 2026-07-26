@@ -2,6 +2,11 @@
 
 Fact-check release notes against the actual code diff.
 
+Release notes are claims. This tool takes a release, splits the notes into
+atomic claims, and checks each claim against the real diff between the
+release and its predecessor — plus the reverse direction: which code changes
+are *not* covered by any note (silent changes).
+
 ## Quick start
 
 Works with any GitHub repository or local git clone — pick a repo, pick a
@@ -14,67 +19,13 @@ $ pnpm dlx comparereleaseii restic/restic --tag v0.19.1 --html report.html
 (`npx comparereleaseii` works too. For hacking on the source, clone the repo
 and run `node src/cli.ts` — no build step, see [Development](#development).)
 
-Requires Node ≥ 24 and an authenticated [`gh`](https://cli.github.com). With
-the [`claude`](https://code.claude.com) CLI (or `ANTHROPIC_API_KEY`) you get
-LLM-judged verdicts; without either, the tool degrades gracefully to the
-deterministic stages. `--estimate` previews the effort before the first run.
-
-### Local models
-
-Fully local judging works via any OpenAI-compatible server (Ollama, MLX,
-LM Studio, vLLM) — nothing leaves your machine, and no model is hardcoded:
-
-```console
-$ node src/cli.ts owner/repo --engine openai            # auto-discovers the model
-$ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine openai
-```
-
-- **Zero config**: `--model` is optional — the server's `/v1/models` list is
-  queried and the model picked automatically (also in the fallback path when
-  neither `claude` nor an API key is available but a local server is running).
-- **Calibrate YOUR model — or find your best one**: `--calibrate` runs the
-  golden set against the configured judge and tells you whether it is safe as
-  a sole judge — over-verification (rubber-stamping unsupported claims) is
-  called out explicitly. With `--engine openai` and no `--model`, every model
-  the server offers is calibrated sequentially and ranked (accuracy,
-  rubber-stamp risk, speed) with a "best local judge" recommendation.
-- **Escalation** (default `auto`): with a local primary judge,
-  release-critical verdicts (`no-evidence`, `contradicted`, and `verified` on
-  security claims) are independently reviewed by a stronger engine when one
-  is available (`claude` CLI or `ANTHROPIC_API_KEY`). Disable with
-  `--escalate off`, or pin engine/model via `--escalate`/`--escalate-model`.
-- Small-model JSON quirks (unterminated objects, hidden thinking budgets)
-  are handled by the parser and request defaults.
-
-Reference point: a local Qwen3.5-9B scored 13/20 on the golden set with 3
-rubber-stamps — all three on attack shapes (an install hook passed off as
-cleanup, a disabled-by-default lie, a refactor sold as a security fix). That
-is exactly the failure mode escalation exists for: fine for bulk
-verification, release-critical verdicts go to a stronger engine. (Haiku:
-19/20, zero rubber-stamps.) Run calibration against single-model local
-servers with `--concurrency 1` — parallel prefills can trip their memory
-guards.
-
-The same engine also speaks to hosted aggregators like OpenRouter — point the
-base URL at it, use your OpenRouter key as `OPENAI_API_KEY`, and always pass
-an explicit model (auto-pick and calibrate-all are guarded against the
-hundreds of models an aggregator lists):
-
-```console
-$ OPENAI_API_KEY=$OPENROUTER_API_KEY node src/cli.ts owner/repo \
-    --engine openai --openai-url https://openrouter.ai/api/v1 --model qwen/qwen3-32b
-$ … --calibrate --model "qwen/qwen3-32b,google/gemini-2.5-flash,mistralai/mistral-small"
-```
-
-The comma-separated `--calibrate --model` form ranks a shortlist of candidate
-judges — on aggregators and local servers alike. Mind that free-tier
-aggregator models may train on your data; for private repos prefer local
-models or paid endpoints.
-
-Release notes are claims. This tool verifies them: it takes a release, splits
-the notes into atomic claims, and checks each claim against the real diff
-between the release and its predecessor — plus the reverse direction: which
-code changes are *not* covered by any note (silent changes).
+Requirements: Node ≥ 24, an authenticated [`gh`](https://cli.github.com), and
+a judge — the [`claude`](https://code.claude.com) CLI (default), an
+`ANTHROPIC_API_KEY`, or any OpenAI-compatible server
+([local models](docs/local-models.md)). Without one, the tool degrades
+gracefully to the deterministic stages. `--estimate` previews claims, LLM
+calls, tokens and cost before the first run — a typical release (~45 claims,
+90 files) needs 10–15 Haiku calls ≈ $0.07; cached re-runs take seconds.
 
 ## How it works
 
@@ -88,37 +39,26 @@ first, an LLM judge only for what remains unclear:
    changed lines of the diff.
 3. **Ranking** — the diff's hunks are ranked against the claim (tiny tf-idf +
    path boost) to select the evidence worth judging.
-4. **LLM judge** — claim + top hunks go to a model (default: Haiku via the
-   `claude` CLI) which rules `verified` / `partial` / `no-evidence` /
-   `contradicted`, citing concrete evidence lines. The judge may request up
-   to three specific changed files once (bounded second retrieval round), and
-   verdicts that would fail a release (`no-evidence`, `contradicted`) are
-   confirmed by a 3-vote median. All verdicts land in an on-disk cache —
-   re-runs on unchanged data are free and bit-identical.
+4. **LLM judge** — claim + top hunks go to a model which rules `verified` /
+   `partial` / `no-evidence` / `contradicted`, citing concrete evidence
+   lines. Verdicts that would fail a release are confirmed by a 3-vote
+   median; all verdicts land in an on-disk cache — re-runs on unchanged data
+   are free and bit-identical.
 
 The reverse (completeness) check flags commits whose changes no claim covers.
-Two refinements keep the check honest:
+Two refinements keep the check honest: auto-generated "Title by @user in #N"
+entries are true by construction and carry only ¼ weight — handwritten claims
+are where notes lie; and vague claims ("Updates and fixes") flip the
+question — the judge lists notable changes the note *hides* and flags them.
 
-- **Generated-entry detection** — auto-generated "Title by @user in #N" list
-  entries whose title equals the squash commit are true by construction and
-  carry only ¼ weight in the score; handwritten claims are where notes lie.
-- **Surplus audit** — vague claims ("Updates and fixes") flip the question:
-  the judge lists notable changes the note *hides* (new endpoints, behavior
-  changes, added dependencies) and flags them.
-
-`--suggest` turns the completeness check into a starting point instead of
-just a flag: for the highest-churn undocumented commits, the judge drafts a
-release-note line from that commit's actual diff (`--suggest-limit`, default
-15, bounds the extra judge calls). See
+`--suggest` turns the completeness check into a starting point: for the
+highest-churn undocumented commits, the judge drafts a release-note line from
+that commit's actual diff. See
 [docs/writing-release-notes.md](docs/writing-release-notes.md) for how to
 write notes that don't need this in the first place.
 
-Touched functions are extracted from unified-diff hunk headers and shown as
-evidence labels (`fns: register_access, should_block_host`).
-
-On top of the per-claim verdicts, every run computes an explainable **trust
-score** (0–100, exact semantics in [SCORING.md](SCORING.md)) from three
-components:
+Every run computes an explainable **trust score** (0–100, exact semantics in
+[SCORING.md](SCORING.md)) from three components:
 
 - **correctness** — share of change claims the diff supports
 - **completeness** — share of the churn (line-weighted) covered by the notes
@@ -127,29 +67,12 @@ components:
   added dependencies, binary/minified/opaque blobs, install-hook changes
 
 Contradicted claims or critical flags cap the overall score — a fake release
-cannot average itself back to green. Repo context (code size, language mix,
-release cadence) is shown for calibration.
+cannot average itself back to green.
 
-With `--baseline <n>` (default 5, GitHub source) the previous releases become
-an anomaly baseline: unusual release size, first-time authors on sensitive
-paths, and first-ever binary artifacts are flagged relative to the repo's own
-history. `--history <n>` prints the release timeline instead of a check:
-
-```console
-$ node src/cli.ts dani-garcia/vaultwarden --history 6
-tag     date        commits  files  ±churn  claims  anchored  sensitive             deps+  bin
-1.37.0  2026-07-24  27       90     10385   45      100%      ci,dependencies,auth  4      0
-1.36.0  2026-05-03  18       54     1304    38      100%      ci,dependencies,auth  0      0
-…
-```
-
-## Requirements
-
-- Node.js ≥ 24 (runs TypeScript natively, no build step)
-- [`gh`](https://cli.github.com/) (authenticated) for the GitHub source
-- [`claude`](https://code.claude.com/) CLI for the default judge engine, or an
-  `ANTHROPIC_API_KEY` with `--engine api`, or any OpenAI-compatible server with
-  `--engine openai`, or `--judge off` for deterministic-only checks
+With `--baseline <n>` (default 5) the previous releases become an anomaly
+baseline: unusual release size, first-time authors on sensitive paths and
+first-ever binary artifacts are flagged relative to the repo's own history.
+`--history <n>` prints the release timeline instead of a check.
 
 ## Usage
 
@@ -159,61 +82,43 @@ $ node src/cli.ts --local ~/src/myrepo --base v1.2.0 --head v1.3.0    # local cl
 $ node src/cli.ts owner/repo --tag v2.0 --notes-file draft-notes.md   # check a draft
 ```
 
-Options:
-
-```
---tag <tag>          Release tag to check (default: latest release)
---base <ref>         Base tag/ref to diff against (default: previous release/tag)
---local <path>       Use a local git repo instead of the GitHub API
---head <ref>         Head ref for --local (default: latest tag)
---notes-file <file>  Check this notes file instead of the published notes
-                     (for --local the default is the CHANGELOG.md section)
---judge <mode>       auto | all | off   (auto: LLM only for unclear claims)
---engine <engine>    claude-cli | api | openai | off (default: claude-cli)
---model <model>      Judge model (default: haiku; required for --engine openai)
---openai-url <url>   Base URL for --engine openai
-                     (default: $OPENAI_BASE_URL or http://127.0.0.1:11434/v1)
---escalate <what>    auto | off | claude-cli | api | openai (default: auto)
---escalate-model <m> Model for the escalation engine
---calibrate          Check the configured judge against the golden set; with
-                     --engine openai and no --model, rank every model offered
---md / --json <f>    Write markdown / JSON reports
---html <file>        Write a self-contained visual HTML report
---concurrency <n>    Parallel judge calls (default: 4)
---fail-on <what>     none | contradicted | no-evidence (default: no-evidence)
---no-reverse         Skip the completeness check (undocumented commits)
---baseline <n>       Compare against the n previous releases (default: 5,
-                     GitHub source only; 0 disables)
---suggest            Draft a release-note line for the highest-churn
-                     undocumented commits (needs a judge engine)
---suggest-limit <n>  Max commits to draft for, highest churn first
-                     (default: 15 — bounds the extra LLM calls)
---history <n>        Print a release-history timeline instead of a check
---estimate           Print a cost/effort estimate instead of judging
---no-cache           Bypass the on-disk verdict cache
-```
-
-`--help` prints the authoritative list — this table is a copy and can lag.
-
-`--estimate` answers "how expensive will this be?" before the first real run:
-claims breakdown, planned LLM calls, input tokens, wall clock and API cost.
-A typical release (~45 claims, 90 files) needs 10–15 Haiku calls ≈ $0.07 via
-the API or 2–3 minutes via the claude CLI; cached re-runs take seconds.
+`--help` lists all options. Reports: `--md` / `--json` / `--html` — the HTML
+report is a single file with no external assets: trust-score ring, verdict
+bar, risk flags, and a treemap of the diff (tile size = changed lines, color
+= documentation status, amber border = sensitive path — an undocumented
+change in an auth path is one big red amber-bordered tile).
 
 Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
 found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
 lenient gate that tolerates unprovable claims (e.g. private advisories).
 
-The `--html` report is a single file with no external assets: trust-score
-ring, verdict bar, risk flags, and a treemap of the diff — tile size = changed
-lines, color = documentation status, amber border = sensitive path. An
-undocumented change in an auth path is one big red amber-bordered tile.
+## Judges: local models, calibration, escalation
 
-## GitHub Action
+Any OpenAI-compatible server (Ollama, MLX, LM Studio, vLLM) works as judge —
+nothing leaves your machine, no model is hardcoded, `--model` is
+auto-discovered from `/v1/models`. `--calibrate` measures any candidate judge
+against a 20-case golden set (rubber-stamping is called out explicitly) and
+can rank every model your server offers; `--escalate auto` sends
+release-critical verdicts from a local judge to a stronger engine when one is
+available. Hosted aggregators (OpenRouter) work through the same engine.
+Details, calibration numbers and quirks: [docs/local-models.md](docs/local-models.md).
 
-The repo doubles as a composite action: it runs the checker, writes the
-report to the step summary, uploads the HTML report as an artifact, and fails
-the job by the CLI's exit code. Gate your own release notes at publish time:
+## Run it continuously
+
+**On your machine — the release watchdog.** `comparerelease watch --config
+watch.json` is built for local use: it monitors a list of repos from
+cron/launchd, fact-checks every new release the moment it appears (no new
+releases = cheap no-op), keeps per-repo state so nothing is checked or
+alerted twice, and renders `reports/index.html` as a dashboard with red rows
+for flagged releases. `--notify <cmd>` pipes every flagged release to your
+alerting command (ntfy, mail, webhook). The recommended setup is a local
+model with `escalate: auto` — bulk verification stays private and free,
+release-critical verdicts get a stronger second opinion. Config format,
+self-test recipe and cron/launchd snippets: [docs/watchdog.md](docs/watchdog.md).
+
+**In CI — the GitHub Action.** The repo doubles as a composite action that
+checks a release's notes, writes the report to the step summary, uploads the
+HTML report as an artifact, and fails the job by the CLI's exit code:
 
 ```yaml
 name: check-release-notes
@@ -231,51 +136,17 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-Or check any repo on demand:
-
-```yaml
-on:
-  workflow_dispatch:
-    inputs:
-      repo:
-        description: "owner/repo"
-        required: true
-      tag:
-        description: "release tag (default: latest)"
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: bmmmm/comparereleaseii@v0.1.0
-        with:
-          repo: ${{ inputs.repo }}
-          tag: ${{ inputs.tag }}
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-```
-
-Inputs mirror the CLI (`repo`, `tag`, `base`, `engine`, `model`, `fail-on`,
-`notes-file`); `comment: true` appends the verdict to the release body (needs
-`contents: write`), and the action outputs `score` and `exit-code`. With
-`engine: "off"` it runs the deterministic stages without any API key.
-
-Checked releases can carry the badge:
+This runs *after* publishing — it cannot block a bad release, but it flags it
+where everyone looks: `comment: true` appends the verdict to the release body
+(needs `contents: write`). To gate *before* publishing, check the draft with
+`notes-file` in a PR workflow. Inputs mirror the CLI (`repo`, `tag`, `base`,
+`engine`, `model`, `fail-on`, `notes-file`); outputs are `score` and
+`exit-code`. With `engine: "off"` the deterministic stages run without any
+API key. Checked releases can carry the badge:
 
 ```markdown
 [![release notes: checked](https://img.shields.io/badge/release_notes-checked-2da44e)](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml)
 ```
-
-## Watch mode: a release watchdog
-
-`comparerelease watch --config watch.json` monitors a list of repos from
-cron/launchd: every new release gets a full check the moment it appears, no
-new releases is a cheap no-op, and `reports/index.html` becomes a one-page
-dashboard — red rows for releases that fail the gate, score a suspicious
-rating, or trip a critical risk flag. `--notify <cmd>` runs your alerting
-command (ntfy, mail, webhook, …) with the JSON report path for every flagged
-release, exactly once. The recommended judge setup is a local model with
-`escalate: auto` — bulk verification stays private and free, release-critical
-verdicts get a stronger second opinion. Full config format, self-test recipe
-and cron/launchd snippets: [docs/watchdog.md](docs/watchdog.md).
 
 ## Tested against release notes we admire
 
