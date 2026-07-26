@@ -27,11 +27,16 @@ from the claim actually found in the diff (score ≥ 5, the same bar with and
 without an anchor) can settle a claim deterministically — plus
 auto-generated entries, which are true by construction.
 Verdicts that would fail a release (`no-evidence`, `contradicted`) are never
-accepted from a single model call: either a stronger **escalation engine**
-independently reviews the claim and its verdict wins, or a 3-vote median of
-independent passes must agree. `verified` verdicts on security claims
-escalate the same way — a rubber stamp on a security fix is the most
-expensive possible mistake.
+accepted from a single model call, and neither is a `verified` whose evidence
+touches sensitive paths (auth/crypto, dependency manifests, CI) or whose claim
+names a security fix — a rubber stamp there is the most expensive possible
+mistake. Either a stronger **escalation engine** reviews the claim
+independently and its verdict wins, or two more independent passes run and
+their median decides. `--escalate auto` only builds a second engine for a
+local primary, so with the default `--engine claude-cli` the vote path is the
+normal one, not the fallback. If a pass fails and the votes come out even,
+the stricter middle wins: a lone lenient vote must not be what clears a
+release.
 
 ## The three components
 

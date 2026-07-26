@@ -101,12 +101,18 @@ const SEVERITY: Record<JudgeVerdict["verdict"], number> = {
   contradicted: 3,
 };
 
-/** Median by severity — one outlier vote cannot flip a release verdict. */
+/**
+ * Median by severity — one outlier vote cannot flip a release verdict. With
+ * an even number of votes (a pass failed and did not count) the stricter of
+ * the two middles wins: the whole point is that a lone lenient vote must not
+ * carry, and picking the milder middle made a single one decisive — two
+ * votes of [contradicted, verified] came out "verified".
+ */
 export function medianVerdict(votes: JudgeVerdict[]): JudgeVerdict {
   const sorted = [...votes].sort(
     (a, b) => SEVERITY[a.verdict] - SEVERITY[b.verdict],
   );
-  return sorted[Math.floor((sorted.length - 1) / 2)];
+  return sorted[Math.ceil((sorted.length - 1) / 2)];
 }
 
 export function capHunks(
@@ -366,9 +372,13 @@ export async function verifyClaims(
           } catch {
             // keep the primary verdict if escalation fails
           }
-        } else if (severe) {
-          // No escalation engine: two more independent passes; the median
-          // wins, so a single outlier cannot fail a release.
+        } else if (severe || riskyVerified) {
+          // No escalation engine — and with the default --engine claude-cli,
+          // --escalate auto builds none, so this is the common path, not the
+          // fallback. It has to cover the rubber stamp too: a "verified" whose
+          // evidence touches auth, crypto, dependencies or CI is the most
+          // expensive verdict to get wrong, and it used to be the one verdict
+          // nobody looked at twice.
           const votes = [verdict];
           for (const pass of [2, 3]) {
             try {

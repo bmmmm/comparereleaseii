@@ -88,8 +88,12 @@ test("medianVerdict: one outlier cannot flip the result", () => {
   assert.equal(medianVerdict([vote("no-evidence"), vote("verified"), vote("verified")]).verdict, "verified");
   assert.equal(medianVerdict([vote("contradicted"), vote("contradicted"), vote("partial")]).verdict, "contradicted");
   assert.equal(medianVerdict([vote("no-evidence")]).verdict, "no-evidence");
-  // Two votes: the milder one wins (flagging needs a majority).
-  assert.equal(medianVerdict([vote("contradicted"), vote("verified")]).verdict, "verified");
+  // Two votes (one pass failed and did not count): the stricter one wins. A
+  // single lenient vote must never be what clears a release, and every extra
+  // pass here was requested because the first verdict was release-critical.
+  assert.equal(medianVerdict([vote("contradicted"), vote("verified")]).verdict, "contradicted");
+  assert.equal(medianVerdict([vote("no-evidence"), vote("verified")]).verdict, "no-evidence");
+  assert.equal(medianVerdict([vote("verified"), vote("verified")]).verdict, "verified");
 });
 
 test("parseJudgeResponse: need-protocol and verdicts", () => {
@@ -559,4 +563,59 @@ test("standing text documents nothing, so it earns no coverage", async () => {
   const freshResults = await verifyClaims(data, [fresh], opts);
   const withFresh = await computeCoverage(data, [fresh], freshResults);
   assert.equal(withFresh.uncovered.length, 0);
+});
+
+test("without an escalation engine a risky 'verified' still gets a second look", async () => {
+  // --engine claude-cli --escalate auto builds no second engine, so this is
+  // the default path. A "verified" whose evidence touches auth/crypto is the
+  // most expensive verdict to get wrong and used to be the only one nobody
+  // checked twice.
+  const file = {
+    path: "src/auth.rs",
+    status: "modified",
+    additions: 2,
+    deletions: 0,
+    patch: "@@ -1,1 +1,3 @@ fn check()\n+    if token.starts_with(\"dbg-\") { return true; }\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [], files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  };
+  let calls = 0;
+  const flipflop = {
+    name: "flipflop",
+    judge: async () => {
+      calls++;
+      // First pass rubber-stamps; the independent passes see it for what it is.
+      return calls === 1
+        ? '{"verdict":"verified","confidence":0.9,"files":["src/auth.rs"],"reasoning":"looks fine"}'
+        : '{"verdict":"contradicted","confidence":0.9,"files":["src/auth.rs"],"reasoning":"adds a bypass"}';
+    },
+  };
+  const [r] = await verifyClaims(data, [claim("Hardens token validation in `auth.rs`")], {
+    judgeMode: "all", engine: flipflop, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(calls, 3, "two independent passes follow the risky verified");
+  assert.equal(r.verdict, "contradicted");
+
+  // A verified on paths nobody is worried about is not re-asked.
+  const plain = { ...file, path: "src/ui.rs" };
+  let plainCalls = 0;
+  const [ok] = await verifyClaims(
+    { ...data, files: [plain], commitFiles: async () => [plain] },
+    [claim("Tweaks the sidebar in `ui.rs`")],
+    {
+      judgeMode: "all",
+      engine: {
+        name: "once",
+        judge: async () => {
+          plainCalls++;
+          return '{"verdict":"verified","confidence":0.9,"files":["src/ui.rs"],"reasoning":"there"}';
+        },
+      },
+      concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+    },
+  );
+  assert.equal(plainCalls, 1);
+  assert.equal(ok.verdict, "verified");
 });
