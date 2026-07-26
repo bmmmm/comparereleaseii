@@ -6,13 +6,13 @@ import { fetchForgeReleases, parseRepoUrl, proxyBlindSpot } from "../src/sources
 test("parseRepoUrl splits every form a forge prints", () => {
   assert.deepEqual(parseRepoUrl("https://forgejo.example.com/your-org/app.git"), {
     origin: "https://forgejo.example.com",
-    owner: "team",
-    repo: "comparereleaseii",
+    owner: "your-org",
+    repo: "app",
   });
   assert.deepEqual(parseRepoUrl("https://forgejo.example.com/your-org/app"), {
     origin: "https://forgejo.example.com",
-    owner: "team",
-    repo: "comparereleaseii",
+    owner: "your-org",
+    repo: "app",
   });
   assert.deepEqual(parseRepoUrl("git@github.com:bmmmm/comparereleaseii.git"), {
     origin: "https://github.com",
