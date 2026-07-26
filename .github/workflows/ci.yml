@@ -22,3 +22,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm test
+      # The packaging path is unused today (releases ship as a git tag, see
+      # ROADMAP 2.5) but kept open. Building it here stops it from rotting.
+      - run: pnpm build

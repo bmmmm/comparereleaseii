@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Local release gate: check our own changelog notes with our own checker.
-// Run `pnpm dogfood` before `pnpm publish` — a trust score below 90 (or any
-// contradicted claim) blocks the release.
+// Run `pnpm dogfood` before tagging a release — a trust score below 90 (or
+// any contradicted claim) blocks it.
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

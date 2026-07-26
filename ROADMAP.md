@@ -4,14 +4,14 @@
 > packaging (the tarball ships compiled `dist/` because Node refuses to
 > strip types under `node_modules`; the roadmap's "ship src/" assumption was
 > wrong), the composite GitHub Action with a keyless smoke workflow, `watch`
-> mode with state/index/notify, the 20-case golden set, and SCORING.md.
+> mode with state/index/notify, the 23-case golden set, and SCORING.md.
 > One deliberate direction change against 1.1/3.2: this is a solo,
 > local-first project, so releasing is a local routine (`pnpm dogfood` gate
-> + `--calibrate` drift check + `pnpm publish`) instead of a secret-carrying
-> CI pipeline — the repo needs no ANTHROPIC_API_KEY/NPM_TOKEN secrets and
-> stays judge-agnostic. Both former open points landed in Iteration 2:
-> v0.1.0 shipped as git tag + GitHub release (no npm — see 2.5), and the
-> full 11-model ranking closed
+> + `--calibrate` drift check + git tag + GitHub release) instead of a
+> secret-carrying CI pipeline — the repo needs no
+> ANTHROPIC_API_KEY/NPM_TOKEN secrets and stays judge-agnostic. Both former
+> open points landed in Iteration 2: v0.1.0 shipped as git tag + GitHub
+> release (no npm — see 2.5), and the full 11-model ranking closed
 > [#6](https://github.com/bmmmm/comparereleaseii/issues/6).
 
 Status when this plan was written (2026-07-26): the CLI is feature-complete
@@ -224,6 +224,13 @@ with the tag.
   switched to clone+run; the watchdog CI recipe checks the tool out at
   `v0.1.0`. `pnpm dlx` can be added any time later (account + `pnpm
   publish` + README revert).
+- **The packaging path stays exercised, not just present:** `pnpm build` runs
+  in CI, so the `dist/` branch of `bin/comparerelease.mjs` and
+  `tsconfig.build.json` cannot rot while unused. Verified end to end on
+  2026-07-26 — `pnpm pack` → extract under `node_modules/` → run: help,
+  `guidelines` (needs `docs/` from the tarball) and a full check all work,
+  the golden set resolves to 23 cases, and the report is byte-identical to
+  the same check run from `src/`.
 
 Process learnings applied outside the repo (global CLAUDE.md + project
 memory): clarify who releases from where BEFORE building release/CI infra;
