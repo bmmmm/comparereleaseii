@@ -9,6 +9,9 @@ function git(repo: string, args: string[]): Promise<string> {
   return run("git", ["-C", repo, ...args]).then((r) => r.stdout);
 }
 
+/** git's well-known empty tree — the diff base for a repo's first release. */
+export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
 /** Parse `git diff --patch` output into per-file entries. */
 export function parseUnifiedDiff(diff: string): DiffFile[] {
   const files: DiffFile[] = [];
@@ -44,7 +47,7 @@ async function loadCommits(repo: string, base: string, head: string): Promise<Co
   const out = await git(repo, [
     "log",
     "--format=%H%x1f%an%x1f%s%x1f%b%x1e",
-    `${base}..${head}`,
+    base ? `${base}..${head}` : head,
   ]);
   return out
     .split("\x1e")
@@ -139,9 +142,16 @@ export async function loadLocalRange(
   base: string,
   head: string,
 ): Promise<Pick<ReleaseData, "commits" | "files" | "commitFiles">> {
+  // The empty tree is not a commit: list every commit up to head and diff
+  // two-dot (three-dot needs a merge base, which a tree cannot have).
   const [commits, diff] = await Promise.all([
-    loadCommits(repo, base, head),
-    git(repo, ["diff", "--patch", "--no-color", `${base}...${head}`]),
+    loadCommits(repo, base === EMPTY_TREE ? "" : base, head),
+    git(repo, [
+      "diff",
+      "--patch",
+      "--no-color",
+      ...(base === EMPTY_TREE ? [EMPTY_TREE, head] : [`${base}...${head}`]),
+    ]),
   ]);
   const commitCache = new Map<string, Promise<DiffFile[]>>();
   const commitFiles = (sha: string): Promise<DiffFile[]> => {
@@ -176,9 +186,17 @@ export async function loadLocalRelease(opts: {
   const warnings: string[] = [];
   const head =
     opts.head ?? (await git(opts.repo, ["describe", "--tags", "--abbrev=0"])).trim();
-  const base =
-    opts.base ??
-    (await git(opts.repo, ["describe", "--tags", "--abbrev=0", `${head}^`])).trim();
+  let base = opts.base;
+  if (!base) {
+    try {
+      base = (await git(opts.repo, ["describe", "--tags", "--abbrev=0", `${head}^`])).trim();
+    } catch {
+      warnings.push(
+        `No tag before ${head} — treating it as the first release and checking against the full history.`,
+      );
+      base = EMPTY_TREE;
+    }
+  }
 
   let notes: string;
   if (opts.notesFile) {

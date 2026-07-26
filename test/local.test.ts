@@ -1,7 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseUnifiedDiff, extractChangelogSection } from "../src/sources/local.ts";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  parseUnifiedDiff,
+  extractChangelogSection,
+  loadLocalRange,
+  EMPTY_TREE,
+} from "../src/sources/local.ts";
+
+const exec = promisify(execFile);
 
 const DIFF = `diff --git a/src/a.ts b/src/a.ts
 index 111..222 100644
@@ -53,4 +65,26 @@ test("extractChangelogSection returns only the tagged section", () => {
 
 test("extractChangelogSection returns null for unknown tags", () => {
   assert.equal(extractChangelogSection(CHANGELOG, "9.9.9"), null);
+});
+
+test("loadLocalRange with the empty tree covers the full history", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
+  const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
+  await git("init", "-q");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(repo, "a.txt"), "first\n");
+  await git("add", "a.txt");
+  await git("commit", "-q", "-m", "first commit");
+  await writeFile(join(repo, "b.txt"), "second\n");
+  await git("add", "b.txt");
+  await git("commit", "-q", "-m", "second commit");
+
+  const range = await loadLocalRange(repo, EMPTY_TREE, "HEAD");
+  assert.equal(range.commits.length, 2);
+  assert.deepEqual(
+    range.files.map((f) => f.path).sort(),
+    ["a.txt", "b.txt"],
+  );
+  assert.ok(range.files.every((f) => f.status === "added"));
 });
