@@ -6,6 +6,30 @@ tool is checked with the tool itself before it ships.
 
 ## Unreleased
 
+### Added
+
+- **`--repo-url <url>` checks a release on any forge.** `owner/repo` meant
+  GitHub and nothing else, which ruled out every self-hosted Forgejo and
+  GitLab — including the forge this project's own `origin` lives on. The cheap
+  route turned out not to be an API adapter per forge: a clone already answers
+  the diff, the commits, the subjects, the authors and the tags, and
+  `ReleaseData` has been forge-agnostic since day one. So `--repo-url` clones
+  (cached under `$XDG_CACHE_HOME`, updated by fetch on later runs) and runs the
+  existing `--local` path; the notes, the one thing a clone does not carry,
+  come from `--notes-file` or the CHANGELOG section for the tag. `--tag` names
+  the ref there. Verified on this repo, which is mirrored to both forges: the
+  Forgejo URL and the GitHub mirror return the same 25 commits, 35 files,
+  ±1885/−229, the same verdicts and the same 82/100 — only the language
+  breakdown differs, since one asks Linguist and the other counts locally. The
+  clone path is the more complete one: GitHub's compare API truncates at 300
+  files, a clone does not.
+- A repository URL is an argument to `git clone`, and `git clone` takes more
+  than repositories: `ext::sh -c …` is a transport helper git executes, and a
+  leading `-` makes the whole string an option (`--upload-pack=` runs a command
+  too). Neither needs a shell, so passing argv rather than a shell string is
+  not what stops them — `assertCloneUrl()` refuses both shapes by name and
+  accepts only ordinary scheme URLs and the scp-like form.
+
 ### Security
 
 - **The PR intake wrote the author's own claim text into the job summary.**

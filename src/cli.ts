@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
-import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
+import { join } from "node:path";
+import { assertCloneUrl, ensureClone, loadLocalRelease, localRepoContext } from "./sources/local.ts";
+import { cacheDir, safeSegment } from "./paths.ts";
 import { parseClaims } from "./claims.ts";
 import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import {
@@ -31,6 +33,7 @@ const USAGE = `${PROG} — fact-check release notes against the actual code diff
 
 Usage:
   ${PROG} <owner/repo> [--tag <tag>] [--base <tag>]
+  ${PROG} --repo-url <url> [--tag <ref>] [--base <ref>] [--notes-file <file>]
   ${PROG} --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
   ${PROG} watch --config <file> [--notify <cmd>]
   ${PROG} watch init|add|remove|list [--config <file>]
@@ -40,9 +43,15 @@ Options:
   --tag <tag>         Release tag to check (default: latest release)
   --base <ref>        Base tag/ref to diff against (default: previous release/tag)
   --local <path>      Use a local git repo instead of the GitHub API
-  --head <ref>        Head ref for --local (default: latest tag)
+  --repo-url <url>    Any forge: clone the URL (cached) and check it like
+                      --local. Works with Forgejo, GitLab, private and
+                      air-gapped repos — no forge API, so the notes come from
+                      --notes-file or the CHANGELOG section
+  --head <ref>        Head ref for --local/--repo-url (default: latest tag;
+                      --tag means the same thing there)
   --notes-file <file> Check this notes file instead of the published notes
-                      (for --local the default is the CHANGELOG.md section)
+                      (for --local/--repo-url the default is the CHANGELOG
+                      section)
   --judge <mode>      auto | all | off (default: auto — LLM only for unclear claims)
   --engine <engine>   claude-cli | api | openai | off (default: claude-cli;
                       openai = any OpenAI-compatible server: Ollama, MLX, vLLM)
@@ -104,6 +113,7 @@ Guidelines (hand release-note writing rules to an LLM coding agent):
 Examples:
   ${PROG} restic/restic --tag v0.19.1
   ${PROG} juanfont/headscale --estimate
+  ${PROG} --repo-url https://git.example.com/team/app.git --tag v1.3.0
   ${PROG} --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
   ${PROG} watch init
   ${PROG} watch --config watch.json --notify 'ntfy publish releases'
@@ -123,6 +133,7 @@ async function main(): Promise<number> {
       tag: { type: "string" },
       base: { type: "string" },
       local: { type: "string" },
+      "repo-url": { type: "string" },
       head: { type: "string" },
       "notes-file": { type: "string" },
       judge: { type: "string", default: "auto" },
@@ -148,9 +159,15 @@ async function main(): Promise<number> {
     },
   });
 
-  if (values.help || (!positionals.length && !values.local && !values.calibrate)) {
+  if (
+    values.help ||
+    (!positionals.length && !values.local && !values["repo-url"] && !values.calibrate)
+  ) {
     console.log(USAGE);
     return values.help ? 0 : 2;
+  }
+  if (values.local && values["repo-url"]) {
+    throw new Error("--local and --repo-url both name the repository — pass one.");
   }
 
   const judgeMode = values.judge as "auto" | "all" | "off";
@@ -171,7 +188,9 @@ async function main(): Promise<number> {
   }
 
   if (values.history) {
-    if (values.local) throw new Error("--history works with the GitHub source only.");
+    if (values.local || values["repo-url"]) {
+      throw new Error("--history works with the GitHub source only.");
+    }
     const snapshots = await buildSnapshots(positionals[0], { count: Number(values.history) });
     printTimeline(snapshots);
     if (values.json) {
@@ -245,23 +264,43 @@ async function main(): Promise<number> {
     return cal.passed === cal.outcomes.length ? 0 : 1;
   }
 
-  if (!values.local && !(await commandExists("gh"))) {
+  // Every forge speaks git, so a clone answers almost everything the check
+  // asks: diff, commits, subjects, authors, tags. Only the published notes and
+  // the list of releases live on the forge itself — hence --notes-file, or the
+  // CHANGELOG section loadLocalRelease already falls back to.
+  let localPath = values.local;
+  if (values["repo-url"]) {
+    const url = assertCloneUrl(values["repo-url"]);
+    const clones = await cacheDir("clones");
+    if (!clones) {
+      throw new Error(
+        "--repo-url needs a private directory to clone into — set XDG_CACHE_HOME to a writable path.",
+      );
+    }
+    localPath = join(clones, safeSegment(url));
+    console.error(`Cloning ${url} (cached at ${localPath})…`);
+    await ensureClone(url, localPath);
+  }
+
+  if (!localPath && !(await commandExists("gh"))) {
     throw new Error(
-      "The GitHub CLI (gh) is required for GitHub sources — install it from https://cli.github.com and run `gh auth login`. Alternatively check a local clone with --local <path>.",
+      "The GitHub CLI (gh) is required for GitHub sources — install it from https://cli.github.com and run `gh auth login`. Alternatively check any forge with --repo-url <url>, or a local clone with --local <path>.",
     );
   }
 
-  console.error(`Loading release data${values.local ? ` from ${values.local}` : ` for ${positionals[0]}`}…`);
+  console.error(`Loading release data${localPath ? ` from ${localPath}` : ` for ${positionals[0]}`}…`);
   let data;
   let context;
-  if (values.local) {
+  if (localPath) {
     data = await loadLocalRelease({
-      repo: values.local,
-      head: values.head,
+      repo: localPath,
+      // --tag is what a reader types for "this release"; for a clone that is
+      // the head ref, and there is no separate release object to name.
+      head: values.head ?? values.tag,
       base: values.base,
       notesFile: values["notes-file"],
     });
-    context = await localRepoContext(values.local, data.headRef);
+    context = await localRepoContext(localPath, data.headRef);
   } else {
     ({ data, context } = await loadGithubReleaseData(positionals[0], {
       tag: values.tag,
@@ -335,14 +374,14 @@ async function main(): Promise<number> {
     escalateEngine: escalate,
     concurrency: Number(values.concurrency),
     reverse: !values["no-reverse"],
-    baseline: values.local ? 0 : Number(values.baseline),
+    baseline: localPath ? 0 : Number(values.baseline),
     suggest: values.suggest,
     suggestLimit: Number(values["suggest-limit"]),
   };
   const report: Report = await analyzeRelease(
     data,
     context,
-    values.local ? null : positionals[0],
+    localPath ? null : positionals[0],
     settings,
   );
 

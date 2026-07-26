@@ -169,8 +169,40 @@ export async function loadLocalRange(
   return { commits, files: parseUnifiedDiff(diff), commitFiles };
 }
 
+const CLONE_URL = /^(https?|ssh|git|file):\/\/[^\s]+$/i;
+/** `git@host:owner/repo.git` — the scp-like form every forge prints. */
+const SCP_LIKE = /^[\w.-]+@[\w.-]+:[^\s]+$/;
+
+/**
+ * A repository URL is an argument to `git clone`, and `git clone` takes more
+ * than repositories.
+ *
+ * `ext::sh -c <cmd>` is a transport helper: git runs the command. A leading
+ * `-` makes the whole thing an option instead of a URL (`--upload-pack=…` runs
+ * a command too). Neither needs a shell to go wrong, so passing argv rather
+ * than a shell string is not the defence — refusing the shapes is. Anything
+ * that is not an ordinary scheme URL or the scp-like form is rejected by name.
+ */
+export function assertCloneUrl(url: string): string {
+  if (url.startsWith("-")) {
+    throw new Error(`Repository URL may not start with "-" (git would read it as an option): ${url}`);
+  }
+  if (url.includes("::")) {
+    throw new Error(
+      `Repository URL may not use a git transport helper ("::"), which runs a command: ${url}`,
+    );
+  }
+  if (!CLONE_URL.test(url) && !SCP_LIKE.test(url)) {
+    throw new Error(
+      `Not a repository URL: ${url} — expected https://, ssh://, git://, file:// or git@host:owner/repo.`,
+    );
+  }
+  return url;
+}
+
 /** Clone (or update) a partial mirror for API-truncation fallback. */
 export async function ensureClone(url: string, dir: string): Promise<void> {
+  assertCloneUrl(url);
   try {
     await git(dir, ["rev-parse", "--git-dir"]);
     await git(dir, ["fetch", "--tags", "--force", "--quiet"]);

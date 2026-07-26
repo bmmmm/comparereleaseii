@@ -12,8 +12,8 @@ are *not* covered by any note (silent changes).
 
 ## Quick start
 
-Works with any GitHub repository or local git clone — pick a repo, pick a
-release, get a verdict:
+Works with any GitHub repository, any other forge by URL, or a local git
+clone — pick a repo, pick a release, get a verdict:
 
 ```console
 $ gh extension install bmmmm/gh-comparereleaseii
@@ -46,8 +46,8 @@ Three ways to run it, the same CLI behind all of them:
   `uses: bmmmm/comparereleaseii@v0.1.2`, nothing to clone.
 
 Requirements: Node ≥ 24, a judge, and an authenticated
-[`gh`](https://cli.github.com) for GitHub repos — `--local` reads a clone from
-disk with plain `git` and never calls `gh`. As judge: the
+[`gh`](https://cli.github.com) for GitHub repos — `--repo-url` and `--local`
+use plain `git` and never call `gh`. As judge: the
 [`claude`](https://code.claude.com) CLI (default), an `ANTHROPIC_API_KEY`, or
 any OpenAI-compatible server ([local models](docs/local-models.md)); without
 one, the tool degrades gracefully to the deterministic stages.
@@ -105,7 +105,20 @@ them reads `node src/cli.ts …`, and via the `PATH` symlink above
 $ gh comparereleaseii juanfont/headscale                                # latest release
 $ gh comparereleaseii --local ~/src/myrepo --base v1.2.0 --head v1.3.0  # local clone
 $ gh comparereleaseii owner/repo --tag v2.0 --notes-file draft.md       # check a draft
+$ gh comparereleaseii --repo-url https://git.example.com/team/app.git --tag v1.3.0
 ```
+
+**Other forges.** `--repo-url` clones the repository (cached) and checks it
+exactly like `--local`, so Forgejo, GitLab, Gitea, a private server or an
+air-gapped mirror all work with no forge API and no adapter — a clone already
+answers the diff, the commits, the subjects, the authors and the tags. What a
+clone does not have is the *published* release notes, so those come from
+`--notes-file` or, by default, the CHANGELOG section for the tag. Checked
+against this repo, which is mirrored to both forges: `--repo-url` against the
+self-hosted Forgejo and `owner/repo` against the GitHub mirror return the same
+25 commits, the same 35 files, the same verdicts and the same 82/100. The
+clone path is also the *more* complete one — GitHub's compare API truncates
+large diffs at 300 files, a clone does not.
 
 `--help` lists all options. Reports: `--md` / `--json` / `--html` — the HTML
 report is a single file with no external assets: trust-score ring, verdict

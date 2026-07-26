@@ -543,6 +543,17 @@ release notes, and which releases exist. So:
   air-gapped ones, and it ships without touching a single HTTP client. Worth
   noting the clone diff is *better* than GitHub's: the API truncates large
   compares (hence `truncated` in `ReleaseData`), a clone does not.
+- **Landed 2026-07-26 (4.2a).** `--repo-url <url>` clones into
+  `$XDG_CACHE_HOME` (fetch on later runs) and runs the existing `--local`
+  path; `--tag` names the ref there. The done-criterion below is met already,
+  since 4.2a alone is what it tests: this repo's `v0.1.2` through the Forgejo
+  URL and through the GitHub mirror return the same 25 commits, 35 files,
+  ±1885/−229, the same verdicts and the same 82/100 — only the language
+  breakdown differs (Linguist vs. counting locally). One thing the plan did
+  not list: a repository URL is an argument to `git clone`, which also accepts
+  `ext::sh -c …` (a transport helper git executes) and, with a leading `-`,
+  options like `--upload-pack=` that run a command. Passing argv instead of a
+  shell string stops neither, so both shapes are refused by name.
 - **4.2b — one endpoint per forge, only for notes and the release list.**
   Forgejo/Gitea (`/api/v1/repos/{o}/{r}/releases`) and GitLab
   (`/api/v4/projects/{id}/releases`) both expose a flat releases list. That
