@@ -6,6 +6,7 @@ import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
 import { ensureClone, loadLocalRange } from "./sources/local.ts";
 import { parseClaims } from "./claims.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
+import { suggestNotes } from "./suggest.ts";
 import { computeMetrics } from "./metrics.ts";
 import { buildSnapshots, summarizeBaseline } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
@@ -19,6 +20,10 @@ export interface CheckSettings {
   reverse: boolean;
   /** Number of previous releases for the anomaly baseline (0 disables). */
   baseline: number;
+  /** Draft a release-note line for the highest-churn undocumented commits. */
+  suggest?: boolean;
+  /** Cap on how many uncovered commits get an LLM-drafted suggestion (cost bound). */
+  suggestLimit?: number;
 }
 
 /**
@@ -100,6 +105,20 @@ export async function analyzeRelease(
   const coverage = s.reverse ? await computeCoverage(data, claims, results) : null;
   const metrics = computeMetrics({ data, results, coverage, context, baseline });
 
+  let uncovered = coverage?.uncovered ?? [];
+  if (s.suggest) {
+    if (!s.engine) {
+      console.error("--suggest needs a judge engine — skipping (run with --engine, or drop the flag).");
+    } else if (uncovered.length) {
+      uncovered = await suggestNotes(data, uncovered, {
+        engine: s.engine,
+        concurrency: s.concurrency,
+        limit: s.suggestLimit ?? 15,
+        maxEvidenceChars: 4000,
+      });
+    }
+  }
+
   return {
     repoLabel: data.repoLabel,
     baseRef: data.baseRef,
@@ -111,7 +130,7 @@ export async function analyzeRelease(
       deletions: data.files.reduce((sum, f) => sum + f.deletions, 0),
     },
     results,
-    uncovered: coverage?.uncovered ?? [],
+    uncovered,
     reverseChecked: s.reverse,
     metrics,
     warnings: data.warnings,

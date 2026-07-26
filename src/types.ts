@@ -96,6 +96,8 @@ export interface UncoveredCommit {
   additions: number;
   deletions: number;
   fileCount: number;
+  /** LLM-drafted release-note line for this commit (--suggest). */
+  suggestedNote?: string;
 }
 
 export type FlagSeverity = "critical" | "warn" | "info";

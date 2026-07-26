@@ -143,6 +143,9 @@ export function printTerminal(report: Report): void {
         `  ${c.yellow("!")} ${u.commit.sha.slice(0, 8)} ${u.commit.subject} ` +
           c.dim(`(+${u.additions}/−${u.deletions}, ${u.fileCount} files)`),
       );
+      if (u.suggestedNote) {
+        console.log(c.dim(`    suggested note: "${u.suggestedNote}"`));
+      }
     }
     if (report.uncovered.length > 10) {
       console.log(c.dim(`  … and ${report.uncovered.length - 10} more`));
@@ -208,6 +211,9 @@ export function toMarkdown(report: Report): string {
       lines.push(
         `- \`${u.commit.sha.slice(0, 8)}\` ${u.commit.subject} (+${u.additions}/−${u.deletions}, ${u.fileCount} files)`,
       );
+      if (u.suggestedNote) {
+        lines.push(`  - suggested note: "${u.suggestedNote}"`);
+      }
     }
   }
   if (report.warnings.length) {

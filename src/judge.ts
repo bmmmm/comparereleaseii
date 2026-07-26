@@ -422,6 +422,30 @@ Respond with ONLY this JSON object, no markdown fences:
 Use an empty surplus array if the note adequately covers everything.`;
 }
 
+export function buildSuggestPrompt(opts: {
+  repoLabel: string;
+  commitSubject: string;
+  hunks: Array<{ path: string; hunk: string }>;
+}): string {
+  const hunkBlock = opts.hunks.map((h) => `--- ${h.path}\n${h.hunk}`).join("\n\n");
+  return `You are drafting a release note for ${opts.repoLabel}. This commit shipped but has no corresponding entry in the release notes:
+
+Commit subject: "${opts.commitSubject}"
+
+Diff:
+${hunkBlock || "(no diff available)"}
+
+Write ONE concise, user-facing release-note line for this change: plain prose, no markdown, no leading bullet, describing what changed and why a user would care — not implementation detail. If the diff is purely internal (refactor, tests, CI, formatting, dependency bump with no behavior change) with nothing a user would need to know, say so explicitly instead of inventing a claim.
+
+Respond with ONLY this JSON object, no markdown fences:
+{"suggestion":"…"}`;
+}
+
+export function parseSuggestOutput(raw: string): string {
+  const parsed = extractJsonObject(raw) as { suggestion?: unknown };
+  return String(parsed.suggestion ?? "").slice(0, 300).trim();
+}
+
 export function parseSurplusOutput(raw: string): SurplusItem[] {
   const parsed = extractJsonObject(raw) as { surplus?: unknown };
   if (!Array.isArray(parsed.surplus)) return [];

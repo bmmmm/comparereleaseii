@@ -108,7 +108,7 @@ export function medianVerdict(votes: JudgeVerdict[]): JudgeVerdict {
   return sorted[Math.floor((sorted.length - 1) / 2)];
 }
 
-function capHunks(
+export function capHunks(
   hunks: Array<{ path: string; hunk: string }>,
   maxChars: number,
 ): Array<{ path: string; hunk: string }> {

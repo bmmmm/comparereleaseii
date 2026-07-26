@@ -261,6 +261,7 @@ export function toHtml(report: Report): string {
   const compareUrl = report.linkBase
     ? `${report.linkBase}/compare/${report.baseRef}...${report.headRef}`
     : undefined;
+  const hasSuggestions = report.uncovered.some((u) => u.suggestedNote);
   const uncoveredRows = report.uncovered
     .map(
       (u) =>
@@ -268,7 +269,9 @@ export function toHtml(report: Report): string {
           report.linkBase
             ? `<a href="${report.linkBase}/commit/${u.commit.sha}">${u.commit.sha.slice(0, 8)}</a>`
             : u.commit.sha.slice(0, 8)
-        }</td><td>${esc(u.commit.subject)}</td><td>+${u.additions}/−${u.deletions}</td><td>${u.fileCount}</td></tr>`,
+        }</td><td>${esc(u.commit.subject)}</td><td>+${u.additions}/−${u.deletions}</td><td>${u.fileCount}</td>${
+          hasSuggestions ? `<td>${u.suggestedNote ? esc(u.suggestedNote) : "—"}</td>` : ""
+        }</tr>`,
     )
     .join("");
 
@@ -361,7 +364,7 @@ ${
   !report.reverseChecked
     ? `<p class="note">Completeness check skipped (--no-reverse).</p>`
     : report.uncovered.length
-      ? `<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th></tr>${uncoveredRows}</table>`
+      ? `<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th>${hasSuggestions ? "<th>suggested note</th>" : ""}</tr>${uncoveredRows}</table>`
       : `<p class="ok">All commits in the range are covered by the release notes.</p>`
 }
 

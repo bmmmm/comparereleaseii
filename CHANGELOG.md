@@ -60,3 +60,13 @@ Initial release.
   `--calibrate` doubles as the judge drift check in the local release
   routine, and `pnpm dogfood` gates every release on our own notes scoring
   at least 90 with our own checker.
+- Suggest mode (`--suggest`, `suggestNotes`): drafts a release-note line for
+  the highest-churn undocumented commits from that commit's own diff,
+  capped by `--suggest-limit` (default 15) to bound the extra judge calls —
+  surfaced in the terminal, markdown and HTML reports. Turns the
+  completeness check from a bare flag into a starting point for the note
+  that's missing.
+- `docs/writing-release-notes.md`: a guide translating the scoring rules
+  into concrete writing advice — what makes a claim verifiable, why vague
+  entries hide surplus, and how to run the reverse check with `--suggest`
+  before publishing.

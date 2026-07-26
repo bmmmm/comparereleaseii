@@ -59,6 +59,10 @@ Options:
   --no-reverse        Skip the completeness check (undocumented commits)
   --baseline <n>      Compare against the n previous releases for anomaly
                       detection (default: 5, GitHub source only; 0 disables)
+  --suggest           Draft a release-note line for the highest-churn
+                      undocumented commits (needs a judge engine)
+  --suggest-limit <n> Max commits to draft for, highest churn first
+                      (default: 15 — bounds the extra LLM calls)
   --history <n>       Print a release-history timeline instead of a check
   --estimate          Print a cost/effort estimate instead of judging
   --no-cache          Bypass the on-disk verdict cache
@@ -107,6 +111,8 @@ async function main(): Promise<number> {
       "fail-on": { type: "string", default: "no-evidence" },
       "no-reverse": { type: "boolean", default: false },
       baseline: { type: "string", default: "5" },
+      suggest: { type: "boolean", default: false },
+      "suggest-limit": { type: "string", default: "15" },
       history: { type: "string" },
       estimate: { type: "boolean", default: false },
       "no-cache": { type: "boolean", default: false },
@@ -280,6 +286,8 @@ async function main(): Promise<number> {
     concurrency: Number(values.concurrency),
     reverse: !values["no-reverse"],
     baseline: values.local ? 0 : Number(values.baseline),
+    suggest: values.suggest,
+    suggestLimit: Number(values["suggest-limit"]),
   };
   const report: Report = await analyzeRelease(
     data,

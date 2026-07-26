@@ -46,8 +46,14 @@ $ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine o
 - Small-model JSON quirks (unterminated objects, hidden thinking budgets)
   are handled by the parser and request defaults.
 
-Reference point: a local Qwen3.5-9B scored 6/8 on the golden set — solid for
-bulk verification, with escalation covering exactly its weak spot.
+Reference point: a local Qwen3.5-9B scored 13/20 on the golden set with 3
+rubber-stamps — all three on attack shapes (an install hook passed off as
+cleanup, a disabled-by-default lie, a refactor sold as a security fix). That
+is exactly the failure mode escalation exists for: fine for bulk
+verification, release-critical verdicts go to a stronger engine. (Haiku:
+19/20, zero rubber-stamps.) Run calibration against single-model local
+servers with `--concurrency 1` — parallel prefills can trip their memory
+guards.
 
 The same engine also speaks to hosted aggregators like OpenRouter — point the
 base URL at it, use your OpenRouter key as `OPENAI_API_KEY`, and always pass
@@ -99,6 +105,13 @@ Two refinements keep the check honest:
 - **Surplus audit** — vague claims ("Updates and fixes") flip the question:
   the judge lists notable changes the note *hides* (new endpoints, behavior
   changes, added dependencies) and flags them.
+
+`--suggest` turns the completeness check into a starting point instead of
+just a flag: for the highest-churn undocumented commits, the judge drafts a
+release-note line from that commit's actual diff (`--suggest-limit`, default
+15, bounds the extra judge calls). See
+[docs/writing-release-notes.md](docs/writing-release-notes.md) for how to
+write notes that don't need this in the first place.
 
 Touched functions are extracted from unified-diff hunk headers and shown as
 evidence labels (`fns: register_access, should_block_host`).
@@ -171,6 +184,10 @@ Options:
 --no-reverse         Skip the completeness check (undocumented commits)
 --baseline <n>       Compare against the n previous releases (default: 5,
                      GitHub source only; 0 disables)
+--suggest            Draft a release-note line for the highest-churn
+                     undocumented commits (needs a judge engine)
+--suggest-limit <n>  Max commits to draft for, highest churn first
+                     (default: 15 — bounds the extra LLM calls)
 --history <n>        Print a release-history timeline instead of a check
 --estimate           Print a cost/effort estimate instead of judging
 --no-cache           Bypass the on-disk verdict cache
@@ -260,23 +277,25 @@ release, exactly once. The recommended judge setup is a local model with
 verdicts get a stronger second opinion. Full config format, self-test recipe
 and cron/launchd snippets: [docs/watchdog.md](docs/watchdog.md).
 
-## Validated against real releases
+## Tested against release notes we admire
 
-The checker is release-note-dialect agnostic — validated against GitHub's
-auto-generated PR lists, handwritten security sections, Keep-a-Changelog
-files, setext/issue-anchored notes (restic) and full sha-list changelogs
-(headscale):
+The test material is real changelogs from mature, well-run projects with
+genuinely different release-note styles — GitHub's auto-generated PR lists,
+handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
+notes (restic), full sha-list changelogs (headscale). If the checker holds up
+across that spread, it'll hold up on yours:
 
 | Release | Notes style | Score |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 96 (solid) |
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 91 (solid) |
 | restic v0.19.1 | setext sections, issue anchors, cherry-picks | 90 (solid) |
-| vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (minor gaps) |
+| vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (flags a few unprovable claims) |
 | vaultwarden 1.37.0, fabricated notes | — | 5 (suspicious), exit 1 |
 
-Checking vaultwarden 1.37.0 (45 claims, 27 commits, 90 files) finds concrete
-evidence for security claims whose advisories are still private:
+Checking vaultwarden 1.37.0 (45 claims, 27 commits, 90 files) shows the kind
+of value the checker adds: backing a terse security advisory with the actual
+mechanism from the diff —
 
 ```
 ✔ Send Access-Count Bypass GHSA-rxhg-2pw9-vf25
@@ -285,8 +304,8 @@ evidence for security claims whose advisories are still private:
   both pass the check and exceed the limit.
 ```
 
-and honestly reports what the public diff cannot prove, while fabricated
-claims are caught:
+— while staying honest about what the diff can't prove, and catching a
+fabricated claim in the same run:
 
 ```
 ✘ The icon endpoint was removed entirely in this release
