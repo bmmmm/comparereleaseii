@@ -149,3 +149,33 @@ test("markCarriedOver ignores short generic lines that repeat by nature", () => 
   const claims = markCarriedOver(parseClaims("- Bug fixes\n"), "- Bug fixes\n", "v1");
   assert.equal(claims[0].carriedOverFrom, undefined);
 });
+
+test("a paragraph citing a PR is a claim under any heading", () => {
+  // The heading comes from the same hand as the claim. Moving a paragraph
+  // from "Security" to "Changes" used to take it out of the check while its
+  // PR reference kept earning completeness credit.
+  const body =
+    "Add a remote maintenance endpoint for support engineers (#42), so operators\n" +
+    "can trigger cache rebuilds without a redeploy.\n";
+  for (const heading of ["Changes", "Security", "What's new", "Details"]) {
+    const [claim] = parseClaims(`## ${heading}\n\n${body}`);
+    assert.equal(claim.kind, "change", heading);
+    assert.deepEqual(claim.prNumbers, [42]);
+  }
+  // Same for a sha and an advisory ID.
+  const [sha] = parseClaims("## Changes\n\nBackported in 9f2c1ab8e4d0 for the LTS line.\n");
+  assert.equal(sha.kind, "change");
+  const [ghsa] = parseClaims("## Changes\n\nResolves GHSA-2222-3333-4444 in the parser.\n");
+  assert.equal(ghsa.kind, "change");
+});
+
+test("prose without a hard anchor still needs a section that invites checking", () => {
+  // An identifier-shaped word alone is weak evidence of an assertion — under
+  // an arbitrary heading it is as likely to be prose about the project.
+  const soft = "The plugin_loader has been part of the project since 1.0 and stays.\n";
+  assert.equal(parseClaims(`## Changes\n\n${soft}`)[0].kind, "meta");
+  assert.equal(parseClaims(`## Upgrade notes\n\n${soft}`)[0].kind, "change");
+  // Thank-yous stay informational however many references they carry.
+  const thanks = parseClaims("## New Contributors\n\n@someone made their first contribution in #42\n");
+  assert.equal(thanks[0].kind, "meta");
+});

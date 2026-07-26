@@ -95,12 +95,17 @@ export function parseClaims(notes: string): Claim[] {
     const claim: Claim = { id: id++, section, text, kind: "change", ...extract(raw) };
     // Prose is only verifiable when it names something concrete (identifier,
     // PR, sha, advisory) — process talk and thank-yous are informational.
-    const verifiable =
-      claim.prNumbers.length > 0 ||
-      claim.shas.length > 0 ||
-      claim.advisories.length > 0 ||
-      extractIdentifiers(claim).length > 0;
-    if (!PROSE_SECTION.test(section) || META_TEXT.test(text) || !verifiable) {
+    const hardAnchor =
+      claim.prNumbers.length > 0 || claim.shas.length > 0 || claim.advisories.length > 0;
+    const verifiable = hardAnchor || extractIdentifiers(claim).length > 0;
+    // The heading alone cannot decide this. It is written by the same hand as
+    // the claim, so a paragraph moved from "Security" to "Changes" would drop
+    // out of the check while its PR reference kept earning coverage credit. A
+    // paragraph citing a PR, sha or advisory is a checkable assertion under
+    // any heading; the allowlist only still admits prose whose sole concrete
+    // element is an identifier-shaped word.
+    const checkable = verifiable && (hardAnchor || PROSE_SECTION.test(section));
+    if (!checkable || META_SECTION.test(section) || META_TEXT.test(text)) {
       claim.kind = "meta";
     }
     claims.push(claim);
