@@ -373,11 +373,18 @@ flag, and `watch` now flags a sliding level. Our own release check went 86 →
 people's projects that could read as sharper detection or as alert fatigue,
 and the two look identical from here.
 
-- Run the existing watchlist (`~/ops/release-watch/watch.json`, 11 repos,
-  `claude-cli`; state already holds 12 repos from the first run) against
-  0.1.2. **Set `XDG_CACHE_HOME` to a writable dir first** — without a usable
-  cache the judge varies between runs and none of the numbers below are
-  comparable (measured: 84 vs 90 on the same check).
+- Run the existing watchlist against 0.1.2. **Set `XDG_CACHE_HOME` to a
+  writable dir first** — without a usable cache the judge varies between runs
+  and none of the numbers below are comparable (measured: 84 vs 90 on the
+  same check). The verdict cache also carries the tool version in its key
+  since 0.1.2, so nothing from earlier runs is reusable: budget the run as
+  fully paid.
+- Two traps, both already worked out with the captured baseline in the
+  tracker: the state file's scores predate iteration 3 (they are v0.1.0-era,
+  not v0.1.1), and `watch` refuses to re-check a release it has already
+  seen — a plain re-run reports "up to date" for every repo and measures
+  nothing. Read that before starting; it decides whether this is a clean A/B
+  or a measurement of everything since the first run.
 - For every repo, put the 0.1.2 score next to the one in the state file from
   the first run, and attribute each move of more than 10 points to a cause:
   which of the four changes did it, or is it genuine drift in that project's
