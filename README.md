@@ -8,10 +8,11 @@ Works with any GitHub repository or local git clone — pick a repo, pick a
 release, get a verdict:
 
 ```console
-$ git clone https://github.com/bmmmm/comparereleaseii && cd comparereleaseii
-$ pnpm install
-$ node src/cli.ts restic/restic --tag v0.19.1 --html report.html
+$ pnpm dlx comparereleaseii restic/restic --tag v0.19.1 --html report.html
 ```
+
+(`npx comparereleaseii` works too. For hacking on the source, clone the repo
+and run `node src/cli.ts` — no build step, see [Development](#development).)
 
 Requires Node ≥ 24 and an authenticated [`gh`](https://cli.github.com). With
 the [`claude`](https://code.claude.com) CLI (or `ANTHROPIC_API_KEY`) you get
@@ -190,6 +191,61 @@ ring, verdict bar, risk flags, and a treemap of the diff — tile size = changed
 lines, color = documentation status, amber border = sensitive path. An
 undocumented change in an auth path is one big red amber-bordered tile.
 
+## GitHub Action
+
+The repo doubles as a composite action: it runs the checker, writes the
+report to the step summary, uploads the HTML report as an artifact, and fails
+the job by the CLI's exit code. Gate your own release notes at publish time:
+
+```yaml
+name: check-release-notes
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bmmmm/comparereleaseii@v0.1.0
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+Or check any repo on demand:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "owner/repo"
+        required: true
+      tag:
+        description: "release tag (default: latest)"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bmmmm/comparereleaseii@v0.1.0
+        with:
+          repo: ${{ inputs.repo }}
+          tag: ${{ inputs.tag }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+Inputs mirror the CLI (`repo`, `tag`, `base`, `engine`, `model`, `fail-on`,
+`notes-file`); `comment: true` appends the verdict to the release body (needs
+`contents: write`), and the action outputs `score` and `exit-code`. With
+`engine: "off"` it runs the deterministic stages without any API key.
+
+Checked releases can carry the badge:
+
+```markdown
+[![release notes: checked](https://img.shields.io/badge/release_notes-checked-2da44e)](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml)
+```
+
 ## Validated against real releases
 
 The checker is release-note-dialect agnostic — validated against GitHub's
@@ -234,6 +290,11 @@ $ pnpm eval    # judge eval against the golden set (needs an engine)
 ```
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
+
+Releasing: bump `package.json`, add the version's [CHANGELOG.md](CHANGELOG.md)
+section, publish a GitHub release. The release workflow first checks our own
+notes with the tool itself (trust score ≥ 90 or no publish — dogfooding as a
+gate), then publishes to npm with provenance.
 
 ## Contributing
 

@@ -11,7 +11,27 @@ permissions:
   id-token: write
 
 jobs:
+  # Dogfood gate: our own release notes must score >= 90 with our own checker.
+  dogfood:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Check our own release notes with our own checker
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          node src/cli.ts --local . --head "$GITHUB_REF_NAME" --engine api \
+            --fail-on contradicted --json report.json --md report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          jq -e '.metrics.scores.overall >= 90' report.json
+
   publish:
+    needs: dogfood
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
