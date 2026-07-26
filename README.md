@@ -48,6 +48,22 @@ $ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine o
 Reference point: a local Qwen3.5-9B scored 6/8 on the golden set — solid for
 bulk verification, with escalation covering exactly its weak spot.
 
+The same engine also speaks to hosted aggregators like OpenRouter — point the
+base URL at it, use your OpenRouter key as `OPENAI_API_KEY`, and always pass
+an explicit model (auto-pick and calibrate-all are guarded against the
+hundreds of models an aggregator lists):
+
+```console
+$ OPENAI_API_KEY=$OPENROUTER_API_KEY node src/cli.ts owner/repo \
+    --engine openai --openai-url https://openrouter.ai/api/v1 --model qwen/qwen3-32b
+$ … --calibrate --model "qwen/qwen3-32b,google/gemini-2.5-flash,mistralai/mistral-small"
+```
+
+The comma-separated `--calibrate --model` form ranks a shortlist of candidate
+judges — on aggregators and local servers alike. Mind that free-tier
+aggregator models may train on your data; for private repos prefer local
+models or paid endpoints.
+
 Release notes are claims. This tool verifies them: it takes a release, splits
 the notes into atomic claims, and checks each claim against the real diff
 between the release and its predecessor — plus the reverse direction: which

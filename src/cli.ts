@@ -55,7 +55,9 @@ Options:
   --calibrate         Run the golden set against the configured judge and
                       report whether YOUR model is good enough (no repo needed).
                       With --engine openai and no --model, ALL models on the
-                      server are calibrated and ranked to find the best judge
+                      server are calibrated and ranked to find the best judge;
+                      --model "a,b,c" ranks an explicit shortlist (required on
+                      aggregators like OpenRouter)
   --md <file>         Write a markdown report
   --json <file>       Write the full JSON report
   --html <file>       Write a self-contained visual HTML report
@@ -137,14 +139,11 @@ async function main(): Promise<number> {
   const openaiBase =
     values["openai-url"] ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
 
-  if (values.calibrate && engineName === "openai" && !values.model) {
-    // "Which of my local models is the best judge?" — calibrate them all.
-    const found = await discoverLocalModels(openaiBase);
-    if (found && !found.authRequired && found.models.length > 1) {
-      console.error(
-        `Found ${found.models.length} models on ${openaiBase} — calibrating all to find the best judge (sequential, one model at a time).`,
-      );
-      const cals = await calibrateModels(found.models, {
+  if (values.calibrate && engineName === "openai") {
+    // "Which model is the best judge?" — rank an explicit shortlist, or
+    // everything a (small) local server offers.
+    const rankAndExit = async (models: string[]): Promise<number> => {
+      const cals = await calibrateModels(models, {
         baseUrl: openaiBase,
         apiKey: process.env.OPENAI_API_KEY,
         cache: !values["no-cache"],
@@ -152,6 +151,26 @@ async function main(): Promise<number> {
       printModelRanking(cals);
       const best = rankCalibrations(cals)[0];
       return best && best.passed === best.outcomes.length ? 0 : 1;
+    };
+    const shortlist = (values.model ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (shortlist.length > 1) {
+      return rankAndExit(shortlist);
+    }
+    if (!values.model) {
+      const found = await discoverLocalModels(openaiBase);
+      if (found && !found.authRequired && found.models.length > 20) {
+        // Aggregators (OpenRouter & co.) list hundreds of models — calibrating
+        // them all would be absurdly expensive and mostly paid.
+        throw new Error(
+          `${openaiBase} offers ${found.models.length} models — that looks like an aggregator. Rank a shortlist instead: --model "vendor/a,vendor/b,vendor/c".`,
+        );
+      }
+      if (found && !found.authRequired && found.models.length > 1) {
+        console.error(
+          `Found ${found.models.length} models on ${openaiBase} — calibrating all to find the best judge (sequential, one model at a time).`,
+        );
+        return rankAndExit(found.models);
+      }
     }
   }
 
@@ -186,6 +205,11 @@ async function main(): Promise<number> {
       }
     }
 
+    if (model?.includes(",")) {
+      throw new Error(
+        'Comma-separated model lists are only for --calibrate ranking — pick ONE model for a check run.',
+      );
+    }
     if (effective === "openai" && !model) {
       const found = await discoverLocalModels(openaiBase);
       if (found?.authRequired) {
@@ -194,6 +218,11 @@ async function main(): Promise<number> {
       if (!found?.models.length) {
         throw new Error(
           `No model server reachable at ${openaiBase} — start one (Ollama/MLX/vLLM) or pass --openai-url / --model.`,
+        );
+      }
+      if (found.models.length > 20) {
+        throw new Error(
+          `${openaiBase} offers ${found.models.length} models — that looks like an aggregator (OpenRouter?). Auto-picking would be arbitrary and possibly expensive; pass --model explicitly.`,
         );
       }
       model = found.models[0];
