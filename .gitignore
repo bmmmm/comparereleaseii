@@ -7,3 +7,10 @@ tmp/
 *.log
 .DS_Store
 .claude/
+
+# `watch init`/`watch` write these next to the config file — the
+# docs/watchdog.md self-test recipe runs them straight from a checkout of
+# this repo, so without this they'd show up as untracked clutter (or worse,
+# get `git add -A`'d with a personal repo list / notify command in them).
+watch.json
+reports/
