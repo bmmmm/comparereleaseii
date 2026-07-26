@@ -67,6 +67,20 @@ test("extractChangelogSection returns null for unknown tags", () => {
   assert.equal(extractChangelogSection(CHANGELOG, "9.9.9"), null);
 });
 
+test("extractChangelogSection matches bare and v-prefixed headings", () => {
+  const bare = "# Changelog\n\n## 0.1.0 — 2026-07-26\n\n- Initial release\n";
+  assert.ok(extractChangelogSection(bare, "0.1.0")?.includes("Initial release"));
+
+  const prefixed = "# Changelog\n\n## v1.2.0\n\n- Feature\n\n## v1.1.0\n\n- Old\n";
+  const section = extractChangelogSection(prefixed, "v1.2.0");
+  assert.ok(section?.includes("Feature"));
+  assert.ok(!section?.includes("Old"));
+
+  // "0.1.0" must not match inside "10.1.0".
+  const trap = "# Changelog\n\n## 10.1.0\n\n- Wrong section\n";
+  assert.equal(extractChangelogSection(trap, "0.1.0"), null);
+});
+
 test("loadLocalRange with the empty tree covers the full history", async () => {
   const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);

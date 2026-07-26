@@ -69,7 +69,9 @@ async function loadCommits(repo: string, base: string, head: string): Promise<Co
 export function extractChangelogSection(changelog: string, tag: string): string | null {
   const lines = changelog.split("\n");
   const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const headingRe = new RegExp(`^(#{1,4})\\s+.*(?:^|[^\\w.])${escaped}(?:[^\\w.]|$)`);
+  // The version may follow the heading marker directly ("## 0.1.0 — date")
+  // or after a prefix ending in a separator ("## [1.2.0] - date").
+  const headingRe = new RegExp(`^(#{1,4})\\s+(?:.*[^\\w.])?${escaped}(?:[^\\w.]|$)`);
   let start = -1;
   let level = 0;
   for (let i = 0; i < lines.length; i++) {
