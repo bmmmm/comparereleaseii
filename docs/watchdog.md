@@ -104,6 +104,27 @@ one is available. Run `comparerelease --calibrate --engine openai` first to
 check your local model against the golden set. No local server? Set
 `"engine": "claude-cli"` or `"engine": "api"` in `defaults`.
 
+## Reading the first run
+
+A fresh watchlist's first run flags a lot — that is expected, and most of
+it is information, not attack:
+
+- **Thin release notes score low honestly.** A project that ships 187
+  commits under 11 bullet points gets a single-digit completeness — the
+  score says "these notes don't tell you what changed", not "this release
+  is malicious". If that is a repo's normal culture, lower its
+  `notifyBelow` or set `"failOn": "none"` per repo, and let the critical
+  risk flags (install hooks, undocumented auth/crypto changes) do the
+  alerting.
+- **Changelog-only repos can't be checked.** A repo that contains no
+  source (release notes describe a product built elsewhere) gives the
+  checker nothing to diff against — every claim lands on a version-bump
+  commit. Take it off the list.
+- **Monorepo product tags and parallel maintenance lines** are handled:
+  the base release must share the tag prefix (`cli-v…` diffs against the
+  previous `cli-v…`) and prefers the same major line (`v3.7.9` against
+  `v3.7.8`/`v3.6.x`, not the `v2.11.x` backport released in between).
+
 ## Flagging and notifications
 
 A release is flagged when any of these hold:
