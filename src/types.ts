@@ -97,6 +97,13 @@ export interface ClaimResult {
   evidence: Evidence;
   reasoning: string;
   judged: boolean;
+  /**
+   * The judge was asked and could not answer (transport error, or output
+   * that is not a verdict). The result then falls back to the deterministic
+   * reading, which is by construction the milder one — so this has to be
+   * visible in the report, not only in the reasoning string.
+   */
+  judgeFailed?: boolean;
   /** Auto-generated notes entry (PR-list boilerplate), down-weighted in scoring. */
   generated: boolean;
   /** Changes hidden behind a vague claim (reverse-direction audit). */

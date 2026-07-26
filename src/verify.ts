@@ -406,6 +406,7 @@ export async function verifyClaims(
           evidence: p.evidence,
           reasoning: `${p.fallback.reasoning} (LLM judge failed: ${(err as Error).message.slice(0, 120)})`,
           judged: false,
+          judgeFailed: true,
           generated: p.generated,
         });
       }

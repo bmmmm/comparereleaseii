@@ -472,3 +472,26 @@ test("an unprovable security claim is never excused by the repo's history", () =
   security[0] = { ...security[0], claim: { ...security[0].claim, section: "Security fixes" } };
   assert.equal(classifyUnverifiable(data, security, [], baseline), null);
 });
+
+test("a judge that could not answer is a finding, not silence", () => {
+  // The fallback the failure lands on is the milder reading by construction,
+  // so "the engine never answered" must not be quietly better for a release
+  // than an answer. It was only ever visible inside the reasoning string.
+  const failed: ClaimResult = {
+    ...result("partial"),
+    judgeFailed: true,
+    reasoning: "commit abc is in the release range, but … (LLM judge failed: rate limited)",
+  };
+  const flags = buildFlags(releaseData(["src/app.js"]), [failed], null, [], null);
+  const flag = flags.find((f) => f.kind === "judge-unavailable");
+  assert.ok(flag, `expected a judge-unavailable flag, got ${flags.map((f) => f.kind).join(",")}`);
+  assert.equal(flag!.severity, "warn");
+  assert.match(flag!.message, /rate limited/);
+
+  // A run where every judge call succeeded says nothing.
+  assert.equal(
+    buildFlags(releaseData(["src/app.js"]), [result("partial")], null, [], null)
+      .some((f) => f.kind === "judge-unavailable"),
+    false,
+  );
+});

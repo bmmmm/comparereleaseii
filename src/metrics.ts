@@ -436,6 +436,23 @@ export function buildFlags(
     });
   }
 
+  // A judge that cannot answer leaves the deterministic fallback standing,
+  // and that fallback is by construction the milder reading. Not answering
+  // must therefore never be quietly better for the release than answering:
+  // say how many claims went unjudged, on the record.
+  const unjudged = results.filter((r) => r.judgeFailed);
+  if (unjudged.length) {
+    flags.push({
+      severity: "warn",
+      kind: "judge-unavailable",
+      message:
+        `${unjudged.length} claim(s) fell back to the deterministic reading — the judge could not answer: ` +
+        `${unjudged[0].reasoning.match(/LLM judge failed: ([^)]*)/)?.[1] ?? "unknown error"}`,
+      files: [],
+      commitShas: [],
+    });
+  }
+
   const noEvidence = results.filter(
     (r) => r.verdict === "no-evidence" && r.claim.kind === "change",
   );
