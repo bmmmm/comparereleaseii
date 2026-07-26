@@ -12,6 +12,7 @@ import {
   parseJudgeResponse,
   extractJsonObject,
   selectEngine,
+  resolveEngines,
   type JudgeVerdict,
 } from "../src/judge.ts";
 import { withVerdictCache } from "../src/cache.ts";
@@ -618,4 +619,35 @@ test("without an escalation engine a risky 'verified' still gets a second look",
   );
   assert.equal(plainCalls, 1);
   assert.equal(ok.verdict, "verified");
+});
+
+// SCORING.md and docs/local-models.md both state that `--escalate auto` builds
+// a second engine only for a local primary — which is why the default setup
+// runs the three-vote path rather than the escalation path. That sentence had
+// nothing pinning it: changing this resolution would silently make two
+// documents wrong, and the audit finding it came from was only half-guarded
+// (the vote-path half is covered by verify's own tests).
+test("--escalate auto builds a reviewer for a local primary only", async () => {
+  const base = { judgeMode: "auto" as const, cache: false, model: "m" };
+
+  const cli = await resolveEngines({ ...base, engine: "claude-cli", escalate: "auto" });
+  assert.equal(cli.escalate, null, "a strong primary must not get a second engine");
+
+  // Explicit beats auto — and is what a local-model user is told to pass.
+  const pinned = await resolveEngines({
+    ...base,
+    engine: "openai",
+    openaiUrl: "http://127.0.0.1:1/v1",
+    escalate: "claude-cli",
+  });
+  assert.ok(pinned.escalate, "an explicit --escalate must be honoured");
+  assert.match(pinned.escalate.name, /claude/);
+
+  const off = await resolveEngines({
+    ...base,
+    engine: "openai",
+    openaiUrl: "http://127.0.0.1:1/v1",
+    escalate: "off",
+  });
+  assert.equal(off.escalate, null, "--escalate off must build nothing");
 });
