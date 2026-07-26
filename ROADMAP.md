@@ -562,6 +562,23 @@ release notes, and which releases exist. So:
   per-commit diffs stay on git. Auth: reuse whatever `git` already has for
   public repos; a token env var per forge for private ones, never a config
   file.
+  - **Landed 2026-07-26**, as `src/sources/forge.ts` — the whole non-git
+    surface, one file. Notes and base-picking work; **`--baseline` stays
+    GitHub-only** and that is the one part of this bullet not delivered:
+    `history.ts` builds its snapshots with `fetchCompare`, so making it
+    forge-agnostic means computing each past release's snapshot from the
+    clone. Doable with what is now in place, deliberately not done here.
+    Verified against gitea.com (`gitea/tea` v0.14.2): notes from the API,
+    base `v0.14.1` from the release list, 15 of 24 claims anchored.
+  - Three failures only a live run produced. Node's `fetch` ignores
+    `HTTP(S)_PROXY` unless `NODE_USE_ENV_PROXY=1` is set before startup — so
+    behind a proxy `git` reaches the forge and the API does not, and the
+    fallback reported "no release API here". A failing `fetch` shared one
+    `try` with "is this a repository", so any update error sent the code to
+    `git clone` against a full directory and killed the run over a usable
+    cache. And a blobless clone fetches contents on demand, so a server
+    hiccup surfaced as `could not fetch <sha> from promisor remote`. All
+    three now say what happened and what to do.
 - **4.2c — merge-request dialect.** `extractPrNumbers()` matches `(#123)` and
   `Merge pull request #123`, both GitHub conventions. GitLab writes `!123`
   and "See merge request group/proj!123"; Forgejo mostly follows GitHub.

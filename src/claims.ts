@@ -14,7 +14,9 @@ function extract(text: string): Omit<Claim, "id" | "section" | "kind" | "text"> 
   // `!123` and `/merge_requests/123` for the same thing. Anchors are a
   // deterministic stage, so a dialect nobody taught the parser does not error
   // — it silently costs the claim its evidence and reads as a worse release.
-  for (const m of text.matchAll(/\/(?:pull|merge_requests)\/(\d+)/g)) prNumbers.add(Number(m[1]));
+  // GitHub says /pull/123, Gitea and Forgejo say /pulls/123, GitLab says
+  // /merge_requests/123.
+  for (const m of text.matchAll(/\/(?:pulls?|merge_requests)\/(\d+)/g)) prNumbers.add(Number(m[1]));
   for (const m of text.matchAll(/(?<![\w/])[#!](\d+)\b/g)) prNumbers.add(Number(m[1]));
   // GitLab's cross-project form, "see merge request platform/backend!4877",
   // where the `!` follows a word character and the rule above cannot fire.

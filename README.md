@@ -110,10 +110,22 @@ $ gh comparereleaseii --repo-url https://git.example.com/team/app.git --tag v1.3
 
 **Other forges.** `--repo-url` clones the repository (cached) and checks it
 exactly like `--local`, so Forgejo, GitLab, Gitea, a private server or an
-air-gapped mirror all work with no forge API and no adapter — a clone already
-answers the diff, the commits, the subjects, the authors and the tags. What a
-clone does not have is the *published* release notes, so those come from
-`--notes-file` or, by default, the CHANGELOG section for the tag. Checked
+air-gapped mirror all work — a clone already answers the diff, the commits,
+the subjects, the authors and the tags. What a clone does not have is the
+*published* release notes and which tags are releases; one flat endpoint on
+Forgejo/Gitea (`/api/v1/repos/…/releases`) and GitLab
+(`/api/v4/projects/…/releases`) covers both, and is the entire non-git
+integration. Private repos need a token in the environment —
+`FORGEJO_TOKEN`/`GITEA_TOKEN` or `GITLAB_TOKEN`, never a config file. Where
+no such API answers, the notes fall back to `--notes-file` or the CHANGELOG
+section for the tag, and the run says which it used.
+
+> Behind an HTTP proxy, export `NODE_USE_ENV_PROXY=1` as well. Node only
+> honours `HTTP(S)_PROXY` for its own requests when that is set before it
+> starts, so otherwise `git` reaches the forge and the release API does not —
+> the run warns and falls back to the CHANGELOG rather than pretending.
+
+Checked
 against this repo, which is mirrored to both forges: `--repo-url` against the
 self-hosted Forgejo and `owner/repo` against the GitHub mirror return the same
 25 commits, the same 35 files, the same verdicts and the same 82/100. The

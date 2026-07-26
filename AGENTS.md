@@ -25,6 +25,7 @@ not add a dependency, a build step, or a framework.
 | `src/check.ts` | One release end to end — shared by the CLI and watch mode |
 | `src/sources/github.ts` | Release data via `gh`, compare API, truncation fallback |
 | `src/sources/local.ts` | Local git ranges, CHANGELOG extraction, unified-diff parsing |
+| `src/sources/forge.ts` | Release lists from Forgejo/Gitea and GitLab — the only non-git surface `--repo-url` needs |
 | `src/claims.ts` | Notes → claims |
 | `src/match.ts` | Identifier extraction, lexical matching |
 | `src/verify.ts` | Escalation ladder, second retrieval round, coverage |

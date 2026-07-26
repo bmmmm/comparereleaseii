@@ -174,3 +174,26 @@ test("--repo-url checks a forge nobody wrote an API client for", async () => {
   assert.match(data.notes, /parseToken/);
   assert.ok(!data.notes.includes("First"), "only the section for this release");
 });
+
+test("a fetch that fails costs freshness, not the cached clone", async () => {
+  const origin = await mkdtemp(join(tmpdir(), "crii-origin2-"));
+  const git = (...args: string[]) => exec("git", ["-C", origin, ...args]);
+  await git("init", "-q");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(origin, "a.txt"), "one\n");
+  await git("add", ".");
+  await git("commit", "-q", "-m", "first");
+  await git("tag", "1.0.0");
+
+  const clone = join(await mkdtemp(join(tmpdir(), "crii-clone2-")), "app");
+  await ensureClone(`file://${origin}`, clone);
+
+  // Whatever makes the update fail — offline, expired token, a credential
+  // helper that cannot write — the clone on disk is still the answer. Before,
+  // this took the `git clone` branch and died on a non-empty directory.
+  await exec("git", ["-C", clone, "remote", "set-url", "origin", "file:///nonexistent-crii"]);
+  await ensureClone(`file://${origin}`, clone);
+  const { stdout } = await exec("git", ["-C", clone, "tag", "-l"]);
+  assert.match(stdout, /1\.0\.0/, "the cached clone survived and still answers");
+});

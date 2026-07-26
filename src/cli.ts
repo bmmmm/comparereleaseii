@@ -4,6 +4,8 @@ import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { assertCloneUrl, ensureClone, loadLocalRelease, localRepoContext } from "./sources/local.ts";
+import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
+import { pickBaseRelease } from "./sources/github.ts";
 import { cacheDir, safeSegment } from "./paths.ts";
 import { parseClaims } from "./claims.ts";
 import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
@@ -266,9 +268,14 @@ async function main(): Promise<number> {
 
   // Every forge speaks git, so a clone answers almost everything the check
   // asks: diff, commits, subjects, authors, tags. Only the published notes and
-  // the list of releases live on the forge itself — hence --notes-file, or the
-  // CHANGELOG section loadLocalRelease already falls back to.
+  // which tags are releases live on the forge, and one flat endpoint on
+  // Forgejo/Gitea and GitLab covers both. Without it — a plain git host, an
+  // air-gapped mirror, a token nobody exported — the CHANGELOG section is the
+  // fallback, which is what --local has always used.
   let localPath = values.local;
+  let forgeNotes: string | undefined;
+  let forgeBase: string | undefined;
+  let forgeLabel: string | undefined;
   if (values["repo-url"]) {
     const url = assertCloneUrl(values["repo-url"]);
     const clones = await cacheDir("clones");
@@ -280,6 +287,32 @@ async function main(): Promise<number> {
     localPath = join(clones, safeSegment(url));
     console.error(`Cloning ${url} (cached at ${localPath})…`);
     await ensureClone(url, localPath);
+
+    const target = parseRepoUrl(url);
+    const forge = target && (await fetchForgeReleases(target));
+    if (target) forgeLabel = `${target.owner}/${target.repo}`;
+    if (forge) {
+      const wanted = values.tag ?? values.head;
+      const release = wanted
+        ? forge.releases.find((r) => r.tag_name === wanted)
+        : forge.releases.find((r) => !r.draft && !r.prerelease);
+      if (release) {
+        forgeNotes = release.body;
+        forgeBase = pickBaseRelease(forge.releases, release.tag_name) ?? undefined;
+        values.head ??= release.tag_name;
+        console.error(
+          `Published notes for ${release.tag_name} from the ${forge.kind} API at ${target!.origin}.`,
+        );
+      } else if (wanted) {
+        console.error(
+          `${wanted} is not a published release on ${target!.origin} — falling back to the CHANGELOG section.`,
+        );
+      }
+    } else if (target) {
+      console.error(
+        `No Forgejo/Gitea or GitLab release API at ${target.origin} — using the CHANGELOG section for the notes.`,
+      );
+    }
   }
 
   if (!localPath && !(await commandExists("gh"))) {
@@ -297,8 +330,12 @@ async function main(): Promise<number> {
       // --tag is what a reader types for "this release"; for a clone that is
       // the head ref, and there is no separate release object to name.
       head: values.head ?? values.tag,
-      base: values.base,
+      // An explicit --base always wins; otherwise the forge's own release
+      // order beats "the tag before this one", which is what a clone can see.
+      base: values.base ?? forgeBase,
       notesFile: values["notes-file"],
+      notes: forgeNotes,
+      repoLabel: forgeLabel,
     });
     context = await localRepoContext(localPath, data.headRef);
   } else {

@@ -6,7 +6,23 @@ import { extractPrNumbers } from "./github.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
 function git(repo: string, args: string[]): Promise<string> {
-  return run("git", ["-C", repo, ...args]).then((r) => r.stdout);
+  return run("git", ["-C", repo, ...args]).then(
+    (r) => r.stdout,
+    (err: Error) => {
+      // A `--filter=blob:none` clone downloads file contents on demand, so
+      // the first diff reaches back to the server and a hiccup surfaces as
+      // "could not fetch <sha> from promisor remote" — true, and useless to
+      // whoever typed --repo-url.
+      if (/promisor remote|filtered.*missing object/i.test(err.message)) {
+        throw new Error(
+          `The cached clone at ${repo} stores file contents on demand and the server did not ` +
+            "answer for some of them. Re-run (it is usually transient); if it persists, delete " +
+            `${repo} to clone again.`,
+        );
+      }
+      throw err;
+    },
+  );
 }
 
 /** git's well-known empty tree — the diff base for a repo's first release. */
@@ -200,14 +216,37 @@ export function assertCloneUrl(url: string): string {
   return url;
 }
 
-/** Clone (or update) a partial mirror for API-truncation fallback. */
+/**
+ * Clone, or update what is already cached.
+ *
+ * Whether to clone is decided by "is this a git repository", never by whether
+ * the update worked. Those were one `try` before, so any failing fetch — an
+ * expired token, an offline laptop, a credential helper that cannot write —
+ * sent it to `git clone` against a directory full of files, and it died with
+ * "destination path already exists" while a perfectly usable clone sat right
+ * there. A fetch that fails costs freshness, and freshness is worth a warning,
+ * not the run.
+ */
 export async function ensureClone(url: string, dir: string): Promise<void> {
   assertCloneUrl(url);
+  let cloned = true;
   try {
     await git(dir, ["rev-parse", "--git-dir"]);
-    await git(dir, ["fetch", "--tags", "--force", "--quiet"]);
   } catch {
+    cloned = false;
+  }
+  if (!cloned) {
     await run("git", ["clone", "--quiet", "--filter=blob:none", url, dir]);
+    return;
+  }
+  try {
+    await git(dir, ["fetch", "--tags", "--force", "--quiet"]);
+  } catch (err) {
+    console.error(
+      `warning: could not update the cached clone at ${dir} ` +
+        `(${(err as Error).message.split("\n")[0].slice(0, 120)}) — checking against what is ` +
+        "already there. A release published since the last successful fetch will not be found.",
+    );
   }
 }
 
@@ -216,6 +255,10 @@ export async function loadLocalRelease(opts: {
   head?: string;
   base?: string;
   notesFile?: string;
+  /** Published notes from a forge API — outrank the CHANGELOG, not a file. */
+  notes?: string;
+  /** Label for the report; defaults to the clone's directory name. */
+  repoLabel?: string;
 }): Promise<ReleaseData> {
   const warnings: string[] = [];
   const head =
@@ -235,6 +278,8 @@ export async function loadLocalRelease(opts: {
   let notes: string;
   if (opts.notesFile) {
     notes = await readFile(opts.notesFile, "utf8");
+  } else if (opts.notes !== undefined) {
+    notes = opts.notes;
   } else {
     let changelog: string;
     try {
@@ -257,7 +302,7 @@ export async function loadLocalRelease(opts: {
 
   const range = await loadLocalRange(opts.repo, base, head);
   return {
-    repoLabel: basename(opts.repo),
+    repoLabel: opts.repoLabel ?? basename(opts.repo),
     baseRef: base,
     headRef: head,
     notes,

@@ -23,6 +23,35 @@ tool is checked with the tool itself before it ships.
   breakdown differs, since one asks Linguist and the other counts locally. The
   clone path is the more complete one: GitHub's compare API truncates at 300
   files, a clone does not.
+- **The published notes, from Forgejo/Gitea and GitLab.** `--repo-url` read
+  the CHANGELOG because a clone has no release objects. Both forges expose one
+  flat list — `/api/v1/repos/{o}/{r}/releases` and
+  `/api/v4/projects/{id}/releases` — carrying the note body, the tag and the
+  order, which is everything base-picking and note selection need; compare,
+  commits and per-commit diffs stay on git, so that endpoint is the whole
+  integration. Tokens come from `FORGEJO_TOKEN`/`GITEA_TOKEN` or
+  `GITLAB_TOKEN`, never a config file. No API is not an error: a plain git
+  host, an air-gapped mirror or a missing token falls back to the CHANGELOG
+  and says which it used. Verified end to end against gitea.com — published
+  notes for `gitea/tea` v0.14.2, base `v0.14.1` from the release list, 15 of
+  24 claims anchored through Gitea's `/pulls/123` spelling.
+- Three things the live run found that no unit test would have:
+  - **Node's `fetch` ignores `HTTP(S)_PROXY`** unless `NODE_USE_ENV_PROXY=1`
+    is set before startup, and setting it from JS is too late. Behind a proxy
+    that means `git` reaches the forge and every API request dies with a DNS
+    error — reported as "this host has no release API", which is a silent
+    downgrade of exactly the kind this tool exists to catch. It now says what
+    happened and what to export, and never prints the proxy URL, which
+    routinely carries credentials.
+  - **A failing `fetch` used to destroy the clone cache.** "Is this a
+    repository" and "did the update work" were one `try`, so an expired token
+    or an offline laptop sent it to `git clone` against a directory full of
+    files, where it died on "destination path already exists" with a usable
+    clone sitting right there. Staleness is a warning now, not the run.
+  - A `--filter=blob:none` clone fetches file contents on demand, so a server
+    hiccup surfaces as `could not fetch <sha> from promisor remote`. True, and
+    useless to whoever typed `--repo-url`; it now says to retry or delete the
+    cache.
 - **The merge-request dialect.** Anchors were GitHub's spelling only: `(#123)`
   and "Merge pull request #123" on the commit side, `#123` and `/pull/123` on
   the claim side. GitLab writes `!123`, `(group/proj!123)`, "See merge request
