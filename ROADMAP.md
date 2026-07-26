@@ -174,6 +174,11 @@ file the hunks don't contain), and down-weight changelog/docs hunks as
 evidence for code claims.
 - **Done when:** Haiku passes the need case without regressing the rest,
   and a changelog-only hunk no longer supports a code claim.
+- **Landed 2026-07-26:** need guidance + changelog-circularity rule in the
+  judge prompt; the vague-claim fallback filters changelog hunks; calibrate
+  now offers the need protocol (`allowNeed` + per-case `allPaths` — the need
+  case was previously unwinnable since the prompt never offered "need").
+  Haiku: 20/20 including the need case, over-verify 0.
 
 ### 2.3 Find the best local judge (issue #6, now unblocked)
 `--concurrency 1` made the full oMLX ranking runnable: 11 models × 20 cases,

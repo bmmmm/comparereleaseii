@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { isGeneratedEntry, isVagueClaim, medianVerdict, verifyClaims } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
 import {
+  buildJudgePrompt,
   parseSurplusOutput,
   parseJudgeResponse,
   extractJsonObject,
@@ -314,6 +315,86 @@ test("every attack-shape golden case escalates a rubber-stamped local 'verified'
     assert.equal(result.verdict, "contradicted", name);
     assert.ok(result.evidence.methods.includes("escalated"), name);
   }
+});
+
+test("judge prompt: circularity rule always, need guidance only with allowNeed", () => {
+  const base = {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    section: "Bug Fixes",
+    claimText: "Fix race in cleanup.go",
+    hunks: [],
+    commits: [],
+  };
+  const withNeed = buildJudgePrompt({ ...base, allPaths: ["a.go"], allowNeed: true });
+  assert.ok(withNeed.includes("names a file or function whose diff is not shown"));
+  const withoutNeed = buildJudgePrompt(base);
+  assert.ok(!withoutNeed.includes("names a file or function"));
+  assert.ok(withoutNeed.includes("notes cannot prove themselves"));
+});
+
+test("a changelog-only commit does not become evidence for a vague claim", async () => {
+  // Anchored vague claim ("Updates and fixes") whose commit only touches the
+  // changelog: the old fallback sent that hunk to the judge — the notes
+  // proving the notes. The judge must now see no evidence at all.
+  const cl = claim("Updates and fixes by @x in #7", [7]);
+  const linked: Commit = { sha: "abc123def", subject: "Bump deps and tweak CI (#7)", body: "", author: "dev", prNumbers: [7] };
+  const changelogFile = {
+    path: "CHANGELOG.md",
+    status: "modified",
+    additions: 2,
+    deletions: 0,
+    patch: "@@ -1,2 +1,4 @@\n # Changelog\n+\n+- Updates and fixes",
+  };
+  const data = {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [linked],
+    files: [changelogFile],
+    commitFiles: async () => [changelogFile],
+    warnings: [] as string[],
+  };
+  const prompts: string[] = [];
+  const engine = {
+    name: "capture",
+    judge: async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"verdict":"no_evidence","confidence":0.8,"files":[],"reasoning":"nothing shown"}';
+    },
+  };
+  const [result] = await verifyClaims(data, [cl], {
+    judgeMode: "auto", engine, escalateEngine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(result.verdict, "no-evidence");
+  const claimPrompts = prompts.filter((p) => p.includes("Candidate diff evidence"));
+  assert.ok(claimPrompts.length > 0);
+  for (const p of claimPrompts) {
+    assert.ok(!p.includes("--- CHANGELOG.md"), "changelog hunk leaked into judge evidence");
+    assert.ok(p.includes("(no matching hunks found)"));
+  }
+});
+
+test("calibration offers the need protocol and the case's full file list", async () => {
+  const { runCalibration } = await import("../src/calibrate.ts");
+  const prompts: string[] = [];
+  const engine = {
+    name: "need-mock",
+    judge: async (prompt: string) => {
+      prompts.push(prompt);
+      return '{"need":["internal/session/cleanup.go"]}';
+    },
+  };
+  const cal = await runCalibration(engine, 4);
+  const needCase = cal.outcomes.find((o) => o.name === "legit-need-more-files");
+  assert.ok(needCase);
+  assert.equal(needCase.pass, true);
+  assert.equal(needCase.got, "need");
+  const needPrompt = prompts.find((p) => p.includes("internal/session/cleanup.go"));
+  assert.ok(needPrompt, "need case prompt must list the file the claim names");
+  assert.ok(needPrompt.includes('{"need":["path1","path2"]}'), "need protocol must be offered");
 });
 
 test("parseSurplusOutput validates and caps items", () => {

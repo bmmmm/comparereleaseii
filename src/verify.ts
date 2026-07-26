@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { pooled, truncate } from "./util.ts";
-import { anchorMatch, functionsOf, lexicalMatch, rankHunks, tokenize } from "./match.ts";
+import { anchorMatch, functionsOf, isChangelogPath, lexicalMatch, rankHunks, tokenize } from "./match.ts";
 import { sensitiveCategory } from "./metrics.ts";
 import {
   buildJudgePrompt,
@@ -263,8 +263,10 @@ export async function verifyClaims(
       if (!ranked.length && p.evidence.commitShas.length) {
         // Vague anchored claim ("Updates and fixes"): no token overlap to rank
         // by, but the linked commit's own diff IS the evidence — send its head.
+        // Changelog files stay out: the notes restating themselves is not
+        // evidence, and a changelog-only commit must not self-verify.
         ranked = p.hunkPool
-          .filter((f) => f.patch)
+          .filter((f) => f.patch && !isChangelogPath(f.path))
           .slice(0, opts.maxHunks)
           .map((f) => ({ path: f.path, hunk: f.patch!, score: 0 }));
       }

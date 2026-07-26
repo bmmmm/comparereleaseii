@@ -368,7 +368,7 @@ export function buildJudgePrompt(opts: {
     ? `\nAll files changed in this release (for orientation; their diffs may not be shown):\n${opts.allPaths.slice(0, 200).join("\n")}\n`
     : "";
   const needBlock = opts.allowNeed
-    ? `\nIf the shown evidence is insufficient to judge, but specific changed files from the list above would settle it, respond INSTEAD with exactly:\n{"need":["path1","path2"]}\n(max 3 paths, only from the changed-files list — you will then receive their full diffs)\n`
+    ? `\nIf the shown evidence is insufficient to judge, but specific changed files from the list above would settle it, respond INSTEAD with exactly:\n{"need":["path1","path2"]}\n(max 3 paths, only from the changed-files list — you will then receive their full diffs)\nTypical case: the claim names a file or function whose diff is not shown — request that file instead of guessing from changelog or docs mentions.\n`
     : "";
   const hunkBlock = opts.hunks
     .map((h) => `--- ${h.path}\n${h.hunk}`)
@@ -397,6 +397,9 @@ Rules:
 - no_evidence: nothing in the evidence supports the claim.
 - contradicted: the evidence shows the opposite of the claim — e.g. the claim
   says something was removed/disabled but the code still registers or uses it.
+- A changelog or release-notes hunk restating the claim is NOT evidence —
+  notes cannot prove themselves. A claim about code behavior needs code
+  changes as support; docs hunks only support claims about documentation.
 ${needBlock}
 Respond with ONLY this JSON object, no markdown fences, no extra prose:
 {"verdict":"verified|partial|no_evidence|contradicted","confidence":0.0,"files":["path"],"reasoning":"1-2 sentences citing concrete evidence lines"}`;

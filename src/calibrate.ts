@@ -11,6 +11,12 @@ interface GoldenCase {
   section: string;
   claim: string;
   hunks: Array<{ path: string; hunk: string }>;
+  /**
+   * Full changed-files list of the fictional release; defaults to the hunk
+   * paths. Cases expecting "need" list here the file the claim names but the
+   * hunks omit — without it the need protocol has nothing to request.
+   */
+  allPaths?: string[];
   expected: string[];
 }
 
@@ -57,6 +63,10 @@ export async function runCalibration(engine: JudgeEngine, concurrency = 4): Prom
       claimText: gc.claim,
       hunks: gc.hunks,
       commits: [],
+      // Production always offers the need protocol on the first round — a
+      // calibration that hides it cannot measure need vs. need-misuse.
+      allPaths: gc.allPaths ?? gc.hunks.map((h) => h.path),
+      allowNeed: true,
     });
     const t0 = performance.now();
     try {
