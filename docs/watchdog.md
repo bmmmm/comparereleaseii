@@ -15,7 +15,11 @@ watch: 4 repos · 1 new release(s) checked · 0 flagged · index reports/index.h
 
 Each checked release writes `reports/<repo>/<tag>.{html,md,json}` and
 regenerates `reports/index.html` — a one-page overview with red rows for
-flagged releases and links to the full reports.
+flagged releases; every row links to its full report (click anywhere in the
+row), repo and release link out to GitHub, and the score components
+(correctness · completeness · risk) sit next to the trust score. Repos that
+haven't had a release since being added are listed as waiting, so the index
+always mirrors the configured list.
 
 ## How state works
 

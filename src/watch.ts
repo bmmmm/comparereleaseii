@@ -60,6 +60,8 @@ export interface CheckedRelease {
   checkedAt: string;
   score: number;
   scoreLabel: string;
+  /** Absent in state files written before the field existed. */
+  components?: { correctness: number; completeness: number | null; risk: number };
   exitCode: number;
   criticalFlags: number;
   flagCount: number;
@@ -68,6 +70,12 @@ export interface CheckedRelease {
   verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
   /** HTML report path relative to the reports directory. */
   report: string;
+}
+
+/** One configured watch entry, for rendering the index: key = label ?? repo. */
+export interface WatchedEntry {
+  key: string;
+  repo: string;
 }
 
 interface RepoState {
@@ -116,31 +124,53 @@ function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/** Self-contained watch overview: one row per watched repo, red rows first. */
-export function toWatchIndexHtml(state: WatchState, generatedAt: string): string {
-  const entries = Object.entries(state.repos)
-    .filter(([, rs]) => rs.latest)
-    .sort(([, a], [, b]) => {
-      const fa = a.latest!.flagged ? 0 : 1;
-      const fb = b.latest!.flagged ? 0 : 1;
+/** Self-contained watch overview: one row per watched repo, red rows first,
+ * whole rows link to the report; repos awaiting their first check are listed
+ * too so a fresh `watch add` is visible immediately. */
+export function toWatchIndexHtml(
+  state: WatchState,
+  generatedAt: string,
+  configured?: WatchedEntry[],
+): string {
+  const entries: Array<{ key: string; repo: string; rs: RepoState | undefined }> = configured
+    ? configured.map((e) => ({ ...e, rs: state.repos[e.key] }))
+    : Object.entries(state.repos).map(([key, rs]) => ({ key, repo: key, rs }));
+  const withData = entries
+    .filter((e) => e.rs?.latest)
+    .sort((a, b) => {
+      const fa = a.rs!.latest!.flagged ? 0 : 1;
+      const fb = b.rs!.latest!.flagged ? 0 : 1;
       if (fa !== fb) return fa - fb;
-      return (b.latest!.checkedAt ?? "").localeCompare(a.latest!.checkedAt ?? "");
+      return (b.rs!.latest!.checkedAt ?? "").localeCompare(a.rs!.latest!.checkedAt ?? "");
     });
-  const flaggedCount = entries.filter(([, rs]) => rs.latest!.flagged).length;
+  const pending = entries.filter((e) => !e.rs?.latest);
+  const flaggedCount = withData.filter((e) => e.rs!.latest!.flagged).length;
   const scoreClass = (s: number) => (s >= 85 ? "good" : s >= 65 ? "mid" : "bad");
-  const rows = entries
-    .map(([key, rs]) => {
-      const l = rs.latest!;
+  const repoCell = (key: string, repo: string) =>
+    repo.includes("/")
+      ? `<a class="repo" href="https://github.com/${esc(repo)}" target="_blank" rel="noopener"${key === repo ? "" : ` title="${esc(repo)}"`}>${esc(key)}</a>`
+      : esc(key);
+  const rows = withData
+    .map(({ key, repo, rs }) => {
+      const l = rs!.latest!;
       const v = l.verdicts;
-      const trend = rs.history
+      const trend = rs!.history
         .slice(-6)
         .map((h) => `<span class="dot ${scoreClass(h.score)}" title="${esc(h.tag)}: ${h.score}"></span>`)
         .join("");
-      return `<tr class="${l.flagged ? "flagged" : ""}">
+      const comp = l.components
+        ? `${l.components.correctness} · ${l.components.completeness ?? "–"} · ${l.components.risk}`
+        : "";
+      const releaseUrl = repo.includes("/")
+        ? ` <a class="ext" href="https://github.com/${esc(repo)}/releases/tag/${encodeURIComponent(l.tag)}" target="_blank" rel="noopener" title="release on GitHub">&#8599;</a>`
+        : "";
+      return `<tr class="${l.flagged ? "flagged" : ""}" data-href="${esc(l.report)}">
 <td>${l.flagged ? "&#9888;" : "&#10003;"}</td>
-<td>${esc(key)}</td>
-<td><a href="${esc(l.report)}">${esc(l.tag)}</a></td>
-<td><span class="score ${scoreClass(l.score)}">${l.score}</span> ${esc(l.scoreLabel)}</td>
+<td>${repoCell(key, repo)}</td>
+<td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
+<td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
+<td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}">${l.score}</span> ${esc(l.scoreLabel)}</td>
+<td class="comp">${comp}</td>
 <td>${v.verified}&#10003; ${v.partial}&#9681; ${v.noEvidence}&#10007; ${v.contradicted}&#8856;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
 <td>${trend}</td>
@@ -148,31 +178,57 @@ export function toWatchIndexHtml(state: WatchState, generatedAt: string): string
 </tr>`;
     })
     .join("\n");
+  const pendingRows = pending
+    .map(
+      ({ key, repo }) => `<tr class="pending">
+<td>&#8943;</td>
+<td>${repoCell(key, repo)}</td>
+<td colspan="8">waiting for the first release check</td>
+</tr>`,
+    )
+    .join("\n");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>comparereleaseii watch</title>
 <style>
-body{font:14px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:70rem;padding:0 1rem;color:#1f2328;background:#fff}
+body{font:14px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:75rem;padding:0 1rem;color:#1f2328;background:#fff}
 h1{font-size:1.3rem} .sub{color:#59636e}
 table{border-collapse:collapse;width:100%;margin-top:1rem}
 th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid #d1d9e0}
 th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:#59636e}
 tr.flagged{background:#fff1f0}
+tr[data-href]{cursor:pointer}
+tr[data-href]:hover{background:#f6f8fa}
+tr.flagged[data-href]:hover{background:#ffe3e0}
+tr.pending td{color:#59636e}
 .score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}
+.comp{color:#59636e;white-space:nowrap}
 .dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:2px}
 .dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}
 a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
-@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}}
+a.repo{color:inherit}a.ext{font-size:.85em}
+@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}}
 </style></head><body>
 <h1>Release watch</h1>
 <p class="sub">${entries.length} repos watched · ${flaggedCount} flagged · generated ${esc(generatedAt)} by comparereleaseii</p>
 <table>
-<thead><tr><th></th><th>repo</th><th>release</th><th>trust score</th><th>verdicts</th><th>flags</th><th>trend</th><th>checked</th></tr></thead>
+<thead><tr><th></th><th>repo</th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th>trend</th><th>checked</th></tr></thead>
 <tbody>
 ${rows}
+${pendingRows}
 </tbody></table>
+<p class="sub">&#10003; verified &middot; &#9681; partial &middot; &#10007; no evidence &middot; &#8856; contradicted &mdash;
+c &middot; c &middot; r = correctness &middot; completeness &middot; risk &mdash; click a row for the full report</p>
+<script>
+for (const tr of document.querySelectorAll("tr[data-href]")) {
+  tr.addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    location.href = tr.dataset.href;
+  });
+}
+</script>
 </body></html>
 `;
 }
@@ -372,6 +428,11 @@ export async function runWatch(
           checkedAt: new Date().toISOString(),
           score: report.metrics.scores.overall,
           scoreLabel: report.metrics.scores.label,
+          components: {
+            correctness: report.metrics.scores.correctness,
+            completeness: report.metrics.scores.completeness,
+            risk: report.metrics.scores.risk,
+          },
           exitCode: ec,
           criticalFlags: critical,
           flagCount: report.metrics.flags.length,
@@ -405,10 +466,14 @@ export async function runWatch(
     }
   }
 
+  const configured: WatchedEntry[] = config.repos.map((entry) => {
+    const rc: WatchRepoConfig = { ...config.defaults, ...entry };
+    return { key: rc.label ?? rc.repo, repo: rc.repo };
+  });
   await mkdir(reportsDir, { recursive: true });
   await writeFile(
     join(reportsDir, "index.html"),
-    toWatchIndexHtml(state, new Date().toISOString()),
+    toWatchIndexHtml(state, new Date().toISOString(), configured),
   );
   await saveState(statePath, state);
   const exit = worstExit(codes);

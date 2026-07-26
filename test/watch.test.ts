@@ -117,3 +117,57 @@ test("toWatchIndexHtml marks flagged repos red and sorts them first", () => {
   assert.ok(html.includes('href="x/v9.html"'));
   assert.ok(html.includes("2 repos watched · 1 flagged"));
 });
+
+test("toWatchIndexHtml: whole rows link to the report, repos link to GitHub", () => {
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "good/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: { ...checked("v1", 95, false), components: { correctness: 94, completeness: null, risk: 70 } },
+        history: [checked("v1", 95, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z", [
+    { key: "good/repo", repo: "good/repo" },
+  ]);
+  assert.ok(html.includes('data-href="x/v1.html"'), "row carries the report link");
+  assert.ok(html.includes('href="https://github.com/good/repo"'), "repo links to GitHub");
+  assert.ok(
+    html.includes('href="https://github.com/good/repo/releases/tag/v1"'),
+    "tag links to the GitHub release",
+  );
+  assert.ok(html.includes("94 · – · 70"), "score components shown, null completeness as dash");
+  assert.ok(html.includes("2026-07-20"), "release date shown");
+});
+
+test("toWatchIndexHtml: configured repos without a check yet get a pending row", () => {
+  const state: WatchState = { version: 1, repos: {} };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z", [
+    { key: "fresh/repo", repo: "fresh/repo" },
+  ]);
+  assert.ok(html.includes("waiting for the first release check"));
+  assert.ok(html.includes("fresh/repo"));
+  assert.ok(html.includes("1 repos watched · 0 flagged"));
+});
+
+test("toWatchIndexHtml: state entries dropped from the config are not rendered", () => {
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "gone/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 95, false),
+        history: [],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z", [
+    { key: "kept/repo", repo: "kept/repo" },
+  ]);
+  assert.ok(!html.includes("gone/repo"));
+  assert.ok(html.includes("kept/repo"));
+});
