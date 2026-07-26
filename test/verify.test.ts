@@ -406,3 +406,79 @@ test("parseSurplusOutput validates and caps items", () => {
   assert.equal(items[1].notable, false);
   assert.deepEqual(parseSurplusOutput('{"surplus":[]}'), []);
 });
+
+test("a note echoing its own commit subject is not evidence about the diff", async () => {
+  // The whole attack: the author writes the note and the commit message, so
+  // "they agree" is a statement about one person's copy-paste, not about the
+  // code. Pre-fix this scored verified (0.90) with the judge never called.
+  const linked: Commit = {
+    sha: "4bce803d7b",
+    subject: "Improve token cache eviction under load (#42)",
+    body: "",
+    author: "mallory",
+    prNumbers: [42],
+  };
+  const backdoored = {
+    path: "src/auth.js",
+    status: "modified",
+    additions: 4,
+    deletions: 1,
+    patch:
+      "@@ -1,3 +1,6 @@ function verifyToken(token)\n" +
+      "+  if (token.startsWith('dbg-')) return true;\n" +
+      "   return checkSignature(token);\n",
+  };
+  const data = {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [linked],
+    files: [backdoored],
+    commitFiles: async () => [backdoored],
+    warnings: [] as string[],
+  };
+  const cl = claim("Improve token cache eviction under load (#42)", [42]);
+
+  let judged = 0;
+  const engine = {
+    name: "counting",
+    judge: async () => {
+      judged++;
+      return '{"verdict":"contradicted","confidence":1,"files":[],"reasoning":"backdoor"}';
+    },
+  };
+  // --judge auto (the default) must route this to the judge, not settle it.
+  const [withJudge] = await verifyClaims(data, [cl], {
+    judgeMode: "auto", engine, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(judged > 0, true, "the judge must see a claim the diff does not support");
+  assert.equal(withJudge.verdict, "contradicted");
+
+  // And with no judge at all it may not claim more than "there is an anchor".
+  const [deterministic] = await verifyClaims(data, [claim("Improve token cache eviction under load (#42)", [42])], {
+    judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(deterministic.verdict, "partial");
+  assert.match(deterministic.reasoning, /restates the commit subject/);
+});
+
+test("one identifier hit in the linked commit is a lead, not a verified verdict", async () => {
+  const linked: Commit = { sha: "aa11bb22cc", subject: "chore: tidy", body: "", author: "dev", prNumbers: [7] };
+  const file = {
+    path: "src/session.js",
+    status: "modified",
+    additions: 1,
+    deletions: 0,
+    patch: "@@ -1,1 +1,2 @@\n+const verifyToken = null;\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [linked], files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  };
+  const cl: Claim = { ...claim("Rewrote `verifyToken` for constant-time comparison (#7)", [7]), codeSpans: ["verifyToken"] };
+  const [r] = await verifyClaims(data, [cl], {
+    judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(r.verdict, "partial");
+});

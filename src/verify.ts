@@ -185,12 +185,22 @@ export async function verifyClaims(
       const anchorLabel = anchors.viaPr.length
         ? `PR #${anchors.viaPr.join(", #")}`
         : `commit ${anchors.viaSha.join(", ")}`;
-      const strong = generated || bestSim >= 0.5 || lex.score >= 2;
+      // A note that restates its own commit subject says nothing about the
+      // diff — both texts are written by the same hand, and agreeing with
+      // yourself is not evidence. It anchors the claim (and raises its
+      // priority for judging), it never settles it. The lexical bar is the
+      // same one the unanchored path uses: a single identifier hit is a lead,
+      // not proof.
+      const strong = generated || lex.score >= 5;
       const detail = generated
         ? `auto-generated entry, title matches the squash commit`
-        : lex.score >= 2
-          ? `identifiers ${lex.matchedTerms.slice(0, 4).join(", ")} appear in its diff`
-          : `commit subject matches the claim (${Math.round(bestSim * 100)}%)`;
+        : `identifiers ${lex.matchedTerms.slice(0, 4).join(", ")} appear in its diff`;
+      const gap =
+        lex.score >= 2
+          ? `only ${lex.matchedTerms.join(", ")} could be matched to its diff content`
+          : bestSim >= 0.5
+            ? `the claim restates the commit subject (${Math.round(bestSim * 100)}%), which asserts nothing about the diff`
+            : `the claim text could not be matched to its diff content`;
       const fallback = strong
         ? {
             verdict: "verified" as const,
@@ -200,7 +210,7 @@ export async function verifyClaims(
         : {
             verdict: "partial" as const,
             confidence: 0.6,
-            reasoning: `${anchorLabel} is in the release range, but the claim text could not be matched to its diff content.`,
+            reasoning: `${anchorLabel} is in the release range, but ${gap}.`,
           };
       if (useJudge && isVagueClaim(claim)) {
         // Reverse-direction audit: what does this vague note hide?

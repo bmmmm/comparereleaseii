@@ -19,7 +19,13 @@ Every atomic claim gets one verdict:
 | `skipped` | Informational claim (`meta`), not checkable against code |
 
 Deterministic stages (PR/commit anchors, lexical identifier matching) settle
-the clear cases; an LLM judge rules the rest, citing evidence lines.
+the clear cases; an LLM judge rules the rest, citing evidence lines. An
+anchor alone never produces `verified`: a note that restates its own commit
+subject only shows that the author agrees with themselves, so a linked PR or
+sha raises a claim's priority for judging and stops there. Only identifiers
+from the claim actually found in the diff (score ≥ 5, the same bar with and
+without an anchor) can settle a claim deterministically — plus
+auto-generated entries, which are true by construction.
 Verdicts that would fail a release (`no-evidence`, `contradicted`) are never
 accepted from a single model call: either a stronger **escalation engine**
 independently reviews the claim and its verdict wins, or a 3-vote median of
