@@ -252,7 +252,12 @@ jobs:
           node-version: 24
       - uses: actions/cache/restore@v6
         with:
-          path: ~/.local/state/comparereleaseii
+          # State keeps alerts single-shot; the verdict cache keeps a re-check
+          # of an unchanged release free (same prompt + engine + tool version
+          # → same answer, from disk).
+          path: |
+            ~/.local/state/comparereleaseii
+            ~/.cache/comparereleaseii
           key: watch-state-${{ github.run_id }}
           restore-keys: watch-state-
       - id: watch
@@ -264,7 +269,9 @@ jobs:
       - uses: actions/cache/save@v6
         if: always()
         with:
-          path: ~/.local/state/comparereleaseii
+          path: |
+            ~/.local/state/comparereleaseii
+            ~/.cache/comparereleaseii
           key: watch-state-${{ github.run_id }}
       - uses: actions/upload-artifact@v7
         if: always()

@@ -56,7 +56,12 @@ commit. Two were measured against the live default judge
   it now scores 35/100 "suspicious". Subject similarity anchors a claim and
   raises its priority for judging; the lexical bar on the anchored path is the
   same score ≥ 5 the unanchored path already used. This costs more judge calls
-  in `--judge auto` — that is the trade the old number was hiding.
+  in `--judge auto` — that is the trade the old number was hiding. Expect
+  lower numbers with `--judge off` (and in keyless CI): without a judge, an
+  anchored claim now tops out at `partial`, because an anchor says the commit
+  is in the range and nothing about whether it does what the note says. This
+  repo's own release check went from 86 to 82 that way, with no claim changing
+  from true to false.
 - **Carve-outs cannot outrank what the release did.** The `sourceless` branch
   ran before the contradicted/critical guards, so a release whose whole diff
   was `requirements.txt` got the carve-out while a critical flag fired about
