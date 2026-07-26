@@ -10,8 +10,16 @@ const PROSE_SECTION = /note|highlight|breaking|important|upgrade|security/i;
 
 function extract(text: string): Omit<Claim, "id" | "section" | "kind" | "text"> {
   const prNumbers = new Set<number>();
-  for (const m of text.matchAll(/\/pull\/(\d+)/g)) prNumbers.add(Number(m[1]));
-  for (const m of text.matchAll(/(?<![\w/])#(\d+)\b/g)) prNumbers.add(Number(m[1]));
+  // GitHub, Gitea and Forgejo write `#123` and `/pull/123`; GitLab writes
+  // `!123` and `/merge_requests/123` for the same thing. Anchors are a
+  // deterministic stage, so a dialect nobody taught the parser does not error
+  // — it silently costs the claim its evidence and reads as a worse release.
+  for (const m of text.matchAll(/\/(?:pull|merge_requests)\/(\d+)/g)) prNumbers.add(Number(m[1]));
+  for (const m of text.matchAll(/(?<![\w/])[#!](\d+)\b/g)) prNumbers.add(Number(m[1]));
+  // GitLab's cross-project form, "see merge request platform/backend!4877",
+  // where the `!` follows a word character and the rule above cannot fire.
+  // The slash is what keeps it off ordinary prose ending in an exclamation.
+  for (const m of text.matchAll(/[\w.-]+\/[\w.-]+!(\d+)\b/g)) prNumbers.add(Number(m[1]));
   const shas = [...text.matchAll(/\b[0-9a-f]{7,40}\b/g)]
     .map((m) => m[0])
     .filter((s) => /[0-9]/.test(s) && /[a-f]/.test(s));

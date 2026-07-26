@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertRepoSlug, pickBaseRelease, ref, type GhRelease } from "../src/sources/github.ts";
+import {
+  assertRepoSlug,
+  extractPrNumbers,
+  pickBaseRelease,
+  ref,
+  type GhRelease,
+} from "../src/sources/github.ts";
 
 function rel(tag_name: string, opts: { draft?: boolean; prerelease?: boolean } = {}): GhRelease {
   return { tag_name, name: tag_name, body: "", draft: opts.draft ?? false, prerelease: opts.prerelease ?? false };
@@ -97,4 +103,23 @@ test("API paths cannot be walked out of the repo they name", () => {
   assert.equal(assertRepoSlug("cli/cli"), "cli/cli");
   assert.equal(assertRepoSlug("zen-browser/desktop"), "zen-browser/desktop");
   assert.equal(assertRepoSlug("user/repo.js"), "user/repo.js");
+});
+
+test("extractPrNumbers reads the merge dialect of whichever forge cut the commit", () => {
+  // GitHub, Gitea and Forgejo.
+  assert.deepEqual(extractPrNumbers("Add rotate support (#426)"), [426]);
+  assert.deepEqual(extractPrNumbers("Merge pull request #91 from dev/topic"), [91]);
+  // GitLab squashes to `(!123)`, optionally namespaced, and its merge commits
+  // put the reference in the body. `--repo-url` reads commits straight from a
+  // clone, so this is the only place the forge still shows through.
+  assert.deepEqual(extractPrNumbers("Resolve export deadlock (!4821)"), [4821]);
+  assert.deepEqual(extractPrNumbers("Bump deps (platform/backend!4877)"), [4877]);
+  assert.deepEqual(
+    extractPrNumbers("Merge branch 'fix' into 'main'\n\nSee merge request platform/backend!4903"),
+    [4903],
+  );
+  assert.deepEqual(extractPrNumbers("See merge request !77"), [77]);
+  // A version in parentheses is not a review reference.
+  assert.deepEqual(extractPrNumbers("Release (1.2.0)"), []);
+  assert.deepEqual(extractPrNumbers("Fix the thing"), []);
 });

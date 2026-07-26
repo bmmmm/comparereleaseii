@@ -179,3 +179,23 @@ test("prose without a hard anchor still needs a section that invites checking", 
   const thanks = parseClaims("## New Contributors\n\n@someone made their first contribution in #42\n");
   assert.equal(thanks[0].kind, "meta");
 });
+
+test("GitLab notes anchor through `!123`, not only `#123`", () => {
+  // Anchors are a deterministic stage: a dialect the parser never learned
+  // does not error, it silently leaves every claim unanchored and the release
+  // reads worse than it is. `--repo-url` made that reachable for real.
+  const gitlab = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "fixtures", "gitlab-15.4.0.md"),
+    "utf8",
+  );
+  const claims = parseClaims(gitlab);
+  const anchored = claims.filter((c) => c.prNumbers.length);
+  assert.equal(anchored.length, 6, "every bullet in the fixture carries an MR reference");
+  const all = new Set(claims.flatMap((c) => c.prNumbers));
+  // Bare `!123`, the namespaced prose form, the link form, and two on one line.
+  for (const n of [4821, 4877, 4903, 4915, 4930, 4931, 4952]) {
+    assert.ok(all.has(n), `!${n} not anchored`);
+  }
+  // The link form must not also yield a stray number from the URL path.
+  assert.ok(!all.has(4), "no fragment of the URL leaks in as an anchor");
+});

@@ -23,6 +23,16 @@ tool is checked with the tool itself before it ships.
   breakdown differs, since one asks Linguist and the other counts locally. The
   clone path is the more complete one: GitHub's compare API truncates at 300
   files, a clone does not.
+- **The merge-request dialect.** Anchors were GitHub's spelling only: `(#123)`
+  and "Merge pull request #123" on the commit side, `#123` and `/pull/123` on
+  the claim side. GitLab writes `!123`, `(group/proj!123)`, "See merge request
+  group/proj!123" and `/merge_requests/123` for exactly the same thing.
+  Anchoring is a deterministic stage, so a dialect the parser never learned
+  does not error — it silently leaves every claim unanchored, which reads as a
+  worse release. Both sides now speak both, with a GitLab fixture in
+  `test/fixtures/`. Writing the fixture found a case the plan did not name:
+  the namespaced prose form has a word character in front of the `!`, where
+  the rule that keeps `#` out of identifiers cannot fire.
 - A repository URL is an argument to `git clone`, and `git clone` takes more
   than repositories: `ext::sh -c …` is a transport helper git executes, and a
   leading `-` makes the whole string an option (`--upload-pack=` runs a command

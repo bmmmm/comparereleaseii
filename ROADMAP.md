@@ -568,6 +568,14 @@ release notes, and which releases exist. So:
   Anchors are one of the deterministic verification stages, so a missing
   dialect quietly costs evidence rather than erroring — needs a fixture per
   forge in `test/fixtures/`.
+  - **Landed 2026-07-26.** Both sides speak both dialects: the commit side
+    reads `(!123)`, `(group/proj!123)` and "See merge request group/proj!123";
+    the claim side reads `!123` and `/merge_requests/123`. The GitLab fixture
+    earned its keep immediately — the namespaced prose form has a word
+    character in front of the `!`, so the rule that keeps `#` from matching
+    inside identifiers could not fire, and that one shape stayed unanchored
+    until the fixture said so. The slash is what keeps the extra rule off
+    ordinary prose that ends in an exclamation.
 - **Stays GitHub-only, on purpose:** `watch init` builds its candidate list
   from stars, watched repos and release notifications — inherently a GitHub
   account feature. Other forges get repos via `watch add`, which is one line

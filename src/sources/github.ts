@@ -63,10 +63,20 @@ interface GhFile {
   patch?: string;
 }
 
+/**
+ * Which review a commit came from, in whichever dialect the forge speaks.
+ *
+ * GitHub, Gitea and Forgejo squash to `subject (#123)` and merge with "Merge
+ * pull request #123". GitLab squashes to `subject (!123)` — optionally
+ * namespaced, `(group/proj!123)` — and its merge commits carry "See merge
+ * request group/proj!123" in the body. Since `--repo-url` reads commits
+ * straight from a clone, this is the only place the forge shows through.
+ */
 export function extractPrNumbers(message: string): number[] {
   const prs = new Set<number>();
-  for (const m of message.matchAll(/\(#(\d+)\)/g)) prs.add(Number(m[1]));
+  for (const m of message.matchAll(/\([\w./-]*[#!](\d+)\)/g)) prs.add(Number(m[1]));
   for (const m of message.matchAll(/Merge pull request #(\d+)/g)) prs.add(Number(m[1]));
+  for (const m of message.matchAll(/merge request [\w./-]*!(\d+)/gi)) prs.add(Number(m[1]));
   return [...prs];
 }
 
