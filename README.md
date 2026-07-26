@@ -1,5 +1,6 @@
 # comparereleaseii
 
+[![tests](https://github.com/bmmmm/comparereleaseii/actions/workflows/ci.yml/badge.svg)](https://github.com/bmmmm/comparereleaseii/actions/workflows/ci.yml)
 [![release notes: checked](https://github.com/bmmmm/comparereleaseii/actions/workflows/check-release-notes.yml/badge.svg)](https://github.com/bmmmm/comparereleaseii/actions/workflows/check-release-notes.yml)
 
 Fact-check release notes against the actual code diff.
@@ -19,16 +20,23 @@ $ gh extension install bmmmm/gh-comparereleaseii
 $ gh comparereleaseii restic/restic --tag v0.19.1 --html report.html
 ```
 
-(The [extension](https://github.com/bmmmm/gh-comparereleaseii) is a
-SHA-pinned wrapper that follows releases via `gh extension upgrade`. For
-hacking on the source: `gh repo clone bmmmm/comparereleaseii` and run
-`node src/cli.ts` — no install or build step, Node ≥ 24 runs the TypeScript
-directly. To gate releases in CI without cloning anything, use the
-[GitHub Action](#run-it-continuously): `uses: bmmmm/comparereleaseii@v0.1.1`.)
+Three ways to run it, the same CLI behind all of them:
 
-Requirements: Node ≥ 24, an authenticated [`gh`](https://cli.github.com), and
-a judge — the [`claude`](https://code.claude.com) CLI (default), an
-`ANTHROPIC_API_KEY`, or any OpenAI-compatible server
+- **`gh` extension** (above) — a SHA-pinned wrapper that follows releases via
+  `gh extension upgrade`; nothing on your machine tracks a moving branch.
+- **Source checkout** — `gh repo clone bmmmm/comparereleaseii`, then
+  `node src/cli.ts …`. No install, no build step: Node ≥ 24 runs the
+  TypeScript directly and there are no runtime dependencies. For cron jobs and
+  scripts, put the short name on your `PATH` from inside the checkout:
+  `ln -s "$PWD/bin/comparerelease.mjs" ~/.local/bin/comparerelease`.
+- **CI** — the repo doubles as a [GitHub Action](#run-it-continuously):
+  `uses: bmmmm/comparereleaseii@v0.1.1`, nothing to clone.
+
+Requirements: Node ≥ 24, a judge, and an authenticated
+[`gh`](https://cli.github.com) for GitHub repos — `--local` reads a clone from
+disk with plain `git` and never calls `gh`. As judge: the
+[`claude`](https://code.claude.com) CLI (default), an `ANTHROPIC_API_KEY`, or
+any OpenAI-compatible server
 ([local models](docs/local-models.md)). Without one, the tool degrades
 gracefully to the deterministic stages. `--estimate` previews claims, LLM
 calls, tokens and cost before the first run — a typical release (~45 claims,
@@ -66,20 +74,21 @@ formulas, weights and flag severities: [SCORING.md](SCORING.md).
 
 Writing notes instead of checking them? `--suggest` drafts a line for each
 high-churn undocumented commit from its actual diff, and
-`comparerelease guidelines >> AGENTS.md` hands the writing rules to your
+`gh comparereleaseii guidelines >> AGENTS.md` hands the writing rules to your
 coding agent — see
 [docs/writing-release-notes.md](docs/writing-release-notes.md).
 
 ## Usage
 
-```console
-$ comparerelease juanfont/headscale                                  # latest release
-$ comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0    # local clone
-$ comparerelease owner/repo --tag v2.0 --notes-file draft-notes.md   # check a draft
-```
+The examples use the extension's name; from a source checkout every one of
+them reads `node src/cli.ts …`, and via the `PATH` symlink above
+`comparerelease …` — same arguments, same output.
 
-(Via the extension the same commands read `gh comparereleaseii …`; from a
-source checkout, `node src/cli.ts …`.)
+```console
+$ gh comparereleaseii juanfont/headscale                                # latest release
+$ gh comparereleaseii --local ~/src/myrepo --base v1.2.0 --head v1.3.0  # local clone
+$ gh comparereleaseii owner/repo --tag v2.0 --notes-file draft.md       # check a draft
+```
 
 `--help` lists all options. Reports: `--md` / `--json` / `--html` — the HTML
 report is a single file with no external assets: trust-score ring, verdict
@@ -200,10 +209,14 @@ $ pnpm dogfood                    # our notes checked by our own checker — < 9
 $ node src/cli.ts --calibrate     # judge drift check against the golden set
 $ git tag vX.Y.Z && git push origin main --tags && git push github main --tags
 $ gh release create vX.Y.Z --notes-file <notes>   # check-release-notes.yml re-checks it
+$ gh workflow run bump-pin.yml --repo bmmmm/gh-comparereleaseii   # pin now, not tomorrow
 ```
 
 There is no npm publish — the tag *is* the distribution: a clone and the
-Action both run `src/` directly on Node ≥ 24.
+Action both run `src/` directly on Node ≥ 24. The extension's `tool.pin`
+follows the latest release on its own daily schedule; the dispatch above only
+closes the window between publishing and that run, in which
+`gh extension install` still hands new users the previous version.
 
 ## Contributing
 
@@ -215,6 +228,7 @@ for the evidence each kind needs, and a wrong-verdict report that carries a
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow and the stable contracts;
 [AGENTS.md](AGENTS.md) is the condensed version for coding agents. Pull requests
 state their claims and let this tool check them against their own diff.
+Vulnerabilities go through [SECURITY.md](SECURITY.md), not the issue tracker.
 
 ## Support
 

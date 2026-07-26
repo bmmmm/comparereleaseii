@@ -5,6 +5,12 @@ it at a list of repos, run it from cron/launchd, and every NEW release gets a
 full fact-check the moment it appears. No new releases means a no-op run
 (one GitHub API call per repo).
 
+This page uses the short `comparerelease` name throughout, because a
+scheduler wants one command it can call. From inside a checkout:
+`ln -s "$PWD/bin/comparerelease.mjs" ~/.local/bin/comparerelease`. Every
+command here works the same as `gh comparereleaseii watch …` if you installed
+the extension instead — then `gh` is what has to be on cron's `PATH`.
+
 ```console
 $ comparerelease watch --config watch.json
 restic/restic: up to date (v0.19.1)
