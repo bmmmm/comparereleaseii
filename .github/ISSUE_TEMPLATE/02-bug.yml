@@ -82,9 +82,15 @@ body:
     id: env
     attributes:
       label: Environment
-      description: Run this and paste the output.
-      value: |
-        $ node -v && gh --version | head -1 && git --version && uname -sm && git -C . rev-parse --short HEAD
+      description: >-
+        Run `node -v && gh --version | head -1 && git --version && uname -sm
+        && git -C . rev-parse --short HEAD` and paste the output.
+      placeholder: |
+        v24.5.0
+        gh version 2.94.0 (2026-06-10)
+        git version 2.51.0
+        Darwin arm64
+        fb797d3
     validations:
       required: true
 
