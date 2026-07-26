@@ -311,7 +311,6 @@ function baselineOf(medianLexicalCoverage: number, releases = 5): Baseline {
     medianLexicalCoverage,
     knownAuthors: [],
     everBinary: false,
-    categoryFreq: {},
   };
 }
 

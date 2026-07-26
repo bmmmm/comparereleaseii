@@ -197,13 +197,13 @@ skew, case validity.
 
 ### 2.4 False-positive sweep over the report corpus
 The watchdog shakedown caught two FP classes (docs and test files matching
-auth keywords) by reading real reports. tmp/watch-reports2 holds 11 of them
-— walk every flag, every FP becomes a class fix with a test; optionally
-widen the corpus to ~25 repos overnight.
+auth keywords) by reading real reports. A local corpus of 11 of them was
+generated under `tmp/` — walk every flag, every FP becomes a class fix with
+a test; optionally widen the corpus to ~25 repos overnight.
 - **Done when:** every critical flag in the corpus is either true or fixed
   as a class, and honest repos stay ≥ 65.
-- **Landed 2026-07-26:** corpus lives in `tmp/watch-reports` (not
-  `watch-reports2`). Both honest-repo criticals were the already-fixed
+- **Landed 2026-07-26:** corpus regenerated under `tmp/` (gitignored — the
+  findings below are the durable part). Both honest-repo criticals were the already-fixed
   docs/tests-as-auth classes; the sweep found one live FP class —
   `.github/*.md` counted as ci/build — fixed by checking DOC_FILE before
   CI_BUILD. All remaining flags are true by design (fabricated-control
@@ -318,8 +318,10 @@ releases whose churn is within the repo's norm.
 - **Done when:** honest large releases in the corpus stop hitting the risk
   floor while the fabricated control and the golden attack shapes keep
   their criticals.
-- **Landed 2026-07-26:** a fresh 10-repo corpus (`tmp/corpus3`) confirmed the
-  hypothesis — no release under 100 commits produced a single critical.
+- **Landed 2026-07-26:** a fresh 10-repo corpus (zed, nextcloud, traefik,
+  cli, ripgrep, caddy, bat, restic, fzf, helix — regenerate with
+  `--judge off --json`) confirmed the hypothesis: no release under 100
+  commits produced a single critical.
   Reading the flags first found three FP classes, fixed before any threshold
   moved: Cargo parsed without section context (`version` under `[package]`),
   `workspace = true` refs counted as new suppliers, and go.mod self-modules /

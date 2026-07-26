@@ -38,8 +38,6 @@ export interface Baseline {
   medianLexicalCoverage: number;
   knownAuthors: string[];
   everBinary: boolean;
-  /** Fraction of past releases touching each sensitive category. */
-  categoryFreq: Record<string, number>;
 }
 
 interface GhRelease {
@@ -141,19 +139,12 @@ function median(values: number[]): number {
 }
 
 export function summarizeBaseline(snapshots: ReleaseSnapshot[]): Baseline {
-  const categoryFreq: Record<string, number> = {};
-  for (const s of snapshots) {
-    for (const cat of s.sensitiveTouched) {
-      categoryFreq[cat] = (categoryFreq[cat] ?? 0) + 1 / (snapshots.length || 1);
-    }
-  }
   return {
     snapshots,
     medianChurn: median(snapshots.map((s) => s.additions + s.deletions)),
     medianLexicalCoverage: median(snapshots.map((s) => s.lexicalCoverage)),
     knownAuthors: [...new Set(snapshots.flatMap((s) => s.authors))],
     everBinary: snapshots.some((s) => s.binaries > 0),
-    categoryFreq,
   };
 }
 
