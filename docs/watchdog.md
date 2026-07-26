@@ -141,7 +141,15 @@ A release is flagged when any of these hold:
   `"failOn": "no-evidence"` per repo for the strict CI-style gate),
 - a critical risk flag fired (install hooks, undocumented auth/crypto
   changes, silently added dependencies, …),
-- the trust score is below `notifyBelow` (default 65).
+- the trust score is below `notifyBelow` (default 65) — or, once three
+  checks exist, at least 20 points below **this repo's own median**, which
+  replaces the absolute bar (a repo that always sits near 25 stops crying
+  wolf; one that always sits near 95 now alerts at 75),
+- the repo's own level has slid: with six checks or more, the median of the
+  newer half is 20 or more below the median of the older half. The relative
+  bar fires once on a step down and then the lower level *is* the normal it
+  compares against — this catches the case where nothing looks anomalous
+  because the anomaly became the baseline.
 
 With `--notify <cmd>` (or `"notify"` in the config) every flagged release
 runs `<cmd> <path-to-json-report>` — composable with whatever you have:

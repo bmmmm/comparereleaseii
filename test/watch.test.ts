@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   pickNewReleases,
   isFlagged,
+  hasDrifted,
   scoreBaseline,
   worstExit,
   toWatchIndexHtml,
@@ -255,4 +256,31 @@ test("alerting reads the score against the repo's own level", () => {
   // Findings about the release itself are never silenced by history.
   assert.equal(isFlagged(25, 1, 0, 65, scoreBaseline(traefik)), true);
   assert.equal(isFlagged(25, 0, 1, 65, scoreBaseline(traefik)), true);
+});
+
+test("a repo whose own level slid is flagged, not normalised", () => {
+  // The relative alert reads a release against the median of that repo's past
+  // checks, and the publisher produces those checks. It fires once on the
+  // step down and then the lower level IS the normal it compares against —
+  // every release after that is "in line with this repo" again.
+  const h = (...scores: number[]) => scores.map((score) => ({ score }));
+  const settled = h(90, 88, 91, 89, 70, 68, 71, 69);
+  assert.equal(
+    isFlagged(69, 0, 0, 65, scoreBaseline(settled.slice(0, -1))),
+    false,
+    "the release itself sits inside the relative bar",
+  );
+  assert.equal(hasDrifted(settled), true, "but the level it is measured against moved 20");
+
+  // An honest repo bobbing around its level is not drift.
+  assert.equal(hasDrifted(h(90, 86, 92, 88, 91, 87, 90, 89)), false);
+  // Nor is an improving one.
+  assert.equal(hasDrifted(h(40, 45, 42, 70, 75, 72, 74, 71)), false);
+  // Too little history to read a trend.
+  assert.equal(hasDrifted(h(90, 50, 40)), false);
+});
+
+test("an exact 20-point drop is the case the constant names", () => {
+  assert.equal(isFlagged(71, 0, 0, 65, 91), true);
+  assert.equal(isFlagged(72, 0, 0, 65, 91), false);
 });

@@ -8,6 +8,7 @@ import { resolveEngines, type EngineOptions } from "./judge.ts";
 import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
+import { safeSegment } from "./paths.ts";
 
 import type { UnverifiableKind } from "./types.ts";
 
@@ -161,8 +162,30 @@ export function isFlagged(
   // Once it exists, the repo's own level replaces the absolute bar rather
   // than joining it: a repo normally at 25 stops crying wolf, and one
   // normally at 95 now alerts at 70 — which no absolute default would catch.
-  if (baseline !== null) return score < baseline - SCORE_DROP;
+  // The comparison is inclusive: a drop of exactly SCORE_DROP is the case
+  // the constant names, and `<` let it through.
+  if (baseline !== null) return score <= baseline - SCORE_DROP;
   return score < notifyBelow;
+}
+
+/** Below this many checks there is no trend to read, only noise. */
+const DRIFT_MIN_CHECKS = 6;
+
+/**
+ * Has the repo's own level slid? The relative alert measures a release
+ * against the median of that repo's past checks — a number the publisher
+ * produces. Six releases losing eight points each never trip it while the
+ * level they define moves forty, and the absolute floor that would have
+ * caught it was given up when alerting went relative. So watch the level
+ * itself: older half of the history against the newer one.
+ */
+export function hasDrifted(history: Array<{ score: number }>): boolean {
+  if (history.length < DRIFT_MIN_CHECKS) return false;
+  const half = Math.floor(history.length / 2);
+  const older = scoreBaseline(history.slice(0, half));
+  const newer = scoreBaseline(history.slice(-half));
+  if (older === null || newer === null) return false;
+  return newer <= older - SCORE_DROP;
 }
 
 /** Worst exit code of the batch: 2 (errors) > 1 (failed gate) > 0. */
@@ -501,7 +524,10 @@ export async function runWatch(
         // instead of pinning the result on the innocent upstream repo.
         if (rc.label) report.repoLabel = `${rc.repo} (${rc.label})`;
 
-        const dir = join(reportsDir, key);
+        // The tag went through a sanitizer and the key did not — a config
+        // with `label: "../.."` wrote outside the reports directory.
+        const dirKey = safeSegment(key);
+        const dir = join(reportsDir, dirKey);
         await mkdir(dir, { recursive: true });
         const base = sanitizeTag(rel.tag);
         const jsonPath = join(dir, `${base}.json`);
@@ -517,13 +543,13 @@ export async function runWatch(
         // The repo's level comes from the checks BEFORE this one — including
         // the current score would let a slow slide redefine "normal".
         const scoreLevel = scoreBaseline(repoState.history);
-        const flagged = isFlagged(
-          report.metrics.scores.overall,
-          ec,
-          critical,
-          rc.notifyBelow,
-          scoreLevel,
-        );
+        const drifted = hasDrifted([
+          ...repoState.history,
+          { score: report.metrics.scores.overall },
+        ]);
+        const flagged =
+          isFlagged(report.metrics.scores.overall, ec, critical, rc.notifyBelow, scoreLevel) ||
+          drifted;
         const verdicts = {
           verified: report.results.filter((r) => r.verdict === "verified").length,
           partial: report.results.filter((r) => r.verdict === "partial").length,
@@ -549,7 +575,7 @@ export async function runWatch(
           verdicts,
           unverifiable: report.metrics.unverifiable?.kind,
           scoreLevel,
-          report: `${key}/${base}.html`,
+          report: `${dirKey}/${base}.html`,
         };
         repoState.lastPublishedAt = rel.publishedAt;
         repoState.lastTag = rel.tag;
@@ -560,7 +586,8 @@ export async function runWatch(
         checked++;
         console.error(
           `${key}: ${rel.tag} → score ${checkedRelease.score} (${checkedRelease.scoreLabel})` +
-            (flagged ? " — FLAGGED" : ""),
+            (flagged ? " — FLAGGED" : "") +
+            (drifted ? " (this repo's own level has been sliding)" : ""),
         );
         if (flagged) {
           flaggedTotal++;
