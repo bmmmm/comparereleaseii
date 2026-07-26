@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { run, pooled } from "../util.ts";
+import { run } from "../util.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
 export async function ghApi<T>(path: string): Promise<T> {
@@ -307,14 +307,6 @@ export async function loadGithubRelease(opts: {
     warnings,
     truncated,
   };
-}
-
-/** Prefetch per-commit diffs with limited concurrency (used by the reverse check). */
-export async function prefetchCommitFiles(
-  data: ReleaseData,
-  concurrency = 6,
-): Promise<void> {
-  await pooled(data.commits, concurrency, (c) => data.commitFiles(c.sha));
 }
 
 /** Repo calibration data — best effort, never fails the run. */

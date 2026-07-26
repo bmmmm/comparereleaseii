@@ -6,6 +6,13 @@ tool is checked with the tool itself before it ships.
 
 ## Unreleased
 
+### Changed
+
+- **The anchor phase warms per-commit and PR lookups in parallel.** They ran
+  one claim at a time; on GitHub sources each is a `gh` process spawn
+  (~0.35 s measured), so a 20-claim release paid ~7 s serially before
+  judging started. Verdicts, routing and prompts are unchanged.
+
 ### Fixed
 
 - **Numeric flags reject garbage instead of silently disabling features.**

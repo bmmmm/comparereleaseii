@@ -169,6 +169,41 @@ export async function verifyClaims(
   const surplusQueue: Array<{ claim: Claim; pool: DiffFile[] }> = [];
   const useJudge = opts.engine !== null && opts.judgeMode !== "off";
 
+  // Warm the source's per-commit and PR caches in parallel before the serial
+  // loop below — its awaits then hit the cache (ReleaseData.commitFiles is
+  // cached by contract). gh-backed sources pay one process spawn per call
+  // (~0.35 s measured); paying them one claim at a time serialized the whole
+  // anchor phase. Routing is untouched: same lookups, same decisions, warmed.
+  const anchorShas = new Set<string>();
+  const prefetchPrs = new Set<number>();
+  for (const claim of claims) {
+    if (claim.kind === "meta") continue;
+    const anchors = anchorMatch(claim, data.commits);
+    if (anchors.commits.length) {
+      for (const commit of anchors.commits) anchorShas.add(commit.sha);
+    } else if (claim.prNumbers.length && data.resolvePr) {
+      for (const pr of claim.prNumbers.slice(0, 5)) prefetchPrs.add(pr);
+    }
+  }
+  if (data.resolvePr && prefetchPrs.size) {
+    const resolvePr = data.resolvePr;
+    const resolved = await pooled([...prefetchPrs], opts.concurrency, (n) =>
+      resolvePr(n).catch(() => null),
+    );
+    for (const sha of resolved) {
+      const commit =
+        sha && data.commits.find((c) => sha.startsWith(c.sha) || c.sha.startsWith(sha));
+      if (commit) anchorShas.add(commit.sha);
+    }
+  }
+  if (anchorShas.size) {
+    // Failures surface (or not) exactly where they did before — on the
+    // loop's own call; the prefetch itself never kills the run.
+    await pooled([...anchorShas], opts.concurrency, (sha) =>
+      data.commitFiles(sha).catch(() => []),
+    );
+  }
+
   for (const claim of claims) {
     if (claim.kind === "meta") {
       results.set(claim.id, {

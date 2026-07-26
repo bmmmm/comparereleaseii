@@ -687,3 +687,43 @@ test("--escalate auto builds a reviewer for a local primary only", async () => {
   });
   assert.equal(off.escalate, null, "--escalate off must build nothing");
 });
+
+// gh-backed sources pay one process spawn (~0.35 s measured) per commitFiles
+// call; paying them one claim at a time serialized the whole anchor phase.
+// The lookups must run pooled — the serial loop then hits the source's cache.
+test("anchor-phase commit lookups run pooled, not one claim at a time", async () => {
+  const commits: Commit[] = [1, 2, 3, 4].map((i) => ({
+    sha: `${i}${i}${i}abc0000`,
+    subject: `change number ${i} (#${i})`,
+    body: "",
+    author: "dev",
+    prNumbers: [i],
+  }));
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const data = {
+    repoLabel: "o/r",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits,
+    files: [],
+    warnings: [] as string[],
+    commitFiles: async () => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      inFlight--;
+      return [];
+    },
+  };
+  const claims = commits.map((_, i) => ({ ...claim(`change number ${i + 1}`, [i + 1]), id: i }));
+  await verifyClaims(data, claims, {
+    judgeMode: "off",
+    engine: null,
+    concurrency: 4,
+    maxHunks: 6,
+    maxEvidenceChars: 20000,
+  });
+  assert.ok(maxInFlight >= 2, `anchor lookups ran serially (max in flight: ${maxInFlight})`);
+});
