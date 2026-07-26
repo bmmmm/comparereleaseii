@@ -158,6 +158,7 @@ async function main(): Promise<number> {
         baseUrl: openaiBase,
         apiKey: process.env.OPENAI_API_KEY,
         cache: !values["no-cache"],
+        concurrency: Number(values.concurrency),
       });
       printModelRanking(cals);
       const best = rankCalibrations(cals)[0];
@@ -201,7 +202,7 @@ async function main(): Promise<number> {
         "--calibrate needs a judge engine (claude CLI, ANTHROPIC_API_KEY, or a local OpenAI-compatible server).",
       );
     }
-    const cal = await runCalibration(engine);
+    const cal = await runCalibration(engine, Number(values.concurrency));
     printCalibration(cal);
     if (values.json) {
       await writeFile(values.json, JSON.stringify(cal, null, 2));

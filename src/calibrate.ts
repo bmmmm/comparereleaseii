@@ -44,9 +44,11 @@ const GOLDEN_PATH = join(
 );
 
 /** Run the golden set against an engine — answers "is MY model good enough?". */
-export async function runCalibration(engine: JudgeEngine): Promise<Calibration> {
+export async function runCalibration(engine: JudgeEngine, concurrency = 4): Promise<Calibration> {
   const cases = JSON.parse(await readFile(GOLDEN_PATH, "utf8")) as GoldenCase[];
-  const outcomes = await pooled(cases, 4, async (gc): Promise<CalibrationOutcome> => {
+  // Local single-model servers can reject parallel prefills (memory guards) —
+  // pass --concurrency 1 there.
+  const outcomes = await pooled(cases, concurrency, async (gc): Promise<CalibrationOutcome> => {
     const prompt = buildJudgePrompt({
       repoLabel: "eval/fixture",
       baseRef: "v1.0.0",
@@ -126,14 +128,14 @@ export function recommendation(cal: Calibration): string {
  */
 export async function calibrateModels(
   models: string[],
-  opts: { baseUrl: string; apiKey?: string; cache: boolean },
+  opts: { baseUrl: string; apiKey?: string; cache: boolean; concurrency?: number },
 ): Promise<Calibration[]> {
   const cals: Calibration[] = [];
   for (const [i, model] of models.entries()) {
     console.error(`Calibrating ${model} (${i + 1}/${models.length})…`);
     let engine = makeOpenAiEngine(model, opts.baseUrl, opts.apiKey);
     if (opts.cache) engine = withVerdictCache(engine);
-    const cal = await runCalibration(engine);
+    const cal = await runCalibration(engine, opts.concurrency);
     cals.push({ ...cal, model });
   }
   return cals;
