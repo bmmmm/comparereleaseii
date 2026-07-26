@@ -12,6 +12,11 @@ tool is checked with the tool itself before it ships.
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number
   silently turned their feature off. All four now exit 2 with a message.
+- **One clone per repository, however it is reached.** `--repo-url` keyed
+  cached clones by raw URL while the compare-truncation fallback keyed by
+  owner/repo — the same repository could be cloned twice into directories
+  that then drift. Both paths now share one normalized key (trailing `.git`
+  and `/` ignored); existing clone caches are re-cloned once under the new key.
 - **A verdict cache that cannot be written warns instead of staying silent.**
   Failing cache writes (permissions, quota) made every run re-judge — slower
   and nondeterministic — with no indication; the first failed write now

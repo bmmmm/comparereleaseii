@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { cacheDir, safeSegment } from "./paths.ts";
+import { cloneDirFor } from "./paths.ts";
 import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
 import { ensureClone, loadLocalRange } from "./sources/local.ts";
 import { parseClaims, markCarriedOver } from "./claims.ts";
@@ -50,10 +49,10 @@ export async function loadGithubReleaseData(
     try {
       // A clone target in a shared temp dir is a symlink waiting to happen —
       // git would happily follow it and write outside the cache.
-      const clones = await cacheDir("clones");
-      if (!clones) throw new Error("no private cache directory for the clone fallback");
-      const dir = join(clones, safeSegment(repo));
-      await ensureClone(`https://github.com/${repo}.git`, dir);
+      const url = `https://github.com/${repo}.git`;
+      const dir = await cloneDirFor(url);
+      if (!dir) throw new Error("no private cache directory for the clone fallback");
+      await ensureClone(url, dir);
       const range = await loadLocalRange(dir, data.baseRef, data.headRef);
       data = {
         ...data,

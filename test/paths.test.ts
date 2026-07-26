@@ -87,3 +87,18 @@ test("safeSegment keeps a hostile ref name inside one path component", () => {
   assert.equal(safeSegment("../../etc/passwd"), ".._.._etc_passwd");
   assert.equal(safeSegment(""), "_");
 });
+
+test("cloneDirFor keys every spelling of the same repo to one directory", async () => {
+  process.env.XDG_CACHE_HOME ??= await (await import("node:fs/promises")).mkdtemp(
+    (await import("node:path")).join((await import("node:os")).tmpdir(), "crii-paths-"),
+  );
+  const { cloneDirFor } = await import("../src/paths.ts");
+  const a = await cloneDirFor("https://github.com/o/r.git");
+  const b = await cloneDirFor("https://github.com/o/r");
+  const c = await cloneDirFor("https://github.com/o/r/");
+  assert.ok(a, "no cache dir available");
+  assert.equal(a, b);
+  assert.equal(a, c);
+  // Different repos stay apart.
+  assert.notEqual(a, await cloneDirFor("https://github.com/o/other"));
+});

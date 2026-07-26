@@ -73,3 +73,16 @@ export async function cacheDir(sub: string): Promise<string | null> {
 export function safeSegment(name: string): string {
   return name.replace(/[^\w.@-]+/g, "_").slice(0, 120) || "_";
 }
+
+/**
+ * The cache directory for a clone of `url` — the ONE key scheme for every
+ * caller. --repo-url used to key by raw URL while the compare-truncation
+ * fallback keyed by owner/repo slug: the same repository cloned twice into
+ * two directories that could then drift. Trailing `.git` and `/` are
+ * stripped so the spellings every forge prints land in the same clone.
+ */
+export async function cloneDirFor(url: string): Promise<string | null> {
+  const clones = await cacheDir("clones");
+  if (!clones) return null;
+  return join(clones, safeSegment(url.replace(/\/+$/, "").replace(/\.git$/, "")));
+}

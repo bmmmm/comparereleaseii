@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import { assertCloneUrl, ensureClone, loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
 import { pickBaseRelease } from "./sources/github.ts";
-import { cacheDir, safeSegment, VERSION } from "./paths.ts";
+import { cloneDirFor, VERSION } from "./paths.ts";
 import { parseClaims } from "./claims.ts";
 import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import {
@@ -235,14 +235,14 @@ async function main(): Promise<number> {
   let forgeReleases: HistoryRelease[] | undefined;
   if (values["repo-url"]) {
     const url = assertCloneUrl(values["repo-url"]);
-    const clones = await cacheDir("clones");
-    if (!clones) {
+    const dir = await cloneDirFor(url);
+    if (!dir) {
       throw new Error(
         "--repo-url needs a private directory to clone into — set XDG_CACHE_HOME to a writable path.",
       );
     }
     cloneUrl = url;
-    localPath = join(clones, safeSegment(url));
+    localPath = dir;
     console.error(`Cloning ${url} (cached at ${localPath})…`);
     await ensureClone(url, localPath);
 
