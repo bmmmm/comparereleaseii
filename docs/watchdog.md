@@ -206,10 +206,12 @@ jobs:
   watch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@v7   # your repo — watch.json lives here
+      - uses: actions/checkout@v7   # the tool — no install, runs from source
         with:
-          version: 10
+          repository: bmmmm/comparereleaseii
+          ref: v0.1.0
+          path: comparereleaseii
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -220,7 +222,7 @@ jobs:
           restore-keys: watch-state-
       - id: watch
         continue-on-error: true
-        run: pnpm dlx comparereleaseii watch --config watch.json
+        run: node comparereleaseii/src/cli.ts watch --config watch.json
         env:
           GH_TOKEN: ${{ github.token }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

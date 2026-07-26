@@ -9,9 +9,10 @@
 > local-first project, so releasing is a local routine (`pnpm dogfood` gate
 > + `--calibrate` drift check + `pnpm publish`) instead of a secret-carrying
 > CI pipeline — the repo needs no ANTHROPIC_API_KEY/NPM_TOKEN secrets and
-> stays judge-agnostic. Open: publishing v0.1.0 itself and the local-9B
-> rerun with `--concurrency 1`
-> ([#6](https://github.com/bmmmm/comparereleaseii/issues/6) territory).
+> stays judge-agnostic. Both former open points landed in Iteration 2:
+> v0.1.0 shipped as git tag + GitHub release (no npm — see 2.5), and the
+> full 11-model ranking closed
+> [#6](https://github.com/bmmmm/comparereleaseii/issues/6).
 
 Status when this plan was written (2026-07-26): the CLI is feature-complete
 and validated — five release-note dialects checked against real releases
@@ -215,6 +216,14 @@ push tags. The README's `uses: bmmmm/comparereleaseii@v0.1.0` becomes valid
 with the tag.
 - **Done when:** `pnpm dlx comparereleaseii` resolves from the registry and
   the action ref works in a workflow.
+- **Landed 2026-07-26:** shipped WITHOUT npm — user decision: no npm
+  account, no standing supply-chain surface for one convenience installer.
+  The Action only needs the git tag (`bin/comparerelease.mjs` falls back to
+  `src/`; Node ≥ 24 runs the TypeScript directly), so the ship is tag
+  v0.1.0 + GitHub release, notes gated at 95/100. README quick start
+  switched to clone+run; the watchdog CI recipe checks the tool out at
+  `v0.1.0`. `pnpm dlx` can be added any time later (account + `pnpm
+  publish` + README revert).
 
 Process learnings applied outside the repo (global CLAUDE.md + project
 memory): clarify who releases from where BEFORE building release/CI infra;

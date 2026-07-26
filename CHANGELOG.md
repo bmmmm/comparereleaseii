@@ -43,9 +43,10 @@ Initial release.
   `--notes-file`; a repo's first release is diffed against the full history.
 - CI gate behavior: exit code 0/1/2 with `--fail-on none | contradicted |
   no-evidence`.
-- Distribution: a `comparerelease` bin launcher, a compiled `dist/` build for
-  the npm package, and a composite GitHub Action (`action.yml`) that writes
-  the report to the step summary and uploads the HTML report as an artifact.
+- Distribution: a `comparerelease` bin launcher (runs `src/` straight from a
+  clone on Node ≥ 24, with a compiled `dist/` build when packaged), and a
+  composite GitHub Action (`action.yml`) that writes the report to the step
+  summary and uploads the HTML report as an artifact.
 - Watch mode (`comparerelease watch`, `runWatch`): continuous release
   monitoring from a JSON config — a state file remembers the last checked
   release per repo, new releases are checked and written to

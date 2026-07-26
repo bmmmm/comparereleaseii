@@ -13,11 +13,13 @@ Works with any GitHub repository or local git clone — pick a repo, pick a
 release, get a verdict:
 
 ```console
-$ pnpm dlx comparereleaseii restic/restic --tag v0.19.1 --html report.html
+$ gh repo clone bmmmm/comparereleaseii && cd comparereleaseii
+$ node src/cli.ts restic/restic --tag v0.19.1 --html report.html
 ```
 
-(`npx comparereleaseii` works too. For hacking on the source, clone the repo
-and run `node src/cli.ts` — no build step, see [Development](#development).)
+(No install or build step — Node ≥ 24 runs the TypeScript directly. To gate
+releases in CI without cloning anything, use the
+[GitHub Action](#run-it-continuously): `uses: bmmmm/comparereleaseii@v0.1.0`.)
 
 Requirements: Node ≥ 24, an authenticated [`gh`](https://cli.github.com), and
 a judge — the [`claude`](https://code.claude.com) CLI (default), an
