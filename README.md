@@ -49,39 +49,23 @@ first, an LLM judge only for what remains unclear:
    median; all verdicts land in an on-disk cache — re-runs on unchanged data
    are free and bit-identical.
 
-The reverse (completeness) check flags commits whose changes no claim covers.
-Two refinements keep the check honest: auto-generated "Title by @user in #N"
-entries are true by construction and carry only ¼ weight — handwritten claims
-are where notes lie; and vague claims ("Updates and fixes") flip the
-question — the judge lists notable changes the note *hides* and flags them.
+The reverse (completeness) check flags commits whose changes no claim
+covers — auto-generated "Title by @user in #N" entries carry only ¼ weight
+(handwritten claims are where notes lie), and vague claims ("Updates and
+fixes") flip the question: the judge lists what the note *hides*.
 
-`--suggest` turns the completeness check into a starting point: for the
-highest-churn undocumented commits, the judge drafts a release-note line from
-that commit's actual diff. See
-[docs/writing-release-notes.md](docs/writing-release-notes.md) for how to
-write notes that don't need this in the first place — and hand the same
-rules to an LLM coding agent so it holds itself to them from the start:
+Every run computes an explainable **trust score** (0–100) from correctness,
+completeness and risk. Contradicted claims or critical flags cap it — a fake
+release cannot average itself back to green. With `--baseline <n>` the
+repo's own release history becomes an anomaly baseline (unusual size,
+first-time authors on sensitive paths, first-ever binaries). Exact
+formulas, weights and flag severities: [SCORING.md](SCORING.md).
 
-```console
-$ comparerelease guidelines >> AGENTS.md
-```
-
-Every run computes an explainable **trust score** (0–100, exact semantics in
-[SCORING.md](SCORING.md)) from three components:
-
-- **correctness** — share of change claims the diff supports
-- **completeness** — share of the churn (line-weighted) covered by the notes
-- **risk** — 100 minus penalties from risk flags: undocumented changes in
-  sensitive paths (auth/crypto, CI/build, dependency manifests), silently
-  added dependencies, binary/minified/opaque blobs, install-hook changes
-
-Contradicted claims or critical flags cap the overall score — a fake release
-cannot average itself back to green.
-
-With `--baseline <n>` (default 5) the previous releases become an anomaly
-baseline: unusual release size, first-time authors on sensitive paths and
-first-ever binary artifacts are flagged relative to the repo's own history.
-`--history <n>` prints the release timeline instead of a check.
+Writing notes instead of checking them? `--suggest` drafts a line for each
+high-churn undocumented commit from its actual diff, and
+`comparerelease guidelines >> AGENTS.md` hands the writing rules to your
+coding agent — see
+[docs/writing-release-notes.md](docs/writing-release-notes.md).
 
 ## Usage
 
@@ -114,17 +98,14 @@ Details, calibration numbers and quirks: [docs/local-models.md](docs/local-model
 
 ## Run it continuously
 
-**On your machine — the release watchdog.** Watch the repos *you* depend on:
-`watch init` builds the list interactively from what your GitHub account
-already follows (watched repos, stars, release notifications), `watch add
-owner/repo` extends it, and `comparerelease watch --config watch.json` runs
-from cron/launchd — every new release is fact-checked the moment it appears,
-no new releases is a cheap no-op, per-repo state means nothing is checked or
-alerted twice, and `reports/index.html` is a dashboard with red rows for
-flagged releases. `--notify <cmd>` pipes every flagged release to your
-alerting command (ntfy, mail, webhook). Judge setup, config format, self-test
-recipe, cron/launchd snippets and a scheduled-CI variant for machines that
-aren't always on: [docs/watchdog.md](docs/watchdog.md).
+**On your machine — the release watchdog.** `watch init` builds the repo
+list from what your GitHub account already follows (watched, starred,
+release notifications), then `comparerelease watch --config watch.json`
+runs from cron/launchd: every new release is fact-checked the moment it
+appears, per-repo state keeps re-runs cheap and alerts single-shot,
+`reports/index.html` is the dashboard, and `--notify <cmd>` pipes flagged
+releases to ntfy/mail/webhook. Config format, judge setup, cron/launchd
+snippets and a scheduled-CI variant: [docs/watchdog.md](docs/watchdog.md).
 
 **In CI — the GitHub Action.** The repo doubles as a composite action that
 checks a release's notes, writes the report to the step summary, uploads the
@@ -146,13 +127,11 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-This runs *after* publishing — it cannot block a bad release, but it flags it
-where everyone looks: `comment: true` appends the verdict to the release body
-(needs `contents: write`). To gate *before* publishing, check the draft with
-`notes-file` in a PR workflow. Inputs mirror the CLI (`repo`, `tag`, `base`,
-`engine`, `model`, `fail-on`, `notes-file`); outputs are `score` and
-`exit-code`. With `engine: "off"` the deterministic stages run without any
-API key. Checked releases can carry the badge:
+Inputs mirror the CLI — full list in [action.yml](action.yml). `comment:
+true` appends the verdict to the release body, `notes-file` gates a draft
+in a PR workflow *before* publishing, and `engine: "off"` runs keyless
+(deterministic stages only — exactly how this repo checks its own
+releases). Checked releases can carry the badge:
 
 ```markdown
 [![release notes: checked](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/check-release-notes.yml)
@@ -166,7 +145,7 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score |
+| Release | Notes style | Score (validation run, 2026-07) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 96 (solid) |
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 91 (solid) |
@@ -174,19 +153,8 @@ across that spread, it'll hold up on yours:
 | vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (flags a few unprovable claims) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 
-Checking vaultwarden 1.37.0 (45 claims, 27 commits, 90 files) shows the kind
-of value the checker adds: backing a terse security advisory with the actual
-mechanism from the diff —
-
-```
-✔ Send Access-Count Bypass GHSA-rxhg-2pw9-vf25
-  verified (0.95) — atomic access-count check-and-increment in a single SQL
-  UPDATE in register_access(); the comment states concurrent accesses could
-  both pass the check and exceed the limit.
-```
-
-— while staying honest about what the diff can't prove, and catching a
-fabricated claim in the same run:
+One verdict from the vaultwarden run shows the point — a fabricated claim,
+caught against the actual diff:
 
 ```
 ✘ The icon endpoint was removed entirely in this release
@@ -212,9 +180,12 @@ write the version's [CHANGELOG.md](CHANGELOG.md) section, then:
 ```console
 $ pnpm dogfood                    # our notes checked by our own checker — < 90 blocks
 $ node src/cli.ts --calibrate     # judge drift check against the golden set
-$ pnpm publish                    # prepublishOnly runs check+test, prepack builds dist/
-$ git tag v0.1.0 && git push origin main --tags && git push github main --tags
+$ git tag vX.Y.Z && git push origin main --tags && git push github main --tags
+$ gh release create vX.Y.Z --notes-file <notes>   # check-release-notes.yml re-checks it
 ```
+
+There is no npm publish — the tag *is* the distribution: a clone and the
+Action both run `src/` directly on Node ≥ 24.
 
 ## Contributing
 

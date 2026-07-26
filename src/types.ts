@@ -161,6 +161,8 @@ export interface Report {
   reverseChecked: boolean;
   metrics: Metrics;
   warnings: string[];
+  /** Diff was incomplete (API caps) — external consumers need not string-match warnings. */
+  truncated: boolean;
   engine: string;
   /** Web URL prefix for commit links, e.g. https://github.com/o/r — optional. */
   linkBase?: string;

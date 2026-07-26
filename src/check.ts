@@ -138,6 +138,7 @@ export async function analyzeRelease(
     reverseChecked: s.reverse,
     metrics,
     warnings: data.warnings,
+    truncated: data.truncated ?? false,
     engine: s.engine ? s.engine.name : "off (deterministic only)",
     linkBase: repoSlug ? `https://github.com/${repoSlug}` : undefined,
   };
