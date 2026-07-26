@@ -1,0 +1,84 @@
+name: Notes dialect not understood
+description: Release notes in this format are parsed into the wrong claims (split, merged, dropped, or misclassified)
+title: "[dialect] "
+labels: ["bug", "notes-dialect", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The checker claims to be release-note-dialect agnostic — it is validated against
+        generated PR lists, Keep a Changelog, setext sections and full sha changelogs.
+        Every format it gets wrong is a real gap.
+
+        These reports are fixed by turning your notes into a fixture in `test/fixtures/`,
+        so the parser can never regress on that dialect again. Keep the excerpt to the
+        smallest piece that still shows the problem — that keeps the fixture readable and
+        avoids vendoring someone else's changelog wholesale.
+
+  - type: input
+    id: release
+    attributes:
+      label: Link to the release or changelog
+      placeholder: https://github.com/owner/repo/releases/tag/v1.2.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What goes wrong
+      options:
+        - "claims are dropped — real entries never show up"
+        - "one entry is split into several claims"
+        - "several entries are merged into one claim"
+        - "classified as meta/informational when it is a real change claim"
+        - "classified as a change claim when it is boilerplate (credits, full changelog links)"
+        - "section headings are not recognised, everything lands in one section"
+        - "anchors (#PR, sha, GHSA) attached to the wrong claim or not picked up"
+        - "duplicate entries (summary + details layout) are not deduplicated"
+    validations:
+      required: true
+
+  - type: textarea
+    id: excerpt
+    attributes:
+      label: Minimal notes excerpt that reproduces it
+      description: >-
+        Raw markdown, exactly as published — including indentation, blank lines and
+        underlines. Whitespace is load-bearing here: indentation decides whether a line
+        continues a bullet or starts a paragraph.
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: parsed
+    attributes:
+      label: How it is parsed today
+      description: >-
+        Save the excerpt to a file and run the command below against any repo, then paste
+        the claim list. `--estimate` prints the claim breakdown without spending a judge call.
+      value: |
+        $ node src/cli.ts owner/repo --tag v1.2.3 --notes-file excerpt.md --estimate
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: How it should be parsed
+      description: List the claims you expect, one per line, and mark each as change or meta.
+      placeholder: |
+        1. change — "Fix TOCTOU in register_access" (anchors: #4711)
+        2. change — "Bump diesel to 2.2" (anchors: none)
+        3. meta   — "Full Changelog: v1.2.2...v1.2.3"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: fixture
+    attributes:
+      label: Fixture
+      options:
+        - label: I am willing to contribute the excerpt as a fixture in `test/fixtures/` with a parser test.
+        - label: The notes are from a public release, so the excerpt can be redistributed with this GPL-3.0 project.

@@ -1,0 +1,93 @@
+name: pr intake
+
+# Advisory only: reads the PR description, then runs this project's own checker
+# over the PR's claims and diff. Never fails a build — it writes a job summary
+# the reviewer can read instead of reconstructing the change by hand.
+#
+# Deliberately `pull_request`, not `pull_request_target`: no secrets, no write
+# permissions, so a fork PR cannot escalate through this workflow.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: intake-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check the description
+        id: body
+        env:
+          # Attacker-controlled text — passed as an environment variable so it is
+          # never interpolated into a shell command.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node .github/scripts/pr-intake.mjs
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check the claims against the diff
+        if: steps.body.outputs.has_claims == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -uo pipefail
+          base="$BASE_SHA"
+          git rev-parse --verify --quiet "$base^{commit}" >/dev/null || base="origin/$BASE_REF"
+          head="$HEAD_SHA"
+          git rev-parse --verify --quiet "$head^{commit}" >/dev/null || head=HEAD
+
+          # --judge off keeps this free, secret-less and deterministic: it reports
+          # which claims the anchors and identifier matching can tie to the diff.
+          # Unresolved claims are not a verdict on the PR — a judge would settle
+          # many of them. --fail-on none keeps the job green either way.
+          node src/cli.ts \
+            --local "$PWD" \
+            --base "$base" \
+            --head "$head" \
+            --notes-file pr-claims.md \
+            --judge off \
+            --fail-on none \
+            --md self-check.md > self-check.txt 2>&1
+          status=$?
+
+          {
+            echo "## Self-check — claims vs. diff"
+            echo
+            if [ $status -ne 0 ] || [ ! -s self-check.md ]; then
+              echo "The checker could not run on this PR. Common and harmless causes:"
+              echo "a docs-only diff, or claims that parse to nothing checkable."
+              echo
+              echo '<details><summary>Output</summary>'
+              echo
+              echo '```'
+              tail -c 3000 self-check.txt
+              echo '```'
+              echo
+              echo '</details>'
+            else
+              echo "Deterministic stages only — anchors and identifier matching, no LLM."
+              echo "A claim without evidence here is a prompt to check it by hand, not a defect."
+              echo
+              cat self-check.md
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0

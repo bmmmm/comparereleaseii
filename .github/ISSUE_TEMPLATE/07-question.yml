@@ -1,0 +1,32 @@
+name: Question
+description: Ask about usage, behaviour, or whether something is intended
+title: "[question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [README](https://github.com/bmmmm/comparereleaseii#readme) first —
+        flags, exit codes, engine setup and the scoring model are documented there.
+
+        If the answer turns out to be "that is a bug", we will convert this into a proper
+        report, so do not worry about picking the wrong form.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran, if any
+      placeholder: node src/cli.ts owner/repo --tag v1.2.3
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output you are asking about
+      render: text

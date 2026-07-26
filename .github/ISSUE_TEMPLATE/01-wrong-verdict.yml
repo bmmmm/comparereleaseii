@@ -1,0 +1,164 @@
+name: Wrong verdict
+description: A claim was ruled verified / partial / no-evidence / contradicted when it should not have been
+title: "[verdict] "
+labels: ["bug", "wrong-verdict", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A wrong verdict is the most valuable bug report this project can get — and the
+        cheapest to fix, **if** it arrives as a reproducible case.
+
+        The single most useful thing you can attach is the golden-set entry at the
+        bottom: it turns your report into a regression test that we paste straight into
+        `test/eval/golden.json`. A report with that entry is usually merged the same day.
+
+  - type: input
+    id: repro
+    attributes:
+      label: Reproduction command
+      description: >-
+        The exact command, against a **public** repo and tag so anyone can rerun it.
+        If it only reproduces on a private repo, describe the shape of the diff instead
+        and say so — but expect this to be much slower to fix.
+      placeholder: node src/cli.ts restic/restic --tag v0.19.1 --no-cache
+    validations:
+      required: true
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: The claim, verbatim
+      description: Copy the claim line exactly as it appears in the release notes — do not paraphrase.
+      placeholder: "- Fix the icon endpoint SSRF check by @user in #4711"
+      render: markdown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: got
+    attributes:
+      label: Verdict given
+      options:
+        - verified
+        - partial
+        - no-evidence
+        - contradicted
+        - skipped
+    validations:
+      required: true
+
+  - type: dropdown
+    id: expected
+    attributes:
+      label: Verdict expected
+      options:
+        - verified
+        - partial
+        - no-evidence
+        - contradicted
+        - skipped
+        - "any of several would be acceptable (explain below)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: The evidence that decides it
+      description: >-
+        The diff hunk that proves your expected verdict — or, for a false `verified`,
+        the reason the cited evidence does *not* support the claim. This is the part we
+        cannot reconstruct ourselves. Include the `@@` header, it carries the function name.
+      placeholder: |
+        src/api/icons.rs
+        @@ -55,9 +55,7 @@ fn parse_icon_url(domain: &str) -> Result<Url, Error> {
+        -    let url = match Url::parse(&format!("https://{}", domain)) {
+        +    let url = Url::parse(&format!("https://{}", domain))?;
+
+        This is an error-handling refactor. Nothing about SSRF host validation changed,
+        so "verified" overstates what the diff shows.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: golden
+    attributes:
+      label: Golden-set entry (regression test)
+      description: >-
+        Fill this in and your report becomes a test. `expected` is a list — put every
+        verdict you would accept as correct. Schema matches `test/eval/golden.json`;
+        run `pnpm eval` to check it against your own judge.
+      value: |
+        {
+          "name": "short-kebab-case-id",
+          "section": "Security Fixes",
+          "claim": "the exact claim line",
+          "hunks": [
+            {
+              "path": "src/api/icons.rs",
+              "hunk": "@@ -55,9 +55,7 @@ fn parse_icon_url(domain: &str) -> Result<Url, Error> {\n-    let old = line();\n+    let new = line();"
+            }
+          ],
+          "expected": ["no-evidence", "partial"]
+        }
+      render: json
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Judge engine
+      description: Local models and hosted models fail in completely different ways — this decides where we look.
+      options:
+        - claude-cli
+        - api (ANTHROPIC_API_KEY)
+        - openai (local server — Ollama / MLX / LM Studio / vLLM)
+        - "off (deterministic only)"
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: Exact model id, plus quantisation if local (e.g. `qwen3.5-9b-instruct-q4_K_M`).
+      placeholder: haiku
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Which stage produced it, if you can tell
+      description: >-
+        The reasoning line in the report names the method used
+        (`pr-anchor`, `sha-anchor`, `lexical`, `llm`, `escalated`, `generated`).
+        Pick "not sure" rather than guessing — a wrong guess sends us down the wrong file.
+      options:
+        - not sure
+        - "anchors — PR/sha resolution (src/verify.ts)"
+        - "lexical — identifier matching (src/match.ts)"
+        - "ranking — wrong hunks were sent to the judge (src/verify.ts)"
+        - "llm judge — right evidence, wrong ruling (src/judge.ts)"
+        - "escalation — primary and escalated judge disagree (src/verify.ts)"
+        - "claim parsing — the claim itself was split/merged wrongly (src/claims.ts)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Full terminal output
+      description: The whole run, not just the offending line — the header shows engine, counts and warnings.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reran with `--no-cache`, so this is not a stale cached verdict.
+          required: true
+        - label: I am on the current `main`.
+          required: true
+        - label: The evidence above is from the actual diff of that release range, not from the current tip of the repo.
+          required: true

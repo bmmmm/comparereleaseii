@@ -1,0 +1,119 @@
+name: Bug — crash, wrong number, broken output
+description: Something errors out, hangs, or reports a value that is provably wrong
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a *wrong ruling on a claim*, use **Wrong verdict** instead — it asks for the
+        evidence we need. This template is for everything else: crashes, wrong scores,
+        broken reports, bad exit codes, hangs.
+
+        Almost every bug here is reproducible from a public repo and a tag. If you give
+        us that, the fix is usually mechanical.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Best guess is fine — it just picks the starting file.
+      options:
+        - not sure
+        - "CLI / flags / exit codes (src/cli.ts)"
+        - "GitHub source — API, compare, truncation (src/sources/github.ts)"
+        - "local source — git, CHANGELOG section (src/sources/local.ts)"
+        - "claim parsing — notes split into claims (src/claims.ts)"
+        - "matching — identifiers, anchors (src/match.ts)"
+        - "verification / retrieval ladder (src/verify.ts)"
+        - "judge engines / JSON parsing (src/judge.ts)"
+        - "score, risk flags, coverage (src/metrics.ts)"
+        - "terminal / markdown report (src/report.ts)"
+        - "HTML report (src/html.ts)"
+        - "release history / baseline (src/history.ts)"
+        - "verdict cache (src/cache.ts)"
+    validations:
+      required: true
+
+  - type: input
+    id: repro
+    attributes:
+      label: Reproduction command
+      description: Exact command against a public repo and a fixed tag. Pin the tag — "latest" moves.
+      placeholder: node src/cli.ts dani-garcia/vaultwarden --tag 1.37.0 --html report.html
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Paste the real output or stack trace. Redact tokens; everything else helps.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+      description: >-
+        Be concrete and falsifiable. "The score is wrong" is not actionable;
+        "completeness is 0.42 but 7 of 9 commits are covered, so it should be ~0.78" is.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deterministic
+    attributes:
+      label: Does it still happen with `--judge off --no-cache`?
+      description: >-
+        This is the single most useful field in the form. It splits the bug into
+        "deterministic code path" vs "model behaviour" — two entirely different fixes.
+      options:
+        - "yes — reproduces without any LLM (deterministic bug)"
+        - "no — only with a judge engine active (model or prompt related)"
+        - "not applicable (crash happens before judging)"
+        - "did not test"
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Run this and paste the output.
+      value: |
+        $ node -v && gh --version | head -1 && git --version && uname -sm && git -C . rev-parse --short HEAD
+    validations:
+      required: true
+
+  - type: textarea
+    id: failing_test
+    attributes:
+      label: Failing test (optional, but this is what gets it fixed fastest)
+      description: >-
+        A `node:test` case that fails on `main` and would pass once fixed.
+        Tests live in `test/*.test.ts` and run with `pnpm test`.
+      value: |
+        test("parseClaims keeps an indented anchor with its bullet", () => {
+          const claims = parseClaims("- Fix the thing\n  see #4711\n");
+          assert.deepEqual(claims[0].prNumbers, [4711]);
+        });
+      render: typescript
+
+  - type: input
+    id: regression
+    attributes:
+      label: Last known-good version or commit (if this used to work)
+      placeholder: worked at ec6cb50, broken since
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reran with `--no-cache`.
+          required: true
+        - label: I am on the current `main` with `pnpm install --frozen-lockfile` applied.
+          required: true

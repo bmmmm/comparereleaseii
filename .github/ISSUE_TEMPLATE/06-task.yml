@@ -1,0 +1,133 @@
+name: Implementation task (ready to pick up)
+description: A fully specified unit of work — enough that someone can open the PR without asking anything
+title: "[task] "
+labels: ["task", "agent-ready"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this once the *what* and the *why* are settled and only the *how* is left —
+        typically after a bug or feature issue has been triaged.
+
+        The bar: someone who has never seen this repo, or a coding agent working from
+        `AGENTS.md`, can implement it start to finish without a single clarifying
+        question, and both of you agree on what "done" means before any code exists.
+        If you cannot fill in the contract and the acceptance criteria, the design is not
+        settled yet — file a feature request instead and settle it there.
+
+  - type: input
+    id: goal
+    attributes:
+      label: Goal, in one sentence
+      description: Observable outcome, not implementation. Start with a verb.
+      placeholder: Make the verdict cache key include the judge prompt version so prompt edits invalidate old entries.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Why — and what breaks today
+      description: Link the issue this came from. Someone reading in six months must understand the motivation without archaeology.
+      placeholder: >-
+        Closes #12. `verdictCacheKey` hashes engine name + prompt, so a prompt edit does
+        invalidate entries — but a change to *response parsing* does not, and stale
+        entries are then read by the new parser. Silent wrong results after a refactor.
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files in scope
+      description: >-
+        Every file expected to change, and one line on why. If you do not know the layout
+        yet, the module map is in `AGENTS.md`. A surprise file appearing in the PR is a
+        review flag — list it here instead.
+      value: |
+        src/cache.ts        — add the version component to the key
+        test/cache.test.ts  — new file: key changes when the version changes
+    validations:
+      required: true
+
+  - type: textarea
+    id: contract
+    attributes:
+      label: Contract — exact before and after
+      description: >-
+        Signatures, data shapes, CLI surface, output strings. This is the field that makes
+        review mechanical: the reviewer diffs the PR against this block instead of
+        reverse-engineering the intent.
+      value: |
+        before: verdictCacheKey(engineName: string, prompt: string): string
+        after:  verdictCacheKey(engineName: string, prompt: string, version = CACHE_VERSION): string
+
+        CACHE_VERSION is a module-level constant, bumped by hand when judge behaviour changes.
+        Cache directory and file format stay as they are; old entries simply stop matching.
+        No CLI flag, no JSON schema change.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Machine-checkable. Every line must be something a reviewer can run or read off a
+        diff — no "works well", no "is clean".
+      value: |
+        - `pnpm check` and `pnpm test` pass
+        - new test fails on current main and passes with the change
+        - same inputs + same CACHE_VERSION produce a byte-identical key (deterministic)
+        - bumping CACHE_VERSION changes the key for otherwise identical inputs
+        - no change to the report JSON schema, exit codes or flags
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: nongoals
+    attributes:
+      label: Out of scope
+      description: Adjacent work that must not be bundled in. Keeps the diff reviewable.
+      placeholder: >-
+        No cache eviction, no move off tmpdir, no config for the cache location.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Blast radius
+      options:
+        - "local — one function, no public surface"
+        - "internal — several modules, no public surface"
+        - "public contract — exit codes, JSON schema or flags change"
+        - "verdict quality — affects what the judge rules"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Hints, gotchas, prior art
+      description: >-
+        Anything that saves the implementer an hour: a similar pattern elsewhere in the
+        repo, a subtlety in the data, a dead end already ruled out.
+      placeholder: >-
+        Judge responses from small models arrive truncated; the parser tolerates that.
+        Do not "fix" it by tightening the parse — see the comments in src/judge.ts.
+
+  - type: checkboxes
+    id: ready
+    attributes:
+      label: Readiness
+      description: All three must be true, or this is not a task yet.
+      options:
+        - label: The contract above is precise enough that two people would implement the same interface.
+          required: true
+        - label: Every acceptance criterion can be verified by running a command or reading the diff.
+          required: true
+        - label: The design decisions are made — no open questions are left for the implementer.
+          required: true

@@ -1,0 +1,108 @@
+name: Judge engine / local model problem
+description: A model server does not work, responses fail to parse, or a local model judges badly
+title: "[engine] "
+labels: ["engine", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two very different problems land here, and the fix differs completely:
+
+        1. **The plumbing is broken** — the server is not reached, the response cannot be
+           parsed, the request is malformed. That is our bug. `scripts/debug-openai.ts`
+           prints the raw response shape for a real judge prompt (metadata only, no
+           secrets) — its output usually contains the whole answer.
+        2. **The model is too weak** — everything works, the rulings are just wrong.
+           `--calibrate` exists to tell those apart: it runs the golden set against
+           *your* judge and reports whether it is safe as a sole judge. Please run it
+           before filing, and paste the output.
+
+        We do not hardcode models and we will not add per-model workarounds that only
+        help one build. General robustness fixes in the parser are always welcome.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which of the two is it
+      options:
+        - "plumbing — cannot connect, malformed request, response will not parse"
+        - "quality — it runs fine, the verdicts are wrong"
+        - "escalation — the escalation engine behaves unexpectedly"
+        - "not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: server
+    attributes:
+      label: Server
+      options:
+        - Ollama
+        - MLX (mlx-lm / oMLX)
+        - LM Studio
+        - vLLM
+        - llama.cpp / llama-server
+        - "hosted OpenAI-compatible endpoint"
+        - other (name it below)
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model and quantisation
+      placeholder: qwen3.5-9b-instruct, q4_K_M, 32k context
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: OPENAI_BASE_URL=http://127.0.0.1:11434/v1 node src/cli.ts --calibrate --engine openai
+    validations:
+      required: true
+
+  - type: textarea
+    id: calibrate
+    attributes:
+      label: Output of `--calibrate`
+      description: >-
+        `node src/cli.ts --calibrate --engine openai --model <your-model>`.
+        This is the single field that decides whether this is our bug or your model's
+        limit. If calibration itself is what crashes, say so and paste the crash.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: raw
+    attributes:
+      label: Raw response shape (plumbing problems only)
+      description: >-
+        `node scripts/debug-openai.ts` — sends one real judge prompt and prints the
+        response shape. It prints metadata only, no keys. Leave empty for quality reports.
+      render: text
+
+  - type: textarea
+    id: expectation
+    attributes:
+      label: What you expected
+      description: >-
+        For quality reports: which golden cases should have passed, and why you believe
+        the model is capable of them. "It is a big model" is not evidence — a specific
+        case where the evidence is unambiguous is.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: The server answers `GET /v1/models` and the model id appears in that list.
+          required: true
+        - label: I reran with `--no-cache` so I am not looking at cached verdicts from an earlier model.
+          required: true
+        - label: No API keys, tokens or private code are included in the pasted output.
+          required: true

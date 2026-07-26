@@ -1,0 +1,132 @@
+name: Feature request
+description: Propose new behaviour — a flag, a check, a source, an output format
+title: "[feature] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form asks you to design the feature, not just wish for it. That is
+        deliberate: the answers below are exactly what someone needs to implement it
+        without asking you a single follow-up question. A request that fills them in is
+        one step away from being an implementable task.
+
+        Two things this project deliberately keeps out: runtime npm dependencies
+        (`gh`, `git` and `claude` are called as subprocesses, and that is the whole
+        dependency list), and anything that makes a check non-deterministic when the
+        judge is off.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you unable to do today? Describe the situation, not your solution —
+        there may be a better way to solve it than the one you have in mind.
+      placeholder: >-
+        I gate releases in CI and want to fail only on claims about security, while
+        tolerating unproven claims elsewhere. `--fail-on` applies to all claims equally,
+        so I have to parse the JSON report myself.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour, at the command line
+      description: >-
+        The exact surface: flag name, value grammar, default, and what happens when it is
+        combined with existing flags. If it changes output, show the before and after.
+      value: |
+        New flag:
+          --fail-on-section <regex>   Only claims whose section matches count for the exit code
+
+        Default: unset (current behaviour)
+        Interaction: applied after --fail-on, narrowing it; ignored when --fail-on none
+
+        $ node src/cli.ts owner/repo --fail-on contradicted --fail-on-section '(?i)security'
+        exit 1 only if a contradicted claim sits in a section matching /security/i
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Written so that someone else can tell whether it is done, without asking you.
+        One Given/When/Then per behaviour, including at least one negative case.
+      value: |
+        - Given a report with one contradicted claim in "Security Fixes"
+          When run with --fail-on contradicted --fail-on-section '(?i)security'
+          Then the exit code is 1
+
+        - Given the same report but the contradicted claim sits in "Chores"
+          When run with the same flags
+          Then the exit code is 0
+
+        - Given an invalid regex
+          When passed to --fail-on-section
+          Then it exits 2 with a message naming the flag and the regex error
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: How it gets tested
+      description: >-
+        Which test file, and what the test asserts. Anything touching verdict quality
+        also needs a `test/eval/golden.json` case, not just a unit test.
+      placeholder: test/report.test.ts — table-driven cases over exitCode(report, failOn, section)
+    validations:
+      required: true
+
+  - type: textarea
+    id: nongoals
+    attributes:
+      label: Explicitly out of scope
+      description: >-
+        The neighbouring things this should *not* grow into. This field prevents the
+        review from turning into a scope negotiation.
+      placeholder: >-
+        Not a general expression language over the report; not per-claim overrides;
+        not a config file.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Does this change a public contract?
+      description: >-
+        This tool has three stable surfaces that people build CI on: exit codes,
+        the `--json` report schema, and the CLI flags. Changing any of them breaks
+        someone's pipeline silently.
+      options:
+        - "no — purely additive"
+        - "yes — exit code semantics"
+        - "yes — JSON report schema"
+        - "yes — existing flag behaviour or default"
+        - "not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and current workaround
+      description: What you do today, and why it is not good enough.
+
+  - type: dropdown
+    id: implement
+    attributes:
+      label: Would you implement it?
+      options:
+        - "yes, if the design is accepted"
+        - "yes, but I would need pointers on where to start"
+        - "no, proposing only"
+    validations:
+      required: true
