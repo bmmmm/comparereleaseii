@@ -129,6 +129,24 @@ export interface RepoContext {
   releaseCadenceDays: number | null;
 }
 
+/**
+ * Why a release's claims could not be checked against its own diff.
+ *
+ * `sourceless` — the diff contains no source file at all (docs-only bump,
+ * changelog mirror of a closed-source product).
+ * `out-of-repo` — the diff has source, but the notes describe code that
+ * lives elsewhere: a fork shipping upstream features, a build or
+ * distribution repo. Detected from the repo's own release history, never
+ * from a single release.
+ */
+export type UnverifiableKind = "sourceless" | "out-of-repo";
+
+export interface Unverifiable {
+  kind: UnverifiableKind;
+  /** Rendered verbatim in every report format — must stand on its own. */
+  reason: string;
+}
+
 export interface Scores {
   correctness: number;
   completeness: number | null;
@@ -144,11 +162,11 @@ export interface Metrics {
   churnCoveredRatio: number | null;
   context: RepoContext;
   /**
-   * The diff touches no source file (docs/metadata only) — claims about
-   * behaviour could not be checked against code. Distinct from claims that
-   * were checked and found unsupported.
+   * The claims could not be checked against this repo's diff at all — set
+   * only when the *shape* of the release explains it. Distinct from claims
+   * that were checked and found unsupported.
    */
-  sourcelessDiff: boolean;
+  unverifiable: Unverifiable | null;
   /** Medians of the repo's own recent releases, for calibration. */
   baseline: {
     releases: number;

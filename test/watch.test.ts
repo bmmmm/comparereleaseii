@@ -90,6 +90,33 @@ function checked(tag: string, score: number, flagged: boolean): CheckedRelease {
   };
 }
 
+test("toWatchIndexHtml distinguishes an unverifiable release from a score collapse", () => {
+  const fork = checked("v2", 72, false);
+  fork.unverifiable = "out-of-repo";
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "fork/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v2",
+        latest: fork,
+        history: [fork],
+      },
+      // Same ballpark score, but its claims WERE checkable — no badge.
+      "normal/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 72, false),
+        history: [checked("v1", 72, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z");
+  assert.ok(html.includes("out of repo"), "badge names the shape");
+  assert.ok(html.includes("not in this repo's own diff"), "title explains it");
+  assert.equal(html.match(/class="tag"/g)?.length, 1, "only the fork row is tagged");
+});
+
 test("toWatchIndexHtml marks flagged repos red and sorts them first", () => {
   const state: WatchState = {
     version: 1,

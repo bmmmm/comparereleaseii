@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pooled, c } from "./util.ts";
 import { parseClaims } from "./claims.ts";
-import { anchorMatch } from "./match.ts";
+import { anchorMatch, lexicalMatch } from "./match.ts";
 import { newDependencies, opacityIssue, sensitiveCategory } from "./metrics.ts";
 import { ghApi, fetchCompare } from "./sources/github.ts";
 
@@ -19,6 +19,12 @@ export interface ReleaseSnapshot {
   claims: number;
   /** Share of commits referenced by note anchors (0..1). */
   anchoredCoverage: number;
+  /**
+   * Share of `change` claims whose identifiers appear anywhere in the diff
+   * (0..1), deterministic — no judge. Near zero across a whole history means
+   * the notes habitually describe code that is not in this repo.
+   */
+  lexicalCoverage: number;
   sensitiveTouched: string[];
   binaries: number;
   newDeps: string[];
@@ -28,6 +34,8 @@ export interface ReleaseSnapshot {
 export interface Baseline {
   snapshots: ReleaseSnapshot[];
   medianChurn: number;
+  /** Median of the snapshots' lexicalCoverage — the repo's normal shape. */
+  medianLexicalCoverage: number;
   knownAuthors: string[];
   everBinary: boolean;
   /** Fraction of past releases touching each sensitive category. */
@@ -54,7 +62,10 @@ async function snapshotFor(
     `${repo.replace(/\//g, "_")}-${baseTag}...${release.tag_name}.json`,
   );
   try {
-    return JSON.parse(await readFile(cacheFile, "utf8")) as ReleaseSnapshot;
+    const cached = JSON.parse(await readFile(cacheFile, "utf8")) as ReleaseSnapshot;
+    // Snapshots written before a field existed would silently read as
+    // undefined and skew every median built from them — rebuild instead.
+    if (typeof cached.lexicalCoverage === "number") return cached;
   } catch {
     // cache miss — build below
   }
@@ -70,6 +81,10 @@ async function snapshotFor(
     const cat = sensitiveCategory(f.path);
     if (cat) categories.add(cat);
   }
+  const changeClaims = claims.filter((claim) => claim.kind === "change");
+  const lexicalHits = changeClaims.filter(
+    (claim) => lexicalMatch(claim, cmp.files).score > 0,
+  ).length;
   const snapshot: ReleaseSnapshot = {
     tag: release.tag_name,
     base: baseTag,
@@ -80,6 +95,7 @@ async function snapshotFor(
     deletions: cmp.files.reduce((s, f) => s + f.deletions, 0),
     claims: claims.length,
     anchoredCoverage: cmp.commits.length ? covered.size / cmp.commits.length : 1,
+    lexicalCoverage: changeClaims.length ? lexicalHits / changeClaims.length : 1,
     sensitiveTouched: [...categories],
     binaries: cmp.files.filter((f) => opacityIssue(f) === "binary file").length,
     newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f)))],
@@ -134,6 +150,7 @@ export function summarizeBaseline(snapshots: ReleaseSnapshot[]): Baseline {
   return {
     snapshots,
     medianChurn: median(snapshots.map((s) => s.additions + s.deletions)),
+    medianLexicalCoverage: median(snapshots.map((s) => s.lexicalCoverage)),
     knownAuthors: [...new Set(snapshots.flatMap((s) => s.authors))],
     everBinary: snapshots.some((s) => s.binaries > 0),
     categoryFreq,
@@ -142,7 +159,7 @@ export function summarizeBaseline(snapshots: ReleaseSnapshot[]): Baseline {
 
 export function printTimeline(snapshots: ReleaseSnapshot[]): void {
   console.log(c.bold("\nRelease history") + c.dim(` — ${snapshots.length} release(s), newest first\n`));
-  const header = ["tag", "date", "commits", "files", "±churn", "claims", "anchored", "sensitive", "deps+", "bin"];
+  const header = ["tag", "date", "commits", "files", "±churn", "claims", "anchored", "lexical", "sensitive", "deps+", "bin"];
   const rows = snapshots.map((s) => [
     s.tag,
     s.date ?? "?",
@@ -151,6 +168,7 @@ export function printTimeline(snapshots: ReleaseSnapshot[]): void {
     `${s.additions + s.deletions}`,
     String(s.claims),
     `${Math.round(s.anchoredCoverage * 100)}%`,
+    `${Math.round(s.lexicalCoverage * 100)}%`,
     s.sensitiveTouched.map((t) => t.split("/")[0]).join(",") || "-",
     String(s.newDeps.length),
     String(s.binaries),

@@ -91,13 +91,17 @@ Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
 found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
 lenient gate that tolerates unprovable claims (e.g. private advisories).
 
-A release whose diff contains no source file at all — a docs-only bump, or a
-closed-source product that publishes notes from a mirror repo — is reported
-as **not verifiable** rather than unsupported: its claims leave the
-correctness ratio, the risk flag drops to `info`, and `--fail-on no-evidence`
-does not fail the build. Consumers can branch on `metrics.sourcelessDiff` in
-the JSON report. The report says "unknown", not "fine" — details in
-[SCORING.md](SCORING.md).
+Some releases cannot be checked here at all: a docs-only bump or a mirror repo
+of a closed-source product (no source in the diff), and a fork or distribution
+repo whose notes describe upstream code (source in the diff, but not the code
+the notes talk about). Both are reported as their own category instead of as
+unsupported claims — the claims leave the correctness ratio, the risk flag
+drops to `info`, the score is labelled **unverified**, and `--fail-on
+no-evidence` does not fail the build. The fork case is only ever claimed when
+the repo's *own release history* shows the same shape, and never when a claim
+is contradicted or a critical flag fires. Consumers can branch on
+`metrics.unverifiable` (`{ kind, reason }` or `null`) in the JSON report. The
+report says "unknown", not "fine" — details in [SCORING.md](SCORING.md).
 
 ## Judges: local models, calibration, escalation
 

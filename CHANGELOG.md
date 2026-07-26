@@ -8,15 +8,29 @@ tool is checked with the tool itself before it ships.
 
 ### Added
 
-- **Not verifiable**: a release whose diff touches no source file (only docs,
-  changelogs, feeds, licence/project metadata, images) no longer scores like a
-  fabricated one. Its `no-evidence` claims leave the correctness ratio, the
-  `unsupported-claim` warn flag becomes a `not-verifiable` info flag, every
-  report format carries the explanation, and `--fail-on no-evidence` does not
-  fail the build. New `metrics.sourcelessDiff` boolean in the JSON report for
-  downstream consumers. `anthropics/claude-code` v2.1.219 → v2.1.220 went from
-  27/100 (suspicious) to 75/100 (minor gaps) plus an explicit not-verifiable
-  line. The signal is the diff's file set, not the repo's language stats.
+- **Unverified releases** are their own category instead of scoring like
+  fabricated ones. Two shapes: `sourceless` — the diff touches no source file
+  at all (docs-only bump, changelog mirror of a closed-source product), and
+  `out-of-repo` — the diff has source but the notes describe upstream code (a
+  fork, a build or distribution repo). In both, `no-evidence` claims leave the
+  correctness ratio, the `unsupported-claim` warn flag drops to a
+  `not-verifiable` info flag, `--fail-on no-evidence` stops failing the build,
+  every report format carries the reason, and the watch index tags the row so
+  it reads differently from a genuine score collapse. New
+  `metrics.unverifiable` (`{ kind, reason }` or `null`) in the JSON report.
+  `anthropics/claude-code` v2.1.219 → v2.1.220: 27/100 suspicious → 75/100
+  unverified. `zen-browser/desktop`: questionable → 96/100 unverified.
+- Score label `unverified`: when the carve-out above leaves no checkable claim,
+  the label says so regardless of the number. Correctness 100 there means
+  "nothing was found wrong", not "the notes were checked and hold" — a fork
+  release reading "96/100 solid" would have been the mirror of the bug the
+  carve-out fixes.
+- `out-of-repo` is decided from the repo's own history, never one release:
+  release snapshots gained a deterministic `lexicalCoverage` (share of claims
+  whose identifiers appear in that release's diff, no judge), and the baseline
+  its median. It is refused outright when a claim is contradicted or a flag is
+  critical — evidence about this release outranks any pattern. `--history`
+  shows the new column.
 
 - `gh` extension as the install path: `gh extension install
   bmmmm/gh-comparereleaseii` — a SHA-pinned wrapper that follows releases

@@ -248,6 +248,9 @@ landed no-evidence. Parser: lines that are pure markup (HTML tags without
 prose) never become claims; standing marketing intros are covered by 3.2.
 - **Done when:** the omlx fixture yields no claim for the img line, claim
   count drops accordingly, no regression on the five dialect fixtures.
+- **Landed 2026-07-26:** paragraphs and bullets whose text is empty after
+  stripping HTML tags never become claims; inline HTML inside real prose
+  survives.
 
 ### 3.2 Carried-over claims: dedupe against the base release's notes
 omlx v0.5.3 repeats v0.5.2 material verbatim (4 of the top no-evidence
@@ -269,6 +272,19 @@ normal shape, the report should state "these notes describe changes outside
 this repo's diff (fork/build/distribution repo)" instead of implying deceit.
 - **Done when:** zen's report carries the explicit out-of-repo notice and
   the watch index shows it distinctly from a genuine score collapse.
+- **Landed 2026-07-26:** both halves, as one `metrics.unverifiable`
+  category. `sourceless` (no source file in the diff at all) came from
+  [#12](https://github.com/bmmmm/comparereleaseii/issues/12) and needs no
+  history — claude-code v2.1.220 went 27 suspicious → 75 unverified.
+  `out-of-repo` needs the repo's own: release snapshots gained a
+  deterministic `lexicalCoverage`, and the shape is only claimed when a
+  strict majority of claims miss AND the last ≥ 3 releases show the same
+  pattern AND nothing is contradicted or critical — zen-browser
+  questionable → 96 unverified with the explicit notice, watch index
+  tagged. One thing the plan did not foresee: with the misses out of the
+  ratio, zen first read "96/100 solid" — a clean bill of health for a
+  release where nothing was checked. Hence the new `unverified` label,
+  which wins over the numeric band whenever no checkable claim is left.
 
 ### 3.4 Baseline-relative labels and alerting
 traefik is ~25 on every release (9% churn coverage is its culture, not an

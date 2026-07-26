@@ -9,7 +9,19 @@ import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./che
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
 
+import type { UnverifiableKind } from "./types.ts";
+
 type FailOn = "none" | "contradicted" | "no-evidence";
+
+/** Short enough for a table cell; the title carries the explanation. */
+const UNVERIFIABLE_TAG: Record<UnverifiableKind, string> = {
+  sourceless: "no source",
+  "out-of-repo": "out of repo",
+};
+const UNVERIFIABLE_TITLE: Record<UnverifiableKind, string> = {
+  sourceless: "This release's diff contains no source-code changes — its claims could not be checked against code.",
+  "out-of-repo": "These notes describe code that is not in this repo's own diff (fork, build or distribution repo).",
+};
 
 export interface WatchRepoConfig {
   /** owner/repo on GitHub. */
@@ -62,6 +74,12 @@ export interface CheckedRelease {
   scoreLabel: string;
   /** Absent in state files written before the field existed. */
   components?: { correctness: number; completeness: number | null; risk: number };
+  /**
+   * Set when the release's claims could not be checked against this repo's
+   * own diff. Without it the index cannot tell a fork/docs-only release from
+   * a repo whose notes genuinely stopped matching its code.
+   */
+  unverifiable?: UnverifiableKind;
   exitCode: number;
   criticalFlags: number;
   flagCount: number;
@@ -178,7 +196,11 @@ export function toWatchIndexHtml(
 <td>${repoCell(key, repo)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
-<td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}">${l.score}</span> ${esc(l.scoreLabel)}</td>
+<td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}">${l.score}</span> ${esc(l.scoreLabel)}${
+        l.unverifiable
+          ? ` <span class="tag" title="${esc(UNVERIFIABLE_TITLE[l.unverifiable])}">${esc(UNVERIFIABLE_TAG[l.unverifiable])}</span>`
+          : ""
+      }</td>
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
@@ -212,6 +234,7 @@ tr[data-href]:hover{background:#f6f8fa}
 tr.flagged[data-href]:hover{background:#ffe3e0}
 tr.pending td{color:#59636e}
 .score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
+.tag{display:inline-block;border:1px solid #58a6ff;color:#58a6ff;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}
 .comp{color:#59636e;white-space:nowrap}
 .dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:2px}
@@ -468,6 +491,7 @@ export async function runWatch(
           flagged,
           engine: report.engine,
           verdicts,
+          unverifiable: report.metrics.unverifiable?.kind,
           report: `${key}/${base}.html`,
         };
         repoState.lastPublishedAt = rel.publishedAt;

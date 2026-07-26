@@ -46,10 +46,10 @@ weight. Handwritten claims are where notes lie; they dominate this
 component. No checkable claims at all → correctness 100 (nothing asserted,
 nothing wrong — completeness and risk still apply).
 
-**Exception — a diff with no source.** When the release's changed-file set
-contains no source file at all (only docs, changelogs, feeds, licence and
-project metadata, images), `no-evidence` claims drop *out of* the ratio
-instead of scoring 0. See "Not verifiable" below.
+**Exception — releases that cannot be checked here.** When the release's own
+shape explains the misses (no source file in the diff at all, or a fork whose
+notes describe upstream code), `no-evidence` claims drop *out of* the ratio
+instead of scoring 0. See "Unverified" below.
 
 ### completeness — do the notes cover what shipped?
 
@@ -77,7 +77,7 @@ risk = max(0, 100 − 25·critical − 10·warn − 0·info)
 |---|---|
 | **critical** | contradicted claims · undocumented auth/crypto changes · vague note hiding auth/crypto changes · undocumented new dependency · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
 | **warn** | unsupported change claims · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · first-time author on sensitive paths (baseline) |
-| **info** | documented new dependencies · release-size anomaly vs. baseline · unchecked claims on a diff with no source ("not verifiable") |
+| **info** | documented new dependencies · release-size anomaly vs. baseline · unchecked claims on a release that cannot be checked here ("not verifiable") |
 
 The asymmetry is deliberate: changelogs routinely omit lockfile and CI
 churn (some generators filter it by design) — that is a `warn`. Silent
@@ -106,30 +106,49 @@ construction.
 | 65–84 | minor gaps |
 | 45–64 | questionable |
 | < 45 | suspicious |
+| any | **unverified** — no claim could be checked here (below) |
 
-## Not verifiable — releases whose diff holds no source
+## Unverified — releases that cannot be checked in this repo
 
-Some releases cannot be checked at all: a closed-source product publishing
-notes from a mirror repo, a docs-only bump, a release whose whole diff is
-`CHANGELOG.md` and `feed.xml`. Lexical matching has nothing to anchor on, so
-every claim lands on `no-evidence` — the same verdict a fabricated release
-gets, for the opposite reason.
+Some releases cannot be checked at all, and lexical matching then has nothing
+to anchor on: every claim lands on `no-evidence` — the same verdict a
+fabricated release gets, for the opposite reason. Two shapes, both benign:
 
-The signal is the **diff's** file set, not the repo's language stats: a repo
-can be 80% Python and still ship a release that touches no source. When no
-changed file is a source file, the report sets `metrics.sourcelessDiff` and:
+| `metrics.unverifiable.kind` | Shape | Decided from |
+|---|---|---|
+| `sourceless` | The diff contains no source file — a docs-only bump, or a changelog mirror of a closed-source product (whole diff = `CHANGELOG.md` + `feed.xml`) | this release alone |
+| `out-of-repo` | The diff *has* source, but the notes describe code that lives elsewhere: a fork shipping upstream features, a build or distribution repo | this release **and** the repo's own history |
+
+The signal is the **diff's** file set, never the repo's language stats: a repo
+can be 80% Python and still ship a release that touches no source.
+
+`out-of-repo` deliberately costs more evidence, because "most claims miss" is
+also exactly what a fabricated release looks like. It is claimed only when all
+of these hold:
+
+- a strict majority of this release's `change` claims are `no-evidence`
+- the last ≥ 3 releases exist as a baseline, and their median **lexical
+  coverage** (share of claims whose identifiers appear anywhere in that
+  release's diff — deterministic, no judge) is ≤ 25 %
+- no claim is `contradicted` and no flag is `critical` — evidence *about this
+  release* outranks any pattern in the history
+
+When either kind holds:
 
 - `no-evidence` claims leave the correctness ratio instead of scoring 0
 - the `unsupported-claim` **warn** flag becomes a `not-verifiable` **info**
   flag — no risk penalty
-- reports (terminal, Markdown, JSON, HTML) carry the line *"This release's
-  diff contains no source-code changes — claims could not be checked against
-  code"*, and each affected claim says so too
-- `--fail-on no-evidence` does not fail the build
+- if that leaves *no* checkable claim, the label becomes `unverified`
+  regardless of the number — correctness 100 there means "nothing was found
+  wrong", not "the notes were checked and hold"
+- reports (terminal, Markdown, JSON, HTML) carry the reason, and each affected
+  claim says why it went unchecked
+- `--fail-on no-evidence` does not fail the build; the watch index tags the
+  row so it reads differently from a genuine score collapse
 
-What this deliberately does **not** do: claim the notes are true. The score
-still loses its completeness component if the docs churn is undocumented,
-and every risk flag still applies. The report says "unknown", not "fine".
+What this deliberately does **not** do: claim the notes are true. Completeness
+still counts undocumented churn, and every risk flag still applies. The report
+says "unknown", not "fine".
 
 ## Reading a score
 

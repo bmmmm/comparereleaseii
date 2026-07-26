@@ -8,9 +8,12 @@ import {
   computeScores,
   isSourceFile,
   isSourcelessDiff,
+  classifyUnverifiable,
+  demoteUnsupportedFlag,
 } from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
-import type { ClaimResult, DiffFile, FileInsight, RiskFlag } from "../src/types.ts";
+import type { ClaimResult, DiffFile, FileInsight, ReleaseData, RiskFlag } from "../src/types.ts";
+import type { Baseline } from "../src/history.ts";
 
 test("sensitiveCategory classifies by priority", () => {
   assert.equal(sensitiveCategory("Cargo.toml"), "dependencies");
@@ -205,16 +208,106 @@ test("computeScores does not score unverifiable claims as false", () => {
   assert.equal(computeScores(claims, 0, []).correctness, 0);
   assert.equal(computeScores(claims, 0, []).label, "suspicious");
 
-  // Sourceless diff: the claims could not be checked at all, so they must not
-  // drag correctness to the level of a fabricated release.
+  // Unverifiable: the claims could not be checked at all, so they must not
+  // drag correctness to the level of a fabricated release — but the label must
+  // not swing to a clean bill of health either.
   const sourceless = computeScores(claims, 0, [], true);
   assert.equal(sourceless.correctness, 100);
-  assert.notEqual(sourceless.label, "suspicious");
+  assert.equal(sourceless.label, "unverified");
 
-  // A claim that *was* checkable still counts, sourceless or not.
+  // Nothing was asserted at all — that is genuinely fine, not "unverified".
+  assert.equal(computeScores([], 1, [], true).label, "solid");
+
+  // A claim that *was* checkable still counts, and its label is earned.
   const mixed = computeScores([result("verified"), result("no-evidence")], 1, [], true);
   assert.equal(mixed.correctness, 100);
+  assert.equal(mixed.label, "solid");
   assert.equal(computeScores([result("verified"), result("no-evidence")], 1, []).correctness, 50);
+});
+
+function releaseData(paths: string[]): ReleaseData {
+  return {
+    repoLabel: "zen-browser/desktop",
+    baseRef: "1.0.0",
+    headRef: "1.1.0",
+    notes: "",
+    commits: [],
+    files: paths.map((path) => ({ path, status: "modified", additions: 5, deletions: 2 })),
+    commitFiles: async () => [],
+    warnings: [],
+  };
+}
+
+function baselineOf(medianLexicalCoverage: number, releases = 5): Baseline {
+  return {
+    snapshots: Array.from({ length: releases }, () => ({}) as never),
+    medianChurn: 100,
+    medianLexicalCoverage,
+    knownAuthors: [],
+    everBinary: false,
+    categoryFreq: {},
+  };
+}
+
+test("classifyUnverifiable: a docs-only diff needs no history", () => {
+  const u = classifyUnverifiable(releaseData(["CHANGELOG.md", "feed.xml"]), [], [], null);
+  assert.equal(u?.kind, "sourceless");
+});
+
+test("classifyUnverifiable: out-of-repo needs the repo's own history to agree", () => {
+  // A fork: real code in the diff, but the notes describe upstream features.
+  const fork = releaseData(["src/browser.ts", "config/prefs.js"]);
+  const missing = [result("no-evidence"), result("no-evidence"), result("verified")];
+
+  assert.equal(classifyUnverifiable(fork, missing, [], baselineOf(0.05))?.kind, "out-of-repo");
+
+  // Same release, but this repo normally anchors its claims in its own code —
+  // then a release where the claims stop matching is a finding, not a shape.
+  assert.equal(classifyUnverifiable(fork, missing, [], baselineOf(0.8)), null);
+  // Too little history to call it a pattern.
+  assert.equal(classifyUnverifiable(fork, missing, [], baselineOf(0.05, 2)), null);
+  assert.equal(classifyUnverifiable(fork, missing, [], null), null);
+  // Most claims DID match — nothing to explain away.
+  assert.equal(
+    classifyUnverifiable(fork, [result("verified"), result("no-evidence")], [], baselineOf(0.05)),
+    null,
+  );
+});
+
+test("classifyUnverifiable: evidence about this release outranks the pattern", () => {
+  const fork = releaseData(["src/browser.ts"]);
+  const missing = [result("no-evidence"), result("no-evidence")];
+  const base = baselineOf(0.05);
+  assert.equal(classifyUnverifiable(fork, missing, [], base)?.kind, "out-of-repo");
+
+  // A contradicted claim is proof the notes disagree with the diff — no repo
+  // shape excuses that.
+  assert.equal(
+    classifyUnverifiable(fork, [...missing, result("contradicted")], [], base),
+    null,
+  );
+  const critical: RiskFlag = {
+    severity: "critical",
+    kind: "undocumented-sensitive",
+    message: "m",
+    files: [],
+    commitShas: [],
+  };
+  assert.equal(classifyUnverifiable(fork, missing, [critical], base), null);
+});
+
+test("demoteUnsupportedFlag turns the warn into an info, only when explained", () => {
+  const flags: RiskFlag[] = [
+    { severity: "warn", kind: "unsupported-claim", message: "2 claim(s) with no supporting evidence in the diff", files: [], commitShas: [] },
+    { severity: "warn", kind: "undocumented-sensitive", message: "keep me", files: [], commitShas: [] },
+  ];
+  assert.deepEqual(demoteUnsupportedFlag(flags, null), flags);
+
+  const demoted = demoteUnsupportedFlag(flags, { kind: "sourceless", reason: "r" });
+  assert.equal(demoted[0].severity, "info");
+  assert.equal(demoted[0].kind, "not-verifiable");
+  assert.match(demoted[0].message, /not checkable against this repo's diff/);
+  assert.deepEqual(demoted[1], flags[1]);
 });
 
 test("layoutTreemap fills the viewport and preserves area proportions", () => {

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { exitCode, isNotVerifiable, toMarkdown } from "../src/report.ts";
+import { exitCode, unverifiableNote, toMarkdown } from "../src/report.ts";
 import { toHtml } from "../src/html.ts";
 import { computeScores } from "../src/metrics.ts";
-import type { ClaimResult, Report } from "../src/types.ts";
+import type { ClaimResult, Report, Unverifiable } from "../src/types.ts";
 
 function claimResult(verdict: ClaimResult["verdict"]): ClaimResult {
   return {
@@ -28,7 +28,7 @@ function claimResult(verdict: ClaimResult["verdict"]): ClaimResult {
 }
 
 /** The claude-code v2.1.219 → v2.1.220 shape: notes without shipped source. */
-function report(sourcelessDiff: boolean): Report {
+function report(unverifiable: Unverifiable | null): Report {
   const results = [claimResult("no-evidence")];
   return {
     repoLabel: "anthropics/claude-code",
@@ -39,13 +39,13 @@ function report(sourcelessDiff: boolean): Report {
     uncovered: [],
     reverseChecked: true,
     metrics: {
-      scores: computeScores(results, 0, [], sourcelessDiff),
+      scores: computeScores(results, 0, [], unverifiable !== null),
       flags: [],
       files: [],
       churnCoveredRatio: 0,
       context: { languages: null, codeBytes: null, releaseCadenceDays: null },
       baseline: null,
-      sourcelessDiff,
+      unverifiable,
     },
     warnings: [],
     truncated: false,
@@ -53,29 +53,48 @@ function report(sourcelessDiff: boolean): Report {
   };
 }
 
-test("a docs-only release is not-verifiable, not suspicious", () => {
-  const sourceless = report(true);
-  assert.equal(isNotVerifiable(sourceless), true);
-  assert.notEqual(sourceless.metrics.scores.label, "suspicious");
+const SOURCELESS: Unverifiable = {
+  kind: "sourceless",
+  reason: "This release's diff contains no source-code changes — claims could not be checked against code.",
+};
+const OUT_OF_REPO: Unverifiable = {
+  kind: "out-of-repo",
+  reason: "These notes describe changes that are not in this repo's own diff — across the last 5 releases only 8% of claims matched its code (fork, build or distribution repo).",
+};
 
-  // Same notes, same verdicts, but the diff did contain source: still a finding.
-  const normal = report(false);
-  assert.equal(isNotVerifiable(normal), false);
+test("an unverifiable release is a category of its own, not suspicious", () => {
+  for (const u of [SOURCELESS, OUT_OF_REPO]) {
+    const r = report(u);
+    assert.equal(unverifiableNote(r)?.heading !== undefined, true, u.kind);
+    assert.notEqual(r.metrics.scores.label, "suspicious", u.kind);
+  }
+
+  // Same notes, same verdicts, but the claims were genuinely checkable here.
+  const normal = report(null);
+  assert.equal(unverifiableNote(normal), null);
   assert.equal(normal.metrics.scores.label, "suspicious");
 });
 
-test("--fail-on no-evidence does not fail on an unverifiable diff", () => {
-  assert.equal(exitCode(report(true), "no-evidence"), 0);
-  assert.equal(exitCode(report(false), "no-evidence"), 1);
-  assert.equal(exitCode(report(true), "none"), 0);
+test("--fail-on no-evidence does not fail on an unverifiable release", () => {
+  assert.equal(exitCode(report(SOURCELESS), "no-evidence"), 0);
+  assert.equal(exitCode(report(OUT_OF_REPO), "no-evidence"), 0);
+  assert.equal(exitCode(report(null), "no-evidence"), 1);
+  assert.equal(exitCode(report(SOURCELESS), "none"), 0);
 });
 
-test("markdown and html surface the not-verifiable category", () => {
-  const md = toMarkdown(report(true));
-  assert.match(md, /Not verifiable/);
-  assert.match(md, /no source file is part of this release's diff/);
-  assert.doesNotMatch(toMarkdown(report(false)), /Not verifiable/);
+test("markdown and html name the right category, per kind", () => {
+  const sourceless = toMarkdown(report(SOURCELESS));
+  assert.match(sourceless, /Not verifiable/);
+  assert.match(sourceless, /no source file is part of this release's diff/);
 
-  assert.match(toHtml(report(true)), /Not verifiable/);
-  assert.doesNotMatch(toHtml(report(false)), /Not verifiable/);
+  // A fork's notes are not "no source" — the heading must say what it is.
+  const fork = toMarkdown(report(OUT_OF_REPO));
+  assert.match(fork, /Changes outside this repo/);
+  assert.match(fork, /not part of this repo's diff/);
+  assert.doesNotMatch(fork, /no source file/);
+
+  assert.doesNotMatch(toMarkdown(report(null)), /Not verifiable|Changes outside/);
+  assert.match(toHtml(report(SOURCELESS)), /Not verifiable/);
+  assert.match(toHtml(report(OUT_OF_REPO)), /Changes outside this repo/);
+  assert.doesNotMatch(toHtml(report(null)), /Not verifiable|Changes outside/);
 });

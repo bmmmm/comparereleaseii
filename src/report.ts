@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { c } from "./util.ts";
-import type { ClaimResult, Report, Verdict } from "./types.ts";
+import type { ClaimResult, Report, UnverifiableKind, Verdict } from "./types.ts";
 
 const SYMBOL: Record<Verdict, string> = {
   verified: "✔",
@@ -39,16 +39,28 @@ function evidenceLine(r: ClaimResult): string {
   return parts.join(" · ");
 }
 
-export const NOT_VERIFIABLE_NOTE =
-  "This release's diff contains no source-code changes — claims could not be checked against code.";
+const HEADING: Record<UnverifiableKind, string> = {
+  sourceless: "Not verifiable",
+  "out-of-repo": "Changes outside this repo",
+};
+
+/** Why this individual claim went unchecked — shown under each no-evidence line. */
+const CLAIM_NOTE: Record<UnverifiableKind, string> = {
+  sourceless: "No source file is part of this release's diff.",
+  "out-of-repo": "This claim's code is not part of this repo's diff.",
+};
 
 /**
- * Claims were made, but the diff holds no source file to check them against.
- * Reported as its own category so a closed-source or docs-only release does
- * not read like a fabricated one.
+ * Claims were made, but the release's shape means they could not be checked
+ * here. Reported as its own category so a docs-only or fork release does not
+ * read like a fabricated one. Null when the claims were genuinely checkable.
  */
-export function isNotVerifiable(report: Report): boolean {
-  return report.metrics.sourcelessDiff && report.results.some((r) => r.claim.kind === "change");
+export function unverifiableNote(
+  report: Report,
+): { heading: string; reason: string; claimNote: string } | null {
+  const u = report.metrics.unverifiable;
+  if (!u || !report.results.some((r) => r.claim.kind === "change")) return null;
+  return { heading: HEADING[u.kind], reason: u.reason, claimNote: CLAIM_NOTE[u.kind] };
 }
 
 export function countVerdicts(results: ClaimResult[]): Record<Verdict, number> {
@@ -74,7 +86,7 @@ export function printTerminal(report: Report): void {
       `\n${c.dim(`judge engine: ${report.engine}`)}\n`,
   );
 
-  const notVerifiable = isNotVerifiable(report);
+  const note = unverifiableNote(report);
   let section = "";
   for (const r of report.results) {
     if (r.claim.section !== section) {
@@ -89,8 +101,8 @@ export function printTerminal(report: Report): void {
         `    ${color(r.verdict)} ${c.dim(`(${r.confidence.toFixed(2)}) · ${evidenceLine(r)}`)}`,
       );
       if (r.reasoning) console.log(c.dim(`    ${r.reasoning}`));
-      if (notVerifiable && r.verdict === "no-evidence") {
-        console.log(c.dim(`    No source file is part of this release's diff.`));
+      if (note && r.verdict === "no-evidence") {
+        console.log(c.dim(`    ${note.claimNote}`));
       }
     }
   }
@@ -115,8 +127,8 @@ export function printTerminal(report: Report): void {
         `correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
       ),
   );
-  if (notVerifiable) {
-    console.log(`${c.bold("Not verifiable:")} ${c.cyan(NOT_VERIFIABLE_NOTE)}`);
+  if (note) {
+    console.log(`${c.bold(`${note.heading}:`)} ${c.cyan(note.reason)}`);
   }
   const b = report.metrics.baseline;
   if (b) {
@@ -179,7 +191,7 @@ export function printTerminal(report: Report): void {
 export function toMarkdown(report: Report): string {
   const counts = countVerdicts(report.results);
   const s = report.metrics.scores;
-  const notVerifiable = isNotVerifiable(report);
+  const note = unverifiableNote(report);
   const lines: string[] = [
     `# Release-note fact check: ${report.repoLabel} ${report.baseRef} → ${report.headRef}`,
     "",
@@ -187,7 +199,7 @@ export function toMarkdown(report: Report): string {
     "",
     `**Trust score: ${s.overall}/100 (${s.label})** — correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
     "",
-    ...(notVerifiable ? [`> **Not verifiable** — ${NOT_VERIFIABLE_NOTE}`, ""] : []),
+    ...(note ? [`> **${note.heading}** — ${note.reason}`, ""] : []),
     ...(report.metrics.flags.length
       ? [
           "## Risk flags",
@@ -220,8 +232,8 @@ export function toMarkdown(report: Report): string {
       const ev = evidenceLine(r);
       if (ev) lines.push(`  - evidence: ${ev}`);
       if (r.reasoning) lines.push(`  - ${r.reasoning}`);
-      if (notVerifiable && r.verdict === "no-evidence") {
-        lines.push(`  - not verifiable: no source file is part of this release's diff`);
+      if (note && r.verdict === "no-evidence") {
+        lines.push(`  - not verifiable: ${note.claimNote.replace(/\.$/, "").toLowerCase()}`);
       }
     }
   }
@@ -253,6 +265,6 @@ export function exitCode(report: Report, failOn: "none" | "contradicted" | "no-e
   // A diff with no source files could not have supported the claims in the
   // first place — failing the build on that would punish the release shape,
   // not the notes.
-  if (failOn === "no-evidence" && counts["no-evidence"] > 0 && !isNotVerifiable(report)) return 1;
+  if (failOn === "no-evidence" && counts["no-evidence"] > 0 && !unverifiableNote(report)) return 1;
   return 0;
 }

@@ -9,6 +9,7 @@ import type {
   RepoContext,
   RiskFlag,
   Scores,
+  Unverifiable,
 } from "./types.ts";
 import type { Coverage } from "./verify.ts";
 import type { Baseline } from "./history.ts";
@@ -52,6 +53,63 @@ export function isSourceFile(path: string): boolean {
  */
 export function isSourcelessDiff(files: DiffFile[]): boolean {
   return !files.some((f) => isSourceFile(f.path));
+}
+
+/** A repo whose notes habitually describe code outside its own diff. */
+const OUT_OF_REPO_BASELINE = 0.25;
+/** …and a release that follows that pattern: a strict majority of misses. */
+const OUT_OF_REPO_RELEASE = 0.5;
+
+/**
+ * Why — if at all — this release's claims could not be checked against its own
+ * diff. Two shapes, both benign, both otherwise scored like a fabrication:
+ *
+ * - `sourceless`: the diff holds no source file. Decided from this release
+ *   alone; the file set is proof enough.
+ * - `out-of-repo`: the diff holds source, but the notes describe code that
+ *   lives elsewhere (a fork shipping upstream features, a build or
+ *   distribution repo). One release cannot prove that — a release where most
+ *   claims miss is exactly what a fabricated one looks like. It takes the
+ *   repo's own history: only when its previous releases show the same shape
+ *   is "this is how this repo publishes" the better explanation than "these
+ *   notes lie".
+ *
+ * Never claimed when the diff actively disagrees with the notes: a
+ * contradicted claim or a critical flag is evidence *about* this release, and
+ * it outranks any pattern in the history.
+ */
+export function classifyUnverifiable(
+  data: ReleaseData,
+  results: ClaimResult[],
+  flags: RiskFlag[],
+  baseline: Baseline | null,
+): Unverifiable | null {
+  if (isSourcelessDiff(data.files)) {
+    return {
+      kind: "sourceless",
+      reason:
+        "This release's diff contains no source-code changes — claims could not be checked against code.",
+    };
+  }
+  if (results.some((r) => r.verdict === "contradicted")) return null;
+  if (flags.some((f) => f.severity === "critical")) return null;
+
+  const change = results.filter((r) => r.claim.kind === "change");
+  if (!change.length) return null;
+  const missing = change.filter((r) => r.verdict === "no-evidence").length;
+  if (missing / change.length <= OUT_OF_REPO_RELEASE) return null;
+
+  // Same bar as the other baseline signals: fewer than 3 past releases is an
+  // accident, not a pattern.
+  if (!baseline || baseline.snapshots.length < 3) return null;
+  if (baseline.medianLexicalCoverage > OUT_OF_REPO_BASELINE) return null;
+
+  return {
+    kind: "out-of-repo",
+    reason:
+      `These notes describe changes that are not in this repo's own diff — across the last ${baseline.snapshots.length} releases only ` +
+      `${Math.round(baseline.medianLexicalCoverage * 100)}% of claims matched its code (fork, build or distribution repo).`,
+  };
 }
 
 /** Classify a path into a sensitivity category (checked in priority order). */
@@ -225,7 +283,6 @@ function buildFlags(
   results: ClaimResult[],
   coverage: Coverage | null,
   files: FileInsight[],
-  sourceless: boolean,
 ): RiskFlag[] {
   const flags: RiskFlag[] = [];
   const shasFor = (paths: string[]): string[] => {
@@ -254,26 +311,13 @@ function buildFlags(
     (r) => r.verdict === "no-evidence" && r.claim.kind === "change",
   );
   if (noEvidence.length) {
-    // Without a single source file in the diff there is nothing the claims
-    // could have been checked against — reporting that as "unsupported" reads
-    // like a fabricated release.
-    flags.push(
-      sourceless
-        ? {
-            severity: "info",
-            kind: "not-verifiable",
-            message: `${noEvidence.length} claim(s) not checkable — this release's diff contains no source-code changes`,
-            files: [],
-            commitShas: [],
-          }
-        : {
-            severity: "warn",
-            kind: "unsupported-claim",
-            message: `${noEvidence.length} claim(s) with no supporting evidence in the diff`,
-            files: [],
-            commitShas: [],
-          },
-    );
+    flags.push({
+      severity: "warn",
+      kind: "unsupported-claim",
+      message: `${noEvidence.length} claim(s) with no supporting evidence in the diff`,
+      files: [],
+      commitShas: [],
+    });
   }
 
   // Reverse-direction audit results: notable changes hidden behind vague notes.
@@ -344,18 +388,43 @@ function buildFlags(
   return flags.sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
+/**
+ * Once the release's shape explains the misses, "unsupported claim" is the
+ * wrong finding — it charges a risk penalty for something nobody could have
+ * done better. The flag stays (the claims really are unchecked) but drops to
+ * info and says why.
+ */
+export function demoteUnsupportedFlag(
+  flags: RiskFlag[],
+  unverifiable: Unverifiable | null,
+): RiskFlag[] {
+  if (!unverifiable) return flags;
+  return flags.map((f) =>
+    f.kind === "unsupported-claim"
+      ? {
+          ...f,
+          severity: "info" as const,
+          kind: "not-verifiable",
+          message: f.message.replace(
+            /with no supporting evidence in the diff$/,
+            "not checkable against this repo's diff",
+          ),
+        }
+      : f,
+  );
+}
+
 export function computeScores(
   results: ClaimResult[],
   churnCoveredRatio: number | null,
   flags: RiskFlag[],
-  sourceless = false,
+  unverifiable = false,
 ): Scores {
   const all = results.filter((r) => r.claim.kind === "change");
-  // A diff without source files cannot support any claim about behaviour.
-  // Scoring those `no-evidence` verdicts as 0 — the same value a *contradicted*
-  // claim gets — would rank a closed-source or docs-only release exactly like a
-  // fabricated one. They drop out of the ratio instead of counting against it.
-  const change = sourceless ? all.filter((r) => r.verdict !== "no-evidence") : all;
+  // Claims nobody could have checked must not score 0 — that is the value a
+  // *contradicted* claim gets, and it would rank a docs-only or fork release
+  // exactly like a fabricated one. They drop out of the ratio instead.
+  const change = unverifiable ? all.filter((r) => r.verdict !== "no-evidence") : all;
   // Auto-generated PR-list entries are true by construction (generated from
   // the same commits we check) — they carry little weight; handwritten claims
   // are where release notes can actually lie.
@@ -383,6 +452,13 @@ export function computeScores(
   if (results.some((r) => r.verdict === "contradicted")) overall = Math.min(overall, 35);
   else if (flags.some((f) => f.severity === "critical")) overall = Math.min(overall, 45);
 
+  // Every checkable claim dropped out: correctness 100 means "nothing was
+  // found wrong", not "the notes were checked and hold". Calling that "solid"
+  // would be the mirror of the bug this carve-out fixes — the score must read
+  // as unknown, not as a clean bill of health.
+  if (unverifiable && !change.length && all.length) {
+    return { correctness, completeness, risk, overall, label: "unverified" };
+  }
   const label =
     overall >= 85 ? "solid" : overall >= 65 ? "minor gaps" : overall >= 45 ? "questionable" : "suspicious";
   return { correctness, completeness, risk, overall, label };
@@ -472,12 +548,15 @@ export function computeMetrics(opts: {
     churnCoveredRatio = total ? covered / total : 1;
   }
 
-  const sourcelessDiff = isSourcelessDiff(data.files);
-  const flags = buildFlags(data, results, coverage, files, sourcelessDiff);
-  if (opts.baseline) flags.push(...baselineFlags(data, coverage, opts.baseline));
+  const measured = buildFlags(data, results, coverage, files);
+  if (opts.baseline) measured.push(...baselineFlags(data, coverage, opts.baseline));
+  // Classify against the flags as measured — a critical finding about THIS
+  // release outranks any benign pattern in the repo's history.
+  const unverifiable = classifyUnverifiable(data, results, measured, opts.baseline ?? null);
+  const flags = demoteUnsupportedFlag(measured, unverifiable);
   const order = { critical: 0, warn: 1, info: 2 };
   flags.sort((a, b) => order[a.severity] - order[b.severity]);
-  const scores = computeScores(results, churnCoveredRatio, flags, sourcelessDiff);
+  const scores = computeScores(results, churnCoveredRatio, flags, unverifiable !== null);
 
   let baseline: Metrics["baseline"] = null;
   if (opts.baseline?.snapshots.length) {
@@ -490,5 +569,5 @@ export function computeMetrics(opts: {
       medianAnchoredCoverage: coverages[Math.floor(coverages.length / 2)],
     };
   }
-  return { scores, flags, files, churnCoveredRatio, context, baseline, sourcelessDiff };
+  return { scores, flags, files, churnCoveredRatio, context, baseline, unverifiable };
 }
