@@ -24,9 +24,18 @@ function section(name) {
   return "";
 }
 
-/** Strip HTML comments — template guidance must not count as filled in. */
+/**
+ * Strip HTML comments — template guidance must not count as filled in.
+ *
+ * An unterminated `<!--` swallows the rest rather than surviving the strip.
+ * Matching only balanced pairs left it in place together with the guidance it
+ * opens — and this text is measured to decide whether a section was answered,
+ * so the template's own prose then counted as the author's. Nesting was never
+ * the problem the scanner suggested: the lazy match already takes
+ * `<!--<!-- x -->` whole.
+ */
 function stripComments(text) {
-  return text.replace(/<!--[\s\S]*?-->/g, "").trim();
+  return text.replace(/<!--[\s\S]*?(?:-->|$)/g, "").trim();
 }
 
 const claimsBlock = body.match(/<!--\s*self-check:begin\s*-->([\s\S]*?)<!--\s*self-check:end\s*-->/i)?.[1];

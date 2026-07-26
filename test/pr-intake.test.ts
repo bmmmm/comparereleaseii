@@ -62,3 +62,18 @@ test("the intake table reports the script's own verdict, not the body's", async 
   assert.ok(!table.includes("| ✓ | Tests | answered |"), "body text reached the verdict table");
   assert.match(table, /\| ○ \| Tests \|/, "the real Tests row is missing");
 });
+
+// Matching only balanced pairs left an unterminated `<!--` in place, and the
+// text it opens is the template's own guidance — which then counted as the
+// author's answer. Nesting is not the case here: the lazy match already
+// swallows `<!--<!-- x -->` whole.
+test("an unterminated comment does not count as a filled-in section", async () => {
+  // The stripped text is never printed, only measured, so the character count
+  // is where a surviving opener shows up.
+  const open = await intake("## What and why\n\n<!-- guidance that never closes\n");
+  assert.match(open, /\| ○ \| What and why \| empty \|/);
+
+  // A closed comment still leaves the real answer alone.
+  const answered = await intake("## What and why\n\n<!-- guidance -->\n" + "x".repeat(60) + "\n");
+  assert.match(answered, /\| ✓ \| What and why \| 60 characters \|/);
+});
