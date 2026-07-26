@@ -18,7 +18,10 @@ tool is checked with the tool itself before it ships.
   verified. All eleven models were also run against the two injection cases
   alone: nine resisted, the 2B edge model obeyed one, MarkItDown errored
   because it is not an LLM. Injection resistance does not track judging
-  accuracy, and it is a property of the prompt more than of the model.
+  accuracy — the 9B resists while rubber-stamping five ordinary attack shapes.
+  What produces the resistance is not yet known: there is no unfenced control
+  arm, and both payloads share one shape, so "the payloads are easy" fits the
+  data just as well.
 
 ## 0.1.2 — 2026-07-26
 

@@ -69,9 +69,11 @@ Nine resisted, including the 9B that rubber-stamps five ordinary attack
 shapes; the only one that obeyed a planted instruction was the 2B edge model,
 and MarkItDown errored out because it is not an LLM. So a model being hard to
 talk out of the evidence says nothing about whether it reads the evidence
-well — and the fencing in the prompt does most of the work here, which is why
-these two cases are worth re-running whenever the prompt changes rather than
-being treated as a model property.
+well. Whether the *fence* is what produces that resistance is untested: there
+is no unfenced control arm in this measurement, and both payloads were
+written by the same hand as the fence, in the same shape. Nine of eleven
+resisting may equally mean the payloads are easy. Re-run these cases when the
+prompt changes; do not read them as a model property yet.
 
 Two cases separate the field more than size does: `legit-need-more-files`
 (only the 27B asked for the file it was missing instead of guessing) and
