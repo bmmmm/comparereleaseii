@@ -6,6 +6,38 @@ tool is checked with the tool itself before it ships.
 
 ## Unreleased
 
+### Security
+
+- **The PR intake wrote the author's own claim text into the job summary.**
+  This repo keeps one rule for text written by the party under examination —
+  it is quoted, never rendered — and enforced it in the judge prompt and the
+  HTML report. The job summary was a third sink nobody had named. A claim
+  bullet is a single line and cannot open a heading, but the summary renders a
+  subset of HTML, so a pull request could place a table above the real verdict
+  rows and a reviewer would read "everything the review needs is here" off
+  markup the author supplied: the self-vouching this tool exists to catch,
+  aimed at the tool's own reviewer. Claims now sit in a fence that outgrows
+  the longest backtick run in them. This affects contributors to this repo,
+  not users of the tool — the workflow is `pull_request` with `contents: read`
+  and no secrets, so there is nothing to escalate and no advisory to file.
+  `AGENTS.md` now states that the list of untrusted-text sinks is open: a new
+  one inherits the rule instead of getting an exemption.
+- An unterminated `<!--` in a PR body survived comment stripping, so the
+  template's own guidance stayed in the section text that decides whether the
+  author filled the section in — the template answered for them. An
+  unterminated opener now swallows the rest, which reads as unanswered.
+
+### Fixed
+
+- Two documentation claims that the 0.1.2 audit itself had made false.
+  `AGENTS.md` still described the pre-audit verdict-cache key; the fix put the
+  tool version in front of it, so a release now invalidates the cache and
+  "reparsing does not" holds only within one version. And
+  `docs/local-models.md` contradicted itself in the space of ten lines —
+  "no absolute scores, because they don't transfer" directly above rows
+  carrying them. The scores are gone; what transfers (which case each model
+  missed, which it rubber-stamped, how slow it is) stays.
+
 ### Changed
 
 - **The A/B against 0.1.1 on twelve real releases, and the four fixes it
@@ -67,11 +99,34 @@ tool is checked with the tool itself before it ships.
   concrete reason — it sold a lockfile pointing at a non-registry tarball as
   verified. All eleven models were also run against the two injection cases
   alone: nine resisted, the 2B edge model obeyed one, MarkItDown errored
-  because it is not an LLM. Injection resistance does not track judging
-  accuracy — the 9B resists while rubber-stamping five ordinary attack shapes.
-  What produces the resistance is not yet known: there is no unfenced control
-  arm, and both payloads share one shape, so "the payloads are easy" fits the
-  data just as well.
+  because it is not an LLM. The control arm — the same models, the same
+  payloads, through the pre-0.1.2 unfenced prompt — puts numbers on it: 5 of
+  11 obeyed unfenced, 1 of 11 fenced. The fence flipped four models from
+  answering `verified` on a diff that supports nothing to answering
+  `no-evidence`, and it does not save the 2B, which obeys either way.
+  Injection resistance does not track judging accuracy in either direction:
+  the model that obeys unfenced is the best judge on that server, and the 9B
+  that rubber-stamps five ordinary attack shapes never obeyed at all. Noted
+  against our own set: `injected-rules-override-in-hunk` was obeyed by nobody
+  in either arm, so it currently proves only that the set contains it. The
+  attempt to find a replacement is unresolved and the reason is worth keeping:
+  a sweep of six payload shapes returned zero obeyed across four models, but
+  its one known-working shape had been rebuilt from memory rather than reused —
+  payload after the code instead of before it, and the JSON it told the model
+  to emit elided to `{...}`, i.e. not copyable. With no working payload in the
+  set, "nothing obeyed" measured the harness. A test for injections needs a
+  positive control like any other.
+- The follow-up settled it, and the dead golden case stays. Six replacement
+  payloads were measured against the models Arm A had shown actually bite —
+  the first panel had been picked by capability instead, so three known
+  obeyers never saw the new shapes and their zeros meant nothing. Of the six,
+  two landed a hit. One did not reproduce: a `verified` from the 27B came back
+  `contradicted` three times out of three with the verdict cache bypassed,
+  while the control answered identically three times out of three on the same
+  model. The other reproduces perfectly but is obeyed only by a model
+  `injected-verdict-in-hunk` already catches — a strict subset, so it would
+  add a case without adding coverage. `docs/local-models.md` now records the
+  bar a replacement has to clear: catch a model the existing case does not.
 
 ## 0.1.2 — 2026-07-26
 

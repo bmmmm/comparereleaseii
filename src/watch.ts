@@ -383,7 +383,16 @@ async function saveState(path: string, state: WatchState): Promise<void> {
   await rename(tmp, path);
 }
 
-function runNotify(cmd: string, jsonPath: string): Promise<void> {
+/**
+ * `cmd` is the operator's own shell string — running it is the feature. The
+ * report path is not: it carries a repo key and a tag, both from the config
+ * and the forge. It is therefore passed as a positional argument and read back
+ * as `"$1"`, never interpolated — the shell parses the operator's command and
+ * nothing else. Writing `${cmd} ${jsonPath}` here would hand a crafted tag a
+ * shell; the two sanitizers upstream (`safeSegment`, `sanitizeTag`) would then
+ * be the only thing left, and defence in depth is the point.
+ */
+export function runNotify(cmd: string, jsonPath: string): Promise<void> {
   return new Promise((done) => {
     const child = spawn("sh", ["-c", `${cmd} "$1"`, "sh", jsonPath], {
       stdio: ["ignore", "inherit", "inherit"],

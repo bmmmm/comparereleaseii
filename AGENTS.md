@@ -59,8 +59,12 @@ not add a dependency, a build step, or a framework.
   headings, commit subjects, file paths, diff hunks, tags, refs — is written by
   the party under examination. In a prompt it goes inside the untrusted markers
   (`untrustedBlock` in `src/judge.ts`); in HTML it goes through `esc()`, and in
-  an `href` through the URL helpers as well. There is no field here that is
-  "obviously safe".
+  an `href` through the URL helpers as well. The same holds for a PR body in a
+  workflow: `.github/scripts/pr-intake.mjs` quotes it into a fence before it
+  reaches the job summary, so the author cannot forge the verdict table a
+  reviewer reads. There is no field here that is "obviously safe", and the list
+  of sinks is not closed — a new one inherits the rule, it does not get an
+  exemption.
 - No claim may reach `verified` because the notes agree with the commit
   message. Both come from the same hand; only the diff is evidence.
 - Change scoring and you change the README's validation table. Re-measure the
@@ -70,16 +74,22 @@ not add a dependency, a build step, or a framework.
 - Comment only what the code cannot say — a constraint, a workaround, a
   surprising behaviour. The existing comments are the model: they explain *why*.
 - Match the surrounding style. No new abstraction layer for a single call site.
+- Push to `origin` (the private forge) as you go; push to the `github` remote
+  **only when cutting a release**. The public mirror is a record of releases,
+  not a live feed of work in progress — and every push to it is one more
+  chance for the pre-push leak gate to be the last line of defence rather
+  than a backstop. The gate is not a licence to push often.
 
 ## Traps
 
 - **Verdict spelling.** Internally and on the CLI it is `no-evidence`. The judge
   prompt asks the model for `no_evidence`, and `src/judge.ts` normalises both.
   This is intentional — do not "unify" it.
-- **The verdict cache.** The key is `sha256(engineName + prompt)`. Editing the
-  prompt invalidates entries automatically; changing how a *response is parsed*
-  does not, so old entries get re-read by your new parser. Verify parser changes
-  with `--no-cache`.
+- **The verdict cache.** The key is `sha256(version + engineName + prompt)`, and
+  the entry repeats all three so a stale file cannot be replayed under a new one.
+  Editing the prompt invalidates entries automatically, and so does a release;
+  changing how a *response is parsed* within one version does not, so old entries
+  get re-read by your new parser. Verify parser changes with `--no-cache`.
 - **Small-model tolerance.** The response parser deliberately accepts truncated
   and malformed JSON, and requests carry defaults for hidden thinking budgets.
   Tightening this breaks local models — read the comments in `src/judge.ts`

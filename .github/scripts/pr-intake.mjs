@@ -24,9 +24,18 @@ function section(name) {
   return "";
 }
 
-/** Strip HTML comments — template guidance must not count as filled in. */
+/**
+ * Strip HTML comments — template guidance must not count as filled in.
+ *
+ * An unterminated `<!--` swallows the rest rather than surviving the strip.
+ * Matching only balanced pairs left it in place together with the guidance it
+ * opens — and this text is measured to decide whether a section was answered,
+ * so the template's own prose then counted as the author's. Nesting was never
+ * the problem the scanner suggested: the lazy match already takes
+ * `<!--<!-- x -->` whole.
+ */
 function stripComments(text) {
-  return text.replace(/<!--[\s\S]*?-->/g, "").trim();
+  return text.replace(/<!--[\s\S]*?(?:-->|$)/g, "").trim();
 }
 
 const claimsBlock = body.match(/<!--\s*self-check:begin\s*-->([\s\S]*?)<!--\s*self-check:end\s*-->/i)?.[1];
@@ -133,8 +142,33 @@ const lines = [
   "",
 ];
 
+/**
+ * Render PR-body text so it cannot forge the summary around it.
+ *
+ * The job summary is the third sink for text written by the party under
+ * examination, next to the judge prompt and the HTML report — and the only
+ * one that had no fence. A claim bullet is a single line, so it cannot open
+ * a heading, but it can carry the HTML subset the summary renders and fake a
+ * verdict row above the real ones. A reviewer reading "everything is here"
+ * off a table the PR author wrote is precisely the self-vouching this repo
+ * exists to catch.
+ *
+ * The fence outgrows the longest backtick run in the content, so the text
+ * cannot close it either.
+ */
+function quoted(text) {
+  const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((m) => m[0].length));
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return [fence, text, fence];
+}
+
 if (claims.length && !claimsArePlaceholder) {
-  lines.push("### Claims to be checked against the diff", "", ...claims.map((c) => c.replace(/^[*+-]\s+/, "- ")), "");
+  lines.push(
+    "### Claims to be checked against the diff",
+    "",
+    ...quoted(claims.map((c) => c.replace(/^[*+-]\s+/, "- ")).join("\n")),
+    "",
+  );
 }
 
 if (summaryFile) await appendFile(summaryFile, lines.join("\n"));
