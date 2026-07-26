@@ -1,0 +1,39 @@
+name: judge-eval
+
+# Drift alarm for the default judge: silent model updates and our own prompt
+# edits must not degrade golden-set accuracy or, worse, start rubber-stamping
+# unsupported claims. Monthly + on demand; needs the ANTHROPIC_API_KEY secret.
+on:
+  schedule:
+    - cron: "23 6 3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Calibrate the default judge against the golden set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          node src/cli.ts --calibrate --engine api --no-cache --json cal.json || true
+          total="$(jq '.outcomes | length' cal.json)"
+          passed="$(jq '.passed' cal.json)"
+          over="$(jq '.overVerified' cal.json)"
+          {
+            echo "## Judge calibration - $(jq -r '.engine' cal.json)"
+            echo ""
+            echo "passed $passed/$total, over-verified $over"
+            echo ""
+            jq -r '.outcomes[] | "- \(if .pass then "PASS" else "FAIL" end) \(.name): got \(.got), expected \(.expected | join("/"))"' cal.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "passed=$passed/$total over-verified=$over"
+          # Red on any rubber-stamping, or more than 2 misses.
+          [ "$over" -eq 0 ] && [ "$passed" -ge "$((total - 2))" ]

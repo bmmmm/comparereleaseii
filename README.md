@@ -104,7 +104,8 @@ Touched functions are extracted from unified-diff hunk headers and shown as
 evidence labels (`fns: register_access, should_block_host`).
 
 On top of the per-claim verdicts, every run computes an explainable **trust
-score** (0–100) from three components:
+score** (0–100, exact semantics in [SCORING.md](SCORING.md)) from three
+components:
 
 - **correctness** — share of change claims the diff supports
 - **completeness** — share of the churn (line-weighted) covered by the notes

