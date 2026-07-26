@@ -13,7 +13,24 @@ function esc(s: string): string {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/**
+ * Refs are hostile: `git check-ref-format` accepts a tag called
+ * `v1.0"><img/src=x/onerror=…>`, and that tag reaches us as `headRef`
+ * straight from the release API. Percent-encode the ref, then escape the
+ * whole URL for the attribute it is going into.
+ */
+function commitUrl(linkBase: string, sha: string): string {
+  return esc(`${linkBase}/commit/${encodeURIComponent(sha)}`);
+}
+
+function compareUrlOf(linkBase: string, baseRef: string, headRef: string): string {
+  return esc(
+    `${linkBase}/compare/${encodeURIComponent(baseRef)}...${encodeURIComponent(headRef)}`,
+  );
 }
 
 const VERDICT_COLOR: Record<Verdict, string> = {
@@ -185,8 +202,8 @@ function flagsHtml(flags: RiskFlag[], linkBase?: string): string {
       const shas = f.commitShas
         .map((s) =>
           linkBase
-            ? `<a href="${linkBase}/commit/${s}">${s.slice(0, 8)}</a>`
-            : s.slice(0, 8),
+            ? `<a href="${commitUrl(linkBase, s)}">${esc(s.slice(0, 8))}</a>`
+            : esc(s.slice(0, 8)),
         )
         .join(", ");
       return `<div class="flag" style="border-left-color:${sevColor[f.severity]}"><b>${f.severity.toUpperCase()}</b> ${esc(f.message)}${
@@ -209,7 +226,7 @@ function claimsHtml(report: Report, linkBase?: string): string {
     const commits = r.evidence.commitShas
       .slice(0, 3)
       .map((s) =>
-        linkBase ? `<a href="${linkBase}/commit/${s}">${s.slice(0, 8)}</a>` : s.slice(0, 8),
+        linkBase ? `<a href="${commitUrl(linkBase, s)}">${esc(s.slice(0, 8))}</a>` : esc(s.slice(0, 8)),
       )
       .join(", ");
     const body =
@@ -261,7 +278,7 @@ export function toHtml(report: Report): string {
         .join(" · ")
     : "n/a";
   const compareUrl = report.linkBase
-    ? `${report.linkBase}/compare/${report.baseRef}...${report.headRef}`
+    ? compareUrlOf(report.linkBase, report.baseRef, report.headRef)
     : undefined;
   const hasSuggestions = report.uncovered.some((u) => u.suggestedNote);
   const uncoveredRows = report.uncovered
@@ -269,8 +286,8 @@ export function toHtml(report: Report): string {
       (u) =>
         `<tr><td>${
           report.linkBase
-            ? `<a href="${report.linkBase}/commit/${u.commit.sha}">${u.commit.sha.slice(0, 8)}</a>`
-            : u.commit.sha.slice(0, 8)
+            ? `<a href="${commitUrl(report.linkBase, u.commit.sha)}">${esc(u.commit.sha.slice(0, 8))}</a>`
+            : esc(u.commit.sha.slice(0, 8))
         }</td><td>${esc(u.commit.subject)}</td><td>+${u.additions}/−${u.deletions}</td><td>${u.fileCount}</td>${
           hasSuggestions ? `<td>${u.suggestedNote ? esc(u.suggestedNote) : "—"}</td>` : ""
         }</tr>`,

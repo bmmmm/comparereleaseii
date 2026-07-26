@@ -114,7 +114,8 @@ test("toWatchIndexHtml distinguishes an unverifiable release from a score collap
   };
   const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z");
   assert.ok(html.includes("out of repo"), "badge names the shape");
-  assert.ok(html.includes("not in this repo's own diff"), "title explains it");
+  // Apostrophes are escaped now — an attribute value must not be closable.
+  assert.ok(html.includes("not in this repo&#39;s own diff"), "title explains it");
   assert.equal(html.match(/class="tag"/g)?.length, 1, "only the fork row is tagged");
 });
 
