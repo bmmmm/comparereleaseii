@@ -46,6 +46,42 @@ test("newDependencies finds added deps, ignores version bumps and lockfiles", ()
   assert.deepEqual(newDependencies(pkg), ["evil-pkg"]);
 });
 
+test("newDependencies reads package.json blocks, not top-level metadata", () => {
+  // Whole-file diff (e.g. a first release): meta keys and scripts have
+  // version-looking values but are not dependencies.
+  const wholeFile = file(
+    "package.json",
+    [
+      "@@ -0,0 +1,14 @@",
+      "+{",
+      '+  "name": "demo",',
+      '+  "version": "0.1.0",',
+      '+  "license": "GPL-3.0-or-later",',
+      '+  "packageManager": "pnpm@11.13.0",',
+      '+  "engines": {',
+      '+    "node": ">=24"',
+      "+  },",
+      '+  "scripts": {',
+      '+    "build": "vite build --base=/v2/"',
+      "+  },",
+      '+  "devDependencies": {',
+      '+    "typescript": "^7.0.2"',
+      "+  }",
+      "+}",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual(newDependencies(wholeFile), ["typescript"]);
+
+  // Small hunk without the block opener in context: versioned lines count,
+  // minus the well-known top-level keys.
+  const noOpener = file(
+    "package.json",
+    '@@ -12,2 +12,3 @@\n     "left-pad": "^1.3.0",\n+    "lodash": "^4.17.21",\n     "ms": "^2.1.3",\n',
+  );
+  assert.deepEqual(newDependencies(noOpener), ["lodash"]);
+});
+
 test("opacityIssue flags binaries, minified blobs and install hooks", () => {
   assert.equal(
     opacityIssue({ path: "vendor/blob.so", status: "added", additions: 0, deletions: 0 }),

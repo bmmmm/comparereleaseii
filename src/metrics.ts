@@ -47,7 +47,8 @@ function depName(line: string, path: string): string | null {
     return trimmed.match(/^([\w-]+)\s*=\s*(?:"[\^~=]?\d|\{.*version)/)?.[1] ?? null;
   }
   if (/package\.json$/.test(path)) {
-    return trimmed.match(/^"((?:@[\w.-]+\/)?[\w.-]+)"\s*:\s*"[^"]*\d/)?.[1] ?? null;
+    // Handled by packageJsonDeps — needs block context, not a single line.
+    return null;
   }
   if (/go\.mod$/.test(path)) {
     return trimmed.match(/^(?:require\s+)?([\w./-]+\.[\w./-]+)\s+v\d/)?.[1] ?? null;
@@ -58,10 +59,62 @@ function depName(line: string, path: string): string | null {
   return null;
 }
 
+/** Well-known top-level package.json keys whose values can look like versions. */
+const PKG_JSON_META_KEYS = new Set([
+  "name", "version", "description", "license", "type", "main", "module",
+  "types", "browser", "packageManager", "node", "npm", "pnpm", "yarn",
+  "homepage", "repository", "bugs", "author", "private", "sideEffects",
+]);
+
+/**
+ * package.json dependency names on one diff side. A dependency is a line
+ * inside a `*dependencies` block — tracked via the `"key": {` openers visible
+ * in the hunk. In small hunks whose opener fell outside the context lines the
+ * section is unknown; then any versioned `"name": "…"` line counts, minus the
+ * well-known top-level keys.
+ */
+function packageJsonDeps(patch: string, sign: "+" | "-"): string[] {
+  const names: string[] = [];
+  let section: string | null = null;
+  let sectionIndent = 0;
+  for (const raw of patch.split("\n")) {
+    if (raw.startsWith("@@")) {
+      section = null;
+      continue;
+    }
+    if (!/^[+\- ]/.test(raw) || raw.startsWith("+++") || raw.startsWith("---")) continue;
+    const line = raw.slice(1);
+    const opener = line.match(/^(\s*)"([\w.-]+)"\s*:\s*[{[]\s*$/);
+    if (opener) {
+      section = opener[2];
+      sectionIndent = opener[1].length;
+      continue;
+    }
+    const close = line.match(/^(\s*)[}\]]/);
+    if (section !== null && close && close[1].length <= sectionIndent) {
+      section = null;
+      continue;
+    }
+    if (!raw.startsWith(sign)) continue;
+    const inDeps = section !== null && /dependencies$/i.test(section);
+    const unknownSection = section === null;
+    if (!inDeps && !unknownSection) continue;
+    const m = line.trim().match(/^"((?:@[\w.-]+\/)?[\w.-]+)"\s*:\s*"[^"]*\d/);
+    if (!m) continue;
+    if (unknownSection && PKG_JSON_META_KEYS.has(m[1])) continue;
+    names.push(m[1]);
+  }
+  return names;
+}
+
 /** Heuristic: dependency names added to a manifest in this diff. */
 export function newDependencies(file: DiffFile): string[] {
   if (!file.patch || !DEP_MANIFEST.test(file.path)) return [];
   if (/\.(lock|sum)$|-lock\.(json|yaml)$|Pipfile\.lock$/.test(file.path)) return [];
+  if (/package\.json$/.test(file.path)) {
+    const removed = new Set(packageJsonDeps(file.patch, "-"));
+    return [...new Set(packageJsonDeps(file.patch, "+"))].filter((n) => !removed.has(n));
+  }
   // A version bump shows the same dependency name on a removed line — parse
   // both sides with the same format-aware extractor (a substring check misses
   // go.mod's "name vX.Y.Z" layout and fabricates "new" dependencies).
