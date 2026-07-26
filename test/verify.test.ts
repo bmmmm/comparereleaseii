@@ -3,7 +3,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isGeneratedEntry, isVagueClaim, medianVerdict } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
-import { parseSurplusOutput, parseJudgeResponse, type JudgeVerdict } from "../src/judge.ts";
+import {
+  parseSurplusOutput,
+  parseJudgeResponse,
+  selectEngine,
+  type JudgeVerdict,
+} from "../src/judge.ts";
 import { withVerdictCache } from "../src/cache.ts";
 import type { Claim, Commit } from "../src/types.ts";
 
@@ -104,6 +109,12 @@ test("withVerdictCache: second call with the same prompt hits the disk", async (
   const second = await engine.judge(prompt);
   assert.equal(first, second);
   assert.equal(calls, 1);
+});
+
+test("selectEngine: openai needs an explicit model, then builds the engine", () => {
+  assert.throws(() => selectEngine({ engine: "openai" }), /--model/);
+  const engine = selectEngine({ engine: "openai", model: "qwen3:8b" });
+  assert.equal(engine?.name, "openai/qwen3:8b");
 });
 
 test("parseSurplusOutput validates and caps items", () => {

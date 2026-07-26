@@ -36,8 +36,11 @@ Options:
   --notes-file <file> Check this notes file instead of the published notes
                       (for --local the default is the CHANGELOG.md section)
   --judge <mode>      auto | all | off (default: auto — LLM only for unclear claims)
-  --engine <engine>   claude-cli | api | off (default: claude-cli)
-  --model <model>     Judge model (default: haiku)
+  --engine <engine>   claude-cli | api | openai | off (default: claude-cli;
+                      openai = any OpenAI-compatible server: Ollama, MLX, vLLM)
+  --model <model>     Judge model (default: haiku; required for --engine openai)
+  --openai-url <url>  Base URL for --engine openai
+                      (default: $OPENAI_BASE_URL or http://127.0.0.1:11434/v1)
   --md <file>         Write a markdown report
   --json <file>       Write the full JSON report
   --html <file>       Write a self-contained visual HTML report
@@ -52,7 +55,8 @@ Options:
   -h, --help          Show this help
 
 Examples:
-  comparerelease dani-garcia/vaultwarden --tag 1.37.0
+  comparerelease restic/restic --tag v0.19.1
+  comparerelease juanfont/headscale --estimate
   comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0 --notes-file notes.md
 `;
 
@@ -68,6 +72,7 @@ async function main(): Promise<number> {
       judge: { type: "string", default: "auto" },
       engine: { type: "string", default: "claude-cli" },
       model: { type: "string" },
+      "openai-url": { type: "string" },
       md: { type: "string" },
       json: { type: "string" },
       html: { type: "string" },
@@ -88,12 +93,12 @@ async function main(): Promise<number> {
   }
 
   const judgeMode = values.judge as "auto" | "all" | "off";
-  const engineName = values.engine as "claude-cli" | "api" | "off";
+  const engineName = values.engine as "claude-cli" | "api" | "openai" | "off";
   if (!["auto", "all", "off"].includes(judgeMode)) {
     throw new Error(`--judge must be auto, all or off (got "${values.judge}")`);
   }
-  if (!["claude-cli", "api", "off"].includes(engineName)) {
-    throw new Error(`--engine must be claude-cli, api or off (got "${values.engine}")`);
+  if (!["claude-cli", "api", "openai", "off"].includes(engineName)) {
+    throw new Error(`--engine must be claude-cli, api, openai or off (got "${values.engine}")`);
   }
   const failOn = values["fail-on"] as "none" | "contradicted" | "no-evidence";
   if (!["none", "contradicted", "no-evidence"].includes(failOn)) {
@@ -217,7 +222,13 @@ async function main(): Promise<number> {
     }
   }
   let engine =
-    judgeMode === "off" ? null : selectEngine({ engine: effectiveEngine, model: values.model });
+    judgeMode === "off"
+      ? null
+      : selectEngine({
+          engine: effectiveEngine,
+          model: values.model,
+          openaiUrl: values["openai-url"],
+        });
   if (engine && !values["no-cache"]) engine = withVerdictCache(engine);
   const baselineCount = Number(values.baseline);
   const baselinePromise =

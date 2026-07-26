@@ -4,16 +4,27 @@ Fact-check release notes against the actual code diff.
 
 ## Quick start
 
+Works with any GitHub repository or local git clone — pick a repo, pick a
+release, get a verdict:
+
 ```console
 $ git clone https://github.com/bmmmm/comparereleaseii && cd comparereleaseii
 $ pnpm install
-$ node src/cli.ts dani-garcia/vaultwarden --tag 1.37.0 --html report.html
+$ node src/cli.ts restic/restic --tag v0.19.1 --html report.html
 ```
 
 Requires Node ≥ 24 and an authenticated [`gh`](https://cli.github.com). With
 the [`claude`](https://code.claude.com) CLI (or `ANTHROPIC_API_KEY`) you get
 LLM-judged verdicts; without either, the tool degrades gracefully to the
 deterministic stages. `--estimate` previews the effort before the first run.
+
+Fully local judging works via any OpenAI-compatible server (Ollama, MLX,
+LM Studio, vLLM) — nothing leaves your machine:
+
+```console
+$ node src/cli.ts owner/repo --engine openai --model qwen3:8b
+$ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine openai --model my-model
+```
 
 Release notes are claims. This tool verifies them: it takes a release, splits
 the notes into atomic claims, and checks each claim against the real diff
@@ -90,8 +101,8 @@ tag     date        commits  files  ±churn  claims  anchored  sensitive        
 ## Usage
 
 ```console
-$ node src/cli.ts dani-garcia/vaultwarden --tag 1.37.0
-$ node src/cli.ts --local ~/src/myrepo --base v1.2.0 --head v1.3.0
+$ node src/cli.ts juanfont/headscale                                  # latest release
+$ node src/cli.ts --local ~/src/myrepo --base v1.2.0 --head v1.3.0    # local clone
 $ node src/cli.ts owner/repo --tag v2.0 --notes-file draft-notes.md   # check a draft
 ```
 
@@ -126,7 +137,20 @@ ring, verdict bar, risk flags, and a treemap of the diff — tile size = changed
 lines, color = documentation status, amber border = sensitive path. An
 undocumented change in an auth path is one big red amber-bordered tile.
 
-## Example
+## Validated against real releases
+
+The checker is release-note-dialect agnostic — validated against GitHub's
+auto-generated PR lists, handwritten security sections, Keep-a-Changelog
+files, setext/issue-anchored notes (restic) and full sha-list changelogs
+(headscale):
+
+| Release | Notes style | Score |
+|---|---|---|
+| headscale v0.29.2 | prose + full sha list | 96 (solid) |
+| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 91 (solid) |
+| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 90 (solid) |
+| vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (minor gaps) |
+| vaultwarden 1.37.0, fabricated notes | — | 5 (suspicious), exit 1 |
 
 Checking vaultwarden 1.37.0 (45 claims, 27 commits, 90 files) finds concrete
 evidence for security claims whose advisories are still private:

@@ -62,9 +62,49 @@ export function makeApiEngine(model: string, apiKey: string): JudgeEngine {
   };
 }
 
+/**
+ * OpenAI-compatible chat endpoint — covers Ollama, MLX servers, LM Studio,
+ * vLLM and friends. Local servers usually need no API key.
+ */
+export function makeOpenAiEngine(model: string, baseUrl: string, apiKey?: string): JudgeEngine {
+  const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  return {
+    name: `openai/${model}`,
+    async judge(prompt: string): Promise<string> {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          max_tokens: 1024,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      }).catch((err: Error) => {
+        throw new Error(
+          `Cannot reach ${url}: ${err.message}. Is the local model server running? (Ollama default: http://127.0.0.1:11434/v1 — override with --openai-url or OPENAI_BASE_URL)`,
+        );
+      });
+      if (!res.ok) {
+        throw new Error(`${url} returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      }
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = data.choices?.[0]?.message?.content;
+      if (!text) throw new Error(`${url} returned no message content`);
+      return text;
+    },
+  };
+}
+
 export function selectEngine(opts: {
-  engine: "claude-cli" | "api" | "off";
+  engine: "claude-cli" | "api" | "openai" | "off";
   model?: string;
+  openaiUrl?: string;
 }): JudgeEngine | null {
   if (opts.engine === "off") return null;
   if (opts.engine === "api") {
@@ -75,6 +115,16 @@ export function selectEngine(opts: {
       );
     }
     return makeApiEngine(opts.model ?? "claude-haiku-4-5-20251001", key);
+  }
+  if (opts.engine === "openai") {
+    if (!opts.model) {
+      throw new Error(
+        "Engine 'openai' needs an explicit --model (e.g. --model qwen3:8b for Ollama) — local servers have no default model.",
+      );
+    }
+    const baseUrl =
+      opts.openaiUrl ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
+    return makeOpenAiEngine(opts.model, baseUrl, process.env.OPENAI_API_KEY);
   }
   return makeClaudeCliEngine(opts.model ?? "haiku");
 }

@@ -20,7 +20,7 @@ interface GoldenCase {
 const goldenPath = join(dirname(fileURLToPath(import.meta.url)), "..", "test", "eval", "golden.json");
 const cases = JSON.parse(await readFile(goldenPath, "utf8")) as GoldenCase[];
 
-const engineName = (process.env.EVAL_ENGINE as "claude-cli" | "api") ?? "claude-cli";
+const engineName = (process.env.EVAL_ENGINE as "claude-cli" | "api" | "openai") ?? "claude-cli";
 let engine = selectEngine({ engine: engineName, model: process.env.EVAL_MODEL });
 if (!engine) throw new Error("eval needs a judge engine");
 if (!process.env.EVAL_NO_CACHE) engine = withVerdictCache(engine);
