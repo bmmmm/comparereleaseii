@@ -20,6 +20,9 @@ const CI_BUILD =
   /(^|\/)\.(github|gitlab|circleci|woodpecker)\/|(^|\/)(Dockerfile[^/]*|Makefile|justfile|build\.rs|setup\.py|\.pre-commit-config\.yaml|Jenkinsfile)$|\.(gradle|cmake)$/i;
 const AUTH_CRYPTO =
   /auth|crypto|token|password|passwd|secret|session|login|signin|permission|policy|acl|sanitiz|escape|csrf|ssrf|xss|jwt|oauth|sso|2fa|totp|webauthn|vault|key(chain|store)/i;
+const DOC_FILE = /\.(md|markdown|rst|txt|adoc|org)$/i;
+const TEST_FILE =
+  /(^|\/)([\w-]*tests?|__tests__|spec|specs|testdata|fixtures)\/|_test\.[a-z0-9]+$|\.(test|spec)\.[a-z0-9]+$/i;
 const BENIGN_BINARY = /\.(png|jpe?g|gif|svg|ico|webp|woff2?|ttf|eot|pdf)$/i;
 const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz|tar|7z)$/i;
 
@@ -27,6 +30,10 @@ const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz
 export function sensitiveCategory(path: string): string | null {
   if (DEP_MANIFEST.test(path)) return "dependencies";
   if (CI_BUILD.test(path)) return "ci/build";
+  // Docs and tests about auth are not auth code (AUTHORS.md, AI_POLICY.md,
+  // forwardauth_test.go would match the keyword list and cap honest releases
+  // at "questionable" — release notes never document test-only changes).
+  if (DOC_FILE.test(path) || TEST_FILE.test(path)) return null;
   if (AUTH_CRYPTO.test(path)) return "auth/crypto";
   return null;
 }

@@ -12,6 +12,15 @@ test("sensitiveCategory classifies by priority", () => {
   assert.equal(sensitiveCategory("src/auth/session.rs"), "auth/crypto");
   assert.equal(sensitiveCategory("src/api/icons.rs"), null);
   assert.equal(sensitiveCategory("README.md"), null);
+  // Documents about auth/policy are not auth code.
+  assert.equal(sensitiveCategory("AUTHORS.md"), null);
+  assert.equal(sensitiveCategory("AI_POLICY.md"), null);
+  assert.equal(sensitiveCategory("docs/oauth-setup.rst"), null);
+  // Neither are test files that mention auth in their path.
+  assert.equal(sensitiveCategory("caddytest/integration/forwardauth_test.go"), null);
+  assert.equal(sensitiveCategory("src/auth/session_test.go"), null);
+  assert.equal(sensitiveCategory("web/__tests__/login.spec.ts"), null);
+  assert.equal(sensitiveCategory("src/auth/session.go"), "auth/crypto");
 });
 
 function file(path: string, patch: string): DiffFile {
