@@ -495,6 +495,31 @@ and the two look identical from here.
   anything measured against real repos with an LLM judge needs repeated runs
   with independent caches, and a delta under ~10 points is not evidence.
 
+- **All four spent, same day.** `lockfile-source` skips a git source carrying
+  its resolved 40-hex commit (Handy back to 91); `contradicted` needs a second
+  voter; the `out-of-repo` bar moves to two thirds; `watch` carries the
+  check's warnings into state and index. Two things the fixing turned up that
+  the measurement had not:
+  - `bin/comparerelease.mjs` preferred `dist/` over `src/`, and only the
+    published tarball ships without `src/` — so in any checkout a `dist/` left
+    from an older `pnpm build` silently *was* the tool. The first verification
+    run of these very fixes reported v0.1.1's numbers out of a stale build.
+    `src/` wins now, with a behavioural test.
+  - `pnpm dogfood` asked for the CHANGELOG section named by package.json,
+    which between a release and the next bump is one already tagged — it
+    compared shipped notes against the diff that came after them and blamed
+    the notes (80/100). It reads `Unreleased` in that case now, and this
+    working tree scores 100.
+
+  One rejected alternative, so it is not re-proposed: deciding `out-of-repo`
+  on the deterministic `lexicalCoverage` instead of the judge's misses, which
+  would take the noise out of the gate entirely. Measured — it tracks note
+  *style*, not where code lives: sniffnet scores 0.15 and vaultwarden 0.31 on
+  releases that are neither forks nor distribution repos, because short
+  bullets and generated PR lists carry no identifiers. The threshold move is a
+  trade, not a clean fix, and zen-browser 1.21.9b — the case the carve-out was
+  built for — now reads `64 questionable`.
+
 ### 4.2 Forge-agnostic input: Forgejo, GitLab, and anything with git
 
 Today `owner/repo` means GitHub and nothing else, which rules out every

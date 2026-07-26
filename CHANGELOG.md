@@ -41,6 +41,13 @@ tool is checked with the tool itself before it ships.
     instead was measured and rejected — that number tracks note style, not
     where the code lives, and it would sweep in sniffnet (0.15) and
     vaultwarden (0.31), neither of which is a fork.
+  - **`pnpm dogfood` checks the `Unreleased` section once the version in
+    package.json is already tagged.** The gate's default base is the newest
+    tag, so between a release and the next version bump it was comparing the
+    shipped notes against the diff that came *after* them — every claim read
+    `no-evidence` and the gate told you to fix the notes. On this working
+    tree that was 80/100; the Unreleased section it should have been reading
+    scores 100.
   - **The launcher no longer lets a stale `dist/` shadow the working tree.**
     `bin/comparerelease.mjs` preferred `dist/` whenever it existed, and only
     the published tarball ships without `src/` — so in a checkout, a `dist/`

@@ -79,6 +79,14 @@ test("extractChangelogSection matches bare and v-prefixed headings", () => {
   // "0.1.0" must not match inside "10.1.0".
   const trap = "# Changelog\n\n## 10.1.0\n\n- Wrong section\n";
   assert.equal(extractChangelogSection(trap, "0.1.0"), null);
+
+  // The dogfood gate asks for "Unreleased" by name once package.json's
+  // version is already tagged — otherwise it would check shipped notes
+  // against the diff that came after them, and blame the notes for it.
+  const wip = "# Changelog\n\n## Unreleased\n\n- In flight\n\n## 0.1.2 — 2026-07-26\n\n- Shipped\n";
+  const unreleased = extractChangelogSection(wip, "Unreleased");
+  assert.ok(unreleased?.includes("In flight"));
+  assert.ok(!unreleased?.includes("Shipped"));
 });
 
 test("loadLocalRange with the empty tree covers the full history", async () => {

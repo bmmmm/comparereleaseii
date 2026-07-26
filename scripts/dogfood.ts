@@ -12,13 +12,29 @@ const MIN_SCORE = 90;
 
 const pkg = JSON.parse(await readFile("package.json", "utf8")) as { version: string };
 const changelog = await readFile("CHANGELOG.md", "utf8");
-const section = extractChangelogSection(changelog, pkg.version);
+
+// After a release and before the next version bump, package.json still names
+// a version that is already tagged — and the check's default base is the
+// newest tag, so asking for that section compares the shipped notes against
+// the diff that came *after* them. Every claim then reads no-evidence and the
+// gate blames the notes. What is actually in that range is the Unreleased
+// section, which is also the one worth checking while the work is going on.
+const released =
+  spawnSync("git", ["rev-parse", "-q", "--verify", `refs/tags/v${pkg.version}`], {
+    stdio: ["ignore", "ignore", "ignore"],
+  }).status === 0;
+const wanted = released ? "Unreleased" : pkg.version;
+const section = extractChangelogSection(changelog, wanted);
 if (!section) {
   console.error(
-    `CHANGELOG.md has no section for ${pkg.version} — write the release notes before releasing.`,
+    released
+      ? `v${pkg.version} is already tagged and CHANGELOG.md has no Unreleased section — ` +
+          "bump the version in package.json (and move Unreleased under it) before releasing."
+      : `CHANGELOG.md has no section for ${pkg.version} — write the release notes before releasing.`,
   );
   process.exit(2);
 }
+console.error(`dogfood: checking the "${wanted}" section against HEAD.\n`);
 
 const dir = await mkdtemp(join(tmpdir(), "comparereleaseii-dogfood-"));
 const notesFile = join(dir, "notes.md");
