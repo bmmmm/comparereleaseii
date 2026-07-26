@@ -155,3 +155,35 @@ test("one release the source cannot answer for does not cost the whole baseline"
   const snapshots = await buildSnapshots(source, { count: 5 });
   assert.deepEqual(snapshots.map((s) => s.tag), ["v2"]);
 });
+
+test("a snapshot cached by a different tool version is rebuilt, not served", async () => {
+  const { readdir, readFile: rf, writeFile: wf } = await import("node:fs/promises");
+  const repo = await repoWithHistory();
+  const source = cloneHistory({ dir: repo, slug: "team/app", cacheKey: "file:///history-version" });
+  const first = await buildSnapshots(source, { count: 5 });
+  assert.equal(first[0].lexicalCoverage, 1);
+
+  // Corrupt the cached numbers and stamp them with another version — the
+  // verdict cache learned this in 0.1.2; a formula change must not serve
+  // stale medians here either.
+  const dir = join(process.env.XDG_CACHE_HOME!, "comparereleaseii", "snapshots");
+  const mine = (await readdir(dir)).filter((f) => f.startsWith("file_history-version"));
+  assert.ok(mine.length >= 2, `expected cache files, got ${JSON.stringify(mine)}`);
+  for (const f of mine) {
+    const entry = JSON.parse(await rf(join(dir, f), "utf8"));
+    entry.version = "0.0.1-other";
+    entry.lexicalCoverage = 0.123;
+    await wf(join(dir, f), JSON.stringify(entry));
+  }
+  const rebuilt = await buildSnapshots(source, { count: 5 });
+  assert.notEqual(rebuilt[0].lexicalCoverage, 0.123, "stale cross-version snapshot was served");
+
+  // Same numbers under the CURRENT version stay served — the cache still works.
+  for (const f of mine) {
+    const entry = JSON.parse(await rf(join(dir, f), "utf8"));
+    entry.lexicalCoverage = 0.456;
+    await wf(join(dir, f), JSON.stringify(entry));
+  }
+  const cached = await buildSnapshots(source, { count: 5 });
+  assert.equal(cached[0].lexicalCoverage, 0.456, "same-version cache entry was not served");
+});

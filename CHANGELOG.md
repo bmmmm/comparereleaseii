@@ -12,6 +12,10 @@ tool is checked with the tool itself before it ships.
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number
   silently turned their feature off. All four now exit 2 with a message.
+- **Snapshot cache entries are stamped with the tool version.** Baseline
+  snapshots cached by an older version were served into the medians even
+  after a scoring-formula change; like the verdict cache (since 0.1.2), a
+  version mismatch now rebuilds the snapshot.
 - **A baseline that cannot be built at all now says so.** When the release
   listing itself failed (API down, unauthenticated), the anomaly baseline
   silently vanished and the report looked identical to "repo has too few

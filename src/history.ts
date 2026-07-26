@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { cacheDir, safeSegment } from "./paths.ts";
+import { cacheDir, safeSegment, VERSION } from "./paths.ts";
 import { pooled, c } from "./util.ts";
 import { parseClaims } from "./claims.ts";
 import { anchorMatch, lexicalMatch } from "./match.ts";
@@ -126,10 +126,14 @@ async function snapshotFor(
     : null;
   if (cacheFile) {
     try {
-      const cached = JSON.parse(await readFile(cacheFile, "utf8")) as ReleaseSnapshot;
-      // Snapshots written before a field existed would silently read as
-      // undefined and skew every median built from them — rebuild instead.
-      if (typeof cached.lexicalCoverage === "number") return cached;
+      const { version, ...cached } = JSON.parse(await readFile(cacheFile, "utf8")) as
+        ReleaseSnapshot & { version?: string };
+      // A snapshot is a bundle of formula outputs (coverage rules, lexical
+      // scoring, dependency heuristics) — all of which change across
+      // releases of this tool. The verdict cache learned in 0.1.2 that only
+      // a version stamp catches a changed formula; the field-presence check
+      // alone only catches an *added* field.
+      if (version === VERSION && typeof cached.lexicalCoverage === "number") return cached;
     } catch {
       // cache miss — build below
     }
@@ -168,7 +172,9 @@ async function snapshotFor(
   };
   if (cacheFile) {
     try {
-      await writeFile(cacheFile, JSON.stringify(snapshot), { mode: 0o600 });
+      await writeFile(cacheFile, JSON.stringify({ version: VERSION, ...snapshot }), {
+        mode: 0o600,
+      });
     } catch {
       // cache is best-effort
     }
