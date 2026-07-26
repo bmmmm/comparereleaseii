@@ -124,9 +124,11 @@ export function functionsOf(files: DiffFile[], cap = 8): string[] {
 }
 
 function changedLines(patch: string): string {
+  // File headers are exactly "+++ b/…"/"--- a/…" (with a space) — the
+  // space-less guard also dropped changed lines starting with ++ or --.
   return patch
     .split("\n")
-    .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+ |--- )/.test(l))
     .join("\n");
 }
 

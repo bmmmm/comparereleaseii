@@ -41,13 +41,18 @@ export function parseUnifiedDiff(diff: string): DiffFile[] {
     if (/^new file mode/m.test(chunk)) status = "added";
     else if (/^deleted file mode/m.test(chunk)) status = "removed";
     else if (/^rename from /m.test(chunk)) status = "renamed";
+    // Count only inside the hunks: before the first @@ live the +++/--- file
+    // headers, and a bare startsWith("+++") guard also ate added lines whose
+    // content starts with "++" (`++i;` arrives as `+++i;`).
+    const hunkStart = chunk.indexOf("\n@@");
     let additions = 0;
     let deletions = 0;
-    for (const line of chunk.split("\n")) {
-      if (line.startsWith("+") && !line.startsWith("+++")) additions++;
-      else if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+    if (hunkStart !== -1) {
+      for (const line of chunk.slice(hunkStart + 1).split("\n")) {
+        if (line.startsWith("+")) additions++;
+        else if (line.startsWith("-")) deletions++;
+      }
     }
-    const hunkStart = chunk.indexOf("\n@@");
     files.push({
       path,
       status,

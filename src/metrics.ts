@@ -180,9 +180,11 @@ export function sensitiveCategory(path: string): string | null {
 }
 
 function addedLines(patch: string): string[] {
+  // "+++ " (with a space) is the file header; the space-less guard also
+  // dropped added lines whose content starts with "++".
   return patch
     .split("\n")
-    .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
+    .filter((l) => l.startsWith("+") && !l.startsWith("+++ "))
     .map((l) => l.slice(1));
 }
 

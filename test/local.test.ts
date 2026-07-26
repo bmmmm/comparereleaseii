@@ -265,3 +265,22 @@ test("loadLocalRelease skips prerelease tags when picking the base for a stable 
   });
   assert.equal(rc.baseRef, "v0.1.0");
 });
+
+test("added lines whose content starts with ++ or -- are still counted", () => {
+  // `++i;` added => diff line `+++i;`, which the header guard used to eat.
+  const diff = `diff --git a/x.c b/x.c
+index 111..222 100644
+--- a/x.c
++++ b/x.c
+@@ -1,2 +1,3 @@
+ int i = 0;
++++i;
++--j;
+@@ -10,1 +11,1 @@
+-old line
++new line
+`;
+  const [file] = parseUnifiedDiff(diff);
+  assert.equal(file.additions, 3, "++i; and +--j; must count as additions");
+  assert.equal(file.deletions, 1);
+});

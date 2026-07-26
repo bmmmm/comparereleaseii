@@ -20,6 +20,10 @@ tool is checked with the tool itself before it ships.
   failure) crashed the run mid-verification; the affected claims now fall
   back to anchor-only evidence with a warning naming the commit, and the
   failed lookup is retried instead of being cached for the rest of the run.
+- **Changed lines starting with `++` or `--` are counted again.** Local-diff
+  parsing treated an added `++i;` (which arrives as `+++i;`) as a file
+  header: line counts came out low and those lines were invisible to
+  lexical claim matching. GitHub-API counts were never affected.
 - **Numeric flags reject garbage instead of silently disabling features.**
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number
