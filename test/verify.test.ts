@@ -727,3 +727,42 @@ test("anchor-phase commit lookups run pooled, not one claim at a time", async ()
   });
   assert.ok(maxInFlight >= 2, `anchor lookups ran serially (max in flight: ${maxInFlight})`);
 });
+
+// One commit whose diff cannot be fetched (force-pushed away, transient gh
+// failure) must degrade that claim's evidence, not kill the whole run —
+// computeCoverage already treats it that way.
+test("a failing commit-diff fetch degrades the claim instead of killing the run", async () => {
+  const linked: Commit = {
+    sha: "deadbeef123",
+    subject: "fix parser (#7)",
+    body: "",
+    author: "dev",
+    prNumbers: [7],
+  };
+  const data = {
+    repoLabel: "o/r",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [linked],
+    files: [],
+    warnings: [] as string[],
+    commitFiles: async () => {
+      throw new Error("gh api HTTP 404");
+    },
+  };
+  const results = await verifyClaims(data, [claim("fix parser crash on empty input", [7])], {
+    judgeMode: "off",
+    engine: null,
+    concurrency: 2,
+    maxHunks: 6,
+    maxEvidenceChars: 20000,
+  });
+  assert.equal(results.length, 1);
+  // Anchored, but its diff is unavailable: the honest verdict is the weak one.
+  assert.equal(results[0].verdict, "partial");
+  assert.ok(
+    data.warnings.some((w) => w.includes("deadbeef123".slice(0, 10))),
+    `no warning about the failed fetch: ${JSON.stringify(data.warnings)}`,
+  );
+});

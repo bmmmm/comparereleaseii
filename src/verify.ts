@@ -204,6 +204,20 @@ export async function verifyClaims(
     );
   }
 
+  // One commit whose diff cannot be fetched must cost that claim its diff
+  // evidence, not the whole run (computeCoverage already degrades this way).
+  const fetchFailed = new Set<string>();
+  const commitFilesOr = (sha: string): Promise<DiffFile[]> =>
+    data.commitFiles(sha).catch((err: Error) => {
+      if (!fetchFailed.has(sha)) {
+        fetchFailed.add(sha);
+        data.warnings.push(
+          `Could not load the diff of ${sha.slice(0, 10)} (${err.message.split("\n")[0].slice(0, 100)}) — claims anchored to it are judged without it.`,
+        );
+      }
+      return [];
+    });
+
   for (const claim of claims) {
     if (claim.kind === "meta") {
       results.set(claim.id, {
@@ -250,7 +264,7 @@ export async function verifyClaims(
 
     if (anchors.commits.length) {
       const fileLists = await Promise.all(
-        anchors.commits.map((c) => data.commitFiles(c.sha)),
+        anchors.commits.map((c) => commitFilesOr(c.sha)),
       );
       const pool = fileLists.flat();
       const generated = isGeneratedEntry(claim, anchors.commits);

@@ -275,6 +275,9 @@ export async function loadGithubRelease(opts: {
       p = ghJson<{ files: GhFile[] }>(`repos/${repo}/commits/${encodeURIComponent(sha)}`).then((r) =>
         r.files.map(toDiffFile),
       );
+      // A transient failure must not poison the cache for the rest of the
+      // run — a later phase (coverage, suggest) may retry and succeed.
+      p.catch(() => commitCache.delete(sha));
       commitCache.set(sha, p);
     }
     return p;

@@ -15,6 +15,11 @@ tool is checked with the tool itself before it ships.
 
 ### Fixed
 
+- **One unfetchable commit diff no longer kills the whole check.** A single
+  commit whose diff the API would not return (force-pushed away, transient
+  failure) crashed the run mid-verification; the affected claims now fall
+  back to anchor-only evidence with a warning naming the commit, and the
+  failed lookup is retried instead of being cached for the rest of the run.
 - **Numeric flags reject garbage instead of silently disabling features.**
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number
