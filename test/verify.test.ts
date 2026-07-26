@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isGeneratedEntry, isVagueClaim, medianVerdict, verifyClaims } from "../src/verify.ts";
+import { computeCoverage, isGeneratedEntry, isVagueClaim, medianVerdict, verifyClaims } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
 import {
   buildJudgePrompt,
@@ -487,4 +487,76 @@ test("one identifier hit in the linked commit is a lead, not a verified verdict"
     judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
   });
   assert.equal(r.verdict, "partial");
+});
+
+test("a repeated line that points into this release is still a claim", async () => {
+  // Both sets of notes are written by the publisher, so "I said it last time
+  // too" cannot be what takes a claim out of the check. Standing text really
+  // is standing text: it anchors nowhere in this range.
+  const linked: Commit = {
+    sha: "cafe1234ab",
+    subject: "Wire maintenance route (#42)",
+    body: "",
+    author: "mallory",
+    prNumbers: [42],
+  };
+  const file = {
+    path: "src/routes.js",
+    status: "modified",
+    additions: 1,
+    deletions: 0,
+    patch: "@@ -1,2 +1,3 @@ function routes(app)\n+  app.post('/__maint', run);\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [linked], files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const anchored = claim("Add a remote maintenance endpoint for support engineers (#42)", [42]);
+  anchored.carriedOverFrom = "v1";
+  const [checked] = await verifyClaims(data, [anchored], opts);
+  assert.notEqual(checked.verdict, "skipped", "an anchored repeat is checked");
+
+  const standing = claim("This project follows semantic versioning");
+  standing.carriedOverFrom = "v1";
+  const [skipped] = await verifyClaims(data, [standing], opts);
+  assert.equal(skipped.verdict, "skipped");
+  assert.match(skipped.reasoning, /Carried over verbatim/);
+});
+
+test("standing text documents nothing, so it earns no coverage", async () => {
+  // The other coverage channel: a commit counts as documented when some claim
+  // restates its subject (cherry-pick workflows lose the PR reference). Text
+  // carried over from the base release was written before this commit existed,
+  // so it cannot be what documents it.
+  const linked: Commit = {
+    sha: "beef5678cd",
+    subject: "Refactor the plugin loader for lazy imports",
+    body: "",
+    author: "dev",
+    prNumbers: [],
+  };
+  const file = {
+    path: "src/loader.js", status: "modified", additions: 40, deletions: 2,
+    patch: "@@ -1,2 +1,42 @@ function load()\n+  // forty new lines\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [linked], files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const standing = claim("Refactor the plugin loader for lazy imports");
+  standing.carriedOverFrom = "v1";
+  const skippedResults = await verifyClaims(data, [standing], opts);
+  assert.equal(skippedResults[0].verdict, "skipped");
+  const withStanding = await computeCoverage(data, [standing], skippedResults);
+  assert.equal(withStanding.uncovered.length, 1, "the commit is still undocumented");
+
+  // The same sentence, written for this release, does document it.
+  const fresh = claim("Refactor the plugin loader for lazy imports");
+  const freshResults = await verifyClaims(data, [fresh], opts);
+  const withFresh = await computeCoverage(data, [fresh], freshResults);
+  assert.equal(withFresh.uncovered.length, 0);
 });

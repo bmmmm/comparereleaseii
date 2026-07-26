@@ -135,15 +135,13 @@ export async function verifyClaims(
   const useJudge = opts.engine !== null && opts.judgeMode !== "off";
 
   for (const claim of claims) {
-    if (claim.kind === "meta" || claim.carriedOverFrom) {
+    if (claim.kind === "meta") {
       results.set(claim.id, {
         claim,
         verdict: "skipped",
         confidence: 1,
         evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
-        reasoning: claim.carriedOverFrom
-          ? `Carried over verbatim from ${claim.carriedOverFrom} — describes the product, not this release.`
-          : "Informational entry, nothing to verify against the diff.",
+        reasoning: "Informational entry, nothing to verify against the diff.",
         judged: false,
         generated: false,
       });
@@ -162,6 +160,24 @@ export async function verifyClaims(
         }
       }
     }
+
+    // Standing text only. A repeated line that points at a commit in THIS
+    // range is an assertion about this release, and the publisher wrote both
+    // sets of notes — "I said it last time too" cannot be what takes a claim
+    // out of the check.
+    if (claim.carriedOverFrom && !anchors.commits.length) {
+      results.set(claim.id, {
+        claim,
+        verdict: "skipped",
+        confidence: 1,
+        evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
+        reasoning: `Carried over verbatim from ${claim.carriedOverFrom} — describes the product, not this release.`,
+        judged: false,
+        generated: false,
+      });
+      continue;
+    }
+
     if (anchors.commits.length) {
       const fileLists = await Promise.all(
         anchors.commits.map((c) => data.commitFiles(c.sha)),
@@ -440,8 +456,16 @@ export async function computeCoverage(
   results: ClaimResult[],
 ): Promise<Coverage> {
   const covered = new Set<string>();
-  // Any anchor in any claim (incl. meta like "New Contributors") documents a commit.
+  const skipped = new Set(
+    results.filter((r) => r.verdict === "skipped").map((r) => r.claim.id),
+  );
+  // Any anchor in any claim (incl. meta like "New Contributors") documents a
+  // commit — except text carried over verbatim from the base release, which
+  // by definition describes the product and not what shipped here. Letting it
+  // count made a claim simultaneously "not this release's assertion" for
+  // correctness and "documents this release's commit" for completeness.
   for (const claim of claims) {
+    if (claim.carriedOverFrom && skipped.has(claim.id)) continue;
     for (const commit of anchorMatch(claim, data.commits).commits) {
       covered.add(commit.sha);
     }
@@ -467,7 +491,7 @@ export async function computeCoverage(
   // Cherry-pick workflows (patch-release branches) lose PR references in the
   // commit message — cover commits whose subject clearly restates a claim.
   const changeClaims = results
-    .filter((r) => r.claim.kind === "change")
+    .filter((r) => r.claim.kind === "change" && r.verdict !== "skipped")
     .map((r) => r.claim.text.replace(/\bby @[\w-]+\b.*$/, ""));
   const subjectCovered = (subject: string): boolean =>
     changeClaims.some((text) => similarity(text, subject) >= 0.45);

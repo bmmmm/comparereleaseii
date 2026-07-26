@@ -59,6 +59,14 @@ is reported separately and leaves the ratio the way meta claims do. Lines
 under four words are exempt: "Bug fixes" recurs everywhere and still asserts
 something each time.
 
+The repeat must be *standing* text, i.e. anchor nowhere in this range. A
+repeated line that cites a PR or sha shipped here is an assertion about this
+release and is checked and scored like any other — both sets of notes come
+from the same publisher, so "I said it last time too" cannot be what takes a
+claim out of the check. Text that really is standing also documents nothing:
+it earns no completeness credit, neither through its anchors nor by
+resembling a commit subject.
+
 **Exception — releases that cannot be checked here.** When the release's own
 shape explains the misses (no source file in the diff at all, or a fork whose
 notes describe upstream code), `no-evidence` claims drop *out of* the ratio

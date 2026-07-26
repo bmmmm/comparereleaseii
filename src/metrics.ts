@@ -119,7 +119,7 @@ export function classifyUnverifiable(
     };
   }
 
-  const change = results.filter((r) => r.claim.kind === "change" && !r.claim.carriedOverFrom);
+  const change = results.filter((r) => r.claim.kind === "change" && r.verdict !== "skipped");
   if (!change.length) return null;
   const missing = change.filter((r) => r.verdict === "no-evidence");
   if (missing.length / change.length <= OUT_OF_REPO_RELEASE) return null;
@@ -563,7 +563,11 @@ export function computeScores(
 ): Scores {
   // Text repeated verbatim from the base release describes the product, not
   // this release — it asserts nothing new to be right or wrong about.
-  const all = results.filter((r) => r.claim.kind === "change" && !r.claim.carriedOverFrom);
+  // "skipped" is the verdict for text that asserts nothing about this release
+  // — informational entries, and lines carried over verbatim that anchor
+  // nowhere in this range. A carried-over line that DOES anchor here was
+  // checked like any other and is scored like any other.
+  const all = results.filter((r) => r.claim.kind === "change" && r.verdict !== "skipped");
   // Claims nobody could have checked must not score 0 — that is the value a
   // *contradicted* claim gets, and it would rank a docs-only or fork release
   // exactly like a fabricated one. They drop out of the ratio instead.
