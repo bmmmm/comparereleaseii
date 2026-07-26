@@ -15,12 +15,15 @@ Works with any GitHub repository or local git clone — pick a repo, pick a
 release, get a verdict:
 
 ```console
-$ gh repo clone bmmmm/comparereleaseii && cd comparereleaseii
-$ node src/cli.ts restic/restic --tag v0.19.1 --html report.html
+$ gh extension install bmmmm/gh-comparereleaseii
+$ gh comparereleaseii restic/restic --tag v0.19.1 --html report.html
 ```
 
-(No install or build step — Node ≥ 24 runs the TypeScript directly. To gate
-releases in CI without cloning anything, use the
+(The [extension](https://github.com/bmmmm/gh-comparereleaseii) is a
+SHA-pinned wrapper that follows releases via `gh extension upgrade`. For
+hacking on the source: `gh repo clone bmmmm/comparereleaseii` and run
+`node src/cli.ts` — no install or build step, Node ≥ 24 runs the TypeScript
+directly. To gate releases in CI without cloning anything, use the
 [GitHub Action](#run-it-continuously): `uses: bmmmm/comparereleaseii@v0.1.0`.)
 
 Requirements: Node ≥ 24, an authenticated [`gh`](https://cli.github.com), and
