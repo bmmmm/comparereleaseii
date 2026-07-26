@@ -142,6 +142,9 @@ fabricated release gets, for the opposite reason. Two shapes, both benign:
 | `sourceless` | The diff contains no source file — a docs-only bump, or a changelog mirror of a closed-source product (whole diff = `CHANGELOG.md` + `feed.xml`) | this release alone |
 | `out-of-repo` | The diff *has* source, but the notes describe code that lives elsewhere: a fork shipping upstream features, a build or distribution repo | this release **and** the repo's own history |
 
+In the JSON report this is one field: `metrics.unverifiable` is
+`{ kind, reason }` or `null`. Consumers branch on that, not on the score.
+
 The signal is the **diff's** file set, never the repo's language stats: a repo
 can be 80% Python and still ship a release that touches no source.
 

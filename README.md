@@ -18,6 +18,19 @@ release, get a verdict:
 ```console
 $ gh extension install bmmmm/gh-comparereleaseii
 $ gh comparereleaseii restic/restic --tag v0.19.1 --html report.html
+19 claims parsed from the notes of v0.19.1; verifying against 38 commits…
+
+comparereleaseii — release-note fact check
+restic/restic  v0.19.0 → v0.19.1  (38 commits, 50 files, +826/−113)
+judge engine: claude-cli/haiku
+…
+Summary: 19 claims — 9 verified, 0 partial, 0 no-evidence, 0 contradicted, 10 skipped
+Trust score: 90/100 (solid) — correctness 100 · completeness 72 · risk 90
+
+Risk flags:
+  ! Undocumented changes in dependencies paths
+    go.mod, go.sum
+HTML report written to report.html
 ```
 
 Three ways to run it, the same CLI behind all of them:
@@ -36,11 +49,13 @@ Requirements: Node ≥ 24, a judge, and an authenticated
 [`gh`](https://cli.github.com) for GitHub repos — `--local` reads a clone from
 disk with plain `git` and never calls `gh`. As judge: the
 [`claude`](https://code.claude.com) CLI (default), an `ANTHROPIC_API_KEY`, or
-any OpenAI-compatible server
-([local models](docs/local-models.md)). Without one, the tool degrades
-gracefully to the deterministic stages. `--estimate` previews claims, LLM
-calls, tokens and cost before the first run — a typical release (~45 claims,
-90 files) needs 10–15 Haiku calls ≈ $0.07; cached re-runs take seconds.
+any OpenAI-compatible server ([local models](docs/local-models.md)); without
+one, the tool degrades gracefully to the deterministic stages.
+
+`--estimate` previews claims, LLM calls, tokens and cost before the first run:
+the restic release above costs ~3 Haiku calls ≈ $0.01, a big one (vaultwarden
+1.37.0 — 45 claims across 90 files) ~13 calls ≈ $0.07. Re-runs hit the verdict
+cache and take seconds.
 
 ## How it works
 
@@ -100,17 +115,13 @@ Exit codes: `0` all claims supported · `1` unsupported or contradicted claims
 found (CI gate) · `2` usage or data errors. Use `--fail-on contradicted` for a
 lenient gate that tolerates unprovable claims (e.g. private advisories).
 
-Some releases cannot be checked here at all: a docs-only bump or a mirror repo
-of a closed-source product (no source in the diff), and a fork or distribution
-repo whose notes describe upstream code (source in the diff, but not the code
-the notes talk about). Both are reported as their own category instead of as
-unsupported claims — the claims leave the correctness ratio, the risk flag
-drops to `info`, the score is labelled **unverified**, and `--fail-on
-no-evidence` does not fail the build. The fork case is only ever claimed when
-the repo's *own release history* shows the same shape, and never when a claim
-is contradicted or a critical flag fires. Consumers can branch on
-`metrics.unverifiable` (`{ kind, reason }` or `null`) in the JSON report. The
-report says "unknown", not "fine" — details in [SCORING.md](SCORING.md).
+Not every release *can* be checked here: a docs-only bump, a changelog mirror
+of a closed-source product, a fork whose notes describe upstream code. Those
+are labelled **unverified** instead of collapsing into a wall of unsupported
+claims, and `--fail-on no-evidence` does not fail the build on them — the
+report says "unknown", not "fine". How that is decided, and why it takes the
+repo's own release history to claim it:
+[SCORING.md](SCORING.md#unverified--releases-that-cannot-be-checked-in-this-repo).
 
 ## Judges: local models, calibration, escalation
 
