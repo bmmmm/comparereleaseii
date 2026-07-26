@@ -6,7 +6,7 @@ import { basename, join } from "node:path";
 import { assertCloneUrl, ensureClone, loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
 import { pickBaseRelease } from "./sources/github.ts";
-import { cacheDir, safeSegment } from "./paths.ts";
+import { cacheDir, safeSegment, VERSION } from "./paths.ts";
 import { parseClaims } from "./claims.ts";
 import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import {
@@ -96,6 +96,7 @@ Options:
   --history <n>       Print a release-history timeline instead of a check
   --estimate          Print a cost/effort estimate instead of judging
   --no-cache          Bypass the on-disk verdict cache
+  --version           Print the version and exit
   -h, --help          Show this help
 
 Watch mode (continuous release monitoring):
@@ -166,9 +167,17 @@ async function main(): Promise<number> {
       history: { type: "string" },
       estimate: { type: "boolean", default: false },
       "no-cache": { type: "boolean", default: false },
+      version: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
+
+  // Before the usage check below: `--version` carries no repo argument, and
+  // that check treats a missing one as a usage error (exit 2).
+  if (values.version) {
+    console.log(`comparereleaseii ${VERSION}`);
+    return 0;
+  }
 
   if (
     values.help ||

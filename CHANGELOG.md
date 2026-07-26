@@ -81,6 +81,11 @@ tool is checked with the tool itself before it ships.
   too). Neither needs a shell, so passing argv rather than a shell string is
   not what stops them — `assertCloneUrl()` refuses both shapes by name and
   accepts only ordinary scheme URLs and the scp-like form.
+- `--version` prints the version and exits 0. It previously fell through to
+  `parseArgs` and exited 2 with `Unknown option '--version'`, advising the
+  reader to pass it after `--` as a positional, which is not what they wanted.
+  The value is read from `package.json` — the same source the cache key uses —
+  so it cannot drift from a release bump.
 
 ### Security
 

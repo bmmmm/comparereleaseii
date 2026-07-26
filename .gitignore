@@ -8,6 +8,11 @@ tmp/
 .DS_Store
 .claude/
 
+# Nothing here loads a dotenv file, but ANTHROPIC_API_KEY / OPENAI_API_KEY are
+# read from the environment and `source .env` is how people supply them.
+.env
+.env.*
+
 # `watch init`/`watch` write these next to the config file — the
 # docs/watchdog.md self-test recipe runs them straight from a checkout of
 # this repo, so without this they'd show up as untracked clutter (or worse,

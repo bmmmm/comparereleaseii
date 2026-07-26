@@ -1,0 +1,25 @@
+# Secrets and key material — never pull these into an agent's context.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*_host_key
+id_*
+.ssh/
+
+# Dependencies and build output.
+node_modules/
+dist/
+*.tgz
+
+# Local run artifacts: watch mode writes a personal repo list, a notify
+# command and generated reports next to the config.
+watch.json
+reports/
+tmp/
+*.log
+
+# Platform metadata.
+.DS_Store
