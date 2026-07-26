@@ -8,6 +8,10 @@ tool is checked with the tool itself before it ships.
 
 ### Fixed
 
+- **Numeric flags reject garbage instead of silently disabling features.**
+  `--concurrency abc` ran zero judge workers and "completed" with empty
+  results; `--baseline`/`--suggest-limit`/`--history` with a non-number
+  silently turned their feature off. All four now exit 2 with a message.
 - **A judge CLI dying at startup no longer crashes the whole check.** Piping
   a large prompt into a child process that exits before reading it raised an
   unhandled EPIPE and killed the run with a stack trace; the failure now

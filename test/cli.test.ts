@@ -33,3 +33,23 @@ test("--version needs no repo argument", async () => {
   assert.match(stdout, /^comparereleaseii \d+\.\d+\.\d+/);
   assert.equal(stderr, "");
 });
+
+// NaN from an unvalidated numeric flag used to flow all the way into
+// pooled(items, NaN, ...), which spawns zero workers and "completes" with an
+// array of empty slots — silent garbage instead of an error.
+test("numeric flags reject non-numbers with an actionable error", async () => {
+  for (const [flag, value] of [
+    ["--concurrency", "abc"],
+    ["--baseline", "abc"],
+    ["--suggest-limit", "x"],
+    ["--history", "abc"],
+  ]) {
+    const res = await exec(process.execPath, [CLI, "owner/repo", flag, value]).then(
+      () => null,
+      (err: { code?: number; stderr?: string }) => err,
+    );
+    assert.ok(res, `${flag} ${value} exited 0`);
+    assert.equal(res.code, 2, `${flag}: exit ${res.code}`);
+    assert.match(res.stderr ?? "", new RegExp(`${flag} must be`), `${flag}: ${res.stderr}`);
+  }
+});

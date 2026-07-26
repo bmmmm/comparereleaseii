@@ -132,6 +132,16 @@ Examples:
   ${PROG} guidelines >> AGENTS.md
 `;
 
+/** Parse a numeric flag or fail loudly — NaN silently disables features
+ * downstream (pooled() with a NaN limit runs zero workers and "completes"). */
+function intFlag(name: string, raw: string, min: number): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < min) {
+    throw new Error(`--${name} must be an integer ≥ ${min} (got "${raw}")`);
+  }
+  return n;
+}
+
 async function main(): Promise<number> {
   if (process.argv[2] === "watch") {
     return runWatchCli(process.argv.slice(3));
@@ -206,6 +216,10 @@ async function main(): Promise<number> {
   if (!["auto", "off", "claude-cli", "api", "openai"].includes(escalateOpt)) {
     throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
   }
+  const concurrency = intFlag("concurrency", values.concurrency, 1);
+  const baseline = intFlag("baseline", values.baseline, 0);
+  const suggestLimit = intFlag("suggest-limit", values["suggest-limit"], 0);
+  const historyCount = values.history === undefined ? null : intFlag("history", values.history, 1);
 
   // Every forge speaks git, so a clone answers almost everything the check
   // asks: diff, commits, subjects, authors, tags. Only the published notes and
@@ -280,13 +294,13 @@ async function main(): Promise<number> {
       ? githubHistory(positionals[0])
       : null;
 
-  if (values.history) {
+  if (historyCount !== null) {
     if (!history) {
       throw new Error(
         "--history needs a repository: pass owner/repo, --repo-url <url>, or --local <path>.",
       );
     }
-    const snapshots = await buildSnapshots(history, { count: Number(values.history) });
+    const snapshots = await buildSnapshots(history, { count: historyCount });
     printTimeline(snapshots);
     if (values.json) {
       await writeFile(values.json, JSON.stringify(snapshots, null, 2));
@@ -306,7 +320,7 @@ async function main(): Promise<number> {
         baseUrl: openaiBase,
         apiKey: process.env.OPENAI_API_KEY,
         cache: !values["no-cache"],
-        concurrency: Number(values.concurrency),
+        concurrency,
       });
       printModelRanking(cals);
       const best = rankCalibrations(cals)[0];
@@ -350,7 +364,7 @@ async function main(): Promise<number> {
         "--calibrate needs a judge engine (claude CLI, ANTHROPIC_API_KEY, or a local OpenAI-compatible server).",
       );
     }
-    const cal = await runCalibration(engine, Number(values.concurrency));
+    const cal = await runCalibration(engine, concurrency);
     printCalibration(cal);
     if (values.json) {
       await writeFile(values.json, JSON.stringify(cal, null, 2));
@@ -419,18 +433,18 @@ async function main(): Promise<number> {
       // Reuse the same stub engine so its draft calls land in est.calls/chars —
       // the printed cost already covers --suggest, not just claim verification.
       const coverage = await computeCoverage(data, claims, results);
-      suggestTargets = Math.min(coverage.uncovered.length, Number(values["suggest-limit"]));
+      suggestTargets = Math.min(coverage.uncovered.length, suggestLimit);
       await suggestNotes(data, coverage.uncovered, {
         engine: stub,
         concurrency: 8,
-        limit: Number(values["suggest-limit"]),
+        limit: suggestLimit,
         maxEvidenceChars: 20000,
       });
     }
 
     const inTokens = Math.round(est.chars / 4);
     const reserve = Math.ceil(est.calls * 0.5);
-    const timeMin = ((est.calls + reserve / 2) * 10) / Number(values.concurrency) / 60;
+    const timeMin = ((est.calls + reserve / 2) * 10) / concurrency / 60;
     const apiCost = (inTokens / 1e6) * 1.0 + ((est.calls * 300) / 1e6) * 5.0;
     console.log(`\nCost estimate — ${data.repoLabel} ${data.baseRef} → ${data.headRef}`);
     console.log(`  Diff: ${data.commits.length} commits, ${data.files.length} files, ±${data.files.reduce((s, f) => s + f.additions + f.deletions, 0)} lines`);
@@ -449,7 +463,7 @@ async function main(): Promise<number> {
         `  Baseline: ${values.baseline} past release(s) diffed out of the clone — no API, but a blobless clone fetches their file contents on demand, so budget roughly one head-sized diff each.`,
       );
     } else {
-      console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * Number(values.baseline)} (compare, per-commit diffs, baseline)`);
+      console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * baseline} (compare, per-commit diffs, baseline)`);
     }
     console.log(`  Verdict cache: repeated runs on unchanged data are free and deterministic.`);
     return 0;
@@ -459,12 +473,12 @@ async function main(): Promise<number> {
     judgeMode,
     engine,
     escalateEngine: escalate,
-    concurrency: Number(values.concurrency),
+    concurrency,
     reverse: !values["no-reverse"],
-    baseline: Number(values.baseline),
+    baseline,
     history,
     suggest: values.suggest,
-    suggestLimit: Number(values["suggest-limit"]),
+    suggestLimit,
   };
   const report: Report = await analyzeRelease(
     data,
