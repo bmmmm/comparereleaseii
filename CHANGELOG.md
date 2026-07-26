@@ -8,6 +8,9 @@ tool is checked with the tool itself before it ships.
 
 ### Added
 
+- `gh` extension as the install path: `gh extension install
+  bmmmm/gh-comparereleaseii` — a SHA-pinned wrapper that follows releases
+  via `gh extension upgrade`; the README quick start leads with it.
 - First-release fallback for the GitHub source: when a repo has no earlier
   published release, the check now diffs against the root commit of the
   tag's history (with a warning — the root commit itself sits outside the
@@ -17,12 +20,28 @@ tool is checked with the tool itself before it ships.
   this repo is checked by the repo's own composite action, keyless
   (`engine: "off"` — this repo carries no secrets); the README badge shows
   the live status of that check.
+- `COMPARERELEASE_PROG`: wrappers set it so help and error texts show the
+  command users actually type (`gh comparereleaseii` vs `comparerelease`).
 
 ### Changed
 
+- The base release must come from the same product line: same tag prefix
+  (monorepos tagging `cli-v…` / `browser-v…` per product) and preferably
+  the same major line (parallel maintenance lines like a v2.11.x backport
+  released between v3.x releases). Found live: a monorepo product tag was
+  diffed against its neighbor product's tag — 1 commit for 328 claims, a
+  false alert.
+- The watch index is rewritten after every checked release, not only at the
+  end of the run — a long batch shows progress and a crash loses nothing.
 - Truncated API diffs are now signalled by an explicit `truncated` field on
-  the release data instead of substring-matching warning texts (which
-  misfired once a warning merely mentioned "full coverage").
+  the release data and in the JSON report, instead of substring-matching
+  warning texts (which misfired once a warning merely mentioned "full
+  coverage").
+
+### Fixed
+
+- Release-notes markdown that GitHub's release renderer broke: a code span
+  wrapped across a line break rendered its continuation as a blockquote.
 
 ## 0.1.0 — 2026-07-26
 

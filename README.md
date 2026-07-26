@@ -73,10 +73,13 @@ coding agent — see
 ## Usage
 
 ```console
-$ node src/cli.ts juanfont/headscale                                  # latest release
-$ node src/cli.ts --local ~/src/myrepo --base v1.2.0 --head v1.3.0    # local clone
-$ node src/cli.ts owner/repo --tag v2.0 --notes-file draft-notes.md   # check a draft
+$ comparerelease juanfont/headscale                                  # latest release
+$ comparerelease --local ~/src/myrepo --base v1.2.0 --head v1.3.0    # local clone
+$ comparerelease owner/repo --tag v2.0 --notes-file draft-notes.md   # check a draft
 ```
+
+(Via the extension the same commands read `gh comparereleaseii …`; from a
+source checkout, `node src/cli.ts …`.)
 
 `--help` lists all options. Reports: `--md` / `--json` / `--html` — the HTML
 report is a single file with no external assets: trust-score ring, verdict
