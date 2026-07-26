@@ -43,3 +43,35 @@ test("pickBaseRelease: a full 100-page must not be mistaken for a first release"
 test("pickBaseRelease: unknown tag is an error, not a fallback", () => {
   assert.throws(() => pickBaseRelease([rel("v1")], "v9"), /not found/);
 });
+
+test("pickBaseRelease: monorepo product tags diff against the same product", () => {
+  // bitwarden/clients shape: four products released back-to-back — the
+  // release right before cli-v2026.7.0 is a different product, and that
+  // diff was 1 commit for 328 claims (seen live).
+  const releases = [
+    rel("cli-v2026.7.0"),
+    rel("browser-v2026.7.0"),
+    rel("desktop-v2026.7.0"),
+    rel("web-v2026.7.0"),
+    rel("cli-v2026.6.1"),
+  ];
+  assert.equal(pickBaseRelease(releases, "cli-v2026.7.0"), "cli-v2026.6.1");
+});
+
+test("pickBaseRelease: parallel maintenance lines diff within the same major", () => {
+  // traefik shape: v2.11.x security backports land between v3.x releases.
+  const releases = [rel("v3.7.9"), rel("v2.11.53"), rel("v3.7.8"), rel("v2.11.52")];
+  assert.equal(pickBaseRelease(releases, "v3.7.9"), "v3.7.8");
+});
+
+test("pickBaseRelease: a line's first release falls back to the previous line", () => {
+  const releases = [rel("v3.0.0"), rel("v2.9.1"), rel("v2.9.0")];
+  assert.equal(pickBaseRelease(releases, "v3.0.0"), "v2.9.1");
+});
+
+test("pickBaseRelease: same-prefix candidates beyond a full page still resolve", () => {
+  // A same-line base exists nowhere on the page but a same-prefix one does:
+  // prefer returning it over the pass-the-page error.
+  const releases = [rel("v3.0.0"), ...Array.from({ length: 99 }, (_, i) => rel(`v2.${99 - i}.0`))];
+  assert.equal(pickBaseRelease(releases, "v3.0.0"), "v2.99.0");
+});

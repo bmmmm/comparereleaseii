@@ -83,6 +83,17 @@ export async function fetchCompare(
  * Throws when the page is full — earlier releases may exist beyond it, so
  * "first release" cannot be asserted.
  */
+/** Tag text before the first digit: "cli-v2026.7.0" → "cli-v", "1.2b" → "". */
+function tagPrefix(tag: string): string {
+  const i = tag.search(/\d/);
+  return i === -1 ? tag : tag.slice(0, i);
+}
+
+/** First number in the tag — the release line's major version. */
+function tagMajor(tag: string): string | null {
+  return tag.match(/\d+/)?.[0] ?? null;
+}
+
 export function pickBaseRelease(releases: GhRelease[], tag: string): string | null {
   const idx = releases.findIndex((r) => r.tag_name === tag);
   if (idx === -1) {
@@ -91,13 +102,26 @@ export function pickBaseRelease(releases: GhRelease[], tag: string): string | nu
     );
   }
   const target = releases[idx];
+  // Monorepos tag per product (cli-v…, browser-v…) and projects maintain
+  // parallel lines (v3.7.x alongside v2.11.x) — "the release right before
+  // this one" is then a different product or line, and the diff is garbage
+  // (seen live: 328 claims against a 1-commit diff). The base must share
+  // the tag prefix, and within that, prefer the same major line.
+  const prefix = tagPrefix(tag);
+  const major = tagMajor(tag);
+  let prefixFallback: string | null = null;
   for (let i = idx + 1; i < releases.length; i++) {
     const r = releases[i];
     if (r.draft) continue;
     // For a stable release, compare against the previous stable one.
     if (!target.prerelease && r.prerelease) continue;
-    return r.tag_name;
+    if (tagPrefix(r.tag_name) !== prefix) continue;
+    if (tagMajor(r.tag_name) === major) return r.tag_name;
+    // Nearest same-prefix release of another line — right when this is the
+    // line's first release (v3.0.0 follows v2.x).
+    prefixFallback ??= r.tag_name;
   }
+  if (prefixFallback) return prefixFallback;
   if (releases.length >= 100) {
     throw new Error(
       `No usable base among the latest 100 releases before ${tag} — earlier ones may exist beyond the page. Pass --base <tag> explicitly.`,
