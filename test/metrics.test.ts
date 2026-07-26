@@ -16,6 +16,12 @@ test("sensitiveCategory classifies by priority", () => {
   assert.equal(sensitiveCategory("AUTHORS.md"), null);
   assert.equal(sensitiveCategory("AI_POLICY.md"), null);
   assert.equal(sensitiveCategory("docs/oauth-setup.rst"), null);
+  // Docs under CI directories are not CI config either (.github/CONTRIBUTING.md
+  // flagged as ci/build in the watchdog corpus) — but real workflows stay.
+  assert.equal(sensitiveCategory(".github/CONTRIBUTING.md"), null);
+  assert.equal(sensitiveCategory(".github/SECURITY.md"), null);
+  assert.equal(sensitiveCategory(".github/workflows/ci.yml"), "ci/build");
+  assert.equal(sensitiveCategory("setup.py"), "ci/build");
   // Neither are test files that mention auth in their path.
   assert.equal(sensitiveCategory("caddytest/integration/forwardauth_test.go"), null);
   assert.equal(sensitiveCategory("src/auth/session_test.go"), null);

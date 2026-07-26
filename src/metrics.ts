@@ -29,11 +29,14 @@ const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz
 /** Classify a path into a sensitivity category (checked in priority order). */
 export function sensitiveCategory(path: string): string | null {
   if (DEP_MANIFEST.test(path)) return "dependencies";
+  // A markdown/rst file is never executable CI config or an install hook —
+  // .github/CONTRIBUTING.md flagged as ci/build in the watchdog corpus.
+  if (DOC_FILE.test(path)) return null;
   if (CI_BUILD.test(path)) return "ci/build";
-  // Docs and tests about auth are not auth code (AUTHORS.md, AI_POLICY.md,
-  // forwardauth_test.go would match the keyword list and cap honest releases
-  // at "questionable" — release notes never document test-only changes).
-  if (DOC_FILE.test(path) || TEST_FILE.test(path)) return null;
+  // Tests about auth are not auth code (forwardauth_test.go would match the
+  // keyword list and cap honest releases at "questionable" — release notes
+  // never document test-only changes).
+  if (TEST_FILE.test(path)) return null;
   if (AUTH_CRYPTO.test(path)) return "auth/crypto";
   return null;
 }

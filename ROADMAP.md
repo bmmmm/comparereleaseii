@@ -194,6 +194,13 @@ auth keywords) by reading real reports. tmp/watch-reports2 holds 11 of them
 widen the corpus to ~25 repos overnight.
 - **Done when:** every critical flag in the corpus is either true or fixed
   as a class, and honest repos stay ≥ 65.
+- **Landed 2026-07-26:** corpus lives in `tmp/watch-reports` (not
+  `watch-reports2`). Both honest-repo criticals were the already-fixed
+  docs/tests-as-auth classes; the sweep found one live FP class —
+  `.github/*.md` counted as ci/build — fixed by checking DOC_FILE before
+  CI_BUILD. All remaining flags are true by design (fabricated-control
+  criticals, dependency-manifest warns, testdata opaque-change, bot as
+  first-time author). Re-run: ripgrep 45→73, caddy 45→91.
 
 ### 2.5 Ship v0.1.0
 Run the local routine: `pnpm dogfood` → `--calibrate` → `pnpm publish` →
