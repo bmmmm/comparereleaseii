@@ -8,6 +8,10 @@ tool is checked with the tool itself before it ships.
 
 ### Fixed
 
+- **A judge CLI dying at startup no longer crashes the whole check.** Piping
+  a large prompt into a child process that exits before reading it raised an
+  unhandled EPIPE and killed the run with a stack trace; the failure now
+  surfaces as the subprocess error message it always should have been.
 - **Changelog sections survive code fences.** A fenced example block whose
   lines start with `#` (a shell comment) ended the section early in both
   markdown extractors — for `--local`/`--repo-url` sources every claim after

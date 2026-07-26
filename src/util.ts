@@ -45,6 +45,11 @@ export function run(
       },
     );
     if (opts.input !== undefined) {
+      // A child that exits before draining stdin (e.g. a judge CLI erroring
+      // at startup while a large prompt is being piped in) emits EPIPE here;
+      // without a listener that is an unhandled 'error' event and kills the
+      // whole process. The execFile callback above still reports the failure.
+      child.stdin?.on("error", () => {});
       child.stdin?.write(opts.input);
       child.stdin?.end();
     }

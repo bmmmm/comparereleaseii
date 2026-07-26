@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractMarkdownSection } from "../src/util.ts";
+import { extractMarkdownSection, run } from "../src/util.ts";
 
 test("extractMarkdownSection returns the body between one heading and the next of equal-or-higher level", () => {
   const md = [
@@ -57,4 +57,14 @@ test("extractMarkdownSection ignores # lines inside fenced code blocks", () => {
   ].join("\n");
   const section = extractMarkdownSection(md, "Section A");
   assert.ok(section?.includes("after the fence"), `section was cut at the fence: ${JSON.stringify(section)}`);
+});
+
+// The child dying before it drains stdin (a claude CLI that errors at startup
+// while a 20k-char judge prompt is being piped in) must reject through the
+// promise, not crash the whole process with an unhandled 'error' event.
+test("run() rejects instead of crashing when the child exits without reading a large stdin", async () => {
+  await assert.rejects(
+    run("false", [], { input: "x".repeat(10 * 1024 * 1024) }),
+    /failed/,
+  );
 });
