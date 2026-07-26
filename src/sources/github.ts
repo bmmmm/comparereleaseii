@@ -131,9 +131,16 @@ export function pickBaseRelease(releases: GhRelease[], tag: string): string | nu
 }
 
 /** Previous release tag, or null when this is the repo's first release. */
-async function findBaseTag(repo: string, tag: string): Promise<string | null> {
+async function findBaseTag(
+  repo: string,
+  tag: string,
+): Promise<{ tag: string; notes: string } | null> {
   const releases = await ghJson<GhRelease[]>(`repos/${repo}/releases?per_page=100`);
-  return pickBaseRelease(releases, tag);
+  const base = pickBaseRelease(releases, tag);
+  if (!base) return null;
+  // The list already carries every release's body — the carry-over check
+  // costs no extra request here.
+  return { tag: base, notes: releases.find((r) => r.tag_name === base)?.body ?? "" };
 }
 
 /**
@@ -171,10 +178,21 @@ export async function loadGithubRelease(opts: {
     ? await ghJson<GhRelease>(`repos/${opts.repo}/releases/tags/${opts.tag}`)
     : await ghJson<GhRelease>(`repos/${opts.repo}/releases/latest`);
   const headRef = release.tag_name;
-  let baseRef = opts.base;
-  if (!baseRef) {
-    baseRef = (await findBaseTag(opts.repo, headRef)) ?? undefined;
-    if (!baseRef) {
+  let baseRef: string;
+  let baseNotes: string | undefined;
+  if (opts.base) {
+    baseRef = opts.base;
+    // Explicit --base: fetch its notes on their own, best-effort (the ref may
+    // be a plain commit or a tag without a release).
+    baseNotes = await ghJson<GhRelease>(`repos/${opts.repo}/releases/tags/${opts.base}`)
+      .then((r) => r.body ?? "")
+      .catch(() => undefined);
+  } else {
+    const base = await findBaseTag(opts.repo, headRef);
+    if (base) {
+      baseRef = base.tag;
+      baseNotes = base.notes;
+    } else {
       const root = await findRootCommit(opts.repo, headRef).catch(() => null);
       if (!root) {
         throw new Error(
@@ -235,6 +253,7 @@ export async function loadGithubRelease(opts: {
     baseRef,
     headRef,
     notes: release.body ?? "",
+    baseNotes,
     commits: cmp.commits,
     files: cmp.files,
     commitFiles,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { createHash } from "node:crypto";
-import { countVerdicts, unverifiableNote } from "./report.ts";
+import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
 import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
 
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
@@ -250,6 +250,7 @@ function fmtBytes(n: number): string {
 export function toHtml(report: Report): string {
   const m = report.metrics;
   const note = unverifiableNote(report);
+  const carried = carriedOver(report);
   const s = m.scores;
   const ctx = m.context;
   const langs = ctx.languages
@@ -336,6 +337,10 @@ footer{margin-top:32px;color:#484f58;font-size:12px}
 </div>
 ${
   note ? `<div class="banner"><strong>${esc(note.heading)}</strong> — ${esc(note.reason)}</div>` : ""
+}${
+  carried
+    ? `<div class="banner"><strong>Carried over</strong> — ${carried.count} claim(s) repeat ${esc(carried.baseRef)} verbatim; standing text, not scored.</div>`
+    : ""
 }
 <h2>Claims at a glance</h2>
 ${verdictBar(report)}

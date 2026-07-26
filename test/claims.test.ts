@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseClaims, cleanText } from "../src/claims.ts";
+import { parseClaims, cleanText, markCarriedOver } from "../src/claims.ts";
 
 const fixture = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), "fixtures", "vaultwarden-1.37.0.md"),
@@ -115,4 +115,37 @@ test("markup-only lines never become claims (omlx img-banner shape)", () => {
     claims.some((c) => c.text.includes("element support")),
     "inline HTML inside real prose survives",
   );
+});
+
+test("markCarriedOver flags text repeated verbatim from the base release", () => {
+  const base = `## What's new
+
+omlx is a fast local inference server for Apple Silicon.
+
+- Added streaming support for the completions endpoint
+- Fixed a crash when the model directory is empty
+`;
+  const head = `## What's new
+
+omlx is a fast local inference server for Apple Silicon.
+
+- Added streaming support for the completions endpoint
+- Added a new /v1/embeddings endpoint
+`;
+  const claims = markCarriedOver(parseClaims(head), base, "v0.5.2");
+  const byText = new Map(claims.map((c) => [c.text, c.carriedOverFrom]));
+
+  // Standing intro and a repeated bullet: both stood in v0.5.2 already.
+  assert.equal(byText.get("omlx is a fast local inference server for Apple Silicon."), "v0.5.2");
+  assert.equal(
+    byText.get("Added streaming support for the completions endpoint"),
+    "v0.5.2",
+  );
+  // The one genuinely new line must stay scorable.
+  assert.equal(byText.get("Added a new /v1/embeddings endpoint"), undefined);
+});
+
+test("markCarriedOver ignores short generic lines that repeat by nature", () => {
+  const claims = markCarriedOver(parseClaims("- Bug fixes\n"), "- Bug fixes\n", "v1");
+  assert.equal(claims[0].carriedOverFrom, undefined);
 });

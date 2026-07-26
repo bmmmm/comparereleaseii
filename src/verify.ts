@@ -135,13 +135,15 @@ export async function verifyClaims(
   const useJudge = opts.engine !== null && opts.judgeMode !== "off";
 
   for (const claim of claims) {
-    if (claim.kind === "meta") {
+    if (claim.kind === "meta" || claim.carriedOverFrom) {
       results.set(claim.id, {
         claim,
         verdict: "skipped",
         confidence: 1,
         evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
-        reasoning: "Informational entry, nothing to verify against the diff.",
+        reasoning: claim.carriedOverFrom
+          ? `Carried over verbatim from ${claim.carriedOverFrom} — describes the product, not this release.`
+          : "Informational entry, nothing to verify against the diff.",
         judged: false,
         generated: false,
       });

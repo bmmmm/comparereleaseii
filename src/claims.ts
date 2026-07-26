@@ -43,6 +43,41 @@ function proseContent(text: string): string {
   return text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** Comparison key for "is this the same sentence?" — case and punctuation out. */
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Below this a repeated line is a coincidence, not a carry-over: "Bug fixes"
+ * appears in every release of every project and still asserts something about
+ * each one. Only a distinctive sentence can be recognised as standing text.
+ */
+const MIN_CARRY_OVER_WORDS = 4;
+
+/**
+ * Mark claims whose text already stood in the base release's notes. Cumulative
+ * or recap-style notes repeat their predecessor verbatim (standing intros,
+ * feature lists); those lines describe the product, not this release, and
+ * scoring them as unsupported assertions drowns an honest release in
+ * `no-evidence`. Mutates and returns the claims for the caller's convenience.
+ */
+export function markCarriedOver(claims: Claim[], baseNotes: string, baseRef: string): Claim[] {
+  const earlier = new Set(
+    parseClaims(baseNotes)
+      .map((c) => normalizeText(c.text))
+      .filter((t) => t.split(" ").length >= MIN_CARRY_OVER_WORDS),
+  );
+  if (!earlier.size) return claims;
+  for (const claim of claims) {
+    if (earlier.has(normalizeText(claim.text))) claim.carriedOverFrom = baseRef;
+  }
+  return claims;
+}
+
 export function parseClaims(notes: string): Claim[] {
   const claims: Claim[] = [];
   let id = 0;

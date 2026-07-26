@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
 import { ensureClone, loadLocalRange } from "./sources/local.ts";
-import { parseClaims } from "./claims.ts";
+import { parseClaims, markCarriedOver } from "./claims.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { computeMetrics } from "./metrics.ts";
@@ -78,6 +78,7 @@ export async function analyzeRelease(
   s: CheckSettings,
 ): Promise<Report> {
   const claims = parseClaims(data.notes);
+  if (data.baseNotes) markCarriedOver(claims, data.baseNotes, data.baseRef);
   if (!claims.length) {
     throw new Error("No claims found in the release notes — nothing to check.");
   }

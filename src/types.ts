@@ -21,6 +21,11 @@ export interface ReleaseData {
   baseRef: string;
   headRef: string;
   notes: string;
+  /**
+   * The base release's own notes, when the source can supply them. Notes that
+   * repeat their predecessor verbatim describe the product, not this release.
+   */
+  baseNotes?: string;
   commits: Commit[];
   files: DiffFile[];
   /** Lazily resolve the per-commit diff (cached by the source). */
@@ -47,6 +52,11 @@ export interface Claim {
   advisories: string[];
   codeSpans: string[];
   author?: string;
+  /**
+   * Tag of the earlier release whose notes already carried this exact text —
+   * a standing product description, not an assertion about this release.
+   */
+  carriedOverFrom?: string;
 }
 
 export type Verdict =

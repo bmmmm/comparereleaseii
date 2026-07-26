@@ -94,7 +94,7 @@ export function classifyUnverifiable(
   if (results.some((r) => r.verdict === "contradicted")) return null;
   if (flags.some((f) => f.severity === "critical")) return null;
 
-  const change = results.filter((r) => r.claim.kind === "change");
+  const change = results.filter((r) => r.claim.kind === "change" && !r.claim.carriedOverFrom);
   if (!change.length) return null;
   const missing = change.filter((r) => r.verdict === "no-evidence").length;
   if (missing / change.length <= OUT_OF_REPO_RELEASE) return null;
@@ -420,7 +420,9 @@ export function computeScores(
   flags: RiskFlag[],
   unverifiable = false,
 ): Scores {
-  const all = results.filter((r) => r.claim.kind === "change");
+  // Text repeated verbatim from the base release describes the product, not
+  // this release — it asserts nothing new to be right or wrong about.
+  const all = results.filter((r) => r.claim.kind === "change" && !r.claim.carriedOverFrom);
   // Claims nobody could have checked must not score 0 — that is the value a
   // *contradicted* claim gets, and it would rank a docs-only or fork release
   // exactly like a fabricated one. They drop out of the ratio instead.

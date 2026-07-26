@@ -63,6 +63,13 @@ export function unverifiableNote(
   return { heading: HEADING[u.kind], reason: u.reason, claimNote: CLAIM_NOTE[u.kind] };
 }
 
+/** Claims repeated verbatim from the base release, grouped by that release. */
+export function carriedOver(report: Report): { baseRef: string; count: number } | null {
+  const carried = report.results.filter((r) => r.claim.carriedOverFrom);
+  if (!carried.length) return null;
+  return { baseRef: carried[0].claim.carriedOverFrom!, count: carried.length };
+}
+
 export function countVerdicts(results: ClaimResult[]): Record<Verdict, number> {
   const counts: Record<Verdict, number> = {
     verified: 0,
@@ -118,6 +125,15 @@ export function printTerminal(report: Report): void {
         c.gray(`${counts.skipped} skipped`),
       ].join(", "),
   );
+
+  const carried = carriedOver(report);
+  if (carried) {
+    console.log(
+      c.dim(
+        `${carried.count} claim(s) carried over verbatim from ${carried.baseRef} — standing text, not scored.`,
+      ),
+    );
+  }
 
   const s = report.metrics.scores;
   const scoreColor = s.overall >= 85 ? c.green : s.overall >= 65 ? c.yellow : c.red;
@@ -192,6 +208,7 @@ export function toMarkdown(report: Report): string {
   const counts = countVerdicts(report.results);
   const s = report.metrics.scores;
   const note = unverifiableNote(report);
+  const carried = carriedOver(report);
   const lines: string[] = [
     `# Release-note fact check: ${report.repoLabel} ${report.baseRef} → ${report.headRef}`,
     "",
@@ -200,6 +217,12 @@ export function toMarkdown(report: Report): string {
     `**Trust score: ${s.overall}/100 (${s.label})** — correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
     "",
     ...(note ? [`> **${note.heading}** — ${note.reason}`, ""] : []),
+    ...(carried
+      ? [
+          `> **Carried over** — ${carried.count} claim(s) repeat \`${carried.baseRef}\` verbatim; standing text, not scored.`,
+          "",
+        ]
+      : []),
     ...(report.metrics.flags.length
       ? [
           "## Risk flags",
