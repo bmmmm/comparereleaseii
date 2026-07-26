@@ -13,7 +13,8 @@ import {
   rankCalibrations,
 } from "./calibrate.ts";
 import { commandExists } from "./util.ts";
-import { verifyClaims } from "./verify.ts";
+import { verifyClaims, computeCoverage } from "./verify.ts";
+import { suggestNotes } from "./suggest.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
 import { buildSnapshots, printTimeline } from "./history.ts";
@@ -265,6 +266,21 @@ async function main(): Promise<number> {
     });
     const change = results.filter((r) => r.claim.kind === "change");
     const generated = results.filter((r) => r.generated).length;
+
+    let suggestTargets = 0;
+    if (values.suggest && !values["no-reverse"]) {
+      // Reuse the same stub engine so its draft calls land in est.calls/chars —
+      // the printed cost already covers --suggest, not just claim verification.
+      const coverage = await computeCoverage(data, claims, results);
+      suggestTargets = Math.min(coverage.uncovered.length, Number(values["suggest-limit"]));
+      await suggestNotes(data, coverage.uncovered, {
+        engine: stub,
+        concurrency: 8,
+        limit: Number(values["suggest-limit"]),
+        maxEvidenceChars: 20000,
+      });
+    }
+
     const inTokens = Math.round(est.chars / 4);
     const reserve = Math.ceil(est.calls * 0.5);
     const timeMin = ((est.calls + reserve / 2) * 10) / Number(values.concurrency) / 60;
@@ -272,6 +288,13 @@ async function main(): Promise<number> {
     console.log(`\nCost estimate — ${data.repoLabel} ${data.baseRef} → ${data.headRef}`);
     console.log(`  Diff: ${data.commits.length} commits, ${data.files.length} files, ±${data.files.reduce((s, f) => s + f.additions + f.deletions, 0)} lines`);
     console.log(`  Claims: ${results.length} total — ${change.length} checkable (${generated} generated), ${results.length - change.length} informational`);
+    if (values.suggest) {
+      console.log(
+        values["no-reverse"]
+          ? `  --suggest: no-op (--no-reverse disables the completeness check it drafts for)`
+          : `  --suggest: up to ${suggestTargets} undocumented commit(s) drafted (--suggest-limit ${values["suggest-limit"]}), included below`,
+      );
+    }
     console.log(`  LLM judge calls (auto): ${est.calls}, plus up to ${reserve} for retrieval rounds / second opinions`);
     console.log(`  Est. input ~${(inTokens / 1000).toFixed(0)}k tokens · wall clock ~${timeMin < 1 ? "<1" : timeMin.toFixed(0)} min via claude-cli · API cost ≈ $${apiCost.toFixed(2)} (haiku)`);
     console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * Number(values.baseline)} (compare, per-commit diffs, baseline)`);

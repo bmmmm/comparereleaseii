@@ -114,7 +114,11 @@ export async function analyzeRelease(
         engine: s.engine,
         concurrency: s.concurrency,
         limit: s.suggestLimit ?? 15,
-        maxEvidenceChars: 4000,
+        // Same budget as claim verification: one commit's full diff can be
+        // as large as the hunks judged for a claim, and these are the
+        // highest-churn commits in the release — the ones least served by a
+        // tight cap.
+        maxEvidenceChars: 20000,
       });
     }
   }
