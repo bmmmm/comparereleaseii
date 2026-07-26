@@ -20,6 +20,12 @@ When writing or editing a release note or changelog entry:
 - Name the mechanism, not just the outcome ("the count-and-increment in
   `register_access()` is now a single atomic SQL UPDATE", not "fixed a
   bypass").
+- Reference the PR (`#123`) or a short commit sha for every bullet, even in
+  hand-written notes. Without one, the checker can't anchor the claim to a
+  specific commit's diff and has to lexical-match it against the *entire*
+  release diff instead — a much noisier bar that needs more matched
+  identifiers to reach `verified` and caps confidence lower even when it
+  clears that bar.
 - Give any commit touching auth, crypto, CI/build config, or a dependency
   manifest its own explicit line, even a one-sentence one, even if the diff
   itself is small.
@@ -59,7 +65,29 @@ to trust:
 The strong version is what a `verified (0.95)` verdict looks like in
 practice — see the vaultwarden example in the [README](../README.md).
 
-## 2. Every sensitive-path change gets an explicit line
+## 2. Anchor every bullet to a PR or commit
+
+The checker resolves each claim against the diff in two very different
+modes, and which one it lands in changes the bar for `verified`:
+
+- **Anchored** — the claim's text contains a `#123`-style PR reference or a
+  commit sha. The checker resolves that to the exact commit(s) it touched and
+  only needs 2 matched identifiers in *that* diff to call it `verified`
+  (confidence 0.9).
+- **Unanchored** — no reference found. The checker falls back to matching
+  the claim's identifiers against the *whole* release diff, which is far
+  noisier: it needs 5 matched identifiers to reach `verified`, and even then
+  confidence caps at 0.8. Two to four matches lands at `partial` (0.55) —
+  the exact bucket most hand-written, prose-style notes fall into when they
+  don't name a PR or commit.
+
+This is a mechanical property of the deterministic matcher, not a
+proofreading nit: a well-written, true claim can still score `partial`
+purely because nothing in its text lets the checker anchor it to the commit
+that proves it. Adding `(#123)` or a short sha costs a few characters and
+moves the claim into the higher-confidence, lower-bar tier.
+
+## 4. Every sensitive-path change gets an explicit line
 
 Auth, crypto, CI/build config, and dependency manifests are scored
 differently on purpose: an undocumented change there is a **critical** risk
@@ -73,7 +101,7 @@ Routine CI/lockfile churn with no behavior change is a `warn`, not
 *adding* a new dependency (not just bumping one) is still worth a line: it
 expands what a security review has to cover.
 
-## 3. Don't let a vague entry hide a real change
+## 5. Don't let a vague entry hide a real change
 
 "Various fixes and improvements" is transparently true and scores badly —
 not because vague notes are penalized directly, but because the checker's
@@ -84,7 +112,7 @@ it the line. If a commit genuinely has nothing user-facing (a comment fix, a
 formatting pass), a vague note is the *correct* choice — the audit only
 flags what should have been said and wasn't.
 
-## 4. Auto-generated PR lists are a floor, not a ceiling
+## 6. Auto-generated PR lists are a floor, not a ceiling
 
 GitHub's `Title by @user in #N` release-note generator produces claims that
 are true by construction (they restate the commit they link), so the
@@ -93,7 +121,7 @@ a high score by themselves. They're a fine starting point (they guarantee
 every PR is at least mentioned) but the score rewards going back and turning
 the ones that matter into real, mechanism-stating sentences per rule 1.
 
-## 5. Check completeness, not just claims
+## 7. Check completeness, not just claims
 
 The reverse (completeness) check answers a different question than "is this
 note true": *"does anything in the diff have no note at all?"* This is
@@ -124,7 +152,7 @@ is to notice is missing; that's the whole value of the reverse check.
 `--suggest-limit` (default 15) bounds it to the highest-churn gaps so the
 extra judge calls stay cheap on large releases.
 
-## 6. Let a contradiction be a contradiction
+## 8. Let a contradiction be a contradiction
 
 If a claim says something was removed and the code still registers it, that
 is not a partial-credit situation — it caps the whole release's score
