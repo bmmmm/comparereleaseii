@@ -154,10 +154,19 @@ export function toWatchIndexHtml(
     .map(({ key, repo, rs }) => {
       const l = rs!.latest!;
       const v = l.verdicts;
-      const trend = rs!.history
-        .slice(-6)
-        .map((h) => `<span class="dot ${scoreClass(h.score)}" title="${esc(h.tag)}: ${h.score}"></span>`)
-        .join("");
+      // A single dot would just repeat the score column — the trend earns
+      // its place only once there is history, and then each dot links to
+      // that release's report.
+      const trend =
+        rs!.history.length >= 2
+          ? rs!.history
+              .slice(-6)
+              .map(
+                (h) =>
+                  `<a href="${esc(h.report)}" title="${esc(h.tag)}: ${h.score}"><span class="dot ${scoreClass(h.score)}"></span></a>`,
+              )
+              .join("")
+          : "";
       const comp = l.components
         ? `${l.components.correctness} · ${l.components.completeness ?? "–"} · ${l.components.risk}`
         : "";
@@ -171,7 +180,7 @@ export function toWatchIndexHtml(
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
 <td><span class="score ${scoreClass(l.score)}" title="judge: ${esc(l.engine)}">${l.score}</span> ${esc(l.scoreLabel)}</td>
 <td class="comp">${comp}</td>
-<td>${v.verified}&#10003; ${v.partial}&#9681; ${v.noEvidence}&#10007; ${v.contradicted}&#8856;</td>
+<td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
 <td>${trend}</td>
 <td title="${esc(l.checkedAt)}">${esc(l.checkedAt.slice(0, 10))}</td>
@@ -219,8 +228,10 @@ a.repo{color:inherit}a.ext{font-size:.85em}
 ${rows}
 ${pendingRows}
 </tbody></table>
-<p class="sub">&#10003; verified &middot; &#9681; partial &middot; &#10007; no evidence &middot; &#8856; contradicted &mdash;
-c &middot; c &middot; r = correctness &middot; completeness &middot; risk &mdash; click a row for the full report</p>
+<p class="sub">rows: &#10003; passed &middot; &#9888; flagged &middot; &#8943; waiting &mdash;
+verdicts: &#10004; verified &middot; &#9680; partial &middot; ? no evidence &middot; &#10008; contradicted &mdash;
+c &middot; c &middot; r = correctness &middot; completeness &middot; risk</p>
+<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; &#8599; opens the release on GitHub</p>
 <script>
 for (const tr of document.querySelectorAll("tr[data-href]")) {
   tr.addEventListener("click", (e) => {

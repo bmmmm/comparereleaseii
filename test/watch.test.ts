@@ -143,6 +143,34 @@ test("toWatchIndexHtml: whole rows link to the report, repos link to GitHub", ()
   assert.ok(html.includes("2026-07-20"), "release date shown");
 });
 
+test("toWatchIndexHtml: trend needs history — one check renders no dots, two render links", () => {
+  const one: WatchState = {
+    version: 1,
+    repos: {
+      "a/x": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 95, false),
+        history: [checked("v1", 95, false)],
+      },
+    },
+  };
+  assert.ok(!toWatchIndexHtml(one, "t").includes('class="dot '), "single check: no trend dots");
+  const two: WatchState = {
+    version: 1,
+    repos: {
+      "a/x": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v2",
+        latest: checked("v2", 80, false),
+        history: [checked("v1", 95, false), checked("v2", 80, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(two, "t");
+  assert.ok(html.includes('<a href="x/v1.html" title="v1: 95">'), "dots link to past reports");
+});
+
 test("toWatchIndexHtml: configured repos without a check yet get a pending row", () => {
   const state: WatchState = { version: 1, repos: {} };
   const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z", [
