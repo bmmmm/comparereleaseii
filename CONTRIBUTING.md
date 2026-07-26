@@ -107,6 +107,23 @@ table and update it in the same commit. Nothing automated can catch that one —
 it takes real judge runs — and a table the current code no longer reproduces is
 the drift this tool exists to find.
 
+## Releasing
+
+```console
+$ pnpm release:prepare 0.2.2   # bump, rename Unreleased, fix version pins, gate on test+dogfood
+$ git diff                     # review
+$ git add package.json CHANGELOG.md README.md docs/
+$ git commit -m "Release v0.2.2: <short pitch>"
+$ pnpm release:publish         # tag, push to every remote, open the GitHub release
+```
+
+`release:prepare` refuses to run on a dirty tree or a branch behind its
+upstream — a stale checkout (a second worktree or session pushed since this
+one last fetched) is caught before it wastes a release on outdated files. It
+writes CHANGELOG.md, package.json and any stale version pin, then runs
+`pnpm test` and `pnpm dogfood` as gates; nothing is committed automatically,
+because the release commit's message is the one thing worth writing by hand.
+
 ## Pull requests
 
 The template asks for claims, real command output, a failing test, contract

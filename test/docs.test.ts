@@ -4,18 +4,9 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { PIN_PATTERNS } from "../scripts/pin-patterns.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-// Recipes readers copy verbatim pin the tool at a tag. A release bumps
-// package.json, and one forgotten file keeps handing them the previous
-// version: v0.1.1 shipped with docs/watchdog.md still checking out v0.1.0,
-// in a commit whose subject was "bump refs to the new tag". History and
-// changelog entries may name old versions — these two patterns may not.
-const PIN_PATTERNS = [
-  String.raw`bmmmm/comparereleaseii@(v[\d.]+)`, // composite action ref
-  String.raw`ref:\s*(v[\d.]+)`, // actions/checkout ref
-];
 
 test("copy-paste recipes pin the version in package.json", async () => {
   const { version } = JSON.parse(await readFile(join(ROOT, "package.json"), "utf8")) as {

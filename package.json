@@ -48,6 +48,8 @@
     "prepack": "pnpm build",
     "prepublishOnly": "pnpm check && pnpm test",
     "dogfood": "node scripts/dogfood.ts",
+    "release:prepare": "node scripts/release-prepare.ts",
+    "release:publish": "node scripts/release-publish.ts",
     "eval": "node scripts/eval.ts",
     "start": "node src/cli.ts"
   },
