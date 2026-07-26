@@ -53,6 +53,11 @@ jobs:
           repo-url: https://gitea.com/gitea/tea.git
           tag: v0.14.2
           engine: "off"
+          # This job asserts the plumbing — arguments, clone, notes, outputs.
+          # Under the default gate the verdict on someone else's release
+          # decides the job, so the run would go red for a reason that has
+          # nothing to do with the action and would move when they edit notes.
+          fail-on: none
           artifact-name: smoke-report-forge
       - name: Assert outputs
         env:
@@ -60,7 +65,7 @@ jobs:
           SCORE: ${{ steps.check.outputs.score }}
         run: |
           echo "exit-code=$CODE score=$SCORE"
-          [ -n "$SCORE" ] && [ "$CODE" != "2" ]
+          [ "$CODE" = "0" ] && [ -n "$SCORE" ]
 
   # `repo` carries a default, so passing both is a real mistake a user can
   # make silently; the action must refuse it rather than pick one.
