@@ -5,6 +5,7 @@ import {
   pickNewReleases,
   isFlagged,
   hasDrifted,
+  runNotify,
   scoreBaseline,
   worstExit,
   toWatchIndexHtml,
@@ -12,6 +13,9 @@ import {
   type WatchState,
   type CheckedRelease,
 } from "../src/watch.ts";
+import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function rel(tag: string, publishedAt: string, extra: Partial<ReleaseInfo> = {}): ReleaseInfo {
   return { tag, publishedAt, prerelease: false, draft: false, ...extra };
@@ -310,4 +314,22 @@ test("a repo whose own level slid is flagged, not normalised", () => {
 test("an exact 20-point drop is the case the constant names", () => {
   assert.equal(isFlagged(71, 0, 0, 65, 91), true);
   assert.equal(isFlagged(72, 0, 0, 65, 91), false);
+});
+
+// `--notify` runs a shell string on purpose. The report path handed to it is
+// not the operator's — it carries a repo key and a tag from the config and the
+// forge — so it must arrive as an argument, never as shell source.
+test("the notify command cannot be extended by the report path", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "notify-"));
+  const marker = join(dir, "pwned");
+  const seen = join(dir, "seen.txt");
+  const hostile = join(dir, `v1.0.0"; touch ${marker}; echo ".json`);
+
+  // runNotify appends the path itself, so the command names only its output.
+  // Interpolating the path instead of passing it would close that quote and
+  // run the `touch`.
+  await runNotify(`printf '%s' > ${JSON.stringify(seen)}`, hostile);
+
+  await assert.rejects(stat(marker), "the path opened a shell");
+  assert.equal(await readFile(seen, "utf8"), hostile, "the path did not arrive intact");
 });

@@ -59,8 +59,12 @@ not add a dependency, a build step, or a framework.
   headings, commit subjects, file paths, diff hunks, tags, refs — is written by
   the party under examination. In a prompt it goes inside the untrusted markers
   (`untrustedBlock` in `src/judge.ts`); in HTML it goes through `esc()`, and in
-  an `href` through the URL helpers as well. There is no field here that is
-  "obviously safe".
+  an `href` through the URL helpers as well. The same holds for a PR body in a
+  workflow: `.github/scripts/pr-intake.mjs` quotes it into a fence before it
+  reaches the job summary, so the author cannot forge the verdict table a
+  reviewer reads. There is no field here that is "obviously safe", and the list
+  of sinks is not closed — a new one inherits the rule, it does not get an
+  exemption.
 - No claim may reach `verified` because the notes agree with the commit
   message. Both come from the same hand; only the diff is evidence.
 - Change scoring and you change the README's validation table. Re-measure the
