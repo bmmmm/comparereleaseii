@@ -10,4 +10,8 @@ if (major < 24) {
   );
   process.exit(2);
 }
-await import("../src/cli.ts");
+// The published tarball ships compiled dist/ — Node refuses to strip types
+// under node_modules — while a git clone runs the src/ TypeScript directly.
+const { existsSync } = await import("node:fs");
+const dist = new URL("../dist/cli.js", import.meta.url);
+await import(existsSync(dist) ? dist.href : new URL("../src/cli.ts", import.meta.url).href);

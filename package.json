@@ -4,17 +4,45 @@
   "description": "Fact-check release notes against the actual code diff between two versions",
   "type": "module",
   "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bmmmm/comparereleaseii.git"
+  },
+  "homepage": "https://github.com/bmmmm/comparereleaseii#readme",
+  "bugs": {
+    "url": "https://github.com/bmmmm/comparereleaseii/issues"
+  },
+  "keywords": [
+    "release-notes",
+    "changelog",
+    "fact-check",
+    "supply-chain",
+    "security",
+    "diff",
+    "llm",
+    "ci",
+    "cli"
+  ],
   "bin": {
     "comparerelease": "./bin/comparerelease.mjs"
   },
+  "files": [
+    "bin/",
+    "dist/",
+    "test/eval/golden.json"
+  ],
+  "exports": {},
   "engines": {
     "node": ">=24"
   },
   "packageManager": "pnpm@11.13.0",
   "scripts": {
-    "preinstall": "node -e \"if(!/pnpm/.test(process.env.npm_config_user_agent||''))throw new Error('Use pnpm — npm/yarn are blocked in this repo')\"",
+    "preinstall": "node -e \"if(require('fs').existsSync('pnpm-workspace.yaml')&&!/pnpm/.test(process.env.npm_config_user_agent||''))throw new Error('Use pnpm — npm/yarn are blocked in this repo')\"",
     "check": "tsc --noEmit",
     "test": "node --test 'test/*.test.ts'",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "prepack": "pnpm build",
+    "prepublishOnly": "pnpm check && pnpm test",
     "eval": "node scripts/eval.ts",
     "start": "node src/cli.ts"
   },

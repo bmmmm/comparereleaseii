@@ -1,0 +1,36 @@
+name: release
+
+# Publishes to npm with provenance when a GitHub release is published.
+# Needs the NPM_TOKEN repo secret (npm automation token, publish scope).
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - name: Verify the tag matches package.json
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$pkg" != "$tag" ]; then
+            echo "package.json version ($pkg) != release tag ($tag) — bump package.json first." >&2
+            exit 1
+          fi
+      # prepublishOnly runs pnpm check + pnpm test, prepack builds dist/.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
