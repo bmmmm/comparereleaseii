@@ -99,3 +99,20 @@ test("restic: details keep the nine fixes, summary duplicates are deduped", () =
   assert.equal(claims.filter((c) => c.section === "Summary" && c.kind === "change").length, 0);
   assert.equal(claims.filter((c) => c.section === "Summary").length, 9);
 });
+
+test("markup-only lines never become claims (omlx img-banner shape)", () => {
+  const notes = [
+    "## Highlights",
+    "",
+    '<p align=center> <img width="932" height="290" alt="0 5 2" src="https://example.com/x.png" /> </p>',
+    "",
+    "- <img src=banner.png>",
+    "- Added `<video>` element support in the renderer",
+  ].join("\n");
+  const claims = parseClaims(notes);
+  assert.ok(!claims.some((c) => /img|align=center/.test(c.text)), "no claim from markup-only lines");
+  assert.ok(
+    claims.some((c) => c.text.includes("element support")),
+    "inline HTML inside real prose survives",
+  );
+});

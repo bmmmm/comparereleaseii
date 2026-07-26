@@ -37,6 +37,12 @@ export function cleanText(text: string): string {
 
 const SETEXT_UNDERLINE = /^[=-]{3,}\s*$/;
 
+/** Prose left after removing HTML markup — an <img>/<p> layout line has
+ * none and must not become a claim (it can only ever land no-evidence). */
+function proseContent(text: string): string {
+  return text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function parseClaims(notes: string): Claim[] {
   const claims: Claim[] = [];
   let id = 0;
@@ -50,7 +56,7 @@ export function parseClaims(notes: string): Claim[] {
     const raw = paragraph.join(" ");
     paragraph = [];
     const text = cleanText(raw);
-    if (text.length < 15) return;
+    if (text.length < 15 || proseContent(text).length < 15) return;
     const claim: Claim = { id: id++, section, text, kind: "change", ...extract(raw) };
     // Prose is only verifiable when it names something concrete (identifier,
     // PR, sha, advisory) — process talk and thank-yous are informational.
@@ -70,7 +76,7 @@ export function parseClaims(notes: string): Claim[] {
     const raw = bullet.join(" ");
     bullet = null;
     const text = cleanText(raw);
-    if (!text) return;
+    if (!text || !proseContent(text)) return;
     const isMeta = META_SECTION.test(section) || META_TEXT.test(text);
     claims.push({
       id: id++,

@@ -230,6 +230,75 @@ memory): clarify who releases from where BEFORE building release/CI infra;
 parallel sessions only in worktrees; `!`-handoff commands pinned (explicit
 `--model`) and detached.
 
+## Iteration 3 — lessons from the first real watchlist (2026-07-26)
+
+The first 12-repo watchlist run (user's own GitHub notifications → watch
+init) flagged 8 of 12. Post-mortem on the reports split that into: one tool
+bug (base picking — fixed same day, bitwarden 35→91), two NEW systematic
+measurement gaps (3.1/3.2/3.3), and two honest-but-mislabeled classes
+(3.4/3.5). Verdict on the method itself: the correctness component and the
+verdict ladder discriminate correctly (sniffnet/zed score 98 correctness
+while red; the four clean repos score 88–100; fabricated control stays 5).
+What breaks in the real world is the assumption "notes describe exactly the
+base→head diff" and the absolute reading of completeness/risk.
+
+### 3.1 HTML/boilerplate lines must not become checkable claims
+omlx: an `<img>` tag and a marketing header both became claims and both
+landed no-evidence. Parser: lines that are pure markup (HTML tags without
+prose) never become claims; standing marketing intros are covered by 3.2.
+- **Done when:** the omlx fixture yields no claim for the img line, claim
+  count drops accordingly, no regression on the five dialect fixtures.
+
+### 3.2 Carried-over claims: dedupe against the base release's notes
+omlx v0.5.3 repeats v0.5.2 material verbatim (4 of the top no-evidence
+claims, including the standing intro — verified against the live API). One
+extra API call fetches the base release's notes; claims whose normalized
+text already appears there are reported as "carried over from <base>" and
+leave correctness (like meta claims) instead of drowning the score in
+no-evidence.
+- **Done when:** omlx v0.5.3 re-checks solid, carried-over claims listed
+  separately in terminal/HTML/markdown.
+
+### 3.3 Out-of-repo releases: say it, don't insinuate
+zen-browser ships upstream Firefox features whose code never appears in the
+fork's own diff (HDR, QWACs, Globe-F — all no-evidence); claude-code is a
+changelog-only repo. The verdicts are technically right, the "suspicious/
+questionable" story is wrong. Cheap detection first: when the majority of
+checkable claims are no-evidence AND the repo's baseline shows that is its
+normal shape, the report should state "these notes describe changes outside
+this repo's diff (fork/build/distribution repo)" instead of implying deceit.
+- **Done when:** zen's report carries the explicit out-of-repo notice and
+  the watch index shows it distinctly from a genuine score collapse.
+
+### 3.4 Baseline-relative labels and alerting
+traefik is ~25 on every release (9% churn coverage is its culture, not an
+incident). The state already holds up to 20 checks per repo — the label and
+the watch alerting should read the score against the repo's own history:
+"25 — in line with this repo's median" is calm, "60 — down from a 90
+median" is the alarm. Absolute `notifyBelow` stays as the fallback for the
+first checks.
+- **Done when:** a repo with a stable low score stops alerting after its
+  baseline forms, and a synthetic score drop on a stable-high repo alerts.
+
+### 3.5 Risk-flag specificity on large releases
+zed (158 commits) and nextcloud (676) each collected 2 criticals — at that
+size some undocumented sensitive-path change is near-certain, so the flag
+measures release size, not risk. Options, to be decided by data from the
+report corpus: cap the warn-penalty, and/or require a baseline anomaly
+(first-time author, first binary, unusual churn) before a critical fires on
+releases whose churn is within the repo's norm.
+- **Done when:** honest large releases in the corpus stop hitting the risk
+  floor while the fabricated control and the golden attack shapes keep
+  their criticals.
+
+### 3.6 Golden set: add the real-world shapes
+The set validates judges against attack shapes; the watchlist showed the
+frequent benign shapes are missing: cumulative/recap notes (omlx), fork/
+out-of-repo notes (zen), thin-notes culture (traefik), monorepo product
+tags (bitwarden — regression-covered in pickBaseRelease unit tests already).
+- **Done when:** calibration distinguishes a judge that handles these
+  shapes from one that panics on them.
+
 ## Order and why
 
 1 → 2 → 3. Distribution first because every later phase benefits from an
