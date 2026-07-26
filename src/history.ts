@@ -98,7 +98,7 @@ async function snapshotFor(
     lexicalCoverage: changeClaims.length ? lexicalHits / changeClaims.length : 1,
     sensitiveTouched: [...categories],
     binaries: cmp.files.filter((f) => opacityIssue(f) === "binary file").length,
-    newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f)))],
+    newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, repo)))],
     authors: [...new Set(cmp.commits.map((commit) => commit.author))],
   };
   try {

@@ -10,6 +10,7 @@ import {
   isSourcelessDiff,
   classifyUnverifiable,
   demoteUnsupportedFlag,
+  buildFlags,
 } from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
 import type { ClaimResult, DiffFile, FileInsight, ReleaseData, RiskFlag } from "../src/types.ts";
@@ -105,6 +106,71 @@ test("newDependencies reads package.json blocks, not top-level metadata", () => 
     '@@ -12,2 +12,3 @@\n     "left-pad": "^1.3.0",\n+    "lodash": "^4.17.21",\n     "ms": "^2.1.3",\n',
   );
   assert.deepEqual(newDependencies(noOpener), ["lodash"]);
+});
+
+test("newDependencies reads Cargo sections, not [package] metadata", () => {
+  // zed: a new crate in the workspace. Every key here looks like a dependency
+  // line, and "version" fired a critical new-dependency flag.
+  const newCrate = file(
+    "crates/path/Cargo.toml",
+    [
+      "@@ -0,0 +1,12 @@",
+      "+[package]",
+      '+name = "path"',
+      '+version = "0.1.0"',
+      "+edition.workspace = true",
+      '+license = "GPL-3.0-or-later"',
+      "+",
+      "+[lints]",
+      "+workspace = true",
+      "+",
+      "+[dependencies]",
+      "+anyhow.workspace = true",
+      "+serde = { workspace = true, optional = true }",
+      '+dunce = "1.0"',
+      "",
+    ].join("\n"),
+  );
+  // Only the directly versioned one is a new supplier: `.workspace = true`
+  // points at the root manifest's existing declaration.
+  assert.deepEqual(newDependencies(newCrate), ["dunce"]);
+
+  // [dependencies.serde] names the dependency in the header.
+  const tableForm = file(
+    "Cargo.toml",
+    '@@ -10,0 +11,3 @@\n+[dependencies.serde]\n+version = "1.0"\n+features = ["derive"]\n',
+  );
+  assert.deepEqual(newDependencies(tableForm), ["serde"]);
+});
+
+test("newDependencies ignores the project's own modules and same-supplier lines", () => {
+  // traefik: a local module wired with `replace … => ./pkg/...`, a submodule of
+  // a dependency already present, and a major bump — all flagged as new
+  // suppliers before, all routine.
+  const goMod = file(
+    "go.mod",
+    [
+      "@@ -20,4 +20,8 @@ require (",
+      " \tsigs.k8s.io/gateway-api v1.5.1",
+      " \tgithub.com/go-acme/lego/v4 v4.35.2",
+      "+\tgithub.com/traefik/traefik/dynamic/ext v0.0.0-00010101000000-000000000000",
+      "+\tsigs.k8s.io/gateway-api/conformance v1.5.1",
+      "+\tgithub.com/go-acme/lego/v5 v5.2.2",
+      "+\tgithub.com/tufanbarisyildirim/gonginx v0.0.0-20250620092546-c3e307e36701",
+      "",
+    ].join("\n"),
+  );
+  // Only the genuinely new supplier survives.
+  assert.deepEqual(newDependencies(goMod, "traefik/traefik"), [
+    "github.com/tufanbarisyildirim/gonginx",
+  ]);
+
+  // Without the repo label the self-module cannot be recognised by name — the
+  // same-supplier rule must not swallow it silently, it is simply still listed.
+  assert.ok(
+    newDependencies(goMod).includes("github.com/traefik/traefik/dynamic/ext"),
+    "self-module needs the repo label to be recognised",
+  );
 });
 
 test("opacityIssue flags binaries, minified blobs and install hooks", () => {
@@ -322,4 +388,24 @@ test("layoutTreemap fills the viewport and preserves area proportions", () => {
   assert.ok(Math.abs(total - 500_000) < 1, `area sum ${total}`);
   const a = rects.find((r) => r.file.path === "a")!;
   assert.ok(Math.abs(a.w * a.h - 300_000) < 1);
+});
+
+test("an undocumented auth path is critical only where the notes are otherwise complete", () => {
+  const files: FileInsight[] = [
+    { path: "src/auth/session.go", churn: 40, sensitive: "auth/crypto", coverage: "undocumented" },
+  ];
+  const data = releaseData(["src/auth/session.go"]);
+  const sev = (ratio: number | null) =>
+    buildFlags(data, [], null, files, ratio).find((f) => f.kind === "undocumented-sensitive")
+      ?.severity;
+
+  // The attack signature: notes read as a full account, the auth change is
+  // the one thing missing.
+  assert.equal(sev(0.95), "critical");
+  // traefik (9% documented) and zed (50%): at that size some undocumented
+  // sensitive path is near-certain — the completeness gap is the finding.
+  assert.equal(sev(0.09), "warn");
+  assert.equal(sev(0.5), "warn");
+  // No reverse check ran — no basis to downgrade.
+  assert.equal(sev(null), "critical");
 });

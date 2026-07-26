@@ -55,6 +55,12 @@ export function isSourcelessDiff(files: DiffFile[]): boolean {
   return !files.some((f) => isSourceFile(f.path));
 }
 
+/**
+ * Share of churn a release must document before a single missing sensitive
+ * path counts as a deliberate omission rather than one gap among many.
+ */
+const WELL_DOCUMENTED = 0.6;
+
 /** A repo whose notes habitually describe code outside its own diff. */
 const OUT_OF_REPO_BASELINE = 0.25;
 /** …and a release that follows that pattern: a strict majority of misses. */
@@ -137,13 +143,11 @@ function addedLines(patch: string): string[] {
 /** Dependency name in a manifest line, per file format — null if none. */
 function depName(line: string, path: string): string | null {
   const trimmed = line.trim();
-  if (/Cargo\.toml$/.test(path)) {
-    // Value must look like a version ("1.2", "^0.3") or a table with a
-    // version key — otherwise [lints.*] entries (pedantic = "warn") match.
-    return trimmed.match(/^([\w-]+)\s*=\s*(?:"[\^~=]?\d|\{.*version)/)?.[1] ?? null;
-  }
-  if (/package\.json$/.test(path)) {
-    // Handled by packageJsonDeps — needs block context, not a single line.
+  if (/Cargo\.toml$/.test(path) || /package\.json$/.test(path)) {
+    // Handled by cargoDeps / packageJsonDeps — both need block context, not a
+    // single line: `version = "0.1.0"` under [package] is crate metadata, and
+    // reading it as a dependency named "version" fires a critical flag on
+    // every new crate in a workspace (seen live on zed).
     return null;
   }
   if (/go\.mod$/.test(path)) {
@@ -153,6 +157,65 @@ function depName(line: string, path: string): string | null {
     return trimmed.match(/^([\w.-]+)\s*[=<>~]/)?.[1] ?? null;
   }
   return null;
+}
+
+/** `[package]`/`[workspace.package]` keys whose values look like versions. */
+const CARGO_META_KEYS = new Set([
+  "name", "version", "edition", "license", "license-file", "description",
+  "repository", "homepage", "documentation", "readme", "keywords",
+  "categories", "authors", "publish", "rust-version", "build", "links",
+  "exclude", "include", "default-run", "resolver", "workspace", "path",
+]);
+
+/**
+ * Cargo dependency names on one diff side. Like package.json, this needs the
+ * section: a `[package]` block's `version`/`edition` keys look exactly like
+ * dependency entries. Covers `[dependencies]`, `[dev-/build-dependencies]`,
+ * `[workspace.dependencies]`, `[target.'cfg(…)'.dependencies]`, and the
+ * single-crate form `[dependencies.serde]`.
+ */
+function cargoDeps(patch: string, sign: "+" | "-"): string[] {
+  const names: string[] = [];
+  let section: string | null = null;
+  let tableDep: string | null = null;
+  for (const raw of patch.split("\n")) {
+    if (raw.startsWith("@@")) {
+      section = null;
+      tableDep = null;
+      continue;
+    }
+    if (!/^[+\- ]/.test(raw) || raw.startsWith("+++") || raw.startsWith("---")) continue;
+    const line = raw.slice(1).trim();
+    const header = line.match(/^\[([^\]]+)\]$/);
+    if (header) {
+      section = header[1];
+      // [dependencies.serde] names the dependency in the header itself.
+      const table = section.match(/(?:^|\.)dependencies\.([\w-]+)$/);
+      tableDep = table ? table[1] : null;
+      if (tableDep && raw.startsWith(sign)) names.push(tableDep);
+      continue;
+    }
+    if (tableDep || !raw.startsWith(sign)) continue;
+    // `serde = "1.0"`, `serde = { version = … }`, `anyhow.workspace = true`.
+    const m = line.match(/^([\w-]+)(\.[\w-]+)?\s*=\s*(.*)$/);
+    if (!m) continue;
+    // `anyhow.workspace = true` points at the workspace root's declaration —
+    // a member crate picking up an already-declared dependency adds no
+    // supplier. A genuinely new one appears in the root Cargo.toml, which is
+    // then its own file in the diff (zed: 4 criticals for existing crates).
+    if (m[2] === ".workspace" || /^\{[^}]*\bworkspace\s*=\s*true/.test(m[3])) continue;
+    if (section !== null) {
+      if (/(^|\.)dependencies$/.test(section)) names.push(m[1]);
+      continue;
+    }
+    // Section unknown (its header fell outside the hunk's context lines):
+    // fall back to the shape of the value — a version literal or a table
+    // with a version key — and drop the well-known [package] keys, whose
+    // values look exactly the same.
+    if (CARGO_META_KEYS.has(m[1])) continue;
+    if (/^"[\^~=]?\d|^\{.*version/.test(m[3])) names.push(m[1]);
+  }
+  return names;
 }
 
 /** Well-known top-level package.json keys whose values can look like versions. */
@@ -203,28 +266,65 @@ function packageJsonDeps(patch: string, sign: "+" | "-"): string[] {
   return names;
 }
 
-/** Heuristic: dependency names added to a manifest in this diff. */
-export function newDependencies(file: DiffFile): string[] {
+/** Module path without its Go major suffix: "example.com/x/v5" → "example.com/x". */
+function moduleRoot(name: string): string {
+  return name.replace(/\/v[0-9]+$/, "");
+}
+
+/**
+ * Is this name just another face of something the manifest already had? A Go
+ * major bump (`lego/v4` → `lego/v5`) and a submodule of an existing dependency
+ * (`gateway-api` → `gateway-api/conformance`) both add a *line*, not a
+ * supplier — flagging them as a new dependency puts routine upgrades next to
+ * an injected package. Both seen live on traefik.
+ */
+function sameSupplier(name: string, known: Set<string>): boolean {
+  const root = moduleRoot(name);
+  for (const k of known) {
+    const kr = moduleRoot(k);
+    if (kr === root || root.startsWith(`${kr}/`) || kr.startsWith(`${root}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Heuristic: dependency names added to a manifest in this diff.
+ *
+ * `repoLabel` (owner/repo) lets the check drop the project's own modules: Go
+ * monorepos split packages into local modules wired with `replace … => ./path`,
+ * whose code is right there in the diff — a supply-chain flag on those is
+ * noise (traefik's `github.com/traefik/traefik/dynamic/ext`).
+ */
+export function newDependencies(file: DiffFile, repoLabel?: string): string[] {
   if (!file.patch || !DEP_MANIFEST.test(file.path)) return [];
   if (/\.(lock|sum)$|-lock\.(json|yaml)$|Pipfile\.lock$/.test(file.path)) return [];
   if (/package\.json$/.test(file.path)) {
     const removed = new Set(packageJsonDeps(file.patch, "-"));
     return [...new Set(packageJsonDeps(file.patch, "+"))].filter((n) => !removed.has(n));
   }
+  if (/Cargo\.toml$/.test(file.path)) {
+    const removed = new Set(cargoDeps(file.patch, "-"));
+    return [...new Set(cargoDeps(file.patch, "+"))].filter((n) => !removed.has(n));
+  }
   // A version bump shows the same dependency name on a removed line — parse
   // both sides with the same format-aware extractor (a substring check misses
   // go.mod's "name vX.Y.Z" layout and fabricates "new" dependencies).
-  const removedNames = new Set(
-    file.patch
-      .split("\n")
-      .filter((l) => l.startsWith("-") && !l.startsWith("---"))
-      .map((l) => depName(l.slice(1), file.path))
-      .filter(Boolean),
-  );
+  // Context lines are the manifest's untouched stock: what stood there before
+  // is what tells a genuinely new supplier from a second line for an old one.
+  const known = new Set<string>();
+  for (const raw of file.patch.split("\n")) {
+    if (!/^[- ]/.test(raw) || raw.startsWith("---")) continue;
+    const name = depName(raw.slice(1), file.path);
+    if (name) known.add(name);
+  }
+  const self = repoLabel ? `${repoLabel.split("/").slice(-2).join("/")}` : null;
   const deps: string[] = [];
   for (const line of addedLines(file.patch)) {
     const name = depName(line, file.path);
-    if (name && !removedNames.has(name)) deps.push(name);
+    if (!name || known.has(name)) continue;
+    if (self && moduleRoot(name).includes(self)) continue;
+    if (sameSupplier(name, known)) continue;
+    deps.push(name);
   }
   return [...new Set(deps)];
 }
@@ -278,11 +378,12 @@ function fileCoverageMap(data: ReleaseData, coverage: Coverage | null): Map<stri
   return map;
 }
 
-function buildFlags(
+export function buildFlags(
   data: ReleaseData,
   results: ClaimResult[],
   coverage: Coverage | null,
   files: FileInsight[],
+  churnCoveredRatio: number | null,
 ): RiskFlag[] {
   const flags: RiskFlag[] = [];
   const shasFor = (paths: string[]): string[] => {
@@ -349,10 +450,22 @@ function buildFlags(
   for (const [category, paths] of byCategory) {
     // Changelogs routinely omit lockfile/CI churn (git-cliff even filters it
     // by design) — only silent auth/crypto changes are an attack signature.
+    //
+    // And only when the notes are otherwise complete. The signature is "the
+    // notes look like a full account, but the auth change is missing" — not
+    // "the notes cover a fraction of the release and auth is in the rest".
+    // At 158 and 187 commits (zed, traefik) some undocumented sensitive path
+    // is near-certain, so a critical there measures release size, not risk;
+    // the completeness component already charges for the gap.
+    const specific = churnCoveredRatio === null || churnCoveredRatio >= WELL_DOCUMENTED;
     flags.push({
-      severity: category === "auth/crypto" ? "critical" : "warn",
+      severity: category === "auth/crypto" && specific ? "critical" : "warn",
       kind: "undocumented-sensitive",
-      message: `Undocumented changes in ${category} paths`,
+      message:
+        `Undocumented changes in ${category} paths` +
+        (category === "auth/crypto" && !specific
+          ? ` (${Math.round(churnCoveredRatio! * 100)}% of this release is documented — read the completeness gap, not this path alone)`
+          : ""),
       files: paths.slice(0, 8),
       commitShas: shasFor(paths),
     });
@@ -360,7 +473,7 @@ function buildFlags(
 
   const coverageOf = new Map(files.map((f) => [f.path, f.coverage]));
   for (const f of data.files) {
-    const deps = newDependencies(f);
+    const deps = newDependencies(f, data.repoLabel);
     if (deps.length) {
       const documented = coverageOf.get(f.path) !== "undocumented";
       flags.push({
@@ -550,7 +663,7 @@ export function computeMetrics(opts: {
     churnCoveredRatio = total ? covered / total : 1;
   }
 
-  const measured = buildFlags(data, results, coverage, files);
+  const measured = buildFlags(data, results, coverage, files, churnCoveredRatio);
   if (opts.baseline) measured.push(...baselineFlags(data, coverage, opts.baseline));
   // Classify against the flags as measured — a critical finding about THIS
   // release outranks any benign pattern in the repo's history.
