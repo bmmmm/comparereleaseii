@@ -245,7 +245,7 @@ jobs:
       - uses: actions/checkout@v7   # the tool — no install, runs from source
         with:
           repository: bmmmm/comparereleaseii
-          ref: v0.2.0
+          ref: v0.2.1
           path: comparereleaseii
       - uses: actions/setup-node@v7
         with:

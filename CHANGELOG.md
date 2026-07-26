@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.2.1 — 2026-07-27
+
 ### Added
 
 - **The composite action reaches other forges too.** `--repo-url` shipped in 0.2.0 on the CLI, but the action exposed only `repo: owner/repo`, so the one place people actually automate from stayed GitHub-only — the release notes said "any forge" while the Action could not honour it. It now takes `repo-url`, plus `forgejo-token`/`gitlab-token` for a private repo. Two details the wiring needed: `repo` carries a default, so passing both is caught and refused rather than silently resolved; and the triggering release's tag is no longer used as a default for `repo-url`, where that tag belongs to a different repository and usually does not exist. `comment` is ignored on that path — the verdict is about a repository elsewhere. `action-test.yml` gains a job for the forge path and one asserting the conflicting-input refusal.
