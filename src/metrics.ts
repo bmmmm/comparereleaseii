@@ -357,6 +357,42 @@ export function newDependencies(file: DiffFile, repoLabel?: string): string[] {
   return [...new Set(deps)];
 }
 
+const LOCKFILE = /(\.lock|\.sum)$|-lock\.(json|ya?ml)$/;
+
+/** Hosts a lockfile is supposed to resolve from. */
+const KNOWN_REGISTRY =
+  /^(registry\.(npmjs\.org|yarnpkg\.com|npmmirror\.com)|(static\.)?crates\.io|(files\.)?pythonhosted\.org|pypi\.org|proxy\.golang\.org|sum\.golang\.org|rubygems\.org|packagist\.org|repo\.?1?\.?maven\.(org|apache\.org)|registry\.bower\.io)$/i;
+
+/** Cargo names the crates.io index by its git URL — that one host is fine. */
+const CARGO_INDEX = "registry+https://github.com/rust-lang/crates.io-index";
+
+/**
+ * Resolution sources a lockfile introduces that are not a package registry:
+ * a tarball on someone's own host, a git or filesystem reference.
+ *
+ * newDependencies() skips lockfiles on purpose — their names only restate the
+ * manifest's. But a resolution hijack does not change a name: the manifest
+ * keeps asking for an ordinary package and the lockfile points the download
+ * somewhere else, which left the deterministic supply-chain check blind to
+ * the shape it exists for.
+ */
+export function lockfileSources(file: DiffFile): string[] {
+  if (!file.patch || !LOCKFILE.test(file.path)) return [];
+  const found = new Set<string>();
+  for (const line of addedLines(file.patch)) {
+    if (line.includes(CARGO_INDEX)) continue;
+    const proto = line.match(/\b(git\+[a-z]+|git|ssh|file|link|portal):(\/\/)?[^\s"',;)}\]]+/i);
+    if (proto && !/^https?:$/i.test(proto[1])) {
+      found.add(proto[0].slice(0, 80));
+      continue;
+    }
+    for (const m of line.matchAll(/https?:\/\/([^/\s"',;)}\]]+)[^\s"',;)}\]]*/gi)) {
+      if (!KNOWN_REGISTRY.test(m[1])) found.add(m[0].slice(0, 80));
+    }
+  }
+  return [...found].slice(0, 6);
+}
+
 /** Opaque changes a human cannot review: binaries and minified blobs. */
 export function opacityIssue(file: DiffFile): string | null {
   if (BENIGN_BINARY.test(file.path)) return null;
@@ -525,6 +561,17 @@ export function buildFlags(
         severity: documented ? "info" : "critical",
         kind: "new-dependency",
         message: `New dependenc${deps.length > 1 ? "ies" : "y"} in ${f.path}: ${deps.join(", ")}${documented ? "" : " — not covered by any note"}`,
+        files: [f.path],
+        commitShas: shasFor([f.path]),
+      });
+    }
+    const sources = lockfileSources(f);
+    if (sources.length) {
+      const documented = coverageOf.get(f.path) !== "undocumented";
+      flags.push({
+        severity: documented ? "warn" : "critical",
+        kind: "lockfile-source",
+        message: `Non-registry resolution source in ${f.path}: ${sources.join(", ")}${documented ? "" : " — not covered by any note"}`,
         files: [f.path],
         commitShas: shasFor([f.path]),
       });

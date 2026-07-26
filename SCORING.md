@@ -101,8 +101,8 @@ risk = max(0, 100 − 25·critical − 10·warn − 0·info)
 
 | Severity | Flags |
 |---|---|
-| **critical** | contradicted claims · undocumented auth/crypto changes *in an otherwise well-documented release* · vague note hiding auth/crypto changes · undocumented new dependency · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
-| **warn** | unsupported change claims · undocumented auth/crypto changes where under 60 % of the churn is documented · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · first-time author on sensitive paths (baseline) · claims the judge could not answer for |
+| **critical** | contradicted claims · undocumented auth/crypto changes *in an otherwise well-documented release* · vague note hiding auth/crypto changes · undocumented new dependency · undocumented non-registry resolution source in a lockfile · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
+| **warn** | unsupported change claims · undocumented auth/crypto changes where under 60 % of the churn is documented · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · documented non-registry resolution source in a lockfile · first-time author on sensitive paths (baseline) · claims the judge could not answer for |
 | **info** | documented new dependencies · release-size anomaly vs. baseline · unchecked claims on a release that cannot be checked here ("not verifiable") |
 
 **A judge that cannot answer is a finding.** On a transport error or an
@@ -126,6 +126,15 @@ than risk (zed and traefik each sat on the risk floor for it). Below 60 %
 documented churn the flag drops to `warn` and names the completeness gap as
 the finding — completeness already charges for it. Without a reverse check
 there is no basis to downgrade, so it stays `critical`.
+
+**A hijacked resolution keeps the old name.** Lockfiles are excluded from
+the new-dependency check on purpose — the names in them restate the
+manifest's. But a resolution hijack changes no name: the manifest keeps
+asking for an ordinary package while the lockfile points the download at
+someone else's host. Added lines introducing a non-registry source — a
+tarball URL outside the known registries, or a `git`/`ssh`/`file`/`link`
+reference — raise their own flag. Cargo's `registry+https://github.com/
+rust-lang/crates.io-index` is the index, not a hijack, and is exempt.
 
 **New dependencies mean new suppliers.** A second line for a supplier already
 in the manifest is not one: a Go major bump (`lego/v4` → `/v5`), a submodule
