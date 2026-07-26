@@ -39,3 +39,42 @@ jobs:
         run: |
           echo "exit-code=$CODE score=$SCORE"
           [ "$CODE" = "0" ] && [ -n "$SCORE" ]
+
+  # The `repo` path above never leaves GitHub, so it cannot catch a broken
+  # `repo-url`: that one builds different arguments, skips the event-tag
+  # default and reads its notes from the forge's own API.
+  forge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        uses: ./
+        with:
+          repo-url: https://gitea.com/gitea/tea.git
+          tag: v0.14.2
+          engine: "off"
+          artifact-name: smoke-report-forge
+      - name: Assert outputs
+        env:
+          CODE: ${{ steps.check.outputs.exit-code }}
+          SCORE: ${{ steps.check.outputs.score }}
+        run: |
+          echo "exit-code=$CODE score=$SCORE"
+          [ -n "$SCORE" ] && [ "$CODE" != "2" ]
+
+  # `repo` carries a default, so passing both is a real mistake a user can
+  # make silently; the action must refuse it rather than pick one.
+  conflicting-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        continue-on-error: true
+        uses: ./
+        with:
+          repo: restic/restic
+          repo-url: https://gitea.com/gitea/tea.git
+          engine: "off"
+      - name: The action must have failed
+        run: |
+          [ "${{ steps.check.outcome }}" = "failure" ]

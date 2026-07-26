@@ -227,7 +227,10 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-Inputs mirror the CLI — full list in [action.yml](action.yml). `comment:
+Inputs mirror the CLI — full list in [action.yml](action.yml). `repo-url`
+points the job at a repository on another forge, so a GitHub runner can gate
+releases on a Forgejo, Gitea or GitLab server (with `forgejo-token` /
+`gitlab-token` for a private one). `comment:
 true` appends the verdict to the release body, `notes-file` gates a draft
 in a PR workflow *before* publishing, and `engine: "off"` runs keyless
 (deterministic stages only — exactly how this repo checks its own
