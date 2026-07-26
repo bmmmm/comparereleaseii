@@ -4,7 +4,7 @@ All notable changes to comparereleaseii are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com); every release of this
 tool is checked with the tool itself before it ships.
 
-## Unreleased
+## 0.1.2 — 2026-07-26
 
 Adversarial audit (#13): the checker was red-teamed instead of extended, and
 these are the fixes. Every one ships with a test that fails on the previous
@@ -43,14 +43,12 @@ commit. Two were measured against the live default judge
   `gh api "repos/cli/cli/releases/tags/../../../../../user"` returns the
   authenticated user. Refs pass through a per-segment encoder that refuses
   `.`/`..`, repo slugs are validated at every entry point.
-
-### Changed
-
-- **A note that restates its own commit subject is no longer evidence.** An
+- **A note that restates its own commit subject was accepted as evidence.** An
   anchored claim counted as `verified` (0.90) at 50 % token similarity to the
   linked commit's subject, and in the default `--judge auto` that verdict was
-  final — the judge was never called. A release whose commit
-  "Improve token cache eviction under load (#42)" adds
+  final — the judge was never called. Both halves are written by the same
+  hand, so a release could vouch for itself: a commit
+  "Improve token cache eviction under load (#42)" that adds
   `if (token.startsWith("dbg-")) return true;` to `verifyToken()`, with that
   subject copied into the notes, scored 100/100 "solid" with zero LLM calls;
   it now scores 35/100 "suspicious". Subject similarity anchors a claim and
@@ -62,6 +60,9 @@ commit. Two were measured against the live default judge
   is in the range and nothing about whether it does what the note says. This
   repo's own release check went from 86 to 82 that way, with no claim changing
   from true to false.
+
+### Changed
+
 - **Carve-outs cannot outrank what the release did.** The `sourceless` branch
   ran before the contradicted/critical guards, so a release whose whole diff
   was `requirements.txt` got the carve-out while a critical flag fired about
