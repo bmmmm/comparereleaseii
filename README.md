@@ -204,6 +204,17 @@ $ pnpm eval    # judge eval against the golden set (needs an engine)
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
 
+## Contributing
+
+Bug reports, dialects that misparse and wrong verdicts are all welcome — the
+[issue forms](https://github.com/bmmmm/comparereleaseii/issues/new/choose) ask
+for the evidence each kind needs, and a wrong-verdict report that carries a
+`test/eval/golden.json` entry arrives as a ready-made regression test.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow and the stable contracts;
+[AGENTS.md](AGENTS.md) is the condensed version for coding agents. Pull requests
+state their claims and let this tool check them against their own diff.
+
 ## Support
 
 If this tool is useful to you, you can support development at
