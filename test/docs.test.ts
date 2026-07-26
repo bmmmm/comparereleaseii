@@ -48,6 +48,12 @@ test("copy-paste recipes pin the version in package.json", async () => {
 // The golden set's size is quoted as a selling point ("an N-case golden
 // set") and has drifted on every single change to the set so far, each time
 // leaving a doc behind. golden.json is the only source of truth for it.
+//
+// This cannot tell a current claim from a deliberate statement about the past
+// ("measured against the 23-case set") and will flag both. That is on purpose:
+// a sentence carrying a number that was only ever true at one moment rots
+// either way, so the fix is to write it without the count, not to teach the
+// guard to look away.
 test("prose that counts golden cases matches golden.json", async () => {
   const cases = JSON.parse(
     await readFile(join(ROOT, "test/eval/golden.json"), "utf8"),
