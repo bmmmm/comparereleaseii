@@ -199,3 +199,30 @@ test("GitLab notes anchor through `!123`, not only `#123`", () => {
   // The link form must not also yield a stray number from the URL path.
   assert.ok(!all.has(4), "no fragment of the URL leaks in as an anchor");
 });
+
+test("fenced code blocks never become claims, headings or bullets", () => {
+  const notes = [
+    "## Upgrade notes",
+    "",
+    "Run the migration before upgrading, it renames the config_key column:",
+    "",
+    "```sql",
+    "ALTER TABLE settings RENAME COLUMN config_key TO setting_key;",
+    "# this comment must not become a section heading",
+    "- this must not become a bullet claim",
+    "```",
+    "",
+    "- Fixed the flux capacitor (#99)",
+    "",
+  ].join("\n");
+  const claims = parseClaims(notes);
+  assert.ok(
+    !claims.some((c) => c.text.includes("ALTER TABLE")),
+    `code line parsed as a claim: ${JSON.stringify(claims.map((c) => c.text))}`,
+  );
+  assert.ok(!claims.some((c) => c.text.includes("must not become a bullet")));
+  // The bullet after the fence still lands, in the real section.
+  const fixed = claims.find((c) => c.text.includes("flux capacitor"));
+  assert.equal(fixed?.section, "Upgrade notes");
+  assert.equal(fixed?.kind, "change");
+});

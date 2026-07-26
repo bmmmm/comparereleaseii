@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { extractIdentifiers } from "./match.ts";
+import { FENCE_LINE } from "./util.ts";
 import type { Claim } from "./types.ts";
 
 const META_SECTION = /new contributors|credits|thanks|acknowledg/i;
@@ -161,8 +162,18 @@ export function parseClaims(notes: string): Claim[] {
   };
 
   const lines = notes.split("\n");
+  let inFence = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // Fenced code is illustration, not assertion: its lines are full of
+    // identifier-shaped tokens and would judge as no-evidence claims, and a
+    // `# comment` inside would even switch the section. Skipping keeps an
+    // open bullet/paragraph open, like blank lines do.
+    if (FENCE_LINE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
     const heading = line.match(/^#{1,4}\s+(.*)/);
     if (heading) {
       flushBullet();

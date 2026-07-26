@@ -12,6 +12,10 @@ tool is checked with the tool itself before it ships.
   a large prompt into a child process that exits before reading it raised an
   unhandled EPIPE and killed the run with a stack trace; the failure now
   surfaces as the subprocess error message it always should have been.
+- **Fenced code blocks in release notes are no longer parsed as claims.**
+  A ```` ```sql ```` migration snippet under "Upgrade notes" produced
+  fabricated change claims (and a `#` comment inside a fence even switched
+  the section), each judging as no-evidence and dragging the score down.
 - **Changelog sections survive code fences.** A fenced example block whose
   lines start with `#` (a shell comment) ended the section early in both
   markdown extractors — for `--local`/`--repo-url` sources every claim after
