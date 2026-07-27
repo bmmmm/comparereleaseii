@@ -298,17 +298,38 @@ test("loadLocalRelease skips prerelease tags when picking the base for a stable 
   // Notes from a file have no base counterpart to compare against.
   assert.equal(rc.baseNotes, undefined);
 
-  // Forge-supplied notes take forge-supplied base notes — passed through,
-  // never mixed with the CHANGELOG's wording of the same release.
+  // Forge-supplied notes resolve their base notes from the forge's own
+  // release list — against the base the load actually used (here git
+  // describe picked v0.1.0), never mixed with the CHANGELOG's wording.
   const forge = await loadLocalRelease({
     repo,
     head: "v0.2.0",
     notes: "- from the API",
-    baseNotes: "- base from the API",
+    publishedReleases: [
+      { tag: "v0.2.0", notes: "- from the API" },
+      { tag: "v0.1.0", notes: "- base from the API" },
+    ],
   });
+  assert.equal(forge.baseRef, "v0.1.0");
   assert.equal(forge.baseNotes, "- base from the API");
+  assert.equal(forge.warnings.length, 0);
+
+  // A base the list does not carry (outside the fetched window, or a tag
+  // that never was a release): the checks going quiet is said out loud.
+  const outsideWindow = await loadLocalRelease({
+    repo,
+    head: "v0.2.0",
+    notes: "- from the API",
+    publishedReleases: [{ tag: "v0.2.0", notes: "- from the API" }],
+  });
+  assert.equal(outsideWindow.baseNotes, undefined);
+  assert.match(outsideWindow.warnings.join("\n"), /No published notes for base v0\.1\.0/);
+
+  // No forge list at all: nothing to resolve against, and nothing to warn
+  // about either — a plain notes override is not a forge.
   const forgeWithoutBase = await loadLocalRelease({ repo, head: "v0.2.0", notes: "- from the API" });
   assert.equal(forgeWithoutBase.baseNotes, undefined);
+  assert.equal(forgeWithoutBase.warnings.length, 0);
 });
 
 test("added lines whose content starts with ++ or -- are still counted", () => {

@@ -358,10 +358,13 @@ export async function loadLocalRelease(opts: {
   /** Published notes from a forge API — outrank the CHANGELOG, not a file. */
   notes?: string;
   /**
-   * The base release's notes, when the forge API had them. Feeds the
-   * carried-over dedupe and promise tracking, same as on the GitHub path.
+   * The forge's release list, for resolving the base release's notes AFTER
+   * the base is actually known — an explicit --base, the forge's pick, and
+   * a git-describe fallback all land here uniformly. Only consulted when
+   * `notes` came from the same forge (media never mix); a base the list
+   * does not carry becomes a warning, not a silent feature drop.
    */
-  baseNotes?: string;
+  publishedReleases?: Array<{ tag: string; notes: string }>;
   /** Label for the report; defaults to the clone's directory name. */
   repoLabel?: string;
 }): Promise<ReleaseData> {
@@ -390,11 +393,25 @@ export async function loadLocalRelease(opts: {
   }
 
   let notes: string;
-  let baseNotes = opts.baseNotes;
+  let baseNotes: string | undefined;
   if (opts.notesFile) {
     notes = await readFile(opts.notesFile, "utf8");
   } else if (opts.notes !== undefined) {
     notes = opts.notes;
+    // Resolved against the base this check actually uses — which may have
+    // come from git describe and be unknowable before this point. A base
+    // outside the fetched release window (or a tag that never was a
+    // release) is said out loud: these checks going quiet must not look
+    // like the release keeping its promises.
+    if (base !== EMPTY_TREE) {
+      baseNotes = opts.publishedReleases?.find((r) => r.tag === base)?.notes;
+      if (baseNotes === undefined && opts.publishedReleases) {
+        warnings.push(
+          `No published notes for base ${base} in the forge's release list — ` +
+            `carried-over and promise checks are off for this release.`,
+        );
+      }
+    }
   } else {
     let changelog: string;
     try {

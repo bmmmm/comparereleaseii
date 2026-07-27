@@ -233,7 +233,6 @@ async function main(): Promise<number> {
   let cloneUrl: string | undefined;
   let forgeNotes: string | undefined;
   let forgeBase: string | undefined;
-  let forgeBaseNotes: string | undefined;
   let forgeLabel: string | undefined;
   let forgeReleases: HistoryRelease[] | undefined;
   let repoLink: RepoLink | null = null;
@@ -282,14 +281,6 @@ async function main(): Promise<number> {
       if (release) {
         forgeNotes = release.body;
         forgeBase = pickBaseRelease(forge.releases, release.tag_name) ?? undefined;
-        // The release list fetched for base-picking already carries every
-        // body — the base's notes cost no extra request, same as on GitHub.
-        // Resolved against the base the check will actually use: an explicit
-        // --base wins over the picked one.
-        const effectiveBase = values.base ?? forgeBase;
-        forgeBaseNotes = effectiveBase
-          ? forge.releases.find((r) => r.tag_name === effectiveBase)?.body
-          : undefined;
         values.head ??= release.tag_name;
         console.error(
           `Published notes for ${release.tag_name} from the ${forge.kind} API at ${target!.origin}.`,
@@ -419,7 +410,11 @@ async function main(): Promise<number> {
       base: values.base ?? forgeBase,
       notesFile: values["notes-file"],
       notes: forgeNotes,
-      baseNotes: forgeBaseNotes,
+      // The list fetched for base-picking carries every body — the base's
+      // notes cost no extra request. Resolution happens inside, against the
+      // base the load actually uses (git describe may pick one this scope
+      // cannot know).
+      publishedReleases: forgeReleases,
       repoLabel: forgeLabel,
     });
     context = await localRepoContext(localPath, data.headRef);
