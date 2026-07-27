@@ -8,16 +8,17 @@
 // It only ever writes files, and only after every answer is in: the config,
 // the schedule file, and nothing else. The command that activates the
 // schedule is PRINTED, never run — no daemon, nothing installed silently.
-import { mkdir, mkdtemp, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
+import { safeSegment } from "./paths.ts";
 import { commandExists, c } from "./util.ts";
 import { ghApi } from "./sources/github.ts";
 import { discoverLocalModels } from "./judge.ts";
 import { calibrateModels, gateCalibration, printCalibration, loadReference } from "./calibrate.ts";
-import { runNotify, type WatchConfig, type WatchState } from "./watch.ts";
+import { runNotify, type WatchConfig, type WatchRepoConfig, type WatchState } from "./watch.ts";
 import { addRepos, addRepoUrl, loadConfig, probeForgeUrl, saveConfig, REPO_RE } from "./watchlist.ts";
 
 /** One judge this machine offers, in recommendation order. */
@@ -52,8 +53,11 @@ export function judgeOptions(opts: {
 
 /**
  * "30m" / "6h" / "daily" → launchd seconds + a cron expression. Minutes under
- * 5 are refused (that is polling, not watching); the cron minute is fixed at
- * 17 so a fleet of watchers does not stampede forges on the hour.
+ * 5 are refused (that is polling, not watching), and only divisors of the
+ * hour/day are accepted: cron's step syntax with a non-divisor (every 7
+ * minutes) fires at :56 and then :00 — a ragged schedule that silently
+ * diverges from launchd's exact interval. The cron minute is fixed at 17 so
+ * a fleet of watchers does not stampede forges on the hour.
  */
 export function scheduleSpec(input: string): { seconds: number; cron: string } | null {
   const t = input.trim().toLowerCase();
@@ -61,17 +65,43 @@ export function scheduleSpec(input: string): { seconds: number; cron: string } |
   let m = t.match(/^(\d+)\s*h(?:ours?)?$/);
   if (m) {
     const n = Number(m[1]);
-    if (n < 1 || n > 24) return null;
+    if (n < 1 || n > 24 || 24 % n !== 0) return null;
     if (n === 24) return { seconds: 86_400, cron: "17 6 * * *" };
     return { seconds: n * 3600, cron: n === 1 ? "17 * * * *" : `17 */${n} * * *` };
   }
   m = t.match(/^(\d+)\s*m(?:in(?:utes?)?)?$/);
   if (m) {
     const n = Number(m[1]);
-    if (n < 5 || n >= 60) return null;
+    if (n === 60) return { seconds: 3600, cron: "17 * * * *" };
+    if (n < 5 || n >= 60 || 60 % n !== 0) return null;
     return { seconds: n * 60, cron: `*/${n} * * * *` };
   }
   return null;
+}
+
+/**
+ * Apply the picked judge to the config's defaults. Clearing the OTHER mode's
+ * leftovers is the point: an adopted config may carry `judge: "off"` from an
+ * earlier setup, and `runWatch` reads that field first — a newly picked
+ * engine would silently never judge under it.
+ */
+export function applyJudgeChoice(defaults: Partial<WatchRepoConfig>, judge: JudgeOption): void {
+  if (judge.engine === "off") {
+    defaults.judge = "off";
+    delete defaults.engine;
+    delete defaults.model;
+    delete defaults.openaiUrl;
+    return;
+  }
+  delete defaults.judge;
+  defaults.engine = judge.engine;
+  defaults.escalate ??= "auto";
+  if (judge.engine !== "openai") {
+    // A model name adopted from an earlier local-server setup means nothing
+    // to claude-cli/api — the default (haiku) does.
+    delete defaults.model;
+    delete defaults.openaiUrl;
+  }
 }
 
 /** POSIX single-quote: closes, escapes the quote, reopens. */
@@ -89,6 +119,7 @@ function xmlEsc(s: string): string {
  * profile is where the operator already solved that.
  */
 export function launchdPlist(opts: {
+  label: string;
   node: string;
   bin: string;
   config: string;
@@ -100,7 +131,7 @@ export function launchdPlist(opts: {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>Label</key><string>comparereleaseii.watch</string>
+  <key>Label</key><string>${xmlEsc(opts.label)}</string>
   <key>ProgramArguments</key><array>
     <string>/bin/sh</string><string>-lc</string>
     <string>${xmlEsc(cmd)}</string>
@@ -126,7 +157,9 @@ export function cronLine(opts: {
   );
 }
 
-function expandHome(p: string): string {
+/** `~` is the first thing a user types at a path prompt; the shell is not
+ * there to expand it. */
+export function expandHome(p: string): string {
   return p === "~" || p.startsWith("~/") ? join(homedir(), p.slice(1)) : p;
 }
 
@@ -216,15 +249,10 @@ export async function runWatchSetup(): Promise<number> {
       else console.error(`Expected a number 1-${options.length}.`);
     }
     config.defaults ??= {};
-    if (judge.engine === "off") {
-      config.defaults.judge = "off";
-    } else {
-      config.defaults.engine = judge.engine;
-      config.defaults.escalate ??= "auto";
-      if (judge.engine === "openai") {
-        const rc = await configureLocalJudge(config, judge.openaiUrl!, ask, yes);
-        if (rc !== undefined) return rc;
-      }
+    applyJudgeChoice(config.defaults, judge);
+    if (judge.engine === "openai") {
+      const rc = await configureLocalJudge(config, judge.openaiUrl!, ask, yes);
+      if (rc !== undefined) return rc;
     }
 
     // 4. Repos — the GitHub account picker stays `watch init`; here entries
@@ -267,7 +295,11 @@ export async function runWatchSetup(): Promise<number> {
       const every = await ask('How often should watch run? ("30m", "6h", "daily")', "6h");
       if (every === null) return cancelled();
       spec = scheduleSpec(every);
-      if (!spec) console.error('Expected minutes ("30m", at least 5m), hours ("6h") or "daily".');
+      if (!spec) {
+        console.error(
+          'Expected "daily", hours dividing 24 ("1h", "6h", "12h"), or minutes dividing 60, at least 5 ("15m", "30m").',
+        );
+      }
     }
 
     // 6. Notify — fired once as a test against a throwaway JSON, so a typo'd
@@ -286,8 +318,18 @@ export async function runWatchSetup(): Promise<number> {
         JSON.stringify({ setupTest: true, note: "comparereleaseii watch setup — notify hook test" }, null, 2),
       );
       console.error("Firing the notify hook once as a test…");
-      await runNotify(notifyAns, testPath);
-      await unlink(testPath).catch(() => {});
+      const ok = await runNotify(notifyAns, testPath);
+      await rm(tmp, { recursive: true, force: true }).catch(() => {});
+      if (!ok) {
+        // The test-fire exists so a typo fails HERE, not on the first
+        // flagged release — a failing command must not slide into the config.
+        const keep = await ask("The notify command failed — keep it in the config anyway? (y/n)", "n");
+        if (keep === null) return cancelled();
+        if (!yes(keep)) {
+          delete config.notify;
+          console.error('Notify hook dropped — add one later as "notify" in the config.');
+        }
+      }
     }
 
     // Every answer is in — now the writes, all of them under `dir`.
@@ -300,18 +342,32 @@ export async function runWatchSetup(): Promise<number> {
     let activate: string;
     let deactivate: string;
     if (process.platform === "darwin") {
-      schedulePath = join(dir, "comparereleaseii.watch.plist");
-      await writeFile(schedulePath, launchdPlist({ node, bin, config: configPath, logPath, seconds: spec.seconds }));
+      // The label carries the home dir's name so two watch homes can
+      // coexist; the activation COPIES the plist into ~/Library/LaunchAgents
+      // because that is the only place launchd reloads it from after a
+      // reboot — bootstrapping the file here would last until logout.
+      const label = `comparereleaseii.watch.${safeSegment(basename(dir))}`;
+      const name = `${label}.plist`;
+      schedulePath = join(dir, name);
+      await writeFile(
+        schedulePath,
+        launchdPlist({ label, node, bin, config: configPath, logPath, seconds: spec.seconds }),
+      );
       const uid = process.getuid?.() ?? "$(id -u)";
-      activate = `launchctl bootstrap gui/${uid} ${shq(schedulePath)}`;
-      deactivate = `launchctl bootout gui/${uid}/comparereleaseii.watch`;
+      const installed = join(homedir(), "Library", "LaunchAgents", name);
+      activate =
+        `cp ${shq(schedulePath)} ${shq(installed)} && launchctl bootstrap gui/${uid} ${shq(installed)}`;
+      deactivate = `launchctl bootout gui/${uid}/${label} && rm ${shq(installed)}`;
     } else {
       schedulePath = join(dir, "watch.cron");
       await writeFile(schedulePath, cronLine({ node, bin, config: configPath, logPath, cron: spec.cron }) + "\n");
-      activate = `( crontab -l 2>/dev/null; cat ${shq(schedulePath)} ) | crontab -`;
+      // Guarded on the config path so pasting it twice cannot double the
+      // schedule — cron happily runs the same line as often as it appears.
+      activate = `crontab -l 2>/dev/null | grep -qF ${shq(configPath)} || ( crontab -l 2>/dev/null; cat ${shq(schedulePath)} ) | crontab -`;
       deactivate = "crontab -e   # delete the comparereleaseii line";
     }
 
+    const prog = process.env.COMPARERELEASE_PROG ?? "comparerelease";
     console.error(
       `\nSetup complete — files written, nothing installed:\n` +
         `  config    ${configPath} (${config.repos.length} repo(s))\n` +
@@ -319,12 +375,12 @@ export async function runWatchSetup(): Promise<number> {
         `  reports   ${join(dir, "reports")} — index.html after the first run\n` +
         `  schedule  ${schedulePath}\n` +
         `\nFirst run — seeds the state and produces the index:\n` +
-        `  ${node} ${bin} watch --config ${configPath}\n` +
+        `  ${shq(node)} ${shq(bin)} watch --config ${shq(configPath)}\n` +
         `\nActivate the schedule (this is the one thing setup does not do):\n` +
         `  ${activate}\n` +
         `  (undo: ${deactivate})\n` +
-        `\nGrow the list anytime: watch init --config ${configPath} (pick from your GitHub\n` +
-        `account), watch add owner/repo, watch add --repo-url https://forge/owner/repo.`,
+        `\nGrow the list anytime: ${prog} watch init --config ${shq(configPath)} (pick from\n` +
+        `your GitHub account), ${prog} watch add owner/repo, ${prog} watch add --repo-url <url>.`,
     );
     return 0;
   } finally {

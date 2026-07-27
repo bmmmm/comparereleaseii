@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cronLine, judgeOptions, launchdPlist, scheduleSpec } from "../src/setup.ts";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import {
+  applyJudgeChoice,
+  cronLine,
+  expandHome,
+  judgeOptions,
+  launchdPlist,
+  scheduleSpec,
+} from "../src/setup.ts";
+import type { WatchRepoConfig } from "../src/watch.ts";
 
 test("scheduleSpec: hours, minutes and daily; nonsense and sub-5m refused", () => {
   assert.deepEqual(scheduleSpec("6h"), { seconds: 21_600, cron: "17 */6 * * *" });
@@ -9,11 +19,45 @@ test("scheduleSpec: hours, minutes and daily; nonsense and sub-5m refused", () =
   assert.deepEqual(scheduleSpec("30m"), { seconds: 1800, cron: "*/30 * * * *" });
   assert.deepEqual(scheduleSpec("daily"), { seconds: 86_400, cron: "17 6 * * *" });
   assert.deepEqual(scheduleSpec("24h"), scheduleSpec("daily"));
+  assert.deepEqual(scheduleSpec("60m"), scheduleSpec("1h"));
   // Under five minutes is polling, not watching; zero and prose are noise.
   assert.equal(scheduleSpec("3m"), null);
   assert.equal(scheduleSpec("0h"), null);
   assert.equal(scheduleSpec("25h"), null);
   assert.equal(scheduleSpec("whenever"), null);
+  // Non-divisors would give cron a ragged schedule (`*/7` fires at :56 then
+  // :00) that silently diverges from launchd's exact interval.
+  assert.equal(scheduleSpec("7m"), null);
+  assert.equal(scheduleSpec("7h"), null);
+  assert.equal(scheduleSpec("13h"), null);
+});
+
+test("applyJudgeChoice clears the other mode's leftovers", () => {
+  // An adopted config carrying judge:"off" from an earlier setup must not
+  // silently disable the engine picked now — runWatch reads judge first.
+  const defaults: Partial<WatchRepoConfig> = { judge: "off", notifyBelow: 50 };
+  applyJudgeChoice(defaults, { engine: "claude-cli", note: "" });
+  assert.deepEqual(defaults, { engine: "claude-cli", escalate: "auto", notifyBelow: 50 });
+
+  // And the way back: picking off clears the engine trio.
+  applyJudgeChoice(defaults, { engine: "off", note: "" });
+  assert.deepEqual(defaults, { judge: "off", escalate: "auto", notifyBelow: 50 });
+
+  // A local model's name means nothing to claude-cli/api.
+  const local: Partial<WatchRepoConfig> = {
+    engine: "openai",
+    model: "qwen3.5",
+    openaiUrl: "http://127.0.0.1:8010/v1",
+  };
+  applyJudgeChoice(local, { engine: "api", note: "" });
+  assert.deepEqual(local, { engine: "api", escalate: "auto" });
+});
+
+test("expandHome expands the tilde a path prompt receives", () => {
+  assert.equal(expandHome("~/release-watch"), join(homedir(), "release-watch"));
+  assert.equal(expandHome("~"), homedir());
+  assert.equal(expandHome("/opt/watch"), "/opt/watch");
+  assert.equal(expandHome("not~home"), "not~home");
 });
 
 test("judgeOptions: what the machine offers, best first, off always last", () => {
@@ -31,19 +75,23 @@ test("judgeOptions: what the machine offers, best first, off always last", () =>
   assert.deepEqual(bare.map((o) => o.engine), ["off"]);
 });
 
-test("launchd plist: sh -lc command, interval, log — hostile paths stay quoted", () => {
+test("launchd plist: label, sh -lc command, interval, log — hostile paths stay quoted", () => {
   const plist = launchdPlist({
+    label: "comparereleaseii.watch.release-watch",
     node: "/usr/local/bin/node",
     bin: "/Users/o'brien/comparereleaseii/bin/comparerelease.mjs",
     config: "/Users/o'brien/release-watch/watch.json",
     logPath: "/Users/o'brien/release-watch/watch.log",
     seconds: 21_600,
   });
+  assert.ok(
+    plist.includes("<string>comparereleaseii.watch.release-watch</string>"),
+    "label carries the home dir's name so two watch homes can coexist",
+  );
   assert.ok(plist.includes("<integer>21600</integer>"), "interval carried");
   assert.ok(plist.includes("<string>/bin/sh</string><string>-lc</string>"), "login shell for PATH");
   // The apostrophe must close-escape-reopen, or the path would end the quote.
   assert.ok(plist.includes("o'\\''brien"), "single quotes escaped for sh");
-  assert.ok(!/<string>[^<]*'[^\\]/.test(plist.split("ProgramArguments")[0]), "label stays clean");
   assert.ok(plist.includes("watch --config"), "runs watch against the config");
 });
 

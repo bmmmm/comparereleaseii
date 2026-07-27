@@ -175,3 +175,16 @@ test("addRepoUrl dedupes on the URL; removeRepo drops URL entries by URL", () =>
   assert.equal(removeRepo(config, "o/r"), 1);
   assert.equal(config.repos.length, 0);
 });
+
+test("URL spellings normalize: .git and trailing slash are the same repo", () => {
+  // Exact-string dedupe stored the same repository twice — two state keys,
+  // two report directories, one repo — and `remove <url>/` removed nothing
+  // while claiming idempotence.
+  const config: WatchConfig = { repos: [] };
+  assert.equal(addRepoUrl(config, "https://gitea.com/gitea/tea"), true);
+  assert.equal(addRepoUrl(config, "https://gitea.com/gitea/tea.git"), false);
+  assert.equal(addRepoUrl(config, "https://gitea.com/gitea/tea/"), false);
+  assert.equal(config.repos.length, 1);
+  assert.equal(removeRepo(config, "https://gitea.com/gitea/tea.git"), 1);
+  assert.equal(config.repos.length, 0);
+});

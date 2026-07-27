@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { lstat, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -80,9 +81,16 @@ export function safeSegment(name: string): string {
  * fallback keyed by owner/repo slug: the same repository cloned twice into
  * two directories that could then drift. Trailing `.git` and `/` are
  * stripped so the spellings every forge prints land in the same clone.
+ *
+ * The hash suffix keys the directory by the EXACT url: safeSegment maps
+ * `o/r`, `o_r` and long URLs past its cap to one segment, and two different
+ * repositories sharing a clone directory means one silently checks the
+ * other's code.
  */
 export async function cloneDirFor(url: string): Promise<string | null> {
   const clones = await cacheDir("clones");
   if (!clones) return null;
-  return join(clones, safeSegment(url.replace(/\/+$/, "").replace(/\.git$/, "")));
+  const canonical = url.replace(/\/+$/, "").replace(/\.git$/, "");
+  const hash = createHash("sha256").update(canonical).digest("hex").slice(0, 8);
+  return join(clones, `${safeSegment(canonical)}-${hash}`);
 }

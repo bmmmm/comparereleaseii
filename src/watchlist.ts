@@ -83,18 +83,32 @@ export function addRepos(
   return { added, skipped };
 }
 
+/**
+ * One spelling per repository: trailing slashes and `.git` are the variants
+ * every forge prints for the same URL, and an exact-string dedupe would store
+ * them as two entries — two state keys, two report directories, one repo.
+ */
+export function normalizeRepoUrl(url: string): string {
+  return url.replace(/\/+$/, "").replace(/\.git$/, "");
+}
+
 /** Add a forge-URL entry unless the URL is already watched. */
 export function addRepoUrl(config: WatchConfig, repoUrl: string): boolean {
-  if (config.repos.some((r) => r.repoUrl === repoUrl)) return false;
-  config.repos.push({ repoUrl });
+  const url = normalizeRepoUrl(repoUrl);
+  if (config.repos.some((r) => r.repoUrl && normalizeRepoUrl(r.repoUrl) === url)) return false;
+  config.repos.push({ repoUrl: url });
   return true;
 }
 
 /** Remove every entry for the repo — owner/repo or a forge URL; returns how
- * many were removed. */
+ * many were removed. URL entries match under normalization, so the spelling
+ * the user types (with `/` or `.git`) removes the entry that add stored. */
 export function removeRepo(config: WatchConfig, repo: string): number {
   const before = config.repos.length;
-  config.repos = config.repos.filter((r) => (r.repo ?? r.repoUrl) !== repo);
+  const url = normalizeRepoUrl(repo);
+  config.repos = config.repos.filter(
+    (r) => (r.repoUrl ? normalizeRepoUrl(r.repoUrl) !== url : r.repo !== repo),
+  );
   return before - config.repos.length;
 }
 
@@ -374,11 +388,13 @@ export async function probeForgeUrl(repoUrl: string): Promise<{
   kind: "forgejo" | "gitlab";
   hasStableRelease: boolean;
 }> {
-  const url = assertCloneUrl(repoUrl.replace(/\/+$/, ""));
+  const url = assertCloneUrl(normalizeRepoUrl(repoUrl));
   const parsed = parseRepoUrl(url);
   if (!parsed) {
     throw new Error(
-      `Cannot read owner/repo from "${url}" — expected a forge URL like https://forge.example.com/owner/repo.`,
+      `Cannot read owner/repo from "${url}" — use the forge's https URL ` +
+        "(https://forge.example.com/owner/repo) or the git@host:owner/repo form; " +
+        "an ssh:// clone URL carries no web origin for the release API.",
     );
   }
   const forge = await fetchForgeReleases(parsed);

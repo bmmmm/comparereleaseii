@@ -137,6 +137,13 @@ export interface WatchedEntry {
   url?: string;
 }
 
+/** One entry's state key and report directory — the single derivation both
+ * the index and the run loop use, so a row can never wait for a check that
+ * is accumulating state under another key. */
+export function entryKey(rc: WatchRepoConfig): string {
+  return rc.label ?? rc.repo ?? rc.repoUrl!;
+}
+
 /** Where a release lives on the web — GitLab spells the route differently. */
 export function releaseWebUrl(link: RepoLink | null, tag: string): string | undefined {
   if (!link) return undefined;
@@ -343,13 +350,17 @@ export function toWatchIndexHtml(
     h.scoreLabel === "unverified" ? "unverified" : h.score >= 85 ? "good" : h.score >= 65 ? "mid" : "bad";
   // A forge entry carries its own web URL; only plain owner/repo entries mean
   // GitHub. A URL-shaped `repo` (unparseable repoUrl) must not be pinned on
-  // github.com just because it contains a slash.
+  // github.com just because it contains a slash. The cell shows owner/repo —
+  // an unlabeled forge entry's key is its whole URL, which belongs in the
+  // title, not across the table.
   const repoCell = (key: string, repo: string, url?: string) => {
+    const shown = key.includes("://") ? repo : key;
+    const title = shown === repo ? (url ?? "") : (url ?? repo);
     const href =
       url ?? (repo.includes("/") && !repo.includes("://") ? `https://github.com/${repo}` : null);
     return href
-      ? `<a class="repo" href="${esc(href)}" target="_blank" rel="noopener"${key === repo ? "" : ` title="${esc(repo)}"`}>${esc(key)}</a>`
-      : esc(key);
+      ? `<a class="repo" href="${esc(href)}" target="_blank" rel="noopener"${title ? ` title="${esc(title)}"` : ""}>${esc(shown)}</a>`
+      : esc(shown);
   };
   const rows = withData
     .map(({ key, repo, url, rs }) => {
@@ -513,18 +524,18 @@ async function saveState(path: string, state: WatchState): Promise<void> {
  * shell; the two sanitizers upstream (`safeSegment`, `sanitizeTag`) would then
  * be the only thing left, and defence in depth is the point.
  */
-export function runNotify(cmd: string, jsonPath: string): Promise<void> {
+export function runNotify(cmd: string, jsonPath: string): Promise<boolean> {
   return new Promise((done) => {
     const child = spawn("sh", ["-c", `${cmd} "$1"`, "sh", jsonPath], {
       stdio: ["ignore", "inherit", "inherit"],
     });
     child.on("close", (code) => {
       if (code !== 0) console.error(`warning: notify command exited with ${code}`);
-      done();
+      done(code === 0);
     });
     child.on("error", (err) => {
       console.error(`warning: notify command failed to start: ${err.message}`);
-      done();
+      done(false);
     });
   });
 }
@@ -546,6 +557,15 @@ export async function runWatch(
   if (!Array.isArray(config.repos) || !config.repos.length) {
     throw new Error('Watch config needs a non-empty "repos" array — see docs/watchdog.md.');
   }
+  // A repository name in defaults would merge into EVERY entry — the
+  // per-entry validation below could then never see a clean entry again,
+  // and `{...defaults, ...entry}` would silently give repo-entries a
+  // repoUrl too (two different state keys for one entry).
+  if (config.defaults?.repo || config.defaults?.repoUrl) {
+    throw new Error(
+      'Watch config: "defaults" cannot name a repository — "repo"/"repoUrl" belong on the entries.',
+    );
+  }
   for (const r of config.repos) {
     if (r.repo && r.repoUrl) {
       throw new Error(
@@ -556,7 +576,9 @@ export async function runWatch(
       assertCloneUrl(r.repoUrl);
       if (!parseRepoUrl(r.repoUrl)) {
         throw new Error(
-          `Watch config: cannot read owner/repo from "repoUrl": ${JSON.stringify(r.repoUrl)} — expected a forge URL like https://forge.example.com/owner/repo.`,
+          `Watch config: cannot read owner/repo from "repoUrl": ${JSON.stringify(r.repoUrl)} — ` +
+            "use the forge's https URL (https://forge.example.com/owner/repo) or the " +
+            "git@host:owner/repo form; an ssh:// clone URL carries no web origin for the release API.",
         );
       }
     } else if (!r.repo?.includes("/")) {
@@ -599,12 +621,12 @@ export async function runWatch(
     if (rc.repoUrl) {
       const parsed = parseRepoUrl(rc.repoUrl);
       return {
-        key: rc.label ?? rc.repoUrl,
+        key: entryKey(rc),
         repo: parsed ? `${parsed.owner}/${parsed.repo}` : rc.repoUrl,
         ...(parsed ? { url: `${parsed.origin}/${parsed.owner}/${parsed.repo}` } : {}),
       };
     }
-    return { key: rc.label ?? rc.repo!, repo: rc.repo! };
+    return { key: entryKey(rc), repo: rc.repo! };
   });
   // Regenerated after every check, not just at the end — a long first run
   // over many repos should have a live dashboard, not a blank page.
@@ -618,7 +640,7 @@ export async function runWatch(
 
   for (const entry of config.repos) {
     const rc: WatchRepoConfig = { ...config.defaults, ...entry };
-    const key = rc.label ?? rc.repo ?? rc.repoUrl!;
+    const key = entryKey(rc);
     const repoState: RepoState = state.repos[key] ?? {
       lastPublishedAt: null,
       lastTag: null,
@@ -822,6 +844,11 @@ export async function runWatch(
         await saveState(statePath, state);
         await writeIndex();
       } catch (err) {
+        // FIXME: `break` assumes the failure is transient. A permanently
+        // failing release (e.g. a tag-only forge release with an empty body
+        // -> "No claims found") wedges the repo: state never advances past
+        // it, so newer releases are never checked. Distinguish permanent
+        // shapes and skip them with a warning instead.
         console.error(`${key}: checking ${rel.tag} failed — ${(err as Error).message}`);
         codes.push(2);
         break; // keep state before the failed release; retried next run

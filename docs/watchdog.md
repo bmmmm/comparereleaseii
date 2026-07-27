@@ -116,8 +116,8 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
 
 `defaults` applies to every repo; each entry can override it. Exactly one of
 `repo` (GitHub) and `repoUrl` (any Forgejo/Gitea/GitLab URL) per entry; a
-`repoUrl` entry's state key and report directory are the URL unless `label`
-renames them. Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
+`repoUrl` entry's state key is the URL unless `label` renames it, and its
+report directory is the URL's path-safe form (`https_gitea.com_gitea_tea`). Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
 `escalate`, `escalateModel`, `failOn`, `baseline`, `concurrency`,
 `includePrerelease`, `notifyBelow`, `notesFile`, `label`. Relative paths
 (`reportsDir`, `stateFile`, `notesFile`) resolve against the config file's
@@ -209,11 +209,14 @@ file.)
 home directory (config, state, reports and log in one place, default
 `~/release-watch/`), judge (detected from this machine, with the calibration
 gate one answer away for a local model), schedule, and an optional notify
-hook (test-fired once) — then writes the config and the launchd plist or
-crontab line and **prints** the command that activates the schedule. It only
-ever writes files; nothing is installed. An existing config or state file is
-adopted, not overwritten. The recipes below are what it generates, for anyone
-wiring things by hand.
+hook (test-fired once — a failing command is dropped unless kept
+deliberately) — then writes the config and the launchd plist or crontab line
+and **prints** the command that activates the schedule (on macOS: copy the
+plist into `~/Library/LaunchAgents` + `launchctl bootstrap`, so it survives
+reboots; on cron: an append guarded against double-pasting). It only ever
+writes files; nothing is installed. An existing config or state file is
+adopted, not overwritten. The hand-wired recipes below do the same thing and
+show the moving parts.
 
 ### cron
 

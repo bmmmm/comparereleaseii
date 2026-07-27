@@ -448,6 +448,10 @@ test("toWatchIndexHtml links forge entries to their forge, never to GitHub", () 
     "release links to the forge's release page",
   );
   assert.ok(!html.includes("github.com"), "nothing points at GitHub for a forge entry");
+  // The cell SHOWS owner/repo — an unlabeled forge entry's key is its whole
+  // URL, which belongs in the title, not across the table.
+  assert.ok(html.includes(">gitea/tea</a>"), "cell text is the slug, not the URL");
+  assert.ok(!html.includes(">https://gitea.com/gitea/tea</a>"), "the URL is not the link text");
 });
 
 test("a URL-shaped repo without a forge link is not pinned on github.com", () => {
@@ -483,6 +487,12 @@ test("watch config validation: exactly one of repo and repoUrl per entry", async
   await assert.rejects(
     runWatch({ repos: [{ repoUrl: "--upload-pack=evil" }] }, opts),
     /may not start with "-"/,
+  );
+  // A repository name in defaults would merge into every entry and split the
+  // index key from the run-loop key — refused up front.
+  await assert.rejects(
+    runWatch({ repos: [{ repo: "o/r" }], defaults: { repoUrl: "https://f/o/r" } }, opts),
+    /"defaults" cannot name a repository/,
   );
 });
 
