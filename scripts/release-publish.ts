@@ -42,9 +42,6 @@ const subject = git("log", "-1", "--format=%s");
 const prefix = `Release ${tag}: `;
 const title = subject.startsWith(prefix) ? subject.slice(prefix.length) : tag;
 
-console.error(`Tagging ${tag}...`);
-git("tag", "-a", tag, "-m", `${tag} — ${title}`);
-
 // Releases land on the default branch, whatever HEAD is called locally. A
 // worktree on a topic branch (or a detached HEAD) whose tip IS the release
 // used to push that topic branch to every remote — the 0.2.2 release needed
@@ -66,6 +63,46 @@ if (pushRef !== branch) {
 }
 const remotes = git("remote").split("\n").filter(Boolean);
 if (remotes.length === 0) fail("No git remotes configured — nothing to push to.");
+
+/** Same line = one is an ancestor of the other (or they are equal). */
+function onOneLine(a: string, b: string): boolean {
+  if (spawnSync("git", ["merge-base", "--is-ancestor", a, b]).status === 0) return true;
+  return spawnSync("git", ["merge-base", "--is-ancestor", b, a]).status === 0;
+}
+
+// The forges must sit on ONE line before anything is pushed to all of them.
+// Lag is fine — the public mirror trailing the private forge between releases
+// is the intended state — but DIVERGENCE means the release push would update
+// one forge and be refused by the other, leaving the release half-published.
+// Lived through 2026-07-27: two variants of the same commit on origin/main
+// vs github/main, and the github push died at the leak gate. Divergence
+// needs a history decision no script should make; checked BEFORE the tag
+// exists, so an aborted release leaves nothing behind.
+if (remotes.length > 1) {
+  const tips: Array<{ remote: string; sha: string }> = [];
+  for (const remote of remotes) {
+    if (spawnSync("git", ["fetch", "--quiet", remote, defaultBranch], { stdio: "inherit" }).status !== 0) {
+      fail(`git fetch ${remote} ${defaultBranch} failed — cannot verify the forges agree before releasing.`);
+    }
+    try {
+      tips.push({ remote, sha: git("rev-parse", `refs/remotes/${remote}/${defaultBranch}`) });
+    } catch {
+      // remote has no default branch yet (fresh mirror) — nothing to disagree with
+    }
+  }
+  for (let i = 1; i < tips.length; i++) {
+    if (!onOneLine(tips[0].sha, tips[i].sha)) {
+      fail(
+        `${tips[0].remote}/${defaultBranch} (${tips[0].sha.slice(0, 7)}) and ${tips[i].remote}/${defaultBranch} ` +
+          `(${tips[i].sha.slice(0, 7)}) have DIVERGED — a release would land on one forge and be refused by ` +
+          `the other. Decide which line wins, bring both remotes onto it, then re-run. Nothing was tagged or pushed.`,
+      );
+    }
+  }
+}
+
+console.error(`Tagging ${tag}...`);
+git("tag", "-a", tag, "-m", `${tag} — ${title}`);
 
 let githubRepo: string | null = null;
 for (const remote of remotes) {
