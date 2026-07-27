@@ -52,7 +52,7 @@ Three ways to run it, the same CLI behind all of them:
   scripts, put the short name on your `PATH` from inside the checkout:
   `ln -s "$PWD/bin/comparerelease.mjs" ~/.local/bin/comparerelease`.
 - **CI** — the repo doubles as a [GitHub Action](#run-it-continuously):
-  `uses: bmmmm/comparereleaseii@v0.4.0`, nothing to clone.
+  `uses: bmmmm/comparereleaseii@v0.5.0`, nothing to clone.
 
 Requirements: Node ≥ 24, a judge, and whatever the source needs — see
 [Sources](#sources) below; GitHub wants an authenticated
@@ -265,7 +265,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: bmmmm/comparereleaseii@v0.4.0
+      - uses: bmmmm/comparereleaseii@v0.5.0
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```

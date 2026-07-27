@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.5.0 — 2026-07-28
+
 ### Added
 
 - **Every repo gets a history page; the watch index becomes a dashboard.** The state has carried up to 20 checks per repo while the index rendered six trend dots — the accumulated record had no view. `reports/<repo>/index.html` now shows the full trust-score series against the repo's own median (flagged checks ringed red, every dot opening that release's report), the verdict composition of each check, the releases table with flags and notices, and the promise ledger with its carry countdown toward stale ("carry 7/10"). The index itself aggregates the watchlist in tiles (repos, flagged, broken promises, a score distribution in the row buckets), sorts its columns on click with pending rows pinned last, filters to flagged rows on a toggle, and closes with a release feed along the other axis: every checked release across all repos, newest first. All regenerated from the same state on every write, so no page can disagree with another; history pages land in each repo's own report directory whatever layout the state was written under, legacy nested paths included.
