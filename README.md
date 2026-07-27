@@ -122,12 +122,20 @@ covers — auto-generated `Title by @user in #N` entries carry only ¼ weight
 (handwritten claims are where notes lie), and vague claims ("Updates and
 fixes") flip the question: the judge lists what the note *hides*.
 
+Notes also commit to the future — "deprecated, will be removed in 2.0".
+Those become **promises**: each release checks its predecessor's promises
+against the actual diff and reports them kept, broken or still-open —
+informational, never a score component, since a promise is about a later
+release than the one being scored. `watch` carries still-open promises
+across releases until they resolve, or until they age out visibly as stale.
+
 Every run computes an explainable **trust score** (0–100) from correctness,
 completeness and risk. Contradicted claims or critical flags cap it — a fake
 release cannot average itself back to green. With `--baseline <n>` the repo's
 own release history becomes an anomaly baseline (unusual size, first-time
-authors on sensitive paths, first-ever binaries) — on any source, not just
-GitHub. Exact formulas, weights and flag severities: [SCORING.md](SCORING.md).
+authors on sensitive paths, a known author email arriving on the wrong
+forge account — the git email is forgeable, the account is not —
+first-ever binaries) — on any source, not just GitHub. Exact formulas, weights and flag severities: [SCORING.md](SCORING.md).
 
 Writing notes instead of checking them? `--suggest` drafts a line for each
 high-churn undocumented commit from its actual diff, and
@@ -282,15 +290,14 @@ No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
 ### Releasing
 
 Releasing happens from a dev machine — no repo secrets, no CI involvement,
-the judge runs where it always runs for us: locally. Bump `package.json`
-(`pnpm test` then names every recipe still pinning the old tag), write the
-version's [CHANGELOG.md](CHANGELOG.md) section, then:
+the judge runs where it always runs for us: locally. Write the release's
+notes into the CHANGELOG's `Unreleased` section as you go, then:
 
 ```console
-$ pnpm dogfood                    # our notes checked by our own checker — < 90 blocks
+$ pnpm release:prepare X.Y.Z      # bump + CHANGELOG section + version pins; gates on tests and dogfood (< 90 blocks)
 $ node src/cli.ts --calibrate     # judge drift check against the golden set
-$ git tag vX.Y.Z && git push origin main --tags && git push github main --tags
-$ gh release create vX.Y.Z --notes-file <notes>   # check-release-notes.yml re-checks it
+$ git add -u && git commit -m "Release vX.Y.Z: <short pitch>"
+$ pnpm release:publish            # tag, push to every remote (HEAD:main even from a worktree), GitHub release
 $ gh workflow run bump-pin.yml --repo bmmmm/gh-comparereleaseii   # pin now, not tomorrow
 ```
 
