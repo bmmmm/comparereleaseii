@@ -12,6 +12,7 @@ import {
   scoreBaseline,
   worstExit,
   toWatchIndexHtml,
+  toWatchAtomFeed,
   carriedFromLedger,
   capLedger,
   MAX_PROMISE_LEDGER,
@@ -215,7 +216,8 @@ test("toWatchIndexHtml marks flagged repos red and sorts them first", () => {
   const goodIdx = html.indexOf("good/repo");
   assert.ok(badIdx < goodIdx, "flagged repo sorts first");
   assert.ok(html.includes('href="x/v9.html"'));
-  assert.ok(html.includes("2 repos watched · 1 flagged"));
+  assert.ok(html.includes('<div class="n">2</div><div class="t">repos watched</div>'));
+  assert.ok(html.includes('<div class="n">1</div><div class="t">flagged</div>'));
 });
 
 test("toWatchIndexHtml: whole rows link to the report, repos link to GitHub", () => {
@@ -255,7 +257,9 @@ test("toWatchIndexHtml: trend needs history — one check renders no dots, two r
       },
     },
   };
-  assert.ok(!toWatchIndexHtml(one, "t").includes('class="dot '), "single check: no trend dots");
+  // The distribution legend also uses dot spans, so the discriminating
+  // signal for "no trend" is the report-linked dot, not the dot class.
+  assert.ok(!toWatchIndexHtml(one, "t").includes('title="v1: 95"'), "single check: no trend dots");
   const two: WatchState = {
     version: 1,
     repos: {
@@ -278,7 +282,8 @@ test("toWatchIndexHtml: configured repos without a check yet get a pending row",
   ]);
   assert.ok(html.includes("waiting for the first release check"));
   assert.ok(html.includes("fresh/repo"));
-  assert.ok(html.includes("1 repos watched · 0 flagged"));
+  assert.ok(html.includes('<div class="n">1</div><div class="t">repos watched</div>'));
+  assert.ok(html.includes('<div class="n">0</div><div class="t">flagged</div>'));
 });
 
 test("toWatchIndexHtml: state entries dropped from the config are not rendered", () => {
@@ -530,4 +535,118 @@ test("toWatchIndexHtml links each checked repo row to its history page", () => {
   // The history dir is derived from the report path, so old states keep
   // working whatever their directory naming was.
   assert.ok(html.includes('href="x/index.html"'), "trend cell links the history page");
+});
+
+test("the index aggregates the watchlist: tiles, distribution, broken promises", () => {
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "a/a": {
+        lastPublishedAt: "t", lastTag: "v1",
+        latest: { ...checked("v1", 95, false), brokenPromises: 2 },
+        history: [checked("v1", 95, false)],
+      },
+      "b/b": {
+        lastPublishedAt: "t", lastTag: "v2",
+        latest: checked("v2", 40, true),
+        history: [checked("v2", 40, true)],
+      },
+      "c/c": {
+        lastPublishedAt: "t", lastTag: "v3",
+        latest: { ...checked("v3", 65, false), scoreLabel: "unverified" },
+        history: [checked("v3", 65, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t", [
+    { key: "a/a", repo: "a/a" },
+    { key: "b/b", repo: "b/b" },
+    { key: "c/c", repo: "c/c" },
+    { key: "d/d", repo: "d/d" },
+  ]);
+  assert.ok(html.includes('<div class="n">4</div><div class="t">repos watched</div>'));
+  assert.ok(html.includes('<div class="n">1</div><div class="t">flagged</div>'));
+  assert.ok(html.includes('<div class="n">2</div><div class="t">broken promises</div>'));
+  // Distribution counts the three checked repos in their buckets. The
+  // unverified latest is scoreLabel "unverified" only in `latest`, not in
+  // history — the tiles read latest.
+  assert.ok(html.includes('title="1 repo(s) at 85+"'));
+  assert.ok(html.includes('title="1 repo(s) at &lt;65"'));
+  assert.ok(html.includes('title="1 repo(s) at unverified"'));
+});
+
+test("index rows carry sortable data and the headers offer the sorts", () => {
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "a/a": {
+        lastPublishedAt: "t", lastTag: "v1",
+        latest: { ...checked("v1", 95, false), criticalFlags: 2, flagCount: 3 },
+        history: [checked("v1", 95, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t", [{ key: "a/a", repo: "a/a" }]);
+  assert.ok(html.includes('data-score="95"'));
+  assert.ok(html.includes('data-flags="2003"'), "critical flags outrank the plain count");
+  assert.ok(html.includes('data-released="2026-07-20T00:00:00Z"'));
+  for (const key of ["repo", "released", "score", "flags", "checked"]) {
+    assert.ok(html.includes(`data-sort="${key}"`), `sortable header ${key}`);
+  }
+  assert.ok(html.includes('id="flagged-only"'), "the flagged-only toggle exists");
+  assert.ok(html.includes("body.only-flagged"), "…and has a rule to act on");
+});
+
+test("the release feed reads across repos, newest release first", () => {
+  const older = { ...checked("v1", 90, false), publishedAt: "2026-07-01T00:00:00Z" };
+  const newer = { ...checked("v9", 50, true), publishedAt: "2026-07-22T00:00:00Z" };
+  const middle = { ...checked("v5", 80, false), publishedAt: "2026-07-10T00:00:00Z" };
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "a/a": { lastPublishedAt: "t", lastTag: "v5", latest: middle, history: [older, middle] },
+      "b/b": { lastPublishedAt: "t", lastTag: "v9", latest: newer, history: [newer] },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t", [
+    { key: "a/a", repo: "a/a" },
+    { key: "b/b", repo: "b/b" },
+  ]);
+  const feed = html.slice(html.indexOf("Release feed"));
+  const posV9 = feed.indexOf(">v9</a>");
+  const posV5 = feed.indexOf(">v5</a>");
+  const posV1 = feed.indexOf(">v1</a>");
+  assert.ok(posV9 !== -1 && posV5 !== -1 && posV1 !== -1, "all checks appear");
+  assert.ok(posV9 < posV5 && posV5 < posV1, "interleaved across repos by release date");
+});
+
+test("the atom feed lists checks newest first with stable ids and relative links", () => {
+  const HOSTILE = `v1"><img/src=x>&<script>`;
+  const first = {
+    ...checked(HOSTILE, 40, true),
+    checkedAt: "2026-07-10T00:00:00Z",
+    report: "x/v1.html",
+    brokenPromises: 1,
+    warnings: ["diff truncated"],
+  };
+  const second = { ...checked("v2", 90, false), checkedAt: "2026-07-20T00:00:00Z" };
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "a/a": { lastPublishedAt: "t", lastTag: "v2", latest: second, history: [first, second] },
+    },
+  };
+  const xml = toWatchAtomFeed(state, "2026-07-26T00:00:00Z", [{ key: "a/a", repo: "a/a" }]);
+  assert.ok(xml.startsWith(`<?xml version="1.0"`));
+  assert.ok(!xml.includes("<img"), "hostile tag cannot become markup");
+  assert.ok(!xml.includes("<script"), "hostile tag cannot become markup");
+  assert.ok(xml.includes("<id>urn:comparereleaseii:a%2Fa:v2</id>"), "id derives from key and tag");
+  assert.ok(xml.includes('href="x/v2.html"'), "links stay relative to the feed");
+  assert.ok(
+    xml.indexOf("v2 — 90/100") < xml.indexOf("40/100"),
+    "entries ordered by checkedAt, newest first",
+  );
+  assert.ok(xml.includes("1 broken promise(s)"));
+  assert.ok(xml.includes("diff truncated"), "partial-data warnings reach the summary");
+  assert.ok(xml.includes("<updated>2026-07-20T00:00:00Z</updated>"), "entry updated = checkedAt");
 });

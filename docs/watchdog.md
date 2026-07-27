@@ -27,7 +27,14 @@ flagged releases; every row links to its full report (click anywhere in the
 row), repo and release link out to their forge, and the score components
 (correctness · completeness · risk) sit next to the trust score. Repos that
 haven't had a release since being added are listed as waiting, so the index
-always mirrors the configured list.
+always mirrors the configured list. Above the table, tiles aggregate the
+watchlist (repos, flagged, broken promises, score distribution); columns
+sort on click and a toggle shows flagged rows only; below it, a release
+feed lists every checked release across repos, newest first. The same feed
+is written as static Atom to `reports/feed.xml` (relative links — serve the
+reports directory and any feed reader can subscribe), and each repo row
+links a `history` page (`reports/<repo>/index.html`) with the full score
+series, verdict composition per release and the promise ledger.
 
 ## How state works
 
