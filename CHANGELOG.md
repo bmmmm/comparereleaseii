@@ -27,6 +27,10 @@ tool is checked with the tool itself before it ships.
 - **`--local .` names the repository after its directory, not ".".** Report
   headers read `Cost estimate — . v0.1.2 → v0.2.0`; the path is resolved
   before its basename becomes the label.
+- **Tokenizer paths are no longer classified as auth/crypto.** The
+  sensitive-path keyword `token` matched `tokenizer.rs`/`tokenize.py` as a
+  substring, producing false "undocumented sensitive change" flags and
+  unnecessary escalation reviews on parser and LLM repos.
 - **A bare tag now finds its `v`-prefixed changelog heading.** Tag `1.0.0`
   with heading `## v1.0.0` failed with "no section" — only the opposite
   mismatch was normalized.

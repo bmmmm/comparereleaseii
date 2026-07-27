@@ -600,3 +600,15 @@ test("a resolution hijack in a lockfile is not invisible", () => {
   assert.ok(flag, `expected a lockfile-source flag, got ${flags.map((f) => f.kind).join(",")}`);
   assert.equal(flag!.severity, "critical", "undocumented is critical, as for a new dependency");
 });
+
+test("tokenizer paths are not auth/crypto", () => {
+  // Every parser/LLM repo has these; a substring "token" match flagged them
+  // sensitive and triggered escalation reviews for nothing.
+  assert.equal(sensitiveCategory("src/tokenizer.rs"), null);
+  assert.equal(sensitiveCategory("lib/tokenize.py"), null);
+  assert.equal(sensitiveCategory("nlp/detokenizer.go"), null);
+  // Real token handling stays sensitive.
+  assert.equal(sensitiveCategory("src/auth/token_store.rs"), "auth/crypto");
+  assert.equal(sensitiveCategory("cmd/tokens.go"), "auth/crypto");
+  assert.equal(sensitiveCategory("app/api_token.ts"), "auth/crypto");
+});

@@ -19,8 +19,11 @@ const DEP_MANIFEST =
   /(^|\/)(Cargo\.(toml|lock)|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|go\.(mod|sum)|requirements[^/]*\.txt|pyproject\.toml|Pipfile(\.lock)?|Gemfile(\.lock)?|composer\.(json|lock)|pom\.xml|build\.gradle(\.kts)?)$/;
 const CI_BUILD =
   /(^|\/)\.(github|gitlab|circleci|woodpecker)\/|(^|\/)(Dockerfile[^/]*|Makefile|justfile|build\.rs|setup\.py|\.pre-commit-config\.yaml|Jenkinsfile)$|\.(gradle|cmake)$/i;
+// `token(?!i[sz])` keeps token/tokens/token_store but not tokenize(r) —
+// every parser and LLM repo has tokenizer paths, and flagging them sensitive
+// fired escalation reviews for nothing.
 const AUTH_CRYPTO =
-  /auth|crypto|token|password|passwd|secret|session|login|signin|permission|policy|acl|sanitiz|escape|csrf|ssrf|xss|jwt|oauth|sso|2fa|totp|webauthn|vault|key(chain|store)/i;
+  /auth|crypto|token(?!i[sz])|password|passwd|secret|session|login|signin|permission|policy|acl|sanitiz|escape|csrf|ssrf|xss|jwt|oauth|sso|2fa|totp|webauthn|vault|key(chain|store)/i;
 const DOC_FILE = /\.(md|markdown|rst|txt|adoc|org)$/i;
 const TEST_FILE =
   /(^|\/)([\w-]*tests?|__tests__|spec|specs|testdata|fixtures)\/|_test\.[a-z0-9]+$|\.(test|spec)\.[a-z0-9]+$/i;
