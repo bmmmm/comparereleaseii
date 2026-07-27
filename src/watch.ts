@@ -136,6 +136,28 @@ export function pickNewReleases(
   return eligible.filter((r) => r.publishedAt! > lastPublishedAt).slice(-cap);
 }
 
+/**
+ * New-but-unchecked releases the maxPerRun cap left behind. Counts only
+ * releases that WOULD have been checked (same eligibility as
+ * pickNewReleases) — counting prereleases here told the operator to raise
+ * maxPerRun to backfill releases that would never be checked anyway.
+ */
+export function countSkipped(
+  releases: ReleaseInfo[],
+  lastPublishedAt: string | null,
+  opts: { includePrerelease?: boolean; cap?: number } = {},
+): number {
+  if (lastPublishedAt === null) return 0;
+  const eligible = releases.filter(
+    (r) =>
+      !r.draft &&
+      r.publishedAt &&
+      (opts.includePrerelease || !r.prerelease) &&
+      r.publishedAt! > lastPublishedAt,
+  );
+  return Math.max(0, eligible.length - (opts.cap ?? 3));
+}
+
 /** Fewer than this many past checks is an accident, not a repo's normal level. */
 const BASELINE_MIN_CHECKS = 3;
 /** A drop this far below the repo's own median is the alarm. */
@@ -508,12 +530,10 @@ export async function runWatch(
       state.repos[key] = repoState;
       continue;
     }
-    const skipped =
-      repoState.lastPublishedAt === null
-        ? 0
-        : releases.filter(
-            (r) => !r.draft && r.publishedAt && r.publishedAt > repoState.lastPublishedAt!,
-          ).length - fresh.length;
+    const skipped = countSkipped(releases, repoState.lastPublishedAt, {
+      includePrerelease: rc.includePrerelease,
+      cap,
+    });
     if (skipped > 0) {
       console.error(
         `${key}: ${skipped} older new release(s) skipped (maxPerRun ${cap} — raise it to backfill).`,

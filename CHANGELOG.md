@@ -27,6 +27,10 @@ tool is checked with the tool itself before it ships.
 - **`--local .` names the repository after its directory, not ".".** Report
   headers read `Cost estimate — . v0.1.2 → v0.2.0`; the path is resolved
   before its basename becomes the label.
+- **Watch's "N older releases skipped" hint counts only checkable
+  releases.** With prereleases excluded (the default), they were still
+  counted as "skipped", telling the operator to raise `maxPerRun` to
+  backfill releases that would never be checked.
 - **The claude-missing fallback no longer auto-picks a model from an
   aggregator.** With no claude CLI and no API key, discovery took the first
   of potentially hundreds of models on an OpenRouter-style server — the

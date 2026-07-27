@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  countSkipped,
   pickNewReleases,
   isFlagged,
   hasDrifted,
@@ -364,4 +365,22 @@ test("the notify command cannot be extended by the report path", async () => {
 
   await assert.rejects(stat(marker), "the path opened a shell");
   assert.equal(await readFile(seen, "utf8"), hostile, "the path did not arrive intact");
+});
+
+test("countSkipped ignores releases that would never be checked", () => {
+  const releases = [
+    { tag: "v2.0.0", publishedAt: "2026-07-20T00:00:00Z", prerelease: false, draft: false },
+    { tag: "v2.0.0-rc2", publishedAt: "2026-07-19T00:00:00Z", prerelease: true, draft: false },
+    { tag: "v2.0.0-rc1", publishedAt: "2026-07-18T00:00:00Z", prerelease: true, draft: false },
+    { tag: "v1.9.0", publishedAt: "2026-07-01T00:00:00Z", prerelease: false, draft: false },
+  ];
+  const last = "2026-07-10T00:00:00Z";
+  // Prereleases are not eligible: nothing was left behind, and the old
+  // "raise maxPerRun to backfill" hint pointed at releases that would never
+  // be checked anyway.
+  assert.equal(countSkipped(releases, last, { cap: 3 }), 0);
+  // With prereleases eligible and a cap of 1, two really are left behind.
+  assert.equal(countSkipped(releases, last, { includePrerelease: true, cap: 1 }), 2);
+  // First run checks only the latest by design — nothing counts as skipped.
+  assert.equal(countSkipped(releases, null, { cap: 1 }), 0);
 });
