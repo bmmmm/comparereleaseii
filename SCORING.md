@@ -172,6 +172,10 @@ A release that lies about one thing does not get to be "82/100, mostly
 fine". The caps put it below every honest-but-sloppy release by
 construction.
 
+The HTML report renders this exact derivation as a waterfall — 100, minus
+each weighted component gap, minus the cap that binds — so a score can be
+read off without opening this file.
+
 | Overall | Label |
 |---|---|
 | ≥ 85 | solid |

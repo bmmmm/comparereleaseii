@@ -6,6 +6,7 @@ import {
   newDependencies,
   opacityIssue,
   computeScores,
+  scoreBreakdown,
   isSourceFile,
   isSourcelessDiff,
   classifyUnverifiable,
@@ -15,7 +16,7 @@ import {
   lockfileSources,
 } from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
-import type { ClaimResult, DiffFile, FileInsight, ReleaseData, RiskFlag } from "../src/types.ts";
+import type { ClaimResult, DiffFile, FileInsight, ReleaseData, Report, RiskFlag } from "../src/types.ts";
 import type { Baseline } from "../src/history.ts";
 import type { Coverage } from "../src/verify.ts";
 
@@ -715,4 +716,115 @@ test("tokenizer paths are not auth/crypto", () => {
   assert.equal(sensitiveCategory("src/auth/token_store.rs"), "auth/crypto");
   assert.equal(sensitiveCategory("cmd/tokens.go"), "auth/crypto");
   assert.equal(sensitiveCategory("app/api_token.ts"), "auth/crypto");
+});
+
+function reportOf(
+  results: ClaimResult[],
+  ratio: number | null,
+  flags: RiskFlag[],
+  unverifiable = false,
+): Report {
+  const scores = computeScores(results, ratio, flags, unverifiable);
+  return {
+    repoLabel: "o/r",
+    baseRef: "v1",
+    headRef: "v2",
+    stats: { commits: 1, files: 1, additions: 1, deletions: 0 },
+    results,
+    uncovered: [],
+    reverseChecked: true,
+    metrics: {
+      scores,
+      flags,
+      files: [],
+      churnCoveredRatio: ratio,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      baseline: null,
+      unverifiable: unverifiable ? { kind: "sourceless", reason: "r" } : null,
+    },
+    warnings: [],
+    truncated: false,
+    engine: "off",
+  };
+}
+
+test("scoreBreakdown reconciles with computeScores across the formula's branches", () => {
+  const warn: RiskFlag = { severity: "warn", kind: "k", message: "m", files: [], commitShas: [] };
+  const critical: RiskFlag = { severity: "critical", kind: "k", message: "m", files: [], commitShas: [] };
+  const resultSets: ClaimResult[][] = [
+    [result("verified"), result("verified")],
+    [result("verified"), result("partial"), result("no-evidence")],
+    [result("verified"), result("contradicted")],
+    [result("no-evidence"), result("no-evidence")],
+    [result("verified"), result("no-evidence", true)],
+  ];
+  const flagSets: RiskFlag[][] = [[], [warn], [critical], [critical, warn, warn], Array(12).fill(critical)];
+  for (const results of resultSets) {
+    for (const ratio of [null, 0, 0.37, 0.5, 1]) {
+      for (const flags of flagSets) {
+        for (const unverifiable of [false, true]) {
+          const report = reportOf(results, ratio, flags, unverifiable);
+          const steps = scoreBreakdown(report);
+          const last = steps.at(-1)!;
+          assert.equal(last.kind, "final");
+          assert.equal(last.total, report.metrics.scores.overall, JSON.stringify(steps));
+          assert.ok(
+            !steps.some((s) => s.kind === "adjustment"),
+            `derivation must reconcile without adjustment: ${JSON.stringify(steps)}`,
+          );
+          // Every step's running total follows from the previous one.
+          for (let i = 1; i < steps.length - 1; i++) {
+            assert.ok(Math.abs(steps[i - 1].total + steps[i].delta - steps[i].total) < 1e-9);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("scoreBreakdown names the cap that binds — and only when it binds", () => {
+  const critical: RiskFlag = { severity: "critical", kind: "k", message: "m", files: [], commitShas: [] };
+  const capped = scoreBreakdown(reportOf([result("verified")], 1, [critical]));
+  const capStep = capped.find((s) => s.kind === "cap");
+  assert.ok(capStep && capStep.label.includes("critical risk flag"));
+  assert.equal(capStep.total, 45);
+
+  const contradicted = scoreBreakdown(reportOf([result("verified"), result("contradicted")], 1, []));
+  assert.ok(contradicted.find((s) => s.kind === "cap")?.label.includes("contradicted"));
+
+  // Terrible components land below the cap on their own — no cap step then.
+  const low = scoreBreakdown(reportOf([result("no-evidence")], 0, [critical]));
+  assert.equal(low.find((s) => s.kind === "cap"), undefined);
+
+  const unverified = reportOf([result("verified"), result("no-evidence")], 1, [], true);
+  assert.equal(unverified.metrics.scores.label, "unverified");
+  const uSteps = scoreBreakdown(unverified);
+  assert.ok(uSteps.find((s) => s.kind === "cap")?.label.includes("unverified"));
+  assert.equal(uSteps.at(-1)!.total, 65);
+});
+
+test("scoreBreakdown shows the weights the formula actually used", () => {
+  const noCompleteness = scoreBreakdown(reportOf([result("verified")], null, []));
+  assert.ok(noCompleteness.some((s) => s.label.includes("× 0.6")));
+  assert.ok(!noCompleteness.some((s) => s.label.startsWith("completeness")));
+  const full = scoreBreakdown(reportOf([result("verified")], 0.8, []));
+  assert.ok(full.some((s) => s.label.includes("× 0.45")));
+  assert.ok(full.some((s) => s.label.startsWith("completeness 80")));
+});
+
+test("scoreBreakdown itemizes the flag penalties behind the risk gap", () => {
+  const warn: RiskFlag = { severity: "warn", kind: "k", message: "m", files: [], commitShas: [] };
+  const critical: RiskFlag = { severity: "critical", kind: "k", message: "m", files: [], commitShas: [] };
+  const steps = scoreBreakdown(reportOf([result("verified")], 1, [critical, critical, warn]));
+  const risk = steps.find((s) => s.label.startsWith("risk"));
+  assert.equal(risk?.detail, "2 critical × −25 · 1 warn × −10");
+});
+
+test("a derivation that stops reconciling surfaces as an adjustment, loudly", () => {
+  const report = reportOf([result("verified"), result("partial")], 1, []);
+  report.metrics.scores = { ...report.metrics.scores, overall: report.metrics.scores.overall - 7 };
+  const steps = scoreBreakdown(report);
+  const adj = steps.find((s) => s.kind === "adjustment");
+  assert.ok(adj, "the residual must be visible, not silently absorbed");
+  assert.equal(steps.at(-1)!.total, report.metrics.scores.overall);
 });

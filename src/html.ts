@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { createHash } from "node:crypto";
 import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
+import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
 import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
 
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
@@ -198,23 +199,85 @@ function treemapSvg(files: FileInsight[], compareUrl?: string, anchors = true): 
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Diff treemap">${parts.join("")}</svg>`;
 }
 
+// Unverified is its own color — a capped 65 must not read as the same
+// "checked, minor gaps" yellow a genuinely-scored 65-84 gets.
+function scoreColor(score: number, label: string): string {
+  return label === "unverified"
+    ? "#a371f7"
+    : score >= 85
+      ? "#3fb950"
+      : score >= 65
+        ? "#d29922"
+        : score >= 45
+          ? "#f0883e"
+          : "#f85149";
+}
+
 function scoreRing(score: number, label: string): string {
   const r = 52;
   const circ = 2 * Math.PI * r;
   const filled = (score / 100) * circ;
-  // Unverified is its own color — a capped 65 must not read as the same
-  // "checked, minor gaps" yellow a genuinely-scored 65-84 gets.
-  const color =
-    label === "unverified"
-      ? "#a371f7"
-      : score >= 85
-        ? "#3fb950"
-        : score >= 65
-          ? "#d29922"
-          : score >= 45
-            ? "#f0883e"
-            : "#f85149";
+  const color = scoreColor(score, label);
   return `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="${r}" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">${score}</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">${esc(label)}</text></svg>`;
+}
+
+function fmtDelta(v: number): string {
+  if (v === 0) return "0";
+  const a = Math.abs(v);
+  const r = Number.isInteger(a) ? String(a) : a.toFixed(1);
+  return v < 0 ? `−${r}` : `+${r}`;
+}
+
+/** SCORING.md as a picture: 100, minus each weighted component gap, minus
+ * the hard cap that binds, down to the reported overall. */
+function waterfallSvg(steps: ScoreStep[], label: string): string {
+  const LABEL_W = 250;
+  const PLOT_W = 470;
+  const NUM_W = 70;
+  const ROW = 26;
+  const TOP = 6;
+  const W = LABEL_W + PLOT_W + NUM_W;
+  const H = TOP + steps.length * ROW + 16;
+  const x = (v: number) => LABEL_W + (Math.max(0, Math.min(100, v)) / 100) * PLOT_W;
+  const grid = [0, 25, 50, 75, 100]
+    .map(
+      (v) =>
+        `<line x1="${x(v).toFixed(1)}" y1="${TOP}" x2="${x(v).toFixed(1)}" y2="${H - 14}" class="wf-grid"/>` +
+        `<text x="${x(v).toFixed(1)}" y="${H - 3}" class="wf-axis" text-anchor="middle">${v}</text>`,
+    )
+    .join("");
+  const rows = steps
+    .map((st, i) => {
+      const y = TOP + i * ROW;
+      const barY = y + 5;
+      const barH = 13;
+      const before = st.total - st.delta;
+      const numX = LABEL_W + PLOT_W + 8;
+      let bar: string;
+      let num: string;
+      if (st.kind === "start") {
+        bar = `<rect x="${x(0).toFixed(1)}" y="${barY}" width="${(x(100) - x(0)).toFixed(1)}" height="${barH}" class="wf-start"/>`;
+        num = "100";
+      } else if (st.kind === "final") {
+        bar = `<rect x="${x(0).toFixed(1)}" y="${barY}" width="${Math.max(x(st.total) - x(0), 1.5).toFixed(1)}" height="${barH}" fill="${scoreColor(st.total, label)}"/>`;
+        num = String(st.total);
+      } else {
+        const cls = st.kind === "cap" ? "wf-cap" : st.kind === "adjustment" ? "wf-adj" : "wf-comp";
+        const x1 = Math.min(x(before), x(st.total));
+        const wdt = Math.max(Math.abs(x(before) - x(st.total)), 1.5);
+        bar = `<rect x="${x1.toFixed(1)}" y="${barY}" width="${wdt.toFixed(1)}" height="${barH}" class="${cls}"/>`;
+        num = fmtDelta(st.delta);
+      }
+      // The dashed drop line ties each bar to where the previous one ended.
+      const conn =
+        i > 0
+          ? `<line x1="${x(before).toFixed(1)}" y1="${(y - ROW + 5 + barH).toFixed(1)}" x2="${x(before).toFixed(1)}" y2="${(barY + barH).toFixed(1)}" class="wf-conn"/>`
+          : "";
+      const title = `<title>${esc(st.label)}${st.detail ? `\n${esc(st.detail)}` : ""}</title>`;
+      return `<g>${title}<text x="${LABEL_W - 10}" y="${y + 15}" class="wf-label" text-anchor="end">${esc(st.label)}</text>${conn}${bar}<text x="${numX}" y="${y + 15}" class="wf-num">${num}</text></g>`;
+    })
+    .join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Score derivation">${grid}${rows}</svg>`;
 }
 
 function verdictBar(report: Report): string {
@@ -369,6 +432,15 @@ h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bot
 .legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 svg{width:100%;height:auto;border-radius:8px}
 .spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.wf-grid{stroke:var(--border);stroke-width:1}
+.wf-axis{font-size:9px;fill:var(--muted)}
+.wf-label{font-size:12px;fill:var(--fg)}
+.wf-num{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.wf-start{fill:var(--border)}
+.wf-comp{fill:#d29922}
+.wf-cap{fill:#f85149}
+.wf-adj{fill:#6e7681}
+.wf-conn{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
 .tile{stroke:var(--bg);stroke-width:1}
 .tile-sens{stroke:#e3b341;stroke-width:2.5}
 .flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
@@ -423,6 +495,9 @@ ${
     ? `<div class="banner"><strong>Carried over</strong> — ${carried.count} claim(s) repeat ${esc(carried.baseRef)} verbatim; standing text, not scored.</div>`
     : ""
 }
+<h2>Score derivation <span class="note">— components, flag penalties and the hard cap, per <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">SCORING.md</a></span></h2>
+${waterfallSvg(scoreBreakdown(report), s.label)}
+
 <h2>Claims at a glance</h2>
 ${verdictBar(report)}
 

@@ -205,6 +205,18 @@ const MUTANTS: Mutant[] = [
     find: "return link.style === \"gitlab\"\n    ? `${link.base}/-/releases/${t}`\n    : `${link.base}/releases/tag/${t}`;",
     replace: "return `${link.base}/releases/tag/${t}`;",
   },
+  {
+    guard: "the score waterfall uses the formula's own weights and reconciles to the reported overall",
+    file: "src/metrics.ts",
+    find: ": 0.45 * s.correctness + 0.25 * s.completeness + 0.3 * s.risk;",
+    replace: ": 0.5 * s.correctness + 0.25 * s.completeness + 0.3 * s.risk;",
+  },
+  {
+    guard: "the waterfall mirrors the critical-flag cap instead of absorbing it as residual",
+    file: "src/metrics.ts",
+    find: '} else if (flags.some((f) => f.severity === "critical") && Math.round(total) > 45) {',
+    replace: "} else if (false) {",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

@@ -236,3 +236,21 @@ test("the report adapts to both color schemes like the watch index", () => {
   const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
   assert.ok(!/body\{[^}]*#0d1117/.test(style), "body still hard-codes the dark background");
 });
+
+test("the report renders the score derivation waterfall", () => {
+  const html = toHtml(
+    report({
+      metrics: {
+        ...report().metrics,
+        scores: { correctness: 80, completeness: 60, risk: 90, overall: 78, label: "minor gaps" },
+        flags: [{ severity: "warn", kind: "k", message: "m", files: [], commitShas: [] }],
+      },
+    }),
+  );
+  assert.ok(html.includes("Score derivation"));
+  assert.ok(html.includes("perfect release"));
+  assert.ok(html.includes("correctness 80 × 0.45"));
+  assert.ok(html.includes("completeness 60 × 0.25"));
+  assert.ok(html.includes("risk 90 × 0.3"));
+  assert.ok(html.includes("78/100 minor gaps"));
+});

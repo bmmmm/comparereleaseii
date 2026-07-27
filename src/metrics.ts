@@ -6,6 +6,7 @@ import type {
   FileInsight,
   Metrics,
   ReleaseData,
+  Report,
   RepoContext,
   RiskFlag,
   Scores,
@@ -719,6 +720,93 @@ export function computeScores(
   const label =
     overall >= 85 ? "solid" : overall >= 65 ? "minor gaps" : overall >= 45 ? "questionable" : "suspicious";
   return { correctness, completeness, risk, overall, label };
+}
+
+export interface ScoreStep {
+  label: string;
+  /** Signed contribution; 0 for the start and final markers. */
+  delta: number;
+  /** Running total after this step. */
+  total: number;
+  kind: "start" | "component" | "cap" | "adjustment" | "final";
+  detail?: string;
+}
+
+/**
+ * The overall score step by step — SCORING.md as numbers: a perfect 100,
+ * minus each component's weighted gap, minus the hard cap that binds.
+ * Derived from the report's own stored scores and flags so the rendering
+ * cannot invent numbers; if a scoring change ever breaks the
+ * reconciliation, the residual surfaces as its own "adjustment" step
+ * instead of silently mislabeling the bars.
+ */
+export function scoreBreakdown(report: Report): ScoreStep[] {
+  const s = report.metrics.scores;
+  const flags = report.metrics.flags;
+  const wCorrectness = s.completeness === null ? 0.6 : 0.45;
+  const wRisk = s.completeness === null ? 0.4 : 0.3;
+  const steps: ScoreStep[] = [];
+  let total = 100;
+  steps.push({ label: "perfect release", delta: 0, total, kind: "start" });
+  const deduct = (kind: "component" | "cap", label: string, to: number, detail?: string) => {
+    const delta = to - total;
+    total = to;
+    steps.push({ label, delta, total, kind, ...(detail ? { detail } : {}) });
+  };
+  deduct(
+    "component",
+    `correctness ${s.correctness} × ${wCorrectness}`,
+    total - wCorrectness * (100 - s.correctness),
+    "weighted share of claims the diff supports",
+  );
+  if (s.completeness !== null) {
+    deduct(
+      "component",
+      `completeness ${s.completeness} × 0.25`,
+      total - 0.25 * (100 - s.completeness),
+      "churn-weighted share of commits the notes cover",
+    );
+  }
+  const crit = flags.filter((f) => f.severity === "critical").length;
+  const warn = flags.filter((f) => f.severity === "warn").length;
+  // The last component lands on computeScores' own weighted-sum expression,
+  // not on another chain of subtractions: the two differ in the last ulp,
+  // and at an exact x.5 that is the difference between rounding up and down.
+  const weighted =
+    s.completeness === null
+      ? 0.6 * s.correctness + 0.4 * s.risk
+      : 0.45 * s.correctness + 0.25 * s.completeness + 0.3 * s.risk;
+  deduct(
+    "component",
+    `risk ${s.risk} × ${wRisk}`,
+    weighted,
+    crit || warn
+      ? `${crit} critical × −25 · ${warn} warn × −10${s.risk === 0 ? " (floored at 0)" : ""}`
+      : "no flag penalties",
+  );
+  // The caps mirror computeScores exactly: contradicted else critical, and
+  // the unverified cap on top — each only when it actually binds.
+  if (report.results.some((r) => r.verdict === "contradicted") && Math.round(total) > 35) {
+    deduct("cap", "hard cap: contradicted claim", 35, "a claim the diff disproves caps the release at 35");
+  } else if (flags.some((f) => f.severity === "critical") && Math.round(total) > 45) {
+    deduct("cap", "hard cap: critical risk flag", 45, "a critical finding caps the release at 45");
+  }
+  if (s.label === "unverified" && Math.round(total) > 65) {
+    deduct("cap", "hard cap: unverified", 65, "claims nobody could check must not read better than checked-with-gaps");
+  }
+  if (Math.round(total) !== s.overall) {
+    const delta = s.overall - total;
+    total = s.overall;
+    steps.push({
+      label: "unexplained adjustment",
+      delta,
+      total,
+      kind: "adjustment",
+      detail: "the derivation no longer reconciles with the reported score — please file a bug",
+    });
+  }
+  steps.push({ label: `${s.overall}/100 ${s.label}`, delta: 0, total: s.overall, kind: "final" });
+  return steps;
 }
 
 /** Anomalies relative to the repo's own release history. */
