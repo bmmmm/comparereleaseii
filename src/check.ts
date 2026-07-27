@@ -27,6 +27,15 @@ export interface CheckSettings {
   suggestLimit?: number;
 }
 
+/** Injection seam for tests — production always uses the real sources. */
+export interface GithubLoadDeps {
+  loadGithubRelease: typeof loadGithubRelease;
+  fetchGithubContext: typeof fetchGithubContext;
+  cloneDirFor: typeof cloneDirFor;
+  ensureClone: typeof ensureClone;
+  loadLocalRange: typeof loadLocalRange;
+}
+
 /**
  * Release data + repo context from GitHub, falling back to a partial clone
  * when the compare API truncates the diff.
@@ -34,10 +43,11 @@ export interface CheckSettings {
 export async function loadGithubReleaseData(
   repo: string,
   opts: { tag?: string; base?: string; notesFile?: string },
+  deps: GithubLoadDeps = { loadGithubRelease, fetchGithubContext, cloneDirFor, ensureClone, loadLocalRange },
 ): Promise<{ data: ReleaseData; context: RepoContext }> {
   let [data, context] = await Promise.all([
-    loadGithubRelease({ repo, tag: opts.tag, base: opts.base }),
-    fetchGithubContext(repo),
+    deps.loadGithubRelease({ repo, tag: opts.tag, base: opts.base }),
+    deps.fetchGithubContext(repo),
   ]);
 
   if (opts.notesFile) {
@@ -50,10 +60,10 @@ export async function loadGithubReleaseData(
       // A clone target in a shared temp dir is a symlink waiting to happen —
       // git would happily follow it and write outside the cache.
       const url = `https://github.com/${repo}.git`;
-      const dir = await cloneDirFor(url);
+      const dir = await deps.cloneDirFor(url);
       if (!dir) throw new Error("no private cache directory for the clone fallback");
-      await ensureClone(url, dir);
-      const range = await loadLocalRange(dir, data.baseRef, data.headRef);
+      await deps.ensureClone(url, dir);
+      const range = await deps.loadLocalRange(dir, data.baseRef, data.headRef);
       data = {
         ...data,
         ...range,
