@@ -766,3 +766,40 @@ test("a failing commit-diff fetch degrades the claim instead of killing the run"
     `no warning about the failed fetch: ${JSON.stringify(data.warnings)}`,
   );
 });
+
+// The explicit `--engine openai` path refuses to auto-pick a model when the
+// server lists more than 20 (aggregator guard) — the claude-missing fallback
+// took models[0] from the same server without asking.
+test("the claude-missing fallback refuses to auto-pick from an aggregator", async (t) => {
+  const origPath = process.env.PATH;
+  const origKey = process.env.ANTHROPIC_API_KEY;
+  process.env.PATH = ""; // no claude CLI findable
+  delete process.env.ANTHROPIC_API_KEY;
+  const models = Array.from({ length: 30 }, (_, i) => ({ id: `vendor/model-${i}` }));
+  t.mock.method(globalThis, "fetch", async () =>
+    new Response(JSON.stringify({ data: models }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  );
+  const errs: string[] = [];
+  const origErr = console.error;
+  console.error = (...args: unknown[]) => {
+    errs.push(args.join(" "));
+  };
+  try {
+    const { engine } = await resolveEngines({
+      judgeMode: "auto",
+      engine: "claude-cli",
+      escalate: "off",
+      cache: false,
+      openaiUrl: "http://127.0.0.1:9/v1",
+    });
+    assert.equal(engine, null, `must not auto-pick from a 30-model aggregator (got ${engine?.name})`);
+    assert.ok(errs.some((e) => /aggregator/i.test(e)), `no aggregator hint in: ${JSON.stringify(errs)}`);
+  } finally {
+    console.error = origErr;
+    process.env.PATH = origPath;
+    if (origKey !== undefined) process.env.ANTHROPIC_API_KEY = origKey;
+  }
+});

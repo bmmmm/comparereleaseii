@@ -27,6 +27,11 @@ tool is checked with the tool itself before it ships.
 - **`--local .` names the repository after its directory, not ".".** Report
   headers read `Cost estimate — . v0.1.2 → v0.2.0`; the path is resolved
   before its basename becomes the label.
+- **The claude-missing fallback no longer auto-picks a model from an
+  aggregator.** With no claude CLI and no API key, discovery took the first
+  of potentially hundreds of models on an OpenRouter-style server — the
+  explicit `--engine openai` path has always refused that; the fallback now
+  applies the same >20-models guard and explains how to pick one.
 - **Tokenizer paths are no longer classified as auth/crypto.** The
   sensitive-path keyword `token` matched `tokenizer.rs`/`tokenize.py` as a
   substring, producing false "undocumented sensitive change" flags and

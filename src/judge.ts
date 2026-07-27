@@ -196,7 +196,11 @@ export async function resolveEngines(
       effective = "api";
     } else {
       const found = await discoverLocalModels(openaiBase);
-      if (found && !found.authRequired && found.models.length) {
+      // Same aggregator guard as the explicit --engine openai path below:
+      // auto-picking models[0] from a 200-model list (OpenRouter & co.)
+      // would be arbitrary and possibly expensive.
+      const aggregator = !!found && !found.authRequired && found.models.length > 20;
+      if (found && !found.authRequired && found.models.length && !aggregator) {
         model ??= found.models[0];
         console.error(
           `claude CLI not found — using the local model server at ${openaiBase} (model ${model}).`,
@@ -207,7 +211,9 @@ export async function resolveEngines(
           "claude CLI not found and ANTHROPIC_API_KEY is unset — running deterministic-only.\n" +
             (found?.authRequired
               ? `(A local server at ${openaiBase} responded but needs OPENAI_API_KEY.)\n`
-              : "") +
+              : aggregator
+                ? `(The server at ${openaiBase} offers ${found.models.length} models — that looks like an aggregator; pick one explicitly with --engine openai --model <m>.)\n`
+                : "") +
             "For LLM-judged verdicts install Claude Code (https://code.claude.com), export ANTHROPIC_API_KEY, or start a local OpenAI-compatible server (Ollama/MLX).",
         );
         return { engine: null, escalate: null };
