@@ -1,11 +1,13 @@
 # Demo — real output of a real watch pass
 
-Everything in this directory is unedited output of `comparerelease watch`,
-run on 2026-07-27 against five public repositories with the `claude-cli`
-judge (Haiku): the dashboard (`index.html`), one Atom feed (`feed.xml`),
-and per repo a history page plus the full HTML/Markdown/JSON report of
-every checked release. Serve the directory statically — GitHub Pages, any
-web server, or a plain browser — and every link works.
+Everything in this directory is real output of `comparerelease watch`, run
+on 2026-07-27 against five public repositories with the `claude-cli` judge
+(Haiku): the dashboard (`index.html`), one Atom feed (`feed.xml`), and per
+repo a history page plus the HTML and Markdown report of every checked
+release. Serve the directory statically — GitHub Pages, any web server, or
+a plain browser — and every link works. The `--json` reports are the one
+thing deliberately not committed: they carry upstream commit-author e-mail
+addresses, which this demo has no business republishing.
 
 Reproduce it from a checkout:
 

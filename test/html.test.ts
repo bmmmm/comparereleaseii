@@ -254,3 +254,31 @@ test("the report renders the score derivation waterfall", () => {
   assert.ok(html.includes("risk 90 × 0.3"));
   assert.ok(html.includes("78/100 minor gaps"));
 });
+
+test("a flag-free release never shows a phantom ±0.0 deduction", () => {
+  // correctness 1 / completeness 0 / risk 100: the weighted sum's float
+  // residue used to render the risk step as "+0.0" with an amber bar.
+  const html = toHtml(
+    report({
+      metrics: {
+        ...report().metrics,
+        scores: { correctness: 1, completeness: 0, risk: 100, overall: 30, label: "suspicious" },
+        flags: [],
+      },
+    }),
+  );
+  assert.ok(!html.includes(">+0.0<") && !html.includes(">−0.0<") && !html.includes(">+0<"));
+  const riskRow = html.slice(html.indexOf("risk 100"), html.indexOf("risk 100") + 400);
+  assert.ok(!riskRow.includes("wf-comp"), "a zero deduction draws no bar");
+  // Exact integer deltas drop the trailing .0 too.
+  const capped = toHtml(
+    report({
+      metrics: {
+        ...report().metrics,
+        scores: { correctness: 60, completeness: 100, risk: 100, overall: 82, label: "minor gaps" },
+        flags: [],
+      },
+    }),
+  );
+  assert.ok(capped.includes(">−18<"), "0.45 × 40 renders as −18, not −18.0");
+});

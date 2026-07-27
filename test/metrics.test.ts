@@ -828,3 +828,13 @@ test("a derivation that stops reconciling surfaces as an adjustment, loudly", ()
   assert.ok(adj, "the residual must be visible, not silently absorbed");
   assert.equal(steps.at(-1)!.total, report.metrics.scores.overall);
 });
+
+test("a flag list that does not itemize the stored risk says so instead of asserting a ledger", () => {
+  const warn: RiskFlag = { severity: "warn", kind: "k", message: "m", files: [], commitShas: [] };
+  const report = reportOf([result("verified")], 1, [warn]);
+  // A second warn recorded after scoring: the stored risk stays 90.
+  report.metrics.flags = [warn, warn];
+  const risk = scoreBreakdown(report).find((s) => s.label.startsWith("risk"));
+  assert.ok(risk?.detail?.includes("does not itemize the stored risk of 90"), risk?.detail ?? "no detail");
+  assert.ok(!scoreBreakdown(report).some((s) => s.kind === "adjustment"), "totals still reconcile");
+});

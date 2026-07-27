@@ -703,8 +703,14 @@ export function runNotify(cmd: string, jsonPath: string): Promise<boolean> {
   });
 }
 
-function sanitizeTag(tag: string): string {
-  return tag.replace(/[^\w.@-]+/g, "_");
+export function sanitizeTag(tag: string): string {
+  const base = tag.replace(/[^\w.@-]+/g, "_");
+  // "index" is the one basename the dashboard owns inside every report
+  // directory — the history page. A release tagged `index` would have its
+  // report overwritten by that page on the next write, taking the evidence
+  // with it; the tag is attacker-chosen, the filename must not be. APFS
+  // and NTFS are case-insensitive, so INDEX collides just the same.
+  return /^index$/i.test(base) ? `${base}_` : base;
 }
 
 export async function runWatch(

@@ -776,12 +776,19 @@ export function scoreBreakdown(report: Report): ScoreStep[] {
     s.completeness === null
       ? 0.6 * s.correctness + 0.4 * s.risk
       : 0.45 * s.correctness + 0.25 * s.completeness + 0.3 * s.risk;
+  // The itemization is derived from the flag list, the number from the
+  // stored risk — flags can be appended after scoring (check.ts does, at
+  // info), so assert the ledger actually reconciles before printing it as
+  // the explanation.
+  const itemized = Math.max(0, 100 - (25 * crit + 10 * warn));
   deduct(
     "component",
     `risk ${s.risk} × ${wRisk}`,
     weighted,
     crit || warn
-      ? `${crit} critical × −25 · ${warn} warn × −10${s.risk === 0 ? " (floored at 0)" : ""}`
+      ? itemized === s.risk
+        ? `${crit} critical × −25 · ${warn} warn × −10${s.risk === 0 ? " (floored at 0)" : ""}`
+        : `the flag list does not itemize the stored risk of ${s.risk} — flags recorded after scoring carry no penalty`
       : "no flag penalties",
   );
   // The caps mirror computeScores exactly: contradicted else critical, and

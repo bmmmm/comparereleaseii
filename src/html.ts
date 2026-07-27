@@ -221,11 +221,15 @@ function scoreRing(score: number, label: string): string {
   return `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="${r}" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">${score}</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">${esc(label)}</text></svg>`;
 }
 
+// Rounded to the displayed decimal BEFORE the zero test: the risk step's
+// delta is the difference of two differently-associated float expressions,
+// so a flag-free release carries a ±4e-15 residue that "+0.0" would render
+// as a phantom deduction — and an exact −24 would render as −24.0.
 function fmtDelta(v: number): string {
-  if (v === 0) return "0";
-  const a = Math.abs(v);
-  const r = Number.isInteger(a) ? String(a) : a.toFixed(1);
-  return v < 0 ? `−${r}` : `+${r}`;
+  const r = Math.round(Math.abs(v) * 10) / 10;
+  if (r === 0) return "0";
+  const s = Number.isInteger(r) ? String(r) : r.toFixed(1);
+  return v < 0 ? `−${s}` : `+${s}`;
 }
 
 /** SCORING.md as a picture: 100, minus each weighted component gap, minus
@@ -265,8 +269,13 @@ function waterfallSvg(steps: ScoreStep[], label: string): string {
         const cls = st.kind === "cap" ? "wf-cap" : st.kind === "adjustment" ? "wf-adj" : "wf-comp";
         const x1 = Math.min(x(before), x(st.total));
         const wdt = Math.max(Math.abs(x(before) - x(st.total)), 1.5);
-        bar = `<rect x="${x1.toFixed(1)}" y="${barY}" width="${wdt.toFixed(1)}" height="${barH}" class="${cls}"/>`;
         num = fmtDelta(st.delta);
+        // A step that deducted nothing draws nothing — a floored-width bar
+        // at the running total would read as a deduction that isn't there.
+        bar =
+          num === "0"
+            ? ""
+            : `<rect x="${x1.toFixed(1)}" y="${barY}" width="${wdt.toFixed(1)}" height="${barH}" class="${cls}"/>`;
       }
       // The dashed drop line ties each bar to where the previous one ended.
       const conn =

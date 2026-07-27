@@ -9,6 +9,7 @@ import {
   releaseWebUrl,
   runNotify,
   runWatch,
+  sanitizeTag,
   scoreBaseline,
   worstExit,
   toWatchIndexHtml,
@@ -649,4 +650,11 @@ test("the atom feed lists checks newest first with stable ids and relative links
   assert.ok(xml.includes("1 broken promise(s)"));
   assert.ok(xml.includes("diff truncated"), "partial-data warnings reach the summary");
   assert.ok(xml.includes("<updated>2026-07-20T00:00:00Z</updated>"), "entry updated = checkedAt");
+});
+
+test("a release tagged index cannot take over the history page's filename", () => {
+  assert.equal(sanitizeTag("index"), "index_");
+  assert.equal(sanitizeTag("INDEX"), "INDEX_", "case-insensitive filesystems collide too");
+  assert.equal(sanitizeTag("v1.0/../index"), "v1.0_.._index");
+  assert.equal(sanitizeTag("v1.2.3"), "v1.2.3");
 });
