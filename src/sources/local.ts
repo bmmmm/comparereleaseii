@@ -64,6 +64,10 @@ export function parseUnifiedDiff(diff: string): DiffFile[] {
   return files;
 }
 
+// FIXME(bughunt 2026-07-27): a commit body containing \x1f or \x1e desyncs
+// this record parsing (extra/truncated records). Low leverage — whoever
+// controls the repo controls the real commits anyway — the clean fix is
+// NUL-framed `git log -z` when this function next changes shape.
 async function loadCommits(repo: string, base: string, head: string): Promise<Commit[]> {
   const out = await git(repo, [
     "log",

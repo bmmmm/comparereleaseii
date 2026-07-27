@@ -22,6 +22,10 @@ export interface RunResult {
   stderr: string;
 }
 
+// FIXME(bughunt 2026-07-27): the 64 MB default maxBuffer is the real ceiling
+// for `git diff` on huge releases (Linux-kernel scale) — the failure is loud
+// but blames git, not the limit. Fixing it properly means streaming the diff
+// parse or diffing per file, which is a module-level change.
 export function run(
   cmd: string,
   args: string[],

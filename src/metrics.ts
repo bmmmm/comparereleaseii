@@ -743,6 +743,12 @@ export function baselineFlags(
   }
 
   if (coverage) {
+    // FIXME(bughunt 2026-07-27): author identities mix API logins and git
+    // names — when the compare API truncates and check.ts falls back to a
+    // clone, commits carry git names while GitHub-built snapshots carry
+    // logins, so knownAuthors never matches and this flag fires spuriously
+    // on exactly the big releases that truncate. Needs an identity
+    // normalization decision (e.g. match via commit email) before fixing.
     const known = new Set(baseline.knownAuthors);
     const suspects = data.commits.filter(
       (commit) =>

@@ -41,7 +41,6 @@ export function extractIdentifiers(claim: Claim): string[] {
     const isIdent =
       /_/.test(w) ||
       /^--/.test(w) ||
-      /^[A-Z0-9_]+$/.test(w) && /_/.test(w) ||
       /[a-z][A-Z]/.test(w) ||
       /^[\w-]+\.[a-z]{1,4}$/.test(w) ||
       // Two-dot versions only: "2026.7.0" is a real anchor, "5.3" (CVSS score,
