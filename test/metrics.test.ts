@@ -11,11 +11,13 @@ import {
   classifyUnverifiable,
   demoteUnsupportedFlag,
   buildFlags,
+  baselineFlags,
   lockfileSources,
 } from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
 import type { ClaimResult, DiffFile, FileInsight, ReleaseData, RiskFlag } from "../src/types.ts";
 import type { Baseline } from "../src/history.ts";
+import type { Coverage } from "../src/verify.ts";
 
 test("sensitiveCategory classifies by priority", () => {
   assert.equal(sensitiveCategory("Cargo.toml"), "dependencies");
@@ -317,6 +319,34 @@ function baselineOf(medianLexicalCoverage: number, releases = 5): Baseline {
     everBinary: false,
   };
 }
+
+test("baselineFlags: mixed author sources demote new-author-sensitive to info", () => {
+  const data = releaseData(["src/auth/login.ts"]);
+  data.commits = [
+    { sha: "abc1234", subject: "tighten session check", body: "", author: "Jane Doe", prNumbers: [] },
+  ];
+  const coverage: Coverage = {
+    uncovered: [],
+    coveredShas: new Set(),
+    evidenceFiles: new Set(),
+    commitFiles: new Map([
+      ["abc1234", [{ path: "src/auth/login.ts", status: "modified", additions: 5, deletions: 2 }]],
+    ]),
+    mergeShas: new Set(),
+  };
+  const authorFlag = () =>
+    baselineFlags(data, coverage, baselineOf(0.5)).find((f) => f.kind === "new-author-sensitive");
+
+  // Comparable sources (both API logins or both git names): a real warn.
+  assert.equal(authorFlag()?.severity, "warn");
+
+  // Truncation fallback: commits carry git names, the baseline carries API
+  // logins — no name can match, so the flag informs instead of alarming.
+  data.mixedAuthorSources = true;
+  const demoted = authorFlag();
+  assert.equal(demoted?.severity, "info");
+  assert.match(demoted?.message ?? "", /not comparable across sources/);
+});
 
 test("classifyUnverifiable: a docs-only diff needs no history", () => {
   const u = classifyUnverifiable(releaseData(["CHANGELOG.md", "feed.xml"]), [], [], null);

@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **The truncated-compare fallback no longer cries "first-time author".** When the compare API truncates and the diff is reloaded from a clone, commits carry git names while the baseline snapshots carry API logins — no name can ever match, so `new-author-sensitive` fired on exactly the big releases that truncate. The mixed-source case now demotes the flag to info with a note that author identities are not comparable across sources; keying identities by commit email is the clean fix and stays anchored as a FIXME.
+
 ## 0.2.2 — 2026-07-27
 
 ### Changed

@@ -38,6 +38,12 @@ export interface ReleaseData {
   warnings: string[];
   /** Diff or commit list is incomplete (API caps) — a local clone would fix it. */
   truncated?: boolean;
+  /**
+   * Commit authors are git names while the baseline's are API logins (the
+   * compare-truncation clone fallback) — the two never match, so first-time-
+   * author detection cannot tell "new" from "differently spelled".
+   */
+  mixedAuthorSources?: boolean;
 }
 
 export type ClaimKind = "change" | "meta";
