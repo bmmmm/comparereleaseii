@@ -443,14 +443,18 @@ test("calibration offers the need protocol and the case's full file list", async
     name: "need-mock",
     judge: async (prompt: string) => {
       prompts.push(prompt);
-      return '{"need":["internal/session/cleanup.go"]}';
+      // Round 1 carries the escape hatch; the served round must verdict.
+      if (prompt.includes('{"need":["path1","path2"]}')) {
+        return '{"need":["internal/session/cleanup.go"]}';
+      }
+      return '{"verdict":"no_evidence","confidence":0.8,"files":[],"reasoning":"file never arrived"}';
     },
   };
   const cal = await runCalibration(engine, 4);
   const needCase = cal.outcomes.find((o) => o.name === "legit-need-more-files");
   assert.ok(needCase);
   assert.equal(needCase.pass, true);
-  assert.equal(needCase.got, "need");
+  assert.equal(needCase.got, "need→no-evidence");
   const needPrompt = prompts.find((p) => p.includes("internal/session/cleanup.go"));
   assert.ok(needPrompt, "need case prompt must list the file the claim names");
   assert.ok(needPrompt.includes('{"need":["path1","path2"]}'), "need protocol must be offered");

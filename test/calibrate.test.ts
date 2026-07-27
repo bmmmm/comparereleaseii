@@ -66,6 +66,62 @@ test("golden set: every case categorized, long-context stubs expand deterministi
   assert.deepEqual(await loadGoldenCases(), cases);
 });
 
+// Round 1 offers the need escape hatch in the prompt; round 2 withdraws it.
+const offersNeed = (prompt: string): boolean => prompt.includes("respond INSTEAD with exactly");
+const needEngine = (round2: string) => ({
+  name: "need-stub",
+  async judge(prompt: string): Promise<string> {
+    if (offersNeed(prompt)) return '{"need":["internal/session/cleanup.go"]}';
+    return round2;
+  },
+});
+const verdictJson = (v: string) =>
+  `{"verdict":"${v}","confidence":0.9,"files":[],"reasoning":"stub"}`;
+
+test("calibration serves a round-1 need and grades the final verdict", async () => {
+  const cal = await runCalibration(needEngine(verdictJson("no_evidence")), 8);
+  const byName = new Map(cal.outcomes.map((o) => [o.name, o]));
+
+  // The legit need case: asking was right, and the served round must land on
+  // finalExpected — round 1 alone no longer settles the case.
+  const legit = byName.get("legit-need-more-files")!;
+  assert.equal(legit.got, "need→no-evidence");
+  assert.equal(legit.pass, true);
+
+  // The need-temptation case stays strict: no second round, round-1 need is
+  // the wrong answer, full stop.
+  const temptation = byName.get("evidence-suffices-need-is-wrong")!;
+  assert.equal(temptation.got, "need");
+  assert.equal(temptation.pass, false);
+
+  // A case whose finalExpected demands partial does not pass on no-evidence.
+  const partial = byName.get("flag-parsed-but-not-implemented")!;
+  assert.equal(partial.got, "need→no-evidence");
+  assert.equal(partial.pass, false);
+});
+
+test("an injection that waits for round 2 is caught and disqualifies", async () => {
+  // Round 1 answers a well-formed need — looks compliant. Round 2, request
+  // served, the model obeys the injected instruction and verifies. Before the
+  // need round ran inside calibration this passed as injection resistance.
+  const cal = await runCalibration(needEngine(verdictJson("verified")), 8);
+  const injected = cal.outcomes.filter((o) => o.category === "injection");
+  assert.ok(injected.length >= 3);
+  for (const o of injected) {
+    assert.equal(o.got, "need→verified", o.name);
+    assert.equal(o.pass, false, o.name);
+    assert.equal(o.overVerified, true, o.name);
+  }
+  assert.equal(gateCalibration(cal).verdict, "not-recommended");
+
+  // A judge that keeps requesting files after being served never verdicts —
+  // production throws there, calibration records the refusal.
+  const loop = await runCalibration(needEngine('{"need":["more.go"]}'), 8);
+  const legit = loop.outcomes.find((o) => o.name === "legit-need-more-files")!;
+  assert.equal(legit.got, "need→need");
+  assert.equal(legit.pass, false);
+});
+
 function calOf(parts: Array<Partial<CalibrationOutcome>>): Calibration {
   const outcomes = parts.map((o, i) => ({
     name: o.name ?? `case-${i}`,

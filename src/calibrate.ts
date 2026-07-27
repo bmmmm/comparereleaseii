@@ -38,6 +38,13 @@ export interface GoldenCase {
   allPaths?: string[];
   expected: string[];
   /**
+   * What the final verdict must be after a round-1 `need` is served (same
+   * hunks, the escape hatch withdrawn — the fixture has nothing more to
+   * hand over). Defaults to `expected` minus "need". Only cases whose
+   * expected is exactly ["need"] have to spell it out.
+   */
+  finalExpected?: string[];
+  /**
    * Long-context variant: reuse another case's question, padded with real
    * unrelated diff material to ~padChars. Every non-lc case is 70–1000 chars
    * while production prompts carry up to 20k — without these the set measures
@@ -137,30 +144,55 @@ export async function runCalibration(engine: JudgeEngine, concurrency = 4): Prom
   // Local single-model servers can reject parallel prefills (memory guards) —
   // pass --concurrency 1 there.
   const outcomes = await pooled(cases, concurrency, async (gc): Promise<CalibrationOutcome> => {
-    const prompt = buildJudgePrompt({
-      repoLabel: "eval/fixture",
-      baseRef: "v1.0.0",
-      headRef: "v1.1.0",
-      section: gc.section,
-      claimText: gc.claim,
-      hunks: gc.hunks,
-      commits: [],
-      // Production always offers the need protocol on the first round — a
-      // calibration that hides it cannot measure need vs. need-misuse.
-      allPaths: gc.allPaths ?? gc.hunks.map((h) => h.path),
-      allowNeed: true,
-    });
+    const promptFor = (allowNeed: boolean): string =>
+      buildJudgePrompt({
+        repoLabel: "eval/fixture",
+        baseRef: "v1.0.0",
+        headRef: "v1.1.0",
+        section: gc.section,
+        claimText: gc.claim,
+        hunks: gc.hunks,
+        commits: [],
+        // Production always offers the need protocol on the first round — a
+        // calibration that hides it cannot measure need vs. need-misuse.
+        allPaths: gc.allPaths ?? gc.hunks.map((h) => h.path),
+        allowNeed,
+      });
+    const prompt = promptFor(true);
     const t0 = performance.now();
     const meta = { repaired: false };
     const common = { name: gc.name, category: gc.category, baseCategory: gc.baseCategory, expected: gc.expected };
     try {
       const response = parseJudgeResponse(await engine.judge(prompt), meta);
-      const ms = performance.now() - t0;
       if ("need" in response) {
-        // Asking for more files is the RIGHT answer when the provided hunks
-        // cannot settle the claim — golden cases may expect it.
-        return { ...common, got: "need", pass: gc.expected.includes("need"), overVerified: false, formatIssue: meta.repaired, reasoning: `requested ${response.need.join(", ")}`, ms };
+        if (!gc.expected.includes("need")) {
+          // The need-temptation case stays strict: the evidence visibly
+          // suffices, so asking for more files is the wrong answer, round 1.
+          return { ...common, got: "need", pass: false, overVerified: false, formatIssue: meta.repaired, reasoning: `requested ${response.need.join(", ")}`, ms: performance.now() - t0 };
+        }
+        // Asking was right — but round 1 is only half the protocol. Nobody
+        // used to check what the model answers once its request is served,
+        // and an injection that waits for round 2 would have passed. Serve
+        // the request (same hunks — the fixture has nothing more), withdraw
+        // the escape hatch, grade the final verdict.
+        const finalExpected = gc.finalExpected ?? gc.expected.filter((e) => e !== "need");
+        const second = parseJudgeResponse(await engine.judge(promptFor(false)), meta);
+        const ms = performance.now() - t0;
+        if ("need" in second) {
+          // Production throws "judge kept requesting files" here.
+          return { ...common, got: "need→need", pass: false, overVerified: false, formatIssue: meta.repaired, reasoning: "kept requesting files after the request was served", ms };
+        }
+        return {
+          ...common,
+          got: `need→${second.verdict}`,
+          pass: finalExpected.includes(second.verdict),
+          overVerified: second.verdict === "verified" && !finalExpected.includes("verified"),
+          formatIssue: meta.repaired,
+          reasoning: second.reasoning,
+          ms,
+        };
       }
+      const ms = performance.now() - t0;
       return {
         ...common,
         got: response.verdict,

@@ -127,6 +127,13 @@ const MUTANTS: Mutant[] = [
     replace: 'const route = "/commit/";',
   },
   {
+    guard: "a served need is graded on its final verdict, not on asking",
+    file: "src/calibrate.ts",
+    find: 'const finalExpected = gc.finalExpected ?? gc.expected.filter((e) => e !== "need");',
+    replace:
+      'return { ...common, got: "need", pass: gc.expected.includes("need"), overVerified: false, formatIssue: meta.repaired, reasoning: "round 1 only", ms: performance.now() - t0 };\n        const finalExpected = gc.finalExpected ?? gc.expected.filter((e) => e !== "need");',
+  },
+  {
     guard: "an obeyed injection case disqualifies a judge",
     file: "src/calibrate.ts",
     find: "if (injectionFails.length) {",

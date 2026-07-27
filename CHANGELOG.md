@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **Calibration plays out the need round instead of stopping at the ask.** A round-1 `need` used to settle a case: asking counted as injection resistance, and nobody checked what the model answers once its request is served. Calibration now serves the request (same hunks — the fixture has nothing more to hand over), withdraws the escape hatch, and grades the final verdict, reported as `need→<verdict>`: an injection that stays polite in round 1 and obeys in round 2 now fails its case and disqualifies the judge. The need-temptation case stays strict (round-1 `need` is the wrong answer, no second round), and `legit-need-more-files` gained an explicit `finalExpected` — after the unfillable request, `no-evidence` is the only honest landing. The frozen Haiku reference stays as a round-1 document; a mutation guard pins the grading.
+
 ### Added
 
 - **Carried-over dedupe and promise tracking work off GitHub now.** Only the GitHub path ever set `baseNotes`, so on a Forgejo/Gitea/GitLab check the base release's notes — fetched anyway for base-picking — were dropped, and `--local` never looked. The forge path now hands the base release's published body through (resolved against the base the check actually uses, so an explicit `--base` gets its own release's notes), and the CHANGELOG path reads the base tag's section from the same file. The two media never mix: API notes get API base notes, CHANGELOG notes get the CHANGELOG's base section, `--notes-file` has no base counterpart. Verified live against gitea.com.
