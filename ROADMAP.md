@@ -403,8 +403,9 @@ lean state-accumulating); whether badges are wanted at all.
   attribution changes accumulate; cap keeps active-then-busiest) → history
   page renders the facts table (bot chip, attribution history) and per
   release count / new-to-this-watcher / top-1 commit share. The neutral
-  framing is printed on the page itself. Still open: only the P5 badge
-  question.
+  framing is printed on the page itself. The badge question closed as
+  settled the same day (see "Settled" below) — nothing from this block
+  remains open.
 
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target
@@ -423,6 +424,15 @@ lean state-accumulating); whether badges are wanted at all.
 - **Public scan-results: stays rejected** — honest-but-weak judges are
   undetectable in CI (engine heterogeneity); revisit only via the
   Scorecard model (PRs contribute watchlist entries, scans run centrally).
+- **Per-repo trust badges: rejected (2026-07-28), and the principle
+  generalizes: this tool is not a wall of shame.** It informs its
+  operator; it does not publish compressed judgements next to other
+  people's project names. A badge is the score stripped of every nuance
+  the dashboard carries (unverified vs. mid, partial data, median-relative
+  reading) — and for this repo's own notes the check-release-notes
+  workflow badge already covers the self-case. Any future idea whose
+  value depends on publicly labeling third-party projects starts from
+  this rejection.
 - **Relative alerting: done** (v0.1.1/0.1.2, verified during the bug hunt).
 
 Order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8. Rationale: ship first, kill the
