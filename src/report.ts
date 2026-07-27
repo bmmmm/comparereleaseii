@@ -186,6 +186,16 @@ export function printTerminal(report: Report): void {
     }
   }
 
+  if (report.promises?.length) {
+    console.log(c.bold("\nPromises from earlier releases:"));
+    for (const p of report.promises) {
+      const mark =
+        p.status === "kept" ? c.green("✓") : p.status === "broken" ? c.red("✗") : c.dim("…");
+      console.log(`  ${mark} ${p.status} (${p.from}) ${p.text.slice(0, 100)}`);
+      console.log(c.dim(`    ${p.note}${p.files.length ? ` — ${p.files.slice(0, 3).join(", ")}` : ""}`));
+    }
+  }
+
   if (!report.reverseChecked) {
     console.log(c.dim("\nCompleteness check skipped (--no-reverse)."));
   } else if (report.uncovered.length) {
@@ -266,6 +276,13 @@ export function toMarkdown(report: Report): string {
       if (note && r.verdict === "no-evidence") {
         lines.push(`  - not verifiable: ${note.claimNote.replace(/\.$/, "").toLowerCase()}`);
       }
+    }
+  }
+  if (report.promises?.length) {
+    lines.push("", "## Promises from earlier releases", "");
+    for (const p of report.promises) {
+      lines.push(`- **${p.status}** (from \`${p.from}\`) ${p.text}`);
+      lines.push(`  - ${p.note}${p.files.length ? ` (${p.files.slice(0, 3).join(", ")})` : ""}`);
     }
   }
   lines.push("", "## Undocumented changes", "");

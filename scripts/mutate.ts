@@ -138,6 +138,18 @@ const MUTANTS: Mutant[] = [
     find: "if (baseline !== null) return score <= baseline - SCORE_DROP;",
     replace: "",
   },
+  {
+    guard: "a promise is broken only once its target release is reached",
+    file: "src/promises.ts",
+    find: "if (targetReached(promise.target, data.headRef)) {",
+    replace: "if (true) {",
+  },
+  {
+    guard: "a removal promise is proven by deletions, not additions",
+    file: "src/promises.ts",
+    find: 'const marker = kind === "removal" ? "-" : "+";',
+    replace: 'const marker = "+";',
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

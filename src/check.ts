@@ -7,6 +7,7 @@ import { parseClaims, markCarriedOver } from "./claims.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { computeMetrics } from "./metrics.ts";
+import { checkPromises, type CarriedPromise } from "./promises.ts";
 import { buildSnapshots, summarizeBaseline, type HistorySource } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
 import type { ReleaseData, Report, RepoContext } from "./types.ts";
@@ -25,6 +26,8 @@ export interface CheckSettings {
   suggest?: boolean;
   /** Cap on how many uncovered commits get an LLM-drafted suggestion (cost bound). */
   suggestLimit?: number;
+  /** Still-open promises from earlier releases (watch state) to re-check. */
+  carriedPromises?: CarriedPromise[];
 }
 
 /** Injection seam for tests — production always uses the real sources. */
@@ -143,6 +146,20 @@ export async function analyzeRelease(
   const coverage = s.reverse ? await computeCoverage(data, claims, results) : null;
   const metrics = computeMetrics({ data, results, coverage, context, baseline });
 
+  // Promises are about LATER releases, so they inform and never score: the
+  // flag is info-level and pushed after computeMetrics has fixed the numbers.
+  const promises = checkPromises(data, s.carriedPromises ?? []);
+  for (const p of promises) {
+    if (p.status !== "broken") continue;
+    metrics.flags.push({
+      severity: "info",
+      kind: "broken-promise",
+      message: `Broken promise from ${p.from}: "${p.text.slice(0, 140)}" — ${p.note}`,
+      files: [],
+      commitShas: [],
+    });
+  }
+
   let uncovered = coverage?.uncovered ?? [];
   if (s.suggest) {
     if (!s.engine) {
@@ -180,5 +197,6 @@ export async function analyzeRelease(
     engine: s.engine ? s.engine.name : "off (deterministic only)",
     linkBase: link?.base,
     linkStyle: link?.style,
+    promises: promises.length ? promises : undefined,
   };
 }

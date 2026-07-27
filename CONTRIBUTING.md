@@ -40,6 +40,7 @@ that way — a dependency needs a strong argument.
 | `src/report.ts` | Terminal and markdown output, exit codes |
 | `src/html.ts` | Self-contained HTML report |
 | `src/history.ts` | Release timeline and anomaly baseline |
+| `src/promises.ts` | Promise tracking — forward-looking notes checked against later releases |
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
 | `src/watch.ts` | Watch mode: state file, per-repo runs, dashboard index, `--notify` |
 | `src/watchlist.ts` | `watch init/add/remove/list` — build the repo list from your GitHub account |

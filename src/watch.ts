@@ -11,7 +11,7 @@ import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
 import { safeSegment } from "./paths.ts";
 
-import type { UnverifiableKind } from "./types.ts";
+import type { PromiseCheck, UnverifiableKind } from "./types.ts";
 
 type FailOn = "none" | "contradicted" | "no-evidence";
 
@@ -96,6 +96,8 @@ export interface CheckedRelease {
    * full diff scores 85.
    */
   warnings?: string[];
+  /** Promises from earlier releases this release was due to keep and did not. */
+  brokenPromises?: number;
   engine: string;
   verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
   /** HTML report path relative to the reports directory. */
@@ -113,6 +115,11 @@ interface RepoState {
   lastTag: string | null;
   latest?: CheckedRelease;
   history: CheckedRelease[];
+  /**
+   * Promise ledger from the last check: still-open entries are re-checked
+   * against every later release until they resolve to kept or broken.
+   */
+  promises?: PromiseCheck[];
 }
 
 export interface WatchState {
@@ -305,6 +312,10 @@ export function toWatchIndexHtml(
       }${
         l.warnings?.length
           ? ` <span class="incomplete" title="${esc(l.warnings.join(" · "))}">&#9888; partial data</span>`
+          : ""
+      }${
+        l.brokenPromises
+          ? ` <span class="incomplete" title="an earlier release promised a change this release was due to ship">&#9888; ${l.brokenPromises} broken promise${l.brokenPromises > 1 ? "s" : ""}</span>`
           : ""
       }</td>
 <td class="comp">${comp}</td>
@@ -560,6 +571,11 @@ export async function runWatch(
           reverse: true,
           baseline: rc.baseline ?? 5,
           history: githubHistory(rc.repo),
+          // Promises older than the base release live only here: the state
+          // carries every still-open one until a later diff resolves it.
+          carriedPromises: (repoState.promises ?? [])
+            .filter((p) => p.status === "still-open")
+            .map((p) => ({ text: p.text, from: p.from, kind: p.kind, target: p.target })),
         };
         const { data, context } = await loadGithubReleaseData(rc.repo, {
           tag: rel.tag,
@@ -624,6 +640,9 @@ export async function runWatch(
           flagCount: report.metrics.flags.length,
           flagged,
           ...(report.warnings.length ? { warnings: report.warnings } : {}),
+          ...(report.promises?.some((p) => p.status === "broken")
+            ? { brokenPromises: report.promises.filter((p) => p.status === "broken").length }
+            : {}),
           engine: report.engine,
           verdicts,
           unverifiable: report.metrics.unverifiable?.kind,
@@ -634,6 +653,12 @@ export async function runWatch(
         repoState.lastTag = rel.tag;
         repoState.latest = checkedRelease;
         repoState.history = [...repoState.history, checkedRelease].slice(-20);
+        // The ledger is replaced wholesale: carried promises were all
+        // re-checked this run, resolved ones keep their final status here and
+        // only still-open entries ride along to the next release.
+        if (report.promises?.length || repoState.promises?.length) {
+          repoState.promises = report.promises ?? [];
+        }
         state.repos[key] = repoState;
         codes.push(ec);
         checked++;

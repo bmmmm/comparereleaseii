@@ -449,6 +449,17 @@ ${treemapSvg(m.files, compareUrl, anchorsWork)}
 </div>
 ${claimsHtml(report, report.linkBase, style)}
 
+${
+  report.promises?.length
+    ? `<h2>Promises from earlier releases <span class="note">— forward-looking notes checked against this diff; informational, never scored</span></h2>${report.promises
+        .map((p) => {
+          const color =
+            p.status === "kept" ? "#3fb950" : p.status === "broken" ? "#f85149" : "#6e7681";
+          return `<div class="flag" style="border-left-color:${color}"><span class="chip" style="background:${color}">${p.status}</span> <b>${esc(p.from)}</b> ${esc(p.text)}<div class="files">${esc(p.note)}${p.files.length ? ` — ${esc(p.files.slice(0, 3).join(", "))}` : ""}</div></div>`;
+        })
+        .join("")}`
+    : ""
+}
 <h2>Undocumented commits</h2>
 ${
   !report.reverseChecked

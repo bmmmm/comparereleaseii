@@ -1,7 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { extractIdentifiers } from "./match.ts";
 import { FENCE_LINE } from "./util.ts";
-import type { Claim } from "./types.ts";
+import type { Claim, ClaimPromise } from "./types.ts";
+
+// Future tense only: "was removed"/"has been removed" is a claim about THIS
+// release and stays out. The removal patterns run first so that "removal
+// planned for 3.0" does not read as an addition via "planned for".
+const FUTURE_REMOVAL =
+  /\bwill be (?:removed|dropped|deleted|disabled|retired)\b|\bwill (?:remove|drop|delete|disable|retire)\b|\b(?:removal|deprecation)\b[^.;:]*\b(?:planned|scheduled|slated)\b|\b(?:planned|scheduled|slated) for removal\b|\bto be removed\b/i;
+const FUTURE_ADDITION =
+  /\bwill (?:be )?(?:added|land|ship|arrive|gain|support)\b|\bplanned for\b|\bcoming in (?:a |the |v?\d)/i;
+const PROMISE_TARGET =
+  /\b(?:in|with|for|by)\s+(?:release\s+|version\s+)?v?(\d+(?:\.\d+)*[\w.-]*)\b|\b(next) (?:release|version|major|minor)\b/i;
+
+/** Detect a forward-looking commitment and the release it names, if any. */
+export function detectPromise(text: string): ClaimPromise | undefined {
+  const removal = FUTURE_REMOVAL.exec(text);
+  const addition = removal ? null : FUTURE_ADDITION.exec(text);
+  const marker = removal ?? addition;
+  if (!marker) return undefined;
+  // The target only counts after the marker: "added in 1.4 and will be
+  // removed" names where it came from, not when it goes.
+  const m = text.slice(marker.index).match(PROMISE_TARGET);
+  return { kind: removal ? "removal" : "addition", target: m ? (m[2] ? "next" : m[1]) : undefined };
+}
 
 const META_SECTION = /new contributors|credits|thanks|acknowledg/i;
 const META_TEXT =
@@ -33,7 +55,14 @@ function extract(text: string): Omit<Claim, "id" | "section" | "kind" | "text"> 
   ];
   const codeSpans = [...text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]);
   const author = text.match(/by @([\w-]+)/)?.[1];
-  return { prNumbers: [...prNumbers], shas, advisories, codeSpans, author };
+  return {
+    prNumbers: [...prNumbers],
+    shas,
+    advisories,
+    codeSpans,
+    author,
+    promise: detectPromise(text),
+  };
 }
 
 /** Normalize a claim line for display and matching: unwrap links, drop URLs. */

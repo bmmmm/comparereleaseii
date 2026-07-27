@@ -48,6 +48,26 @@ export interface ReleaseData {
 
 export type ClaimKind = "change" | "meta";
 
+/** A forward-looking commitment in release notes — checked against LATER releases. */
+export interface ClaimPromise {
+  kind: "removal" | "addition";
+  /** Release the promise names ("v2.0"), or "next" for "the next release". */
+  target?: string;
+}
+
+/** One promise from an earlier release, checked against this release's diff. */
+export interface PromiseCheck {
+  text: string;
+  /** Tag whose notes made the promise. */
+  from: string;
+  kind: ClaimPromise["kind"];
+  target?: string;
+  status: "kept" | "broken" | "still-open";
+  /** Files whose diff decided a kept verdict. */
+  files: string[];
+  note: string;
+}
+
 export interface Claim {
   id: number;
   section: string;
@@ -63,6 +83,8 @@ export interface Claim {
    * a standing product description, not an assertion about this release.
    */
   carriedOverFrom?: string;
+  /** Set when the claim commits to a FUTURE change ("will be removed in 2.0"). */
+  promise?: ClaimPromise;
 }
 
 export type Verdict =
@@ -217,4 +239,6 @@ export interface Report {
   linkBase?: string;
   /** URL path dialect: GitLab spells commit/compare routes with a `/-/`. */
   linkStyle?: "github" | "gitlab";
+  /** Earlier releases' promises checked against this diff — informational, never scored. */
+  promises?: PromiseCheck[];
 }

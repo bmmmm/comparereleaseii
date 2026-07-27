@@ -38,6 +38,7 @@ not add a dependency, a build step, or a framework.
 | `src/report.ts` | Terminal/markdown output, exit codes |
 | `src/html.ts` | HTML report |
 | `src/history.ts` | Timeline, baseline |
+| `src/promises.ts` | Forward-looking notes from earlier releases checked against this diff |
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
 | `src/watch.ts` | Watch mode: state, per-repo runs, dashboard index, `--notify` |
 | `src/watchlist.ts` | `watch init/add/remove/list` — repo list from your GitHub account |
