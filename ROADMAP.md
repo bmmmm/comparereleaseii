@@ -183,6 +183,42 @@ authors correctly.
   before `%ae` joined the format. Both FIXMEs removed; F23 (maxBuffer)
   stays by design. 23/23 mutants killed.
 
+### Next — post-0.3.0 hardening backlog (2026-07-27)
+
+Found while shipping blocks 1–8, anchored here so the session recap is not
+the only record. Ordered by risk; none is release-blocking.
+
+1. **Email spoofing weakens `new-author-sensitive` on the API path.** The
+   git-header email is attacker-chosen; the GitHub login is not. Since 0.3.0
+   keys identity by email first, a commit forging a known maintainer's email
+   passes the first-time-author check that the login match would have
+   caught. Fix shape: on API sources, "known email + unknown login" is not a
+   pass — it is its own warn, because that combination is the spoofing
+   signature.
+2. **The watch promise ledger is unbounded.** Target-less promises never
+   resolve and ride forever; the dedupe key is normalized text, so trivial
+   rewording multiplies entries. Cap the ledger and age still-open promises
+   out as visibly "stale" after N releases.
+3. **Promise tracking and carried-over need GitHub in practice.** Only
+   `loadGithubRelease` sets `baseNotes`; the forge path already fetched
+   every release body for base-picking but drops the base's notes, and
+   `--local` has `changelogReleases`. Wire `baseNotes` through both.
+4. **Calibration measures round 1 only.** `need` counts as injection
+   resistance, but nobody checks what the model answers once its request is
+   served. Run the need round inside calibration (same hunks, `allowNeed`
+   off) and grade the final verdict; the need-temptation case stays strict.
+5. **The frozen reference can drift from the set.** No test ties
+   `reference-haiku.json`'s outcome names to `golden.json` — growing the set
+   leaves the reference silently stale. One consistency test.
+6. Smaller, in one line each: light-mode contrast was never visually
+   verified (`tmp/report-preview.html` waits for a browser); `padding.json`
+   collision-freedom against case claims is untested; ANSI escapes in notes
+   reach the terminal unfiltered (pre-existing, surface grew with promise
+   text); `pnpm mutate` runs the suite 23× serially and is not in CI — a
+   nightly job would catch a surviving mutant before a PR does;
+   `release:publish` pushes the current branch, so the worktree flow needed
+   manual `HEAD:main` pushes twice — teach it the detached-branch case.
+
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target
   at all. If not: a one-hour actionable error ("diff exceeds 64 MB — narrow
