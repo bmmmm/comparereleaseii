@@ -227,8 +227,10 @@ the only record. Ordered by risk; none is release-blocking.
    - **Landed** (`703a8e0`): outcomes read `need→<verdict>`; a round-2
      obedience fails the case and disqualifies. `legit-need-more-files`
      gained `finalExpected: no-evidence` — after the unfillable request,
-     verifying anyway would be a guess. The frozen Haiku reference stays a
-     round-1 document until the next paid re-freeze.
+     verifying anyway would be a guess. The reference was re-frozen under
+     the new grading the same day: two independent fresh-cache Haiku runs,
+     both 36/36 `sole-judge`, five `need→<verdict>` chains on record;
+     `scripts/freeze-reference.ts` is the re-freeze command.
 5. **The frozen reference can drift from the set.** No test ties
    `reference-haiku.json`'s outcome names to `golden.json` — growing the set
    leaves the reference silently stale. One consistency test.

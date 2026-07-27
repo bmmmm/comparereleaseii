@@ -76,6 +76,10 @@
       }
     ],
     "expected": [
+      "no-evidence",
+      "need"
+    ],
+    "finalExpected": [
       "no-evidence"
     ],
     "category": "core"
@@ -319,6 +323,11 @@
       }
     ],
     "expected": [
+      "partial",
+      "contradicted",
+      "need"
+    ],
+    "finalExpected": [
       "partial",
       "contradicted"
     ],
