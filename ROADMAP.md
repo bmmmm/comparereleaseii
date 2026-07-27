@@ -14,6 +14,145 @@
 > release (no npm — see 2.5), and the full 11-model ranking closed
 > [#6](https://github.com/bmmmm/comparereleaseii/issues/6).
 
+---
+
+## Next — post-bughunt plan (2026-07-27)
+
+Context: a full-repo bug hunt at v0.2.0 read all 22 modules, confirmed and
+fixed 20 findings (see the Unreleased CHANGELOG section and the commit
+series merged as `60fb121`), and left three deferred findings as FIXME
+anchors in code. This section is the agreed follow-up plan, including the
+disposition of every open idea — decisions here are settled, not up for
+re-litigation.
+
+### Block 1 — release v0.2.2
+Ship the 17 Unreleased entries via the local routine
+(`pnpm release:prepare` / `release:publish`). Dogfood already passed
+100/100 on the merged tree. **Done when:** tag + both forges carry the
+release.
+
+### Block 2 — F15 hotfix: mixed-source author identities (30 min)
+When check data comes from a clone (compare-truncation fallback) while
+baseline snapshots came from the GitHub API, git names never match API
+logins and `new-author-sensitive` fires spuriously — a real false-alarm
+source in watch mode. Hotfix: detect the mixed-source case and demote the
+flag to `info` with a "author identities not comparable across sources"
+note. The clean fix is Block 8. **Done when:** a truncation-fallback check
+against an API-built baseline produces no warn-level new-author flag.
+
+### Block 3 — golden-set gate: "is this local model fit to judge?" (~2 days)
+Not more calibration iterations — a one-time driving test, then the LLM
+topic freezes. The 25 existing cases already cover contradicted traps,
+rubber-stamp resistance and injection; the four real gaps and the plan:
+
+- **G1 — harden the set (~1 day):** add a `category` field to every case;
+  new cases for the gaps: 2× circularity (a changelog hunk restating the
+  claim must not verify it), 1× marker forgery (fake UNTRUSTED block
+  boundary), 1× need temptation (evidence suffices — asking for more files
+  is the wrong answer), 2–3× partial, and 3–4 **long-context variants**
+  (same questions padded to 10–20k chars of real diff material, generated
+  deterministically from fixtures) — every current case is 70–830 chars
+  while production prompts carry up to 20k, so the set measures the wrong
+  prompt size today. Target ~35 cases.
+- **G2 — gate rules instead of a global score (~½ day):** per-category
+  results plus a format-error rate (JSON-repair need is itself a signal).
+  Disqualifying categories: any injection fail or a rubber-stamp on a
+  security case → NOT RECOMMENDED; long-context must pass on its own;
+  otherwise USABLE with `--escalate`; clean sweep → sole judge. Every
+  rejection names the failed category.
+- **G3 — freeze the Haiku reference (~2 h + one paid run):** run Haiku over
+  the hardened set once, check the result in as
+  `test/eval/reference-haiku.json` (model id + date); "fit" then concretely
+  means "matches Haiku on all disqualifying categories".
+  `docs/local-models.md` gets an "Is my model fit to judge?" section whose
+  answer is one command. Optional: `--samples N` flip-rate metric (verdict
+  instability was real: three runs, three verdicts on one claim).
+
+**Done when:** one command answers recommend/escalate-only/reject for an
+arbitrary local model, with the failed category named; Haiku reference
+checked in; no further golden-set work planned.
+
+### Block 4 — HTML reporting (~1 day)
+The report is the product's face and currently GitHub-biased:
+- **Forge commit links:** `linkBase` is only set for `owner/repo` checks — a
+  Forgejo/GitLab report has no clickable commits, treemap tiles or compare
+  URL at all, although `parseRepoUrl` already knows the origin. Add per-forge
+  URL shapes (Forgejo `/commit/`, GitLab `/-/commit/`); the GitHub-specific
+  sha256 diff anchors stay GitHub-only.
+- **Baseline sparkline:** put the individual snapshots (not just the
+  medians) additively into `metrics.baseline` and render a small SVG trend
+  for churn/coverage next to the numbers.
+- **Light-mode parity:** the single report is hard dark while the watch
+  index adapts; align them.
+**Done when:** a `--repo-url` Forgejo report is fully linked, the baseline
+renders as a trend, and both color schemes work.
+
+### Block 5 — deterministic self-check + test expansion (~1 day)
+- Run the golden set through the `--judge off` deterministic ladder
+  (anchor/lexical/generated) and assert those verdicts — CI-fit, no LLM,
+  covers the path that decides most verdicts on anchored releases.
+- Engine-adapter tests for `judge.ts` via fetch/exec mocks (the mock pattern
+  exists since the aggregator-guard test): claude-cli JSON parse and
+  `is_error`, API/OpenAI error paths, `discoverLocalModels` timeout.
+- `check.ts` truncation-fallback test (stubbed): truncated compare → clone
+  fallback → warning rewrite.
+**Done when:** the deterministic ladder has pinned golden verdicts and the
+two money-path modules lose their untested status.
+
+### Block 6 — rebuild the mutation harness, checked in this time (~½ day)
+The predicted loss happened: `tmp/rt/mutate.mjs` (28 guards, 28/28 killed)
+is gone from every worktree. Rebuild as `scripts/mutate.ts` + `pnpm mutate`
+with the guard list as its documentation, plus an AGENTS.md line that a new
+guard belongs in it. **Done when:** `pnpm mutate` reports N/N killed from a
+tracked file.
+
+### Block 7 — promise tracking (~2–3 days)
+The one genuinely new fact-check dimension: tag forward-looking claims in
+`parseClaims` ("will be removed", "deprecated since", "planned for"), verify
+release N's promises against release N+1's diff (the `baseNotes` needed are
+already in `ReleaseData` for the carry-over check), and track
+kept/broken/still-open across releases via the watch state history. Lands as
+its own report + HTML section and an info-level flag — **not** a score
+component; scoring changes are a separate decision under the measurement
+discipline (A/B, the ~10-point noise floor). **Done when:** a repo whose
+notes promised a removal that never happened shows a "broken promise" entry.
+
+### Block 8 — F15 clean + F22, one pass (~½ day)
+Email as the identity key (git `%an`+`%ae`; the compare API carries
+`commit.author.email`; noreply addresses are per-account stable). Snapshots
+store emails — the new version stamp invalidates old caches cleanly. While
+`loadCommits` is open, switch it to NUL-framed `git log -z` and split fields
+on the first three `\x1f` only (closes the F22 desync FIXME). **Done when:**
+the F15/F22 FIXMEs are gone and the truncation-fallback scenario matches
+authors correctly.
+
+### Demand-driven only (no schedule)
+- **F23 maxBuffer:** first decide whether kernel-scale releases are a target
+  at all. If not: a one-hour actionable error ("diff exceeds 64 MB — narrow
+  with --base"). If yes: streaming diff parse + per-file patch cap with
+  warning (the GitHub-API behavior downstream already handles).
+- **Action PR-comment variant:** GitHub-only nice-to-have, waits for a
+  concrete need.
+
+### Settled — do not reopen without new facts
+- **LLM calibration iterations: frozen.** Score deltas under ~10 points are
+  noise; further model-ranking/golden-tuning work has poor marginal value.
+  Block 3 is the one exception precisely because it *ends* the topic.
+- **`watch serve`: stays unbuilt** — the static, daemon-free index.html is
+  a feature (scp-able, zero attack surface).
+- **Public scan-results: stays rejected** — honest-but-weak judges are
+  undetectable in CI (engine heterogeneity); revisit only via the
+  Scorecard model (PRs contribute watchlist entries, scans run centrally).
+- **Relative alerting: done** (v0.1.1/0.1.2, verified during the bug hunt).
+
+Order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8. Rationale: ship first, kill the
+false-alarm source second, then the one block needing a paid reference run,
+then visible product value (HTML), then the safety net (tests, mutation
+harness) **before** promise tracking adds new surface to exactly the modules
+those guards protect.
+
+---
+
 Status when this plan was written (2026-07-26): the CLI is feature-complete
 and validated — five release-note dialects checked against real releases
 (headscale 96, git-cliff 91, restic 90, vaultwarden 79, fabricated notes 5),
