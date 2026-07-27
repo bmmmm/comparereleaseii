@@ -30,6 +30,11 @@ Ship the 17 Unreleased entries via the local routine
 (`pnpm release:prepare` / `release:publish`). Dogfood already passed
 100/100 on the merged tree. **Done when:** tag + both forges carry the
 release.
+- **Landed 2026-07-27.** Dogfood 100/100; tag `v0.2.2` on both forges,
+  GitHub release published. One deviation from the routine: the release ran
+  from the worktree on `bughunt` (whose tip WAS remote `main`), so the
+  publish script's branch push was replaced by explicit `HEAD:main` pushes —
+  `release:publish` would have pushed a `bughunt` branch to both forges.
 
 ### Block 2 — F15 hotfix: mixed-source author identities (30 min)
 When check data comes from a clone (compare-truncation fallback) while
@@ -39,6 +44,8 @@ source in watch mode. Hotfix: detect the mixed-source case and demote the
 flag to `info` with a "author identities not comparable across sources"
 note. The clean fix is Block 8. **Done when:** a truncation-fallback check
 against an API-built baseline produces no warn-level new-author flag.
+- **Landed 2026-07-27** (`13d6a36`), and superseded by Block 8 the same day —
+  the demotion and its `mixedAuthorSources` field lived for six commits.
 
 ### Block 3 — golden-set gate: "is this local model fit to judge?" (~2 days)
 Not more calibration iterations — a one-time driving test, then the LLM
@@ -72,6 +79,20 @@ rubber-stamp resistance and injection; the four real gaps and the plan:
 arbitrary local model, with the failed category named; Haiku reference
 checked in; no further golden-set work planned.
 
+- **Landed 2026-07-27** (`9bd7093`). Set 25 → 36 with categories; the four
+  long-context variants expand at load time from `test/eval/padding.json`
+  (real diff hunks of this repo, deliberately excluding judge.ts — prompt
+  text reads as instructions). `gateCalibration()` implements exactly the
+  G2 rules; JSON-repair became measurable via `JudgeFormatError`/meta.
+  Haiku reference frozen at 36/36 gate `sole-judge` across two independent
+  fresh-cache runs. What the runs settled that the plan could not: Haiku
+  answers round-1 `need` on cases whose hunk cannot prove absence, and
+  flickers between `need` and `no-evidence` on injections without ever
+  obeying — those cases accept `need` now; the need-temptation case stays
+  strict because its evidence visibly suffices. The optional `--samples N`
+  flip-rate metric was skipped: two full runs answered the stability
+  question the metric was for.
+
 ### Block 4 — HTML reporting (~1 day)
 The report is the product's face and currently GitHub-biased:
 - **Forge commit links:** `linkBase` is only set for `owner/repo` checks — a
@@ -86,6 +107,14 @@ The report is the product's face and currently GitHub-biased:
   index adapts; align them.
 **Done when:** a `--repo-url` Forgejo report is fully linked, the baseline
 renders as a trend, and both color schemes work.
+- **Landed 2026-07-27** (`52e6e21`). `analyzeRelease` takes a `RepoLink`
+  (base + path dialect) instead of a GitHub slug; GitLab spells `/-/`
+  routes, everything else shares GitHub's; the sha256 treemap anchors stay
+  GitHub-only. Verified live against gitea.com (`gitea/tea` fully linked,
+  130 compare links, zero fabricated anchors). Baseline snapshots ride in
+  `metrics.baseline` oldest-first and render as two inline sparklines with
+  per-release tooltips; the report CSS moved to variables, light-first with
+  a dark media query, sharing the watch index palette.
 
 ### Block 5 — deterministic self-check + test expansion (~1 day)
 - Run the golden set through the `--judge off` deterministic ladder
@@ -98,6 +127,14 @@ renders as a trend, and both color schemes work.
   fallback → warning rewrite.
 **Done when:** the deterministic ladder has pinned golden verdicts and the
 two money-path modules lose their untested status.
+- **Landed 2026-07-27** (`9858b09`). The pin lives in
+  `test/eval/golden-deterministic.json` (33 no-evidence, 3 partial via
+  lexical evidence; `UPDATE_PINNED=1` refreshes deliberately) plus a
+  property test that the judge-free ladder never rubber-stamps. judge.ts is
+  tested through a fetch mock and a stub `claude` binary on PATH (no module
+  mocks needed); check.ts's fallback through an injection seam with
+  production defaults — which also gave the Block 2 hotfix its end-to-end
+  proof.
 
 ### Block 6 — rebuild the mutation harness, checked in this time (~½ day)
 The predicted loss happened: `tmp/rt/mutate.mjs` (28 guards, 28/28 killed)
@@ -105,6 +142,12 @@ is gone from every worktree. Rebuild as `scripts/mutate.ts` + `pnpm mutate`
 with the guard list as its documentation, plus an AGENTS.md line that a new
 guard belongs in it. **Done when:** `pnpm mutate` reports N/N killed from a
 tracked file.
+- **Landed 2026-07-27** (`d9f8342`). 20 guards then, 23 after Blocks 7–8
+  added theirs — all killed. A stale pattern aborts loudly, sources restore
+  even when the suite run throws, and a substring argument runs single
+  mutants. The harness immediately earned its keep in Block 8: a weaker
+  body-assertion let the NUL-framing mutant survive until the test asserted
+  the full poisoned body.
 
 ### Block 7 — promise tracking (~2–3 days)
 The one genuinely new fact-check dimension: tag forward-looking claims in
@@ -116,6 +159,14 @@ its own report + HTML section and an info-level flag — **not** a score
 component; scoring changes are a separate decision under the measurement
 discipline (A/B, the ~10-point noise floor). **Done when:** a repo whose
 notes promised a removal that never happened shows a "broken promise" entry.
+- **Landed 2026-07-27** (`30a2e9c`), deterministic rather than judged:
+  promise identifiers matched against deletions (removal) or additions
+  (addition). Two definitions the plan left open: **broken** requires the
+  promise's named target release to be reached (a target-less promise stays
+  still-open forever rather than ever accusing), and a promise naming no
+  code identifier stays honestly still-open. Score neutrality is proven by
+  a test comparing scores with and without the promise; watch carries
+  still-open promises in its state and badges broken ones in the index.
 
 ### Block 8 — F15 clean + F22, one pass (~½ day)
 Email as the identity key (git `%an`+`%ae`; the compare API carries
@@ -125,6 +176,12 @@ store emails — the new version stamp invalidates old caches cleanly. While
 on the first three `\x1f` only (closes the F22 desync FIXME). **Done when:**
 the F15/F22 FIXMEs are gone and the truncation-fallback scenario matches
 authors correctly.
+- **Landed 2026-07-27** (`6f275aa`). `authorKey()` = lowercased git-header
+  email, display-name fallback; snapshots store keys, `baselineFlags`
+  accepts key or pre-email name; the Block 2 demotion and its field are
+  gone. Fields split on the first *four* separators — the plan said three
+  before `%ae` joined the format. Both FIXMEs removed; F23 (maxBuffer)
+  stays by design. 23/23 mutants killed.
 
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target
