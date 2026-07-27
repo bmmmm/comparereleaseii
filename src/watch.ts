@@ -175,6 +175,12 @@ export interface RepoState {
   promises?: PromiseCheck[];
   /** Author ledger — per-identity facts accumulated across checked releases. */
   authors?: AuthorRecord[];
+  /**
+   * The ledger cap has evicted identities at least once. Sticky: from then
+   * on a returning evicted identity recounts as "new", so the display must
+   * qualify first-appearance counts instead of stating them as fact.
+   */
+  authorsEvicted?: boolean;
 }
 
 /**
@@ -248,10 +254,18 @@ export function updateAuthorLedger(
   const active = new Set((activity ?? []).map((a) => a.key));
   const keep = all.filter((a) => active.has(a.key));
   const rest = all.filter((a) => !active.has(a.key)).sort((x, y) => y.commits - x.commits);
+  // The whole active set survives even when it alone exceeds the cap — a
+  // 150-author release must not have 50 of its own identities forgotten,
+  // or they would recount as "new" on every later release forever. The
+  // ledger runs wide for that one release and shrinks back to the cap on
+  // the next narrower one; only inactive records are ever evicted. An
+  // evicted identity returning later still recounts as new — that is the
+  // bounded-memory limit, and the caller sticky-flags it for display.
+  const room = Math.max(0, MAX_AUTHOR_LEDGER - keep.length);
   return {
-    ledger: [...keep, ...rest].slice(0, MAX_AUTHOR_LEDGER),
+    ledger: [...keep, ...rest.slice(0, room)],
     newAuthors,
-    dropped: all.length - MAX_AUTHOR_LEDGER,
+    dropped: rest.length - room,
   };
 }
 
@@ -1053,9 +1067,10 @@ export async function runWatch(
         // to everything this watcher has seen", not "new to this run".
         const authorUpdate = updateAuthorLedger(repoState.authors, report.authors, rel.tag);
         if (authorUpdate.dropped > 0) {
+          repoState.authorsEvicted = true;
           console.error(
             `${key}: author ledger capped at ${MAX_AUTHOR_LEDGER} identities ` +
-              `(${authorUpdate.dropped} least-active dropped).`,
+              `(${authorUpdate.dropped} least-active dropped — later "new author" counts may overcount).`,
           );
         }
         repoState.authors = authorUpdate.ledger;

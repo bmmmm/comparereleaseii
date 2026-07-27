@@ -8,7 +8,7 @@
         {
           "tag": "v0.0.65",
           "publishedAt": "2026-07-10T16:45:20Z",
-          "checkedAt": "2026-07-27T22:23:17.730Z",
+          "checkedAt": "2026-07-27T22:49:24.682Z",
           "score": 76,
           "scoreLabel": "minor gaps",
           "components": {
@@ -39,7 +39,7 @@
         {
           "tag": "v0.0.66",
           "publishedAt": "2026-07-17T22:05:27Z",
-          "checkedAt": "2026-07-27T22:23:23.925Z",
+          "checkedAt": "2026-07-27T22:49:30.877Z",
           "score": 78,
           "scoreLabel": "minor gaps",
           "components": {
@@ -70,7 +70,7 @@
         {
           "tag": "v0.0.67",
           "publishedAt": "2026-07-23T03:23:58Z",
-          "checkedAt": "2026-07-27T22:23:28.983Z",
+          "checkedAt": "2026-07-27T22:49:35.211Z",
           "score": 85,
           "scoreLabel": "solid",
           "components": {
@@ -101,7 +101,7 @@
         {
           "tag": "v0.0.68",
           "publishedAt": "2026-07-24T19:24:28Z",
-          "checkedAt": "2026-07-27T22:23:31.373Z",
+          "checkedAt": "2026-07-27T22:49:37.567Z",
           "score": 100,
           "scoreLabel": "solid",
           "components": {
@@ -130,10 +130,90 @@
           "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.68"
         }
       ],
+      "authors": [
+        {
+          "key": "redacted:5cd8f57de2fc",
+          "name": "ig-ant",
+          "firstSeen": "v0.0.65",
+          "lastSeen": "v0.0.67",
+          "releases": 2,
+          "commits": 21,
+          "sensitiveCommits": 5,
+          "binaryCommits": 0,
+          "logins": [
+            "ig-ant"
+          ]
+        },
+        {
+          "key": "redacted:df5da0bac7ea",
+          "name": "dylan-conway",
+          "firstSeen": "v0.0.65",
+          "lastSeen": "v0.0.65",
+          "releases": 1,
+          "commits": 9,
+          "sensitiveCommits": 2,
+          "binaryCommits": 0,
+          "logins": [
+            "dylan-conway"
+          ]
+        },
+        {
+          "key": "redacted:56e64e56b4a5",
+          "name": "shawnm-anthropic",
+          "firstSeen": "v0.0.65",
+          "lastSeen": "v0.0.67",
+          "releases": 3,
+          "commits": 16,
+          "sensitiveCommits": 3,
+          "binaryCommits": 0,
+          "logins": [
+            "shawnm-anthropic"
+          ]
+        },
+        {
+          "key": "redacted:2bd64e877f1e",
+          "name": "elhajjj",
+          "firstSeen": "v0.0.65",
+          "lastSeen": "v0.0.67",
+          "releases": 3,
+          "commits": 50,
+          "sensitiveCommits": 4,
+          "binaryCommits": 0,
+          "logins": [
+            "elhajjj"
+          ]
+        },
+        {
+          "key": "redacted:ef04b20d7203",
+          "name": "seanyeoh-ant",
+          "firstSeen": "v0.0.66",
+          "lastSeen": "v0.0.66",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "seanyeoh-ant"
+          ]
+        },
+        {
+          "key": "redacted:77988d471963",
+          "name": "MarshallOfSound",
+          "firstSeen": "v0.0.68",
+          "lastSeen": "v0.0.68",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "MarshallOfSound"
+          ]
+        }
+      ],
       "latest": {
         "tag": "v0.0.68",
         "publishedAt": "2026-07-24T19:24:28Z",
-        "checkedAt": "2026-07-27T22:23:31.373Z",
+        "checkedAt": "2026-07-27T22:49:37.567Z",
         "score": 100,
         "scoreLabel": "solid",
         "components": {
@@ -169,7 +249,7 @@
         {
           "tag": "v2.1.218",
           "publishedAt": "2026-07-22T21:24:56Z",
-          "checkedAt": "2026-07-27T22:23:37.023Z",
+          "checkedAt": "2026-07-27T22:49:42.494Z",
           "score": 65,
           "scoreLabel": "unverified",
           "components": {
@@ -201,7 +281,7 @@
         {
           "tag": "v2.1.219",
           "publishedAt": "2026-07-24T17:14:23Z",
-          "checkedAt": "2026-07-27T22:23:41.075Z",
+          "checkedAt": "2026-07-27T22:49:46.471Z",
           "score": 65,
           "scoreLabel": "unverified",
           "components": {
@@ -233,7 +313,7 @@
         {
           "tag": "v2.1.220",
           "publishedAt": "2026-07-25T01:35:55Z",
-          "checkedAt": "2026-07-27T22:23:44.889Z",
+          "checkedAt": "2026-07-27T22:49:50.250Z",
           "score": 65,
           "scoreLabel": "unverified",
           "components": {
@@ -263,10 +343,25 @@
           "releaseUrl": "https://github.com/anthropics/claude-code/releases/tag/v2.1.220"
         }
       ],
+      "authors": [
+        {
+          "key": "redacted:b5a496076c78",
+          "name": "actions-user",
+          "firstSeen": "v2.1.218",
+          "lastSeen": "v2.1.220",
+          "releases": 3,
+          "commits": 3,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "actions-user"
+          ]
+        }
+      ],
       "latest": {
         "tag": "v2.1.220",
         "publishedAt": "2026-07-25T01:35:55Z",
-        "checkedAt": "2026-07-27T22:23:44.889Z",
+        "checkedAt": "2026-07-27T22:49:50.250Z",
         "score": 65,
         "scoreLabel": "unverified",
         "components": {
@@ -303,7 +398,7 @@
         {
           "tag": "v0.9.2",
           "publishedAt": "2026-07-12T12:56:33Z",
-          "checkedAt": "2026-07-27T22:23:50.671Z",
+          "checkedAt": "2026-07-27T22:49:56.012Z",
           "score": 100,
           "scoreLabel": "solid",
           "components": {
@@ -334,7 +429,7 @@
         {
           "tag": "v0.9.3",
           "publishedAt": "2026-07-15T13:43:59Z",
-          "checkedAt": "2026-07-27T22:23:55.461Z",
+          "checkedAt": "2026-07-27T22:50:00.388Z",
           "score": 97,
           "scoreLabel": "solid",
           "components": {
@@ -365,7 +460,7 @@
         {
           "tag": "v0.9.4",
           "publishedAt": "2026-07-21T08:13:47Z",
-          "checkedAt": "2026-07-27T22:24:00.456Z",
+          "checkedAt": "2026-07-27T22:50:05.560Z",
           "score": 91,
           "scoreLabel": "solid",
           "components": {
@@ -394,10 +489,103 @@
           "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.4"
         }
       ],
+      "authors": [
+        {
+          "key": "redacted:fcdf6bb53daf",
+          "name": "MikaKrul",
+          "firstSeen": "v0.9.2",
+          "lastSeen": "v0.9.4",
+          "releases": 3,
+          "commits": 4,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "MikaKrul"
+          ]
+        },
+        {
+          "key": "redacted:17bd3ba220b0",
+          "name": "cjpais",
+          "firstSeen": "v0.9.2",
+          "lastSeen": "v0.9.4",
+          "releases": 3,
+          "commits": 15,
+          "sensitiveCommits": 11,
+          "binaryCommits": 0,
+          "logins": [
+            "cjpais"
+          ]
+        },
+        {
+          "key": "redacted:742b60bcad36",
+          "name": "JavaGT",
+          "firstSeen": "v0.9.3",
+          "lastSeen": "v0.9.3",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "JavaGT"
+          ]
+        },
+        {
+          "key": "redacted:45545b0f3f36",
+          "name": "j1gc",
+          "firstSeen": "v0.9.3",
+          "lastSeen": "v0.9.3",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "j1gc"
+          ]
+        },
+        {
+          "key": "redacted:abcb9f6c7e12",
+          "name": "kud",
+          "firstSeen": "v0.9.3",
+          "lastSeen": "v0.9.3",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "kud"
+          ]
+        },
+        {
+          "key": "redacted:951fbabd3753",
+          "name": "Jo-Con-El",
+          "firstSeen": "v0.9.4",
+          "lastSeen": "v0.9.4",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "Jo-Con-El"
+          ]
+        },
+        {
+          "key": "redacted:2bdaae18d2ec",
+          "name": "Punit-Dethe",
+          "firstSeen": "v0.9.4",
+          "lastSeen": "v0.9.4",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "Punit-Dethe"
+          ]
+        }
+      ],
       "latest": {
         "tag": "v0.9.4",
         "publishedAt": "2026-07-21T08:13:47Z",
-        "checkedAt": "2026-07-27T22:24:00.456Z",
+        "checkedAt": "2026-07-27T22:50:05.560Z",
         "score": 91,
         "scoreLabel": "solid",
         "components": {
@@ -433,7 +621,7 @@
         {
           "tag": "1.37.0",
           "publishedAt": "2026-07-24T17:04:39Z",
-          "checkedAt": "2026-07-27T22:24:06.616Z",
+          "checkedAt": "2026-07-27T22:50:12.073Z",
           "score": 79,
           "scoreLabel": "minor gaps",
           "components": {
@@ -462,10 +650,168 @@
           "releaseUrl": "https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0"
         }
       ],
+      "authors": [
+        {
+          "key": "redacted:0b35bba9546c",
+          "name": "Timshel",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 10,
+          "sensitiveCommits": 4,
+          "binaryCommits": 0,
+          "logins": [
+            "Timshel"
+          ]
+        },
+        {
+          "key": "redacted:a3d4ce4031f9",
+          "name": "BlackDex",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 6,
+          "sensitiveCommits": 5,
+          "binaryCommits": 0,
+          "logins": [
+            "BlackDex"
+          ]
+        },
+        {
+          "key": "redacted:e0806540171d",
+          "name": "dfunkt",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 2,
+          "sensitiveCommits": 2,
+          "binaryCommits": 0,
+          "logins": [
+            "dfunkt"
+          ]
+        },
+        {
+          "key": "redacted:f24c9de0b4f0",
+          "name": "txase",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "txase"
+          ]
+        },
+        {
+          "key": "redacted:292aebf60a7c",
+          "name": "stefan0xC",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "stefan0xC"
+          ]
+        },
+        {
+          "key": "redacted:d97fd2c56dcf",
+          "name": "mfw78",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "mfw78"
+          ]
+        },
+        {
+          "key": "redacted:e8b84513982d",
+          "name": "user71424q",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "user71424q"
+          ]
+        },
+        {
+          "key": "redacted:b7d0a060d3cb",
+          "name": "kvdb",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "kvdb"
+          ]
+        },
+        {
+          "key": "redacted:d27ca43e0b40",
+          "name": "pilotstew",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "pilotstew"
+          ]
+        },
+        {
+          "key": "redacted:2c74cf2fe514",
+          "name": "TriplEight",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "TriplEight"
+          ]
+        },
+        {
+          "key": "redacted:909abfd29f20",
+          "name": "tom27052006",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "tom27052006"
+          ]
+        },
+        {
+          "key": "redacted:aa217abd1d6b",
+          "name": "dani-garcia",
+          "firstSeen": "1.37.0",
+          "lastSeen": "1.37.0",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "dani-garcia"
+          ]
+        }
+      ],
       "latest": {
         "tag": "1.37.0",
         "publishedAt": "2026-07-24T17:04:39Z",
-        "checkedAt": "2026-07-27T22:24:06.616Z",
+        "checkedAt": "2026-07-27T22:50:12.073Z",
         "score": 79,
         "scoreLabel": "minor gaps",
         "components": {
@@ -501,7 +847,7 @@
         {
           "tag": "v1.5.1",
           "publishedAt": "2026-07-22T07:54:30Z",
-          "checkedAt": "2026-07-27T22:24:20.952Z",
+          "checkedAt": "2026-07-27T22:50:28.648Z",
           "score": 45,
           "scoreLabel": "questionable",
           "components": {
@@ -530,10 +876,285 @@
           "releaseUrl": "https://github.com/GyulyVGC/sniffnet/releases/tag/v1.5.1"
         }
       ],
+      "authors": [
+        {
+          "key": "redacted:4959fb8586ce",
+          "name": "GyulyVGC",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 59,
+          "sensitiveCommits": 23,
+          "binaryCommits": 0,
+          "logins": [
+            "GyulyVGC"
+          ]
+        },
+        {
+          "key": "redacted:228ed8679280",
+          "name": "GyulyVGC",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 31,
+          "sensitiveCommits": 13,
+          "binaryCommits": 0,
+          "logins": [
+            "GyulyVGC"
+          ]
+        },
+        {
+          "key": "redacted:9948c9df32e6",
+          "name": "allcontributors[bot]",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 19,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "allcontributors[bot]"
+          ]
+        },
+        {
+          "key": "redacted:4bf96f7d9c82",
+          "name": "DmytroGaiduk",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 5,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "DmytroGaiduk"
+          ]
+        },
+        {
+          "key": "redacted:f578bea06fe0",
+          "name": "TheMasterOfDisasters",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 4,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "TheMasterOfDisasters"
+          ]
+        },
+        {
+          "key": "redacted:b5525c747fec",
+          "name": "ethical-buddy",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 4,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "ethical-buddy"
+          ]
+        },
+        {
+          "key": "redacted:bd5a8d6c673b",
+          "name": "dependabot[bot]",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 3,
+          "sensitiveCommits": 3,
+          "binaryCommits": 0,
+          "logins": [
+            "dependabot[bot]"
+          ]
+        },
+        {
+          "key": "redacted:0d039ff38424",
+          "name": "thambaru",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 3,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "thambaru"
+          ]
+        },
+        {
+          "key": "redacted:740fe81df51d",
+          "name": "HiProfession",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 2,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            null
+          ]
+        },
+        {
+          "key": "redacted:4ab1a5f454d7",
+          "name": "Charpy",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 2,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "Charpy"
+          ]
+        },
+        {
+          "key": "redacted:5a6879ad8fe6",
+          "name": "Elyrial",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 2,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "Elyrial"
+          ]
+        },
+        {
+          "key": "redacted:bb8dfdec25aa",
+          "name": "Hurdadd",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 2,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "Hurdadd"
+          ]
+        },
+        {
+          "key": "redacted:4aadb0fb1538",
+          "name": "EfesX",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 2,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "EfesX"
+          ]
+        },
+        {
+          "key": "redacted:1432658d84a7",
+          "name": "HiProfession",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "HiProfession"
+          ]
+        },
+        {
+          "key": "redacted:df4f609c404d",
+          "name": "Franco Bonfiglio",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            null
+          ]
+        },
+        {
+          "key": "redacted:a1dac950cd6f",
+          "name": "nubikripto",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "nubikripto"
+          ]
+        },
+        {
+          "key": "redacted:34d9963c2d74",
+          "name": "GeorgeLS",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "GeorgeLS"
+          ]
+        },
+        {
+          "key": "redacted:d530ee3a126f",
+          "name": "pml68",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "pml68"
+          ]
+        },
+        {
+          "key": "redacted:35dfa65afef5",
+          "name": "LeandroPG19",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "LeandroPG19"
+          ]
+        },
+        {
+          "key": "redacted:1cb93e9983eb",
+          "name": "orbisai0security",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 1,
+          "binaryCommits": 0,
+          "logins": [
+            "orbisai0security"
+          ]
+        },
+        {
+          "key": "redacted:a16cc92a8b8a",
+          "name": "toboil-features",
+          "firstSeen": "v1.5.1",
+          "lastSeen": "v1.5.1",
+          "releases": 1,
+          "commits": 1,
+          "sensitiveCommits": 0,
+          "binaryCommits": 0,
+          "logins": [
+            "toboil-features"
+          ]
+        }
+      ],
       "latest": {
         "tag": "v1.5.1",
         "publishedAt": "2026-07-22T07:54:30Z",
-        "checkedAt": "2026-07-27T22:24:20.952Z",
+        "checkedAt": "2026-07-27T22:50:28.648Z",
         "score": 45,
         "scoreLabel": "questionable",
         "components": {

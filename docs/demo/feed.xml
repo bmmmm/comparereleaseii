@@ -2,90 +2,90 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
 <id>urn:comparereleaseii:watch-feed</id>
 <title>Release watch — comparereleaseii</title>
-<updated>2026-07-27T22:24:20.956Z</updated>
+<updated>2026-07-27T22:50:48.761Z</updated>
 <author><name>comparereleaseii</name></author>
 <link rel="alternate" type="text/html" href="index.html"/>
 <entry>
 <id>urn:comparereleaseii:GyulyVGC%2Fsniffnet:v1.5.1</id>
 <title>GyulyVGC/sniffnet v1.5.1 — 45/100 questionable ⚠</title>
-<updated>2026-07-27T22:24:20.952Z</updated>
+<updated>2026-07-27T22:50:28.648Z</updated>
 <link rel="alternate" type="text/html" href="GyulyVGC_sniffnet/v1.5.1.html"/>
 <summary>score 45/100 (questionable) — FLAGGED · verdicts: 17 verified, 1 partial, 1 no-evidence, 0 contradicted · flags: 6 (2 critical)</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:dani-garcia%2Fvaultwarden:1.37.0</id>
 <title>dani-garcia/vaultwarden 1.37.0 — 79/100 minor gaps</title>
-<updated>2026-07-27T22:24:06.616Z</updated>
+<updated>2026-07-27T22:50:12.073Z</updated>
 <link rel="alternate" type="text/html" href="dani-garcia_vaultwarden/1.37.0.html"/>
 <summary>score 79/100 (minor gaps) · verdicts: 33 verified, 1 partial, 2 no-evidence, 0 contradicted · flags: 7</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:cjpais%2FHandy:v0.9.4</id>
 <title>cjpais/Handy v0.9.4 — 91/100 solid</title>
-<updated>2026-07-27T22:24:00.456Z</updated>
+<updated>2026-07-27T22:50:05.560Z</updated>
 <link rel="alternate" type="text/html" href="cjpais_Handy/v0.9.4.html"/>
 <summary>score 91/100 (solid) · verdicts: 7 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 1</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:cjpais%2FHandy:v0.9.3</id>
 <title>cjpais/Handy v0.9.3 — 97/100 solid</title>
-<updated>2026-07-27T22:23:55.461Z</updated>
+<updated>2026-07-27T22:50:00.388Z</updated>
 <link rel="alternate" type="text/html" href="cjpais_Handy/v0.9.3.html"/>
 <summary>score 97/100 (solid) · verdicts: 5 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 1</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:cjpais%2FHandy:v0.9.2</id>
 <title>cjpais/Handy v0.9.2 — 100/100 solid</title>
-<updated>2026-07-27T22:23:50.671Z</updated>
+<updated>2026-07-27T22:49:56.012Z</updated>
 <link rel="alternate" type="text/html" href="cjpais_Handy/v0.9.2.html"/>
 <summary>score 100/100 (solid) · verdicts: 3 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 0</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropics%2Fclaude-code:v2.1.220</id>
 <title>anthropics/claude-code v2.1.220 — 65/100 unverified</title>
-<updated>2026-07-27T22:23:44.889Z</updated>
+<updated>2026-07-27T22:49:50.250Z</updated>
 <link rel="alternate" type="text/html" href="anthropics_claude-code/v2.1.220.html"/>
 <summary>score 65/100 (unverified) · verdicts: 0 verified, 0 partial, 1 no-evidence, 0 contradicted · flags: 1</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropics%2Fclaude-code:v2.1.219</id>
 <title>anthropics/claude-code v2.1.219 — 65/100 unverified</title>
-<updated>2026-07-27T22:23:41.075Z</updated>
+<updated>2026-07-27T22:49:46.471Z</updated>
 <link rel="alternate" type="text/html" href="anthropics_claude-code/v2.1.219.html"/>
 <summary>score 65/100 (unverified) · verdicts: 5 verified, 0 partial, 21 no-evidence, 0 contradicted · flags: 1</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropics%2Fclaude-code:v2.1.218</id>
 <title>anthropics/claude-code v2.1.218 — 65/100 unverified</title>
-<updated>2026-07-27T22:23:37.023Z</updated>
+<updated>2026-07-27T22:49:42.494Z</updated>
 <link rel="alternate" type="text/html" href="anthropics_claude-code/v2.1.218.html"/>
 <summary>score 65/100 (unverified) · verdicts: 6 verified, 0 partial, 31 no-evidence, 0 contradicted · flags: 1</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropic-experimental%2Fsandbox-runtime:v0.0.68</id>
 <title>anthropic-experimental/sandbox-runtime v0.0.68 — 100/100 solid</title>
-<updated>2026-07-27T22:23:31.373Z</updated>
+<updated>2026-07-27T22:49:37.567Z</updated>
 <link rel="alternate" type="text/html" href="anthropic-experimental_sandbox-runtime/v0.0.68.html"/>
 <summary>score 100/100 (solid) · verdicts: 1 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 0</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropic-experimental%2Fsandbox-runtime:v0.0.67</id>
 <title>anthropic-experimental/sandbox-runtime v0.0.67 — 85/100 solid</title>
-<updated>2026-07-27T22:23:28.983Z</updated>
+<updated>2026-07-27T22:49:35.211Z</updated>
 <link rel="alternate" type="text/html" href="anthropic-experimental_sandbox-runtime/v0.0.67.html"/>
 <summary>score 85/100 (solid) · verdicts: 8 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 1</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropic-experimental%2Fsandbox-runtime:v0.0.66</id>
 <title>anthropic-experimental/sandbox-runtime v0.0.66 — 78/100 minor gaps</title>
-<updated>2026-07-27T22:23:23.925Z</updated>
+<updated>2026-07-27T22:49:30.877Z</updated>
 <link rel="alternate" type="text/html" href="anthropic-experimental_sandbox-runtime/v0.0.66.html"/>
 <summary>score 78/100 (minor gaps) · verdicts: 8 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 0</summary>
 </entry>
 <entry>
 <id>urn:comparereleaseii:anthropic-experimental%2Fsandbox-runtime:v0.0.65</id>
 <title>anthropic-experimental/sandbox-runtime v0.0.65 — 76/100 minor gaps</title>
-<updated>2026-07-27T22:23:17.730Z</updated>
+<updated>2026-07-27T22:49:24.682Z</updated>
 <link rel="alternate" type="text/html" href="anthropic-experimental_sandbox-runtime/v0.0.65.html"/>
 <summary>score 76/100 (minor gaps) · verdicts: 7 verified, 0 partial, 0 no-evidence, 0 contradicted · flags: 2</summary>
 </entry>

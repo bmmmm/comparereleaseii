@@ -83,9 +83,13 @@ async function loadCommits(repo: string, base: string, head: string): Promise<Co
   // record terminator a hostile body cannot forge — a body containing \x1f
   // used to desync this parsing into extra/truncated records. Fields split
   // on the first four \x1f only; the body keeps any it carries.
+  // Oldest first, like the compare API's commit list — consumers that pick
+  // "the latest" (author display names) must not get a different answer
+  // depending on which source loaded the range.
   const out = await git(repo, [
     "log",
     "-z",
+    "--reverse",
     "--format=%H%x1f%an%x1f%ae%x1f%s%x1f%b",
     base ? `${base}..${head}` : head,
   ]);

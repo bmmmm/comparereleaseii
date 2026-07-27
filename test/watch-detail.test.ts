@@ -248,3 +248,20 @@ test("isBotAuthor stays narrow: word-bounded, known bots, no human false positiv
   assert.equal(isBotAuthor("Abbot"), false);
   assert.equal(isBotAuthor("Jia Tan"), false);
 });
+
+test("an evicted-ledger page qualifies its first-appearance counts", () => {
+  const base: RepoState = {
+    ...state([check("v3", 80)]),
+    authors: [
+      {
+        key: "a@x", name: "A", firstSeen: "v1", lastSeen: "v3",
+        releases: 3, commits: 5, sensitiveCommits: 0, binaryCommits: 0,
+      },
+    ],
+  };
+  const clean = toRepoDetailHtml(ENTRY, base, null, "t");
+  assert.ok(!clean.includes("an upper bound"), "no qualifier while the ledger is complete");
+  const evicted = toRepoDetailHtml(ENTRY, { ...base, authorsEvicted: true }, null, "t");
+  assert.ok(evicted.includes("identities have been evicted"));
+  assert.ok(evicted.includes("an upper bound"));
+});

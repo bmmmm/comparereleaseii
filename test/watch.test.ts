@@ -698,3 +698,16 @@ test("the author ledger cap keeps this release's identities, then the busiest", 
   assert.ok(update.ledger.some((a) => a.key === "fresh@x"), "the active identity survives the cap");
   assert.ok(!update.ledger.some((a) => a.key === "old0@x"), "the least active is what drops");
 });
+
+test("a release wider than the cap keeps its whole active set — new stays honest", () => {
+  const wide = Array.from({ length: MAX_AUTHOR_LEDGER + 50 }, (_, i) => activity(`a${i}@x`, 1));
+  const r1 = updateAuthorLedger(undefined, wide, "v1");
+  assert.equal(r1.ledger.length, MAX_AUTHOR_LEDGER + 50, "every active identity survives");
+  assert.equal(r1.dropped, 0);
+  const r2 = updateAuthorLedger(r1.ledger, wide, "v2");
+  assert.equal(r2.newAuthors, 0, "an identity the cap kept never recounts as new");
+  // The next narrow release shrinks the ledger back to the cap.
+  const r3 = updateAuthorLedger(r2.ledger, [activity("fresh@x", 1)], "v3");
+  assert.equal(r3.ledger.length, MAX_AUTHOR_LEDGER);
+  assert.equal(r3.dropped, 51);
+});
