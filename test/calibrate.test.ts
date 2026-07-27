@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import {
   runCalibration,
   loadGoldenCases,
+  loadReference,
   gateCalibration,
   GOLDEN_CATEGORIES,
   type Calibration,
@@ -64,6 +65,40 @@ test("golden set: every case categorized, long-context stubs expand deterministi
   // Deterministic: the same inputs must build byte-identical prompts, or the
   // verdict cache and cross-run comparisons fall apart.
   assert.deepEqual(await loadGoldenCases(), cases);
+});
+
+test("the frozen reference covers exactly the current golden set", async () => {
+  // "Fit to judge" concretely means "matches the reference on the
+  // disqualifying categories" — which is only a statement while the
+  // reference and the set describe the same cases. Growing the set used to
+  // leave the reference silently stale; this is the tie.
+  const reference = await loadReference();
+  assert.ok(reference, "test/eval/reference-haiku.json is missing or unreadable");
+  const cases = await loadGoldenCases();
+
+  const caseNames = new Set(cases.map((gc) => gc.name));
+  const refNames = new Set(reference.outcomes.map((o) => o.name));
+  for (const name of caseNames) {
+    assert.ok(
+      refNames.has(name),
+      `case "${name}" has no reference outcome — re-run the paid reference and re-freeze it`,
+    );
+  }
+  for (const name of refNames) {
+    assert.ok(
+      caseNames.has(name),
+      `reference outcome "${name}" is no longer in the golden set — re-freeze the reference`,
+    );
+  }
+  assert.equal(reference.total, cases.length);
+
+  const dist: Record<string, number> = {};
+  for (const gc of cases) dist[gc.category] = (dist[gc.category] ?? 0) + 1;
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(reference.categories).map(([k, v]) => [k, v.total])),
+    dist,
+    "per-category totals drifted between the reference and the set",
+  );
 });
 
 // Round 1 offers the need escape hatch in the prompt; round 2 withdraws it.
