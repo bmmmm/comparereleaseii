@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scoreClass, toRepoDetailHtml } from "../src/watch-detail.ts";
+import { reportDirOf, scoreClass, toRepoDetailHtml } from "../src/watch-detail.ts";
 import { STALE_AFTER } from "../src/promises.ts";
 import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch.ts";
 import type { PromiseCheck } from "../src/types.ts";
@@ -177,4 +177,29 @@ test("the page links back to the index and out to the repo", () => {
   );
   assert.ok(forge.includes('href="https://forge.example/o/r"'));
   assert.ok(!forge.includes("github.com/o/r"), "a forge entry never points at GitHub");
+});
+
+test("reportDirOf keeps a legacy nested layout and rejects escape attempts", () => {
+  assert.equal(reportDirOf({ latest: { report: "o-r/v1.html" } }, "o/r"), "o-r");
+  assert.equal(
+    reportDirOf({ latest: { report: "zen-browser/desktop/1.21.9b.html" } }, "zen-browser/desktop"),
+    "zen-browser/desktop",
+  );
+  assert.equal(reportDirOf({ latest: { report: "../evil/v1.html" } }, "o/r"), "o_r");
+  assert.equal(reportDirOf({}, "o/r"), "o_r");
+});
+
+test("a legacy nested layout climbs the right number of levels", () => {
+  const history = [
+    check("v1", 80, { report: "zen-browser/desktop/v1.html" }),
+    check("v2", 70, { report: "zen-browser/desktop/v2.html" }),
+  ];
+  const html = toRepoDetailHtml(
+    { key: "zen-browser/desktop", repo: "zen-browser/desktop" },
+    state(history),
+    null,
+    "t",
+  );
+  assert.ok(html.includes('href="../../index.html"'), "back link climbs two levels");
+  assert.ok(html.includes('href="../../zen-browser/desktop/v2.html"'), "report links climb too");
 });

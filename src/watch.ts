@@ -19,7 +19,7 @@ import {
 import { githubHistory } from "./history.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
-import { toRepoDetailHtml } from "./watch-detail.ts";
+import { reportDirOf, toRepoDetailHtml } from "./watch-detail.ts";
 import { safeSegment } from "./paths.ts";
 
 import type { PromiseCheck, UnverifiableKind } from "./types.ts";
@@ -144,6 +144,7 @@ export interface WatchedEntry {
 export function entryKey(rc: WatchRepoConfig): string {
   return rc.label ?? rc.repo ?? rc.repoUrl!;
 }
+
 
 /** Where a release lives on the web — GitLab spells the route differently. */
 export function releaseWebUrl(link: RepoLink | null, tag: string): string | undefined {
@@ -473,11 +474,7 @@ ${feedRows}
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
-<td>${trend}${
-        l.report.includes("/")
-          ? `${trend ? " " : ""}<a class="hist" href="${esc(l.report.slice(0, l.report.lastIndexOf("/")))}/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a>`
-          : ""
-      }</td>
+<td>${trend}${trend ? " " : ""}<a class="hist" href="${esc(reportDirOf(rs!, key))}/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
 <td title="${esc(l.checkedAt)}">${esc(l.checkedAt.slice(0, 10))}</td>
 </tr>`;
     })
@@ -806,7 +803,9 @@ export async function runWatch(
     for (const e of configured) {
       const rs = state.repos[e.key];
       if (!rs?.latest) continue;
-      const dir = join(reportsDir, safeSegment(e.key));
+      // Same derivation as the index's history link — the page must land
+      // where the link points, whatever layout the state was written under.
+      const dir = join(reportsDir, reportDirOf(rs, e.key));
       await mkdir(dir, { recursive: true });
       await writeFile(
         join(dir, "index.html"),

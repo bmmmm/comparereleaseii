@@ -4,9 +4,28 @@
 // this repo been doing" — the full score series, verdict composition and
 // flag history the state already carries but the six trend dots cannot show,
 // plus the promise ledger with its carry countdowns.
+import { safeSegment } from "./paths.ts";
 import { STALE_AFTER } from "./promises.ts";
 import type { PromiseCheck } from "./types.ts";
 import type { CheckedRelease, RepoState, WatchedEntry } from "./watch.ts";
+
+/**
+ * Where a repo's reports live, relative to the reports root — derived from
+ * the stored report path so states written before the sanitized layout keep
+ * their nested directories (the history page must land where the index
+ * links, and its relative links must climb the right number of levels).
+ * Falls back to the sanitized key; a stored path whose segments could
+ * escape the root is not trusted.
+ */
+export function reportDirOf(rs: { latest?: { report: string } }, key: string): string {
+  const rel = rs.latest?.report ?? "";
+  if (rel.includes("/")) {
+    const dir = rel.slice(0, rel.lastIndexOf("/"));
+    const segments = dir.split("/");
+    if (segments.every((s) => s && s !== "." && s !== ".." && !s.includes("\\"))) return dir;
+  }
+  return safeSegment(key);
+}
 
 function esc(s: string): string {
   return s
@@ -55,10 +74,10 @@ function xAt(i: number, n: number): number {
   return PAD_L + (i / (n - 1)) * (W - PAD_L - PAD_R);
 }
 
-/** The report path in state is relative to the reports root; this page sits
- * one directory below it. */
-function reportHref(h: CheckedRelease): string {
-  return `../${h.report}`;
+/** Report paths in state are relative to the reports root; `root` is the
+ * climb from this page's own directory back up to it. */
+function reportHref(root: string, h: CheckedRelease): string {
+  return `${root}${h.report}`;
 }
 
 function pointTitle(h: CheckedRelease): string {
@@ -71,7 +90,7 @@ function pointTitle(h: CheckedRelease): string {
 }
 
 /** Score series 0–100 with the repo's own median as the reference line. */
-function scoreChart(history: CheckedRelease[], level: number | null): string {
+function scoreChart(history: CheckedRelease[], level: number | null, root: string): string {
   const n = history.length;
   const H = 210;
   const TOP = 10;
@@ -103,7 +122,7 @@ function scoreChart(history: CheckedRelease[], level: number | null): string {
       const ring = h.flagged
         ? `<circle cx="${cx}" cy="${cy}" r="7.5" class="flag-ring"/>`
         : "";
-      return `<a href="${esc(reportHref(h))}">${ring}<circle cx="${cx}" cy="${cy}" r="4.5" fill="${CLASS_COLOR[cls]}" class="pt"><title>${esc(pointTitle(h))}</title></circle></a>`;
+      return `<a href="${esc(reportHref(root, h))}">${ring}<circle cx="${cx}" cy="${cy}" r="4.5" fill="${CLASS_COLOR[cls]}" class="pt"><title>${esc(pointTitle(h))}</title></circle></a>`;
     })
     .join("");
   // At most ~8 tag labels — the tooltips carry the rest.
@@ -120,7 +139,7 @@ function scoreChart(history: CheckedRelease[], level: number | null): string {
 
 /** Verdict composition per release — status-colored stacked counts, aligned
  * with the score chart above; the releases table repeats the numbers. */
-function verdictChart(history: CheckedRelease[]): string {
+function verdictChart(history: CheckedRelease[], root: string): string {
   const n = history.length;
   const H = 130;
   const TOP = 8;
@@ -143,7 +162,7 @@ function verdictChart(history: CheckedRelease[]): string {
         yCursor -= hgt;
         return `<rect x="${x}" y="${yCursor.toFixed(1)}" width="${barW.toFixed(1)}" height="${hgt.toFixed(1)}" fill="${v.color}" class="seg"><title>${esc(h.tag)}: ${count} ${v.key === "noEvidence" ? "no-evidence" : v.key}</title></rect>`;
       }).join("");
-      return `<a href="${esc(reportHref(h))}">${segs}</a>`;
+      return `<a href="${esc(reportHref(root, h))}">${segs}</a>`;
     })
     .join("");
   const axis =
@@ -171,7 +190,7 @@ function scoreCell(h: CheckedRelease): string {
   return `<span class="score ${cls}">${h.score}</span> ${esc(h.scoreLabel)}${drop}${partial}${broken}`;
 }
 
-function releasesTable(history: CheckedRelease[]): string {
+function releasesTable(history: CheckedRelease[], root: string): string {
   const rows = [...history]
     .reverse()
     .map((h) => {
@@ -181,7 +200,7 @@ function releasesTable(history: CheckedRelease[]): string {
         : "";
       return `<tr class="${h.flagged ? "flagged" : ""}">
 <td>${h.flagged ? "&#9888;" : "&#10003;"}</td>
-<td><a href="${esc(reportHref(h))}">${esc(h.tag)}</a></td>
+<td><a href="${esc(reportHref(root, h))}">${esc(h.tag)}</a></td>
 <td>${h.publishedAt ? esc(h.publishedAt.slice(0, 10)) : ""}</td>
 <td>${scoreCell(h)}</td>
 <td class="comp">${comp}</td>
@@ -225,6 +244,7 @@ export function toRepoDetailHtml(
 ): string {
   const history = rs.history;
   const latest = rs.latest;
+  const root = "../".repeat(reportDirOf(rs, entry.key).split("/").length);
   const repoLink = entry.url ?? (entry.repo.includes("/") && !entry.repo.includes("://")
     ? `https://github.com/${entry.repo}`
     : null);
@@ -278,7 +298,7 @@ footer{margin-top:28px;color:var(--faint);font-size:12px}
       ? `<a class="repo" href="${esc(repoLink)}" target="_blank" rel="noopener">${esc(entry.repo)}</a>`
       : esc(entry.repo)
   } <span class="note">release watch history</span></h1>
-<p class="sub"><a href="../index.html">&larr; all watched repos</a> · ${history.length} check${history.length === 1 ? "" : "s"} on record · generated ${esc(generatedAt)}</p>
+<p class="sub"><a href="${esc(root)}index.html">&larr; all watched repos</a> · ${history.length} check${history.length === 1 ? "" : "s"} on record · generated ${esc(generatedAt)}</p>
 ${
   latest
     ? `<div class="cards">
@@ -293,11 +313,11 @@ ${
     : ""
 }
 <h2>Trust score over time <span class="note">— dots open that release&#39;s report; red ring = flagged</span></h2>
-${scoreChart(history, level)}
+${scoreChart(history, level, root)}
 <h2>Verdicts per release <span class="note">— claim verdict composition of each check</span></h2>
-${verdictChart(history)}
+${verdictChart(history, root)}
 <h2>Checked releases</h2>
-${releasesTable(history)}
+${releasesTable(history, root)}
 ${rs.promises?.length ? promisesSection(rs.promises) : ""}
 <footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
 </body></html>
