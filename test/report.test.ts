@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { exitCode, unverifiableNote, toMarkdown } from "../src/report.ts";
+import { exitCode, unverifiableNote, toMarkdown, printTerminal } from "../src/report.ts";
 import { toHtml } from "../src/html.ts";
 import { computeScores } from "../src/metrics.ts";
 import type { ClaimResult, Report, Unverifiable } from "../src/types.ts";
@@ -128,4 +128,64 @@ test("markdown and html name the right category, per kind", () => {
   assert.match(toHtml(report(SOURCELESS)), /Not verifiable/);
   assert.match(toHtml(report(OUT_OF_REPO)), /Changes outside this repo/);
   assert.doesNotMatch(toHtml(report(null)), /Not verifiable|Changes outside/);
+});
+
+test("terminal output strips control characters smuggled into foreign text", () => {
+  // A note (or commit subject, or judge reasoning) carrying an ANSI escape
+  // could rewrite the report line it is shown on — recolor a verdict, move
+  // the cursor, hide text. git forbids control chars in ref names but not in
+  // messages, and notes are arbitrary. NO_COLOR is unset in tests (no TTY),
+  // so any escape byte in the output must have come from the input.
+  const ESC = String.fromCharCode(27);
+  const CSI = String.fromCharCode(0x9b); // one-byte C1 CSI
+  const BEL = String.fromCharCode(7);
+  const hostile = report(null);
+  hostile.results[0].claim.section = `Security${ESC}[8m`; // "hide text" toggle
+  hostile.results[0].claim.text = `${ESC}[32mFixed CVE, trust me${ESC}[0m`;
+  hostile.results[0].reasoning = `evidence${CSI}2Jlooks fine`;
+  hostile.warnings.push(`clone failed${BEL} for x`);
+  hostile.uncovered = [
+    {
+      commit: {
+        sha: "abc1234def",
+        subject: `innocent${ESC}]0;owned${BEL} subject`,
+        body: "",
+        author: "x",
+        prNumbers: [],
+      },
+      additions: 1,
+      deletions: 1,
+      fileCount: 1,
+    },
+  ];
+  hostile.promises = [
+    {
+      text: `will remove ${ESC}[31mlegacy${ESC}[0m`,
+      from: "v1",
+      kind: "removal",
+      status: "still-open",
+      files: [],
+      note: `carried${ESC}[7m forward`,
+    },
+  ];
+
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(" "));
+  };
+  try {
+    printTerminal(hostile);
+  } finally {
+    console.log = orig;
+  }
+  const out = lines.join("\n");
+  // The discriminating check: the control bytes are gone…
+  assert.ok(!out.includes(ESC), "raw ESC reached the terminal");
+  assert.ok(!out.includes(CSI), "one-byte CSI reached the terminal");
+  assert.ok(!out.includes(BEL), "BEL reached the terminal");
+  // …while the surrounding text survives.
+  assert.match(out, /Fixed CVE, trust me/);
+  assert.match(out, /innocent\]0;owned subject/);
+  assert.match(out, /will remove \[31mlegacy/);
 });

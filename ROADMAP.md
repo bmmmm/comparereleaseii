@@ -188,6 +188,9 @@ authors correctly.
 Found while shipping blocks 1–8, anchored here so the session recap is not
 the only record. Ordered by risk; none is release-blocking.
 
+> **All six landed 2026-07-27**, same day, one commit series (`4efc8f0` …).
+> Per-item notes appended below; details in the Unreleased CHANGELOG section.
+
 1. **Email spoofing weakens `new-author-sensitive` on the API path.** The
    git-header email is attacker-chosen; the GitHub login is not. Since 0.3.0
    keys identity by email first, a commit forging a known maintainer's email
@@ -195,21 +198,41 @@ the only record. Ordered by risk; none is release-blocking.
    caught. Fix shape: on API sources, "known email + unknown login" is not a
    pass — it is its own warn, because that combination is the spoofing
    signature.
+   - **Landed** (`4efc8f0`): API-built snapshots record forge logins;
+     `author-email-spoof` (warn) fires on a sensitive-path commit whose
+     email the baseline knows but whose account it does not — including "no
+     account at all", the shape a forged unregistered email produces. Clone
+     paths carry no attribution and stay silent instead of guessing.
 2. **The watch promise ledger is unbounded.** Target-less promises never
    resolve and ride forever; the dedupe key is normalized text, so trivial
    rewording multiplies entries. Cap the ledger and age still-open promises
    out as visibly "stale" after N releases.
+   - **Landed** (`382f8be`): `carriedFor` counts carries in the state; the
+     10th unresolved carry reports as `stale` and leaves the ledger, the
+     ledger caps at 50 with the drop announced, own promises kept first.
 3. **Promise tracking and carried-over need GitHub in practice.** Only
    `loadGithubRelease` sets `baseNotes`; the forge path already fetched
    every release body for base-picking but drops the base's notes, and
    `--local` has `changelogReleases`. Wire `baseNotes` through both.
+   - **Landed** (`5d37554`): the forge path hands the effective base's
+     published body through; the CHANGELOG path reads the base tag's
+     section from the same file; the two media never mix. Verified live
+     against gitea.com.
 4. **Calibration measures round 1 only.** `need` counts as injection
    resistance, but nobody checks what the model answers once its request is
    served. Run the need round inside calibration (same hunks, `allowNeed`
    off) and grade the final verdict; the need-temptation case stays strict.
+   - **Landed** (`703a8e0`): outcomes read `need→<verdict>`; a round-2
+     obedience fails the case and disqualifies. `legit-need-more-files`
+     gained `finalExpected: no-evidence` — after the unfillable request,
+     verifying anyway would be a guess. The frozen Haiku reference stays a
+     round-1 document until the next paid re-freeze.
 5. **The frozen reference can drift from the set.** No test ties
    `reference-haiku.json`'s outcome names to `golden.json` — growing the set
    leaves the reference silently stale. One consistency test.
+   - **Landed** (`b1f4158`): the test requires an outcome for exactly the
+     current cases plus matching per-category totals, and names the
+     re-freeze step on failure.
 6. Smaller, in one line each: light-mode contrast was never visually
    verified (`tmp/report-preview.html` waits for a browser); `padding.json`
    collision-freedom against case claims is untested; ANSI escapes in notes
@@ -218,6 +241,12 @@ the only record. Ordered by risk; none is release-blocking.
    nightly job would catch a surviving mutant before a PR does;
    `release:publish` pushes the current branch, so the worktree flow needed
    manual `HEAD:main` pushes twice — teach it the detached-branch case.
+   - **All landed**: both color schemes verified in a browser against a
+     live gitea.com report; a test cross-checks every golden claim's
+     identifiers against every padding hunk; `printTerminal` strips
+     C0/DEL/C1 from foreign text (mutation-guarded); `mutate.yml` runs
+     nightly keyless; `release:publish` pushes `HEAD:<default>` when HEAD
+     is not on the default branch. 27/27 mutants killed.
 
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target

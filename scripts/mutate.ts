@@ -170,6 +170,12 @@ const MUTANTS: Mutant[] = [
     replace: 'const marker = "+";',
   },
   {
+    guard: "foreign text is stripped of control characters before the terminal",
+    file: "src/util.ts",
+    find: 'return s.replace(CONTROL_CHARS, "");',
+    replace: "return s;",
+  },
+  {
     guard: "a still-open promise ages out as stale after STALE_AFTER carries",
     file: "src/promises.ts",
     find: 'if (res.status === "still-open" && (res.carriedFor ?? 0) >= STALE_AFTER) {',

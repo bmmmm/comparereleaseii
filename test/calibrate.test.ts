@@ -67,6 +67,40 @@ test("golden set: every case categorized, long-context stubs expand deterministi
   assert.deepEqual(await loadGoldenCases(), cases);
 });
 
+test("padding material never collides with any golden claim", async () => {
+  // The long-context variants bury a case's hunks in real diff material from
+  // this repo. If a padding hunk happened to contain an identifier a claim
+  // names, the padded case would have evidence its base case does not — and
+  // the set would measure the padding, not the model.
+  const { extractIdentifiers } = await import("../src/match.ts");
+  const padding = JSON.parse(await readFile("test/eval/padding.json", "utf8")) as Array<{
+    path: string;
+    hunk: string;
+  }>;
+  const raw = JSON.parse(await readFile("test/eval/golden.json", "utf8")) as GoldenCase[];
+  for (const gc of raw) {
+    if (!gc.claim) continue;
+    const ids = extractIdentifiers({
+      id: 0,
+      section: gc.section,
+      text: gc.claim,
+      kind: "change",
+      prNumbers: [],
+      shas: [],
+      advisories: [],
+      codeSpans: [...gc.claim.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
+    });
+    for (const p of padding) {
+      const hit = ids.find((id) => p.hunk.includes(id) || p.path.includes(id));
+      assert.equal(
+        hit,
+        undefined,
+        `padding hunk ${p.path} contains "${hit}" from case "${gc.name}" — swap that hunk out`,
+      );
+    }
+  }
+});
+
 test("the frozen reference covers exactly the current golden set", async () => {
   // "Fit to judge" concretely means "matches the reference on the
   // disqualifying categories" — which is only a statement while the

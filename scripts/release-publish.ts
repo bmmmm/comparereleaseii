@@ -45,7 +45,25 @@ const title = subject.startsWith(prefix) ? subject.slice(prefix.length) : tag;
 console.error(`Tagging ${tag}...`);
 git("tag", "-a", tag, "-m", `${tag} — ${title}`);
 
+// Releases land on the default branch, whatever HEAD is called locally. A
+// worktree on a topic branch (or a detached HEAD) whose tip IS the release
+// used to push that topic branch to every remote — the 0.2.2 release needed
+// two manual HEAD:main pushes because of exactly this. A push that is not a
+// fast-forward of the remote's main still fails loudly, so releasing from a
+// stray branch cannot overwrite anything.
 const branch = git("branch", "--show-current");
+let defaultBranch = "main";
+try {
+  defaultBranch = git("symbolic-ref", "--short", "refs/remotes/origin/HEAD").replace(/^origin\//, "");
+} catch {
+  // remote HEAD not recorded locally — "main" is this repo's default
+}
+const pushRef = branch === defaultBranch ? branch : `HEAD:${defaultBranch}`;
+if (pushRef !== branch) {
+  console.error(
+    `Releasing from ${branch || "a detached HEAD"} — pushing HEAD:${defaultBranch} instead of a topic branch.`,
+  );
+}
 const remotes = git("remote").split("\n").filter(Boolean);
 if (remotes.length === 0) fail("No git remotes configured — nothing to push to.");
 
@@ -55,9 +73,9 @@ for (const remote of remotes) {
   const m = url.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
   if (m) githubRepo = `${m[1]}/${m[2]}`;
 
-  console.error(`Pushing ${branch} and ${tag} to ${remote}...`);
-  if (spawnSync("git", ["push", remote, branch], { stdio: "inherit" }).status !== 0) {
-    fail(`git push ${remote} ${branch} failed`);
+  console.error(`Pushing ${pushRef} and ${tag} to ${remote}...`);
+  if (spawnSync("git", ["push", remote, pushRef], { stdio: "inherit" }).status !== 0) {
+    fail(`git push ${remote} ${pushRef} failed`);
   }
   if (spawnSync("git", ["push", remote, tag], { stdio: "inherit" }).status !== 0) {
     fail(`git push ${remote} ${tag} failed`);

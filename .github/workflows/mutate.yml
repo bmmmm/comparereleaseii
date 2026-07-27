@@ -1,0 +1,26 @@
+name: mutation-tests
+
+# The mutation harness (scripts/mutate.ts) runs the full suite once per
+# guard — dozens of serial suite runs — too slow for every push. Nightly
+# catches a surviving mutant before a PR does; dispatch covers "run it now".
+# Keyless like every workflow here: the harness is deterministic, no judge.
+on:
+  schedule:
+    - cron: "14 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm mutate

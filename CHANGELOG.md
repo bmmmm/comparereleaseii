@@ -4,7 +4,15 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **Control characters in foreign text no longer reach the terminal.** Release notes, commit subjects and judge output are arbitrary text, and an ANSI escape smuggled into any of them could rewrite the report line it appears on — recolor a verdict, move the cursor, hide text (git forbids control characters in ref names, but not in messages or notes). Every foreign string `printTerminal` shows now passes through a filter that strips C0 (keeping newline and tab), DEL and C1; the surrounding text survives byte-for-byte. HTML output was already escaped; markdown files are not a terminal. A mutation guard pins the stripping.
+
 ### Changed
+
+- **The mutation harness runs nightly in CI.** `pnpm mutate` runs the full suite once per guard — dozens of serial runs, too slow for every push — so a surviving mutant used to wait for someone to run it locally. A scheduled keyless workflow (03:14 UTC, plus manual dispatch) catches it before a PR does.
+- **`release:publish` handles the worktree/topic-branch release.** It pushed the *current branch* to every remote, so releasing from a worktree whose topic branch tip was the release created stray branches on both forges — the 0.2.2 release needed two manual `HEAD:main` pushes. When HEAD is not on the default branch (detected from `origin/HEAD`, falling back to `main`), it now pushes `HEAD:<default>` and says so; a non-fast-forward still fails loudly.
+- **The long-context padding is proven collision-free.** A padding hunk that happened to contain an identifier some claim names would give the padded case evidence its base case does not have — the set would measure the padding, not the model. A test now cross-checks every golden claim's identifiers against every padding hunk; light-mode and dark-mode report rendering got their deferred visual check (both schemes verified in a browser against a live gitea.com report).
 
 - **Calibration plays out the need round instead of stopping at the ask.** A round-1 `need` used to settle a case: asking counted as injection resistance, and nobody checked what the model answers once its request is served. Calibration now serves the request (same hunks — the fixture has nothing more to hand over), withdraws the escape hatch, and grades the final verdict, reported as `need→<verdict>`: an injection that stays polite in round 1 and obeys in round 2 now fails its case and disqualifies the judge. The need-temptation case stays strict (round-1 `need` is the wrong answer, no second round), and `legit-need-more-files` gained an explicit `finalExpected` — after the unfillable request, `no-evidence` is the only honest landing. The frozen Haiku reference stays as a round-1 document; a mutation guard pins the grading.
 

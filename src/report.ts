@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { c } from "./util.ts";
+import { c, stripControl } from "./util.ts";
 import type { ClaimResult, Report, UnverifiableKind, Verdict } from "./types.ts";
+
+// Everything printed to the terminal that originated outside this tool —
+// notes, commit subjects, judge reasoning, file paths — goes through this.
+// git forbids control characters in ref names, but not in messages or notes.
+const safe = stripControl;
 
 const SYMBOL: Record<Verdict, string> = {
   verified: "✔",
@@ -36,7 +41,7 @@ function evidenceLine(r: ClaimResult): string {
   if (r.evidence.functions?.length) {
     parts.push(`fns: ${r.evidence.functions.slice(0, 4).join(", ")}`);
   }
-  return parts.join(" · ");
+  return safe(parts.join(" · "));
 }
 
 const HEADING: Record<UnverifiableKind, string> = {
@@ -90,7 +95,7 @@ export function printTerminal(report: Report): void {
   const { stats } = report;
   console.log(
     `\n${c.bold("comparereleaseii")} — release-note fact check\n` +
-      `${c.cyan(report.repoLabel)}  ${report.baseRef} → ${report.headRef}  ` +
+      `${c.cyan(safe(report.repoLabel))}  ${safe(report.baseRef)} → ${safe(report.headRef)}  ` +
       c.dim(
         `(${stats.commits} commits, ${stats.files} files, +${stats.additions}/−${stats.deletions})`,
       ) +
@@ -102,16 +107,16 @@ export function printTerminal(report: Report): void {
   for (const r of report.results) {
     if (r.claim.section !== section) {
       section = r.claim.section;
-      console.log(c.bold(`\n${section}`));
+      console.log(c.bold(`\n${safe(section)}`));
     }
     const color = COLOR[r.verdict];
-    const text = r.claim.text.length > 110 ? r.claim.text.slice(0, 107) + "…" : r.claim.text;
-    console.log(`  ${color(SYMBOL[r.verdict])} ${text}`);
+    const raw = r.claim.text.length > 110 ? r.claim.text.slice(0, 107) + "…" : r.claim.text;
+    console.log(`  ${color(SYMBOL[r.verdict])} ${safe(raw)}`);
     if (r.verdict !== "skipped") {
       console.log(
         `    ${color(r.verdict)} ${c.dim(`(${r.confidence.toFixed(2)}) · ${evidenceLine(r)}`)}`,
       );
-      if (r.reasoning) console.log(c.dim(`    ${r.reasoning}`));
+      if (r.reasoning) console.log(c.dim(`    ${safe(r.reasoning)}`));
       if (note && r.verdict === "no-evidence") {
         console.log(c.dim(`    ${note.claimNote}`));
       }
@@ -134,7 +139,7 @@ export function printTerminal(report: Report): void {
   if (carried) {
     console.log(
       c.dim(
-        `${carried.count} claim(s) carried over verbatim from ${carried.baseRef} — standing text, not scored.`,
+        `${carried.count} claim(s) carried over verbatim from ${safe(carried.baseRef)} — standing text, not scored.`,
       ),
     );
   }
@@ -181,8 +186,8 @@ export function printTerminal(report: Report): void {
     for (const f of report.metrics.flags) {
       const mark =
         f.severity === "critical" ? c.red("‼") : f.severity === "warn" ? c.yellow("!") : c.cyan("i");
-      console.log(`  ${mark} ${f.message}`);
-      if (f.files.length) console.log(c.dim(`    ${f.files.slice(0, 4).join(", ")}`));
+      console.log(`  ${mark} ${safe(f.message)}`);
+      if (f.files.length) console.log(c.dim(`    ${safe(f.files.slice(0, 4).join(", "))}`));
     }
   }
 
@@ -197,8 +202,8 @@ export function printTerminal(report: Report): void {
             : p.status === "stale"
               ? c.dim("∅")
               : c.dim("…");
-      console.log(`  ${mark} ${p.status} (${p.from}) ${p.text.slice(0, 100)}`);
-      console.log(c.dim(`    ${p.note}${p.files.length ? ` — ${p.files.slice(0, 3).join(", ")}` : ""}`));
+      console.log(`  ${mark} ${p.status} (${safe(p.from)}) ${safe(p.text.slice(0, 100))}`);
+      console.log(c.dim(`    ${safe(p.note)}${p.files.length ? ` — ${safe(p.files.slice(0, 3).join(", "))}` : ""}`));
     }
   }
 
@@ -211,11 +216,11 @@ export function printTerminal(report: Report): void {
     );
     for (const u of report.uncovered.slice(0, 10)) {
       console.log(
-        `  ${c.yellow("!")} ${u.commit.sha.slice(0, 8)} ${u.commit.subject} ` +
+        `  ${c.yellow("!")} ${u.commit.sha.slice(0, 8)} ${safe(u.commit.subject)} ` +
           c.dim(`(+${u.additions}/−${u.deletions}, ${u.fileCount} files)`),
       );
       if (u.suggestedNote) {
-        console.log(c.dim(`    suggested note: "${u.suggestedNote}"`));
+        console.log(c.dim(`    suggested note: "${safe(u.suggestedNote)}"`));
       }
     }
     if (report.uncovered.length > 10) {
@@ -225,7 +230,7 @@ export function printTerminal(report: Report): void {
     console.log(c.green("\nAll commits in the range are covered by the release notes."));
   }
 
-  for (const w of report.warnings) console.log(c.yellow(`\nwarning: ${w}`));
+  for (const w of report.warnings) console.log(c.yellow(`\nwarning: ${safe(w)}`));
 }
 
 export function toMarkdown(report: Report): string {

@@ -127,6 +127,19 @@ export function truncate(text: string, maxChars: number): string {
   return text.slice(0, maxChars) + `\n… [truncated ${text.length - maxChars} chars]`;
 }
 
+/**
+ * Strip terminal control characters from text of foreign origin (release
+ * notes, commit subjects, judge output) before printing it. An escape
+ * sequence smuggled into a note could otherwise rewrite the report line it
+ * appears on: recolor a verdict, move the cursor, hide text. Keeps newline
+ * and tab; strips the rest of C0, DEL, and C1 (U+009B is a one-byte CSI).
+ */
+const CONTROL_CHARS = new RegExp("[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f]", "g");
+
+export function stripControl(s: string): string {
+  return s.replace(CONTROL_CHARS, "");
+}
+
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
 
 function ansi(code: string): (s: string) => string {
