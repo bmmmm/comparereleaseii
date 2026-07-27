@@ -24,7 +24,9 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **Author identity is the commit email now, and the mixed-source demotion retired with the problem.** The interim fix below shipped hours earlier in this same cycle: it could only demote the false alarm to info, because git names and API logins genuinely never match. Both sources carry the git-header email (`%ae` from a clone, `commit.author.email` from the compare API; noreply addresses are per-account stable), so commits and baseline snapshots now share one identity key and the truncation-fallback scenario matches authors correctly — a display name known from pre-email snapshots still counts. Old snapshot caches hold names, and the version stamp retires them at the next release bump.
 - **The truncated-compare fallback no longer cries "first-time author".** When the compare API truncates and the diff is reloaded from a clone, commits carry git names while the baseline snapshots carry API logins — no name can ever match, so `new-author-sensitive` fired on exactly the big releases that truncate. The mixed-source case now demotes the flag to info with a note that author identities are not comparable across sources; keying identities by commit email is the clean fix and stays anchored as a FIXME.
+- **A commit body carrying `\x1f`/`\x1e` can no longer desync commit parsing.** `git log` records were framed with in-band separators a body can simply contain, splitting the stream into extra or truncated records. Records are NUL-framed now (`git log -z` — git forbids NUL in commit messages, so the terminator cannot be forged) and fields split on the first four separators only, the body keeping any it carries. A mutation guard pins the framing.
 
 ## 0.2.2 — 2026-07-27
 

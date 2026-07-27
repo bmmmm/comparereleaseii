@@ -320,10 +320,20 @@ function baselineOf(medianLexicalCoverage: number, releases = 5): Baseline {
   };
 }
 
-test("baselineFlags: mixed author sources demote new-author-sensitive to info", () => {
+test("baselineFlags: the email key matches authors across sources", () => {
+  // The truncation-fallback scenario: commits carry git names (clone) while
+  // the baseline snapshots carry identity keys built from API data. The
+  // git-header email is the one identity both sources share.
   const data = releaseData(["src/auth/login.ts"]);
   data.commits = [
-    { sha: "abc1234", subject: "tighten session check", body: "", author: "Jane Doe", prNumbers: [] },
+    {
+      sha: "abc1234",
+      subject: "tighten session check",
+      body: "",
+      author: "Jane Doe",
+      email: "Jane@Example.com",
+      prNumbers: [],
+    },
   ];
   const coverage: Coverage = {
     uncovered: [],
@@ -334,18 +344,19 @@ test("baselineFlags: mixed author sources demote new-author-sensitive to info", 
     ]),
     mergeShas: new Set(),
   };
-  const authorFlag = () =>
-    baselineFlags(data, coverage, baselineOf(0.5)).find((f) => f.kind === "new-author-sensitive");
+  const authorFlag = (knownAuthors: string[]) => {
+    const base = baselineOf(0.5);
+    base.knownAuthors = knownAuthors;
+    return baselineFlags(data, coverage, base).find((f) => f.kind === "new-author-sensitive");
+  };
 
-  // Comparable sources (both API logins or both git names): a real warn.
-  assert.equal(authorFlag()?.severity, "warn");
-
-  // Truncation fallback: commits carry git names, the baseline carries API
-  // logins — no name can match, so the flag informs instead of alarming.
-  data.mixedAuthorSources = true;
-  const demoted = authorFlag();
-  assert.equal(demoted?.severity, "info");
-  assert.match(demoted?.message ?? "", /not comparable across sources/);
+  // Known by email (case-insensitive): "Jane Doe" the login never matched,
+  // the email does — no first-time-author alarm.
+  assert.equal(authorFlag(["jane@example.com"]), undefined);
+  // A pre-email snapshot may still know the display name — also no alarm.
+  assert.equal(authorFlag(["Jane Doe"]), undefined);
+  // Genuinely unseen author on a sensitive path: a real warn.
+  assert.equal(authorFlag(["someone-else@example.com"])?.severity, "warn");
 });
 
 test("classifyUnverifiable: a docs-only diff needs no history", () => {

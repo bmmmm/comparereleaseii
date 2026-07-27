@@ -12,7 +12,7 @@ import type {
   Unverifiable,
 } from "./types.ts";
 import type { Coverage } from "./verify.ts";
-import type { Baseline } from "./history.ts";
+import { authorKey, type Baseline } from "./history.ts";
 import { hunkFunctions, isChangelogPath } from "./match.ts";
 
 const DEP_MANIFEST =
@@ -743,40 +743,27 @@ export function baselineFlags(
   }
 
   if (coverage) {
-    // FIXME(bughunt 2026-07-27): author identities mix API logins and git
-    // names — when the compare API truncates and check.ts falls back to a
-    // clone, commits carry git names while GitHub-built snapshots carry
-    // logins, so knownAuthors never matches and every author looks new.
-    // Demoted to info below when the sources are mixed; the real fix is
-    // keying identities by commit email (ROADMAP Block 8).
+    // Identity is the git-header email (authorKey): API logins and git names
+    // never match across sources, so the compare-truncation clone fallback
+    // used to make every author look new. Both the compare API and a clone
+    // carry the email, and a snapshot cached before emails existed retires
+    // with its version stamp.
     const known = new Set(baseline.knownAuthors);
     const suspects = data.commits.filter(
       (commit) =>
+        !known.has(authorKey(commit)) &&
         !known.has(commit.author) &&
         (coverage.commitFiles.get(commit.sha) ?? []).some((f) => sensitiveCategory(f.path)),
     );
     if (suspects.length) {
       const names = [...new Set(suspects.map((commit) => `@${commit.author}`))].join(", ");
-      const commitShas = suspects.map((commit) => commit.sha).slice(0, 5);
-      if (data.mixedAuthorSources) {
-        flags.push({
-          severity: "info",
-          kind: "new-author-sensitive",
-          message:
-            `Author identities not comparable across sources (commits from a clone, ` +
-            `baseline from the API) — first-time-author check inconclusive for: ${names}`,
-          files: [],
-          commitShas,
-        });
-      } else {
-        flags.push({
-          severity: "warn",
-          kind: "new-author-sensitive",
-          message: `First-time author(s) changing sensitive paths (not seen in the last ${n} releases): ${names}`,
-          files: [],
-          commitShas,
-        });
-      }
+      flags.push({
+        severity: "warn",
+        kind: "new-author-sensitive",
+        message: `First-time author(s) changing sensitive paths (not seen in the last ${n} releases): ${names}`,
+        files: [],
+        commitShas: suspects.map((commit) => commit.sha).slice(0, 5),
+      });
     }
   }
 

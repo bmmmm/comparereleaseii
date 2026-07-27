@@ -97,7 +97,9 @@ test("a baseline builds out of a clone, with no forge API in reach", async () =>
   assert.deepEqual(snapshots.map((s) => s.tag), ["1.2.0", "1.1.0"]);
   assert.deepEqual(snapshots.map((s) => s.base), ["1.1.0", "1.0.0"]);
   assert.equal(snapshots[0].commits, 1);
-  assert.deepEqual(snapshots[0].authors, ["test"]);
+  // Identity keys are the git-header email, not the display name — that is
+  // what lets an API-built baseline recognize clone-loaded commits.
+  assert.deepEqual(snapshots[0].authors, ["test@example.invalid"]);
   // The identifier in the notes is in the diff — this is the deterministic
   // number the out-of-repo gate reads, and it has to survive the clone path.
   assert.equal(snapshots[0].lexicalCoverage, 1);

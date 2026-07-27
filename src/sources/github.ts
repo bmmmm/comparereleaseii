@@ -53,7 +53,7 @@ export interface GhRelease {
 
 interface GhCompareCommit {
   sha: string;
-  commit: { message: string; author: { name: string } };
+  commit: { message: string; author: { name: string; email?: string } };
   author: { login: string } | null;
 }
 
@@ -89,6 +89,8 @@ function toCommit(gc: GhCompareCommit): Commit {
     subject,
     body: rest.join("\n").trim(),
     author: gc.author?.login ?? gc.commit.author.name,
+    // The git-header email survives every source switch; the login does not.
+    email: gc.commit.author.email,
     prNumbers: extractPrNumbers(gc.commit.message),
   };
 }

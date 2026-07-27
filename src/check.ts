@@ -71,7 +71,6 @@ export async function loadGithubReleaseData(
         ...data,
         ...range,
         truncated: false,
-        mixedAuthorSources: true,
         warnings: data.warnings
           .filter((w) => !w.startsWith("Compare API"))
           .concat("Diff loaded from a local partial clone (compare API truncated)."),

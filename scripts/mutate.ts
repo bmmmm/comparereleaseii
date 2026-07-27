@@ -49,10 +49,16 @@ const MUTANTS: Mutant[] = [
     replace: "",
   },
   {
-    guard: "mixed author sources demote new-author-sensitive to info",
-    file: "src/metrics.ts",
-    find: "if (data.mixedAuthorSources) {",
-    replace: "if (false) {",
+    guard: "author identity is keyed by email across sources",
+    file: "src/history.ts",
+    find: "return email || commit.author;",
+    replace: "return commit.author;",
+  },
+  {
+    guard: "commit records are NUL-framed; body separators cannot desync them",
+    file: "src/sources/local.ts",
+    find: "const [sha, author, email, subject = \"\", body = \"\"] = splitFields(entry, 4);",
+    replace: "const [sha, author, email, subject = \"\", body = \"\"] = entry.split(\"\\x1f\");",
   },
   {
     guard: "contradicted needs a second concordant voter",

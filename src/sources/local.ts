@@ -64,27 +64,42 @@ export function parseUnifiedDiff(diff: string): DiffFile[] {
   return files;
 }
 
-// FIXME(bughunt 2026-07-27): a commit body containing \x1f or \x1e desyncs
-// this record parsing (extra/truncated records). Low leverage — whoever
-// controls the repo controls the real commits anyway — the clean fix is
-// NUL-framed `git log -z` when this function next changes shape.
+/** Split off the first `n` fields; the remainder keeps any stray separators. */
+function splitFields(record: string, n: number): string[] {
+  const parts: string[] = [];
+  let rest = record;
+  for (let i = 0; i < n; i++) {
+    const idx = rest.indexOf("\x1f");
+    if (idx === -1) break;
+    parts.push(rest.slice(0, idx));
+    rest = rest.slice(idx + 1);
+  }
+  parts.push(rest);
+  return parts;
+}
+
 async function loadCommits(repo: string, base: string, head: string): Promise<Commit[]> {
+  // NUL framing: git forbids NUL in commit messages, so `-z` is the one
+  // record terminator a hostile body cannot forge — a body containing \x1f
+  // used to desync this parsing into extra/truncated records. Fields split
+  // on the first four \x1f only; the body keeps any it carries.
   const out = await git(repo, [
     "log",
-    "--format=%H%x1f%an%x1f%s%x1f%b%x1e",
+    "-z",
+    "--format=%H%x1f%an%x1f%ae%x1f%s%x1f%b",
     base ? `${base}..${head}` : head,
   ]);
   return out
-    .split("\x1e")
-    .map((e) => e.trim())
-    .filter(Boolean)
+    .split("\0")
+    .filter((e) => e.length > 0)
     .map((entry) => {
-      const [sha, author, subject, body = ""] = entry.split("\x1f");
+      const [sha, author, email, subject = "", body = ""] = splitFields(entry, 4);
       return {
         sha,
         subject,
         body: body.trim(),
         author,
+        email,
         prNumbers: extractPrNumbers(subject + "\n" + body),
       };
     });

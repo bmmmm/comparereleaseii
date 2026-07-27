@@ -30,7 +30,19 @@ export interface ReleaseSnapshot {
   sensitiveTouched: string[];
   binaries: number;
   newDeps: string[];
+  /** Identity keys (see authorKey) — emails where the source carries them. */
   authors: string[];
+}
+
+/**
+ * Cross-source author identity: the git-header email when present
+ * (lowercased — the compare API and a clone both carry it), the display
+ * name/login otherwise. Snapshots cached before emails existed hold names;
+ * the version stamp retires them at the next release bump.
+ */
+export function authorKey(commit: { author: string; email?: string }): string {
+  const email = commit.email?.trim().toLowerCase();
+  return email || commit.author;
 }
 
 export interface Baseline {
@@ -168,7 +180,7 @@ async function snapshotFor(
     sensitiveTouched: [...categories],
     binaries: cmp.files.filter((f) => opacityIssue(f) === "binary file").length,
     newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, source.slug)))],
-    authors: [...new Set(cmp.commits.map((commit) => commit.author))],
+    authors: [...new Set(cmp.commits.map((commit) => authorKey(commit)))],
   };
   if (cacheFile) {
     try {

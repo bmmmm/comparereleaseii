@@ -69,7 +69,14 @@ test("truncation fallback: clone replaces the diff, warnings rewritten, sources 
       },
       loadLocalRange: async () => ({
         commits: [
-          { sha: "a".repeat(40), subject: "s", body: "", author: "Jane Doe", prNumbers: [] },
+          {
+            sha: "a".repeat(40),
+            subject: "s",
+            body: "",
+            author: "Jane Doe",
+            email: "jane@example.com",
+            prNumbers: [],
+          },
         ],
         files: [{ path: "src/x.ts", status: "modified", additions: 2, deletions: 1 }],
         commitFiles: async () => [],
@@ -81,8 +88,10 @@ test("truncation fallback: clone replaces the diff, warnings rewritten, sources 
     "clone:https://github.com/o/r.git:/tmp/fake-clone",
   ]);
   assert.equal(data.truncated, false);
-  assert.equal(data.mixedAuthorSources, true);
   assert.equal(data.commits[0].author, "Jane Doe");
+  // The clone carries the email — the cross-source identity key that lets
+  // baselineFlags match these commits against an API-built baseline.
+  assert.equal(data.commits[0].email, "jane@example.com");
   assert.ok(!data.warnings.some((w) => w.startsWith("Compare API")), "stale truncation warning kept");
   assert.ok(data.warnings.some((w) => w.includes("local partial clone")), "no fallback notice");
 });
@@ -106,7 +115,6 @@ test("truncation fallback failing keeps the truncated data and says why", async 
     },
   );
   assert.equal(data.truncated, true);
-  assert.notEqual(data.mixedAuthorSources, true);
   const warning = data.warnings.find((w) => w.includes("Partial-clone fallback failed"));
   assert.ok(warning, `no failure warning in ${JSON.stringify(data.warnings)}`);
   assert.ok(warning.includes("git clone exploded"), `cause missing from: ${warning}`);

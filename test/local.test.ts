@@ -140,6 +140,33 @@ test("loadLocalRange with the empty tree covers the full history", async () => {
     ["a.txt", "b.txt"],
   );
   assert.ok(range.files.every((f) => f.status === "added"));
+  // The git-header email rides along — it is the cross-source identity key.
+  assert.ok(range.commits.every((c) => c.email === "test@example.invalid"));
+});
+
+test("a commit body carrying field separators cannot desync commit parsing", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "crii-local-sep-"));
+  const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
+  await git("init", "-q");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(repo, "a.txt"), "first\n");
+  await git("add", "a.txt");
+  // \x1f is the field separator, \x1e the old record separator — a body
+  // containing them used to split into extra/truncated commit records.
+  await git("commit", "-q", "-m", "subject one", "-m", "body with \x1f and \x1e inside");
+  await writeFile(join(repo, "b.txt"), "second\n");
+  await git("add", "b.txt");
+  await git("commit", "-q", "-m", "subject two");
+
+  const range = await loadLocalRange(repo, EMPTY_TREE, "HEAD");
+  assert.equal(range.commits.length, 2, "separator in a body split the record stream");
+  const one = range.commits.find((c) => c.subject === "subject one");
+  assert.ok(one, "the poisoned commit lost its subject");
+  // The whole body, separators included — a field split that truncates at
+  // the first \x1f still "has a body" but lost everything after it.
+  assert.equal(one.body, "body with \x1f and \x1e inside");
+  assert.ok(range.commits.every((c) => c.author === "test" && c.sha.length === 40));
 });
 
 test("assertCloneUrl refuses what git would run instead of clone", () => {
