@@ -10,6 +10,7 @@ pnpm install --frozen-lockfile   # pnpm only; a preinstall guard blocks npm/yarn
 pnpm check                       # tsc --noEmit — must pass
 pnpm test                        # node --test 'test/*.test.ts' — must pass
 pnpm eval                        # golden-set eval; needs a judge engine
+pnpm mutate                      # mutation harness: every listed guard's test must kill its mutant
 node src/cli.ts --help
 ```
 
@@ -108,6 +109,8 @@ not add a dependency, a build step, or a framework.
 
 1. `pnpm check` and `pnpm test` pass.
 2. A test exists that fails without the change. Verify that — do not assume it.
+   A new scoring/parsing guard also gets an entry in `scripts/mutate.ts`, and
+   `pnpm mutate` must report it killed.
 3. Anything that can move a ruling has a `test/eval/golden.json` case, and
    `pnpm eval` was run before and after.
 4. The PR description follows `.github/PULL_REQUEST_TEMPLATE.md`: claims as
