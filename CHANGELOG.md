@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.3.0 — 2026-07-27
+
 ### Added
 
 - **Promise tracking: release notes commit to the future, and now somebody checks.** `parseClaims` tags forward-looking claims ("will be removed", "scheduled for removal", "planned for 1.5" — future tense only, "was removed" stays an ordinary claim), and every check verifies the base release's promises against the current diff: identifiers from the promise matched against deletions for a removal, additions for an addition. A promise whose named target release has arrived without the change is **broken**; without a target, or before it, **still-open**; a promise naming no code identifier stays honestly still-open rather than guessed at. Results land in their own terminal/markdown/HTML section and a broken promise raises an info-level flag — deliberately never a score component, since a promise is about a later release than the one being scored. In watch mode the state carries every still-open promise forward and re-checks it against each new release until it resolves; the index shows a "broken promise" badge. Two new mutation guards pin the semantics (broken needs the target reached; removals are proven by deletions).
