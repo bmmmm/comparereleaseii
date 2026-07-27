@@ -258,6 +258,61 @@ the only record. Ordered by risk; none is release-blocking.
      tested functions, and labeled the frozen Haiku reference as
      round-1-graded in `--calibrate` output. 29/29 mutants killed.
 
+### Next — the watchdog leaves GitHub, and setup becomes a command (2026-07-27)
+
+Context: v0.4.0 shipped the full hardening backlog, and the same-day
+real-data check (a full `watch` pass over the 12-repo list plus a 4-repo
+baseline spot sample) found nothing to fix — scores in their known bands,
+no false spoof warns, the one suspicious flag verified true against the
+snapshots. What remains is operational, in two blocks. Decisions here are
+settled; A lands before B (setup should configure the finished surface,
+not grow a flag later).
+
+#### Block A — watch entries for any forge (`repoUrl`)
+`WatchRepoConfig` only knows `repo: "owner/repo"` and loads hard through
+`loadGithubReleaseData`, while the single check has spoken Forgejo/GitLab
+and local clones since 4.2 — you can check your own Forgejo repo by hand
+but not watch it. Every building block already exists: `fetchForgeReleases`
+answers "is there a new release?" (the poll AND base-picking),
+`cloneHistory` builds the baseline, `loadLocalRelease` +
+`publishedReleases` resolve notes and base notes with the no-published-
+notes warning. Add `repoUrl` as an alternative to `repo` (exactly one of
+the two per entry), route those entries through the clone path, state key
+stays `label ?? repoUrl`. `watch init` stays GitHub-only by design (it
+reads a GitHub account); forge repos arrive via `watch add --repo-url` or
+the config file.
+**Done when:** a Forgejo/Gitea repo in the watchlist is picked up on a new
+release exactly like a GitHub one — state, report files, index row,
+alerting — verified live (gitea.com, or this repo's own Forgejo origin).
+
+#### Block B — `watch setup`: from bare machine to running routine
+The operating decisions are undocumented handwork today: where config/
+state/reports live, which judge (and whether the local one is even fit),
+how often, launchd or cron, where to alert. `watch init` (the interactive
+TTY picker) is the established pattern; `setup` is its sibling for
+operations, and it only ever writes files — no daemon, nothing installed
+silently:
+1. **Home:** propose a directory (default `~/release-watch/`, freely
+   changeable), write config + state there; adopt an existing state file
+   when pointed at one.
+2. **Judge:** detect the `claude` CLI / `OPENAI_BASE_URL`; for a local
+   model offer the calibration gate on the spot — fit / escalate-only /
+   reject has been a one-command answer since the golden-set gate.
+3. **Schedule:** write the launchd plist (macOS) or crontab line and PRINT
+   the command that activates it.
+4. **Notify:** optional ntfy/mail/command hook, fired once as a test.
+5. With Block A landed: accept `--repo-url` entries in the same flow.
+**Done when:** on a machine with nothing but the checkout and a judge,
+`watch setup` ends with a scheduled routine whose first run produces the
+index — without opening the docs.
+
+Operational notes for the next session: a complete working setup (config
+with the 12 repos, state, reports) sits in the iteration-2 worktree under
+`tmp/release-watch/`; the canonical state from the first real run lives in
+`~/.local/state/comparereleaseii/watch-state.json`; creating
+`~/release-watch/` as a new top-level home directory is the user's call —
+ask before creating it.
+
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target
   at all. If not: a one-hour actionable error ("diff exceeds 64 MB — narrow
