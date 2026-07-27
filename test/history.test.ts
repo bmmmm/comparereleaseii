@@ -103,6 +103,37 @@ test("a baseline builds out of a clone, with no forge API in reach", async () =>
   // The identifier in the notes is in the diff — this is the deterministic
   // number the out-of-repo gate reads, and it has to survive the clone path.
   assert.equal(snapshots[0].lexicalCoverage, 1);
+  // A clone attributes commits to no forge account — absent, not empty:
+  // an empty list would read as "no known account touched this".
+  assert.equal(snapshots[0].logins, undefined);
+});
+
+test("API-built snapshots carry forge logins; clone-built ones stay silent", async () => {
+  const commit = (login: string | null) => ({
+    sha: "a".repeat(40),
+    subject: "change",
+    body: "",
+    author: login ?? "Jane Doe",
+    email: "jane@example.invalid",
+    login,
+    prNumbers: [],
+  });
+  const source: HistorySource = {
+    cacheKey: "file:///history-logins",
+    slug: "team/app",
+    listReleases: async () => [
+      { tag: "v2", notes: "", date: null },
+      { tag: "v1", notes: "", date: null },
+    ],
+    // One attributed commit, one the forge maps to no account: the login
+    // list keeps the account and drops the null — presence of the field is
+    // what says "this range came from an API".
+    loadRange: async () => ({ commits: [commit("janedoe"), commit(null)], files: [] }),
+  };
+  const snapshots = await buildSnapshots(source, { count: 5 });
+  assert.deepEqual(snapshots[0].logins, ["janedoe"]);
+  const { summarizeBaseline } = await import("../src/history.ts");
+  assert.deepEqual(summarizeBaseline(snapshots).knownLogins, ["janedoe"]);
 });
 
 test("`before` restricts the baseline to releases older than the one under test", async () => {

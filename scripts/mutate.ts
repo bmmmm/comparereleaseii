@@ -139,6 +139,12 @@ const MUTANTS: Mutant[] = [
     replace: "if (false) {",
   },
   {
+    guard: "a known email with no known forge account raises the spoof warn",
+    file: "src/metrics.ts",
+    find: "!(commit.login && knownLogins.has(commit.login)) &&",
+    replace: "false &&",
+  },
+  {
     guard: "a formed baseline replaces the absolute alert bar",
     file: "src/watch.ts",
     find: "if (baseline !== null) return score <= baseline - SCORE_DROP;",

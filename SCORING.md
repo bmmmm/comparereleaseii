@@ -111,7 +111,7 @@ risk = max(0, 100 − 25·critical − 10·warn − 0·info)
 | Severity | Flags |
 |---|---|
 | **critical** | contradicted claims · undocumented auth/crypto changes *in an otherwise well-documented release* · vague note hiding auth/crypto changes · undocumented new dependency · undocumented non-registry resolution source in a lockfile · undocumented opaque change (binary, minified, no patch) · install-hook change in an undocumented file · first-ever binary artifact (baseline) |
-| **warn** | unsupported change claims · undocumented auth/crypto changes where under 60 % of the churn is documented · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · documented non-registry resolution source in a lockfile · first-time author on sensitive paths (baseline) · claims the judge could not answer for |
+| **warn** | unsupported change claims · undocumented auth/crypto changes where under 60 % of the churn is documented · undocumented CI/build or dependency-manifest changes · vague note hiding notable non-auth changes · documented opaque changes · documented non-registry resolution source in a lockfile · first-time author on sensitive paths (baseline) · known author email with no known forge account on sensitive paths (baseline, API sources — the git email is forgeable, the account is not) · claims the judge could not answer for |
 | **info** | documented new dependencies · release-size anomaly vs. baseline · unchecked claims on a release that cannot be checked here ("not verifiable") |
 
 **A judge that cannot answer is a finding.** On a transport error or an

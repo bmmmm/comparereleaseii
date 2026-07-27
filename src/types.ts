@@ -10,6 +10,14 @@ export interface Commit {
    * never match across sources; noreply addresses are per-account stable.
    */
   email?: string;
+  /**
+   * Forge account the commit is attributed to. Only API sources can answer:
+   * a login string, or null when the forge maps the email to no account.
+   * Clone sources leave it undefined — no attribution exists there. The
+   * email is attacker-chosen while the login is not, so "known email, no
+   * known login" is the spoofing signature baselineFlags warns about.
+   */
+  login?: string | null;
   prNumbers: number[];
 }
 

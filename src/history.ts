@@ -32,6 +32,12 @@ export interface ReleaseSnapshot {
   newDeps: string[];
   /** Identity keys (see authorKey) — emails where the source carries them. */
   authors: string[];
+  /**
+   * Forge logins, when the range came from an API (a clone has none). What
+   * makes them worth a second list: the email above is attacker-chosen, the
+   * forge account is not.
+   */
+  logins?: string[];
 }
 
 /**
@@ -51,6 +57,8 @@ export interface Baseline {
   /** Median of the snapshots' lexicalCoverage — the repo's normal shape. */
   medianLexicalCoverage: number;
   knownAuthors: string[];
+  /** Forge logins seen in API-built snapshots; empty when history came from a clone. */
+  knownLogins: string[];
   everBinary: boolean;
 }
 
@@ -182,6 +190,14 @@ async function snapshotFor(
     newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, source.slug)))],
     authors: [...new Set(cmp.commits.map((commit) => authorKey(commit)))],
   };
+  // Only when the source attributes commits at all — an empty list from an
+  // API range is a statement ("no known account touched this"), an absent
+  // one from a clone is not.
+  if (cmp.commits.some((commit) => commit.login !== undefined)) {
+    snapshot.logins = [
+      ...new Set(cmp.commits.flatMap((commit) => (commit.login ? [commit.login] : []))),
+    ];
+  }
   if (cacheFile) {
     try {
       await writeFile(cacheFile, JSON.stringify({ version: VERSION, ...snapshot }), {
@@ -242,6 +258,7 @@ export function summarizeBaseline(snapshots: ReleaseSnapshot[]): Baseline {
     medianChurn: median(snapshots.map((s) => s.additions + s.deletions)),
     medianLexicalCoverage: median(snapshots.map((s) => s.lexicalCoverage)),
     knownAuthors: [...new Set(snapshots.flatMap((s) => s.authors))],
+    knownLogins: [...new Set(snapshots.flatMap((s) => s.logins ?? []))],
     everBinary: snapshots.some((s) => s.binaries > 0),
   };
 }

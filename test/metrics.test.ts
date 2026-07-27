@@ -316,6 +316,7 @@ function baselineOf(medianLexicalCoverage: number, releases = 5): Baseline {
     medianChurn: 100,
     medianLexicalCoverage,
     knownAuthors: [],
+    knownLogins: [],
     everBinary: false,
   };
 }
@@ -357,6 +358,66 @@ test("baselineFlags: the email key matches authors across sources", () => {
   assert.equal(authorFlag(["Jane Doe"]), undefined);
   // Genuinely unseen author on a sensitive path: a real warn.
   assert.equal(authorFlag(["someone-else@example.com"])?.severity, "warn");
+});
+
+test("baselineFlags: a known email with no known forge account is the spoofing signature", () => {
+  const sensitiveFiles = [
+    { path: "src/auth/login.ts", status: "modified", additions: 5, deletions: 2 },
+  ];
+  const coverage: Coverage = {
+    uncovered: [],
+    coveredShas: new Set(),
+    evidenceFiles: new Set(),
+    commitFiles: new Map([["abc1234", sensitiveFiles]]),
+    mergeShas: new Set(),
+  };
+  const commit = (login: string | null | undefined) => ({
+    sha: "abc1234",
+    subject: "tighten session check",
+    body: "",
+    author: login ?? "Jane Doe",
+    email: "jane@example.com",
+    login,
+    prNumbers: [],
+  });
+  const spoofFlag = (login: string | null | undefined, knownLogins: string[]) => {
+    const data = releaseData([]);
+    data.commits = [commit(login)];
+    const base = baselineOf(0.5);
+    base.knownAuthors = ["jane@example.com"];
+    base.knownLogins = knownLogins;
+    const flags = baselineFlags(data, coverage, base);
+    return flags.find((f) => f.kind === "author-email-spoof");
+  };
+
+  // API source, email known, but the forge maps it to no account at all —
+  // the email is forgeable, the missing attribution is the tell.
+  assert.equal(spoofFlag(null, ["janedoe"])?.severity, "warn");
+  // Attributed to an account the baseline never saw: same signature.
+  assert.equal(spoofFlag("attacker", ["janedoe"])?.severity, "warn");
+  // The account the baseline knows — a genuine pass, no flag.
+  assert.equal(spoofFlag("janedoe", ["janedoe"]), undefined);
+  // Clone source (no attribution exists): the check cannot apply.
+  assert.equal(spoofFlag(undefined, ["janedoe"]), undefined);
+  // Clone-built baseline (no logins known): nothing to compare against.
+  assert.equal(spoofFlag(null, []), undefined);
+
+  // Off sensitive paths the forged email stays quiet, like new-author-sensitive.
+  const data = releaseData([]);
+  data.commits = [commit(null)];
+  const base = baselineOf(0.5);
+  base.knownAuthors = ["jane@example.com"];
+  base.knownLogins = ["janedoe"];
+  const docsCoverage: Coverage = {
+    ...coverage,
+    commitFiles: new Map([
+      ["abc1234", [{ path: "docs/notes.md", status: "modified", additions: 5, deletions: 2 }]],
+    ]),
+  };
+  assert.equal(
+    baselineFlags(data, docsCoverage, base).find((f) => f.kind === "author-email-spoof"),
+    undefined,
+  );
 });
 
 test("classifyUnverifiable: a docs-only diff needs no history", () => {
@@ -514,6 +575,7 @@ test("an unprovable security claim is never excused by the repo's history", () =
     medianChurn: 10,
     medianLexicalCoverage: 0.1,
     knownAuthors: [],
+    knownLogins: [],
     everBinary: false,
   };
   const routine = [result("no-evidence"), result("no-evidence"), result("no-evidence")];

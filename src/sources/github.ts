@@ -91,6 +91,7 @@ function toCommit(gc: GhCompareCommit): Commit {
     author: gc.author?.login ?? gc.commit.author.name,
     // The git-header email survives every source switch; the login does not.
     email: gc.commit.author.email,
+    login: gc.author?.login ?? null,
     prNumbers: extractPrNumbers(gc.commit.message),
   };
 }

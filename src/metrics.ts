@@ -765,6 +765,41 @@ export function baselineFlags(
         commitShas: suspects.map((commit) => commit.sha).slice(0, 5),
       });
     }
+
+    // The email above is attacker-chosen; the forge account is not. On API
+    // sources a known email must therefore not settle identity by itself:
+    // when the forge attributes the commit to no account the baseline has
+    // ever seen, that combination is the spoofing signature, not a pass.
+    // Needs an API-built baseline (a clone knows no logins) and API commits.
+    const knownLogins = new Set(baseline.knownLogins);
+    if (knownLogins.size) {
+      const spoofs = data.commits.filter(
+        (commit) =>
+          commit.login !== undefined &&
+          (known.has(authorKey(commit)) || known.has(commit.author)) &&
+          !(commit.login && knownLogins.has(commit.login)) &&
+          (coverage.commitFiles.get(commit.sha) ?? []).some((f) => sensitiveCategory(f.path)),
+      );
+      if (spoofs.length) {
+        const who = [
+          ...new Set(
+            spoofs.map(
+              (commit) =>
+                `${authorKey(commit)} (${commit.login ? `@${commit.login}` : "no account"})`,
+            ),
+          ),
+        ].join(", ");
+        flags.push({
+          severity: "warn",
+          kind: "author-email-spoof",
+          message:
+            `Commit(s) on sensitive paths reuse a known author email, but the forge attributes them ` +
+            `to no account seen in the last ${n} releases — the git email is forgeable, the account is not: ${who}`,
+          files: [],
+          commitShas: spoofs.map((commit) => commit.sha).slice(0, 5),
+        });
+      }
+    }
   }
 
   const binaries = data.files.filter((f) => opacityIssue(f) === "binary file");

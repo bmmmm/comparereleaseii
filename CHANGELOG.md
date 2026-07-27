@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **A known author email with no known forge account is its own warn now.** Keying identity by the git-header email (0.3.0) opened a gap on API sources: the email is attacker-chosen, so a commit forging a known maintainer's email passed the first-time-author check that the login match used to catch. Baseline snapshots built from an API now also record which forge accounts authored each release, and a sensitive-path commit whose email the baseline knows but whose account it does not — including "no account at all", which a forged unregistered email produces — raises `author-email-spoof` (warn). Clone-built baselines and clone-loaded commits carry no attribution, so the check stays silent there instead of guessing; a mutation guard pins it.
+
 ## 0.3.0 — 2026-07-27
 
 ### Added
