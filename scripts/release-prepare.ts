@@ -69,7 +69,9 @@ if (!extractChangelogSection(changelog, "Unreleased")) {
 const heading = "## Unreleased";
 const idx = changelog.indexOf(heading);
 if (idx === -1) throw new Error("unreachable: Unreleased heading vanished mid-run");
-const today = new Date().toISOString().slice(0, 10);
+// Local date, not toISOString()'s UTC slice — a late-evening release in any
+// timezone east of UTC would be stamped with yesterday's date (bit v0.5.0).
+const today = new Date().toLocaleDateString("en-CA");
 const newChangelog =
   changelog.slice(0, idx + heading.length) +
   `\n\n## ${newVersion} — ${today}` +
