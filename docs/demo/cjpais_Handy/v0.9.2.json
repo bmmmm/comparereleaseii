@@ -1,0 +1,293 @@
+{
+  "repoLabel": "cjpais/Handy",
+  "baseRef": "v0.9.1",
+  "headRef": "v0.9.2",
+  "stats": {
+    "commits": 4,
+    "files": 8,
+    "additions": 71,
+    "deletions": 80
+  },
+  "results": [
+    {
+      "claim": {
+        "id": 0,
+        "section": "Notes",
+        "text": "Fix mainly for better GPU detection and selection",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 1,
+        "section": "What's Changed",
+        "text": "Update descriptions for Moonshine models by @MikaKrul in #1648",
+        "kind": "change",
+        "prNumbers": [
+          1648
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "author": "MikaKrul"
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #1648 is in the release range (8c46721a77); auto-generated entry, title matches the squash commit.",
+      "evidence": {
+        "commitShas": [
+          "8c46721a77cf157092802f1024c04394b22d1113"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "generated"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": true
+    },
+    {
+      "claim": {
+        "id": 2,
+        "section": "What's Changed",
+        "text": "Add cancel download functionality to Onboarding component by @MikaKrul in #1653",
+        "kind": "change",
+        "prNumbers": [
+          1653
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "author": "MikaKrul"
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #1653 is in the release range (38825767cf); auto-generated entry, title matches the squash commit.",
+      "evidence": {
+        "commitShas": [
+          "38825767cf933f59b90209c3f3c5f1e3bbe98766"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "generated"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": true
+    },
+    {
+      "claim": {
+        "id": 3,
+        "section": "What's Changed",
+        "text": "transcribe 0.1.3 by @cjpais in #1664",
+        "kind": "change",
+        "prNumbers": [
+          1664
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "author": "cjpais"
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #1664 is in the release range (c912c6baae); auto-generated entry, title matches the squash commit.",
+      "evidence": {
+        "commitShas": [
+          "c912c6baaeef20b11e5744feedffc57cab3ab69b"
+        ],
+        "files": [
+          ".github/workflows/build.yml",
+          "BUILD.md",
+          "src-tauri/Cargo.lock",
+          "src-tauri/Cargo.toml"
+        ],
+        "matchedTerms": [
+          "0.1.3"
+        ],
+        "methods": [
+          "pr-anchor",
+          "generated",
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": true
+    },
+    {
+      "claim": {
+        "id": 4,
+        "section": "What's Changed",
+        "text": "**Full Changelog**:",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    }
+  ],
+  "uncovered": [],
+  "reverseChecked": true,
+  "metrics": {
+    "scores": {
+      "correctness": 100,
+      "completeness": 100,
+      "risk": 100,
+      "overall": 100,
+      "label": "solid"
+    },
+    "flags": [],
+    "files": [
+      {
+        "path": ".github/workflows/build.yml",
+        "churn": 31,
+        "sensitive": "ci/build",
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "BUILD.md",
+        "churn": 59,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "package.json",
+        "churn": 2,
+        "sensitive": "dependencies",
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src-tauri/Cargo.lock",
+        "churn": 10,
+        "sensitive": "dependencies",
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "src-tauri/Cargo.toml",
+        "churn": 12,
+        "sensitive": "dependencies",
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "src-tauri/src/catalog/catalog.json",
+        "churn": 24,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src-tauri/tauri.conf.json",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/components/onboarding/Onboarding.tsx",
+        "churn": 11,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      }
+    ],
+    "churnCoveredRatio": 1,
+    "context": {
+      "languages": {
+        "Rust": 754655,
+        "TypeScript": 518615,
+        "Nix": 119875,
+        "NSIS": 35880,
+        "CSS": 16355,
+        "Python": 13488,
+        "Swift": 5917,
+        "Shell": 2458,
+        "HTML": 838,
+        "C": 829,
+        "JavaScript": 820
+      },
+      "codeBytes": 1469730,
+      "releaseCadenceDays": 9
+    },
+    "baseline": {
+      "releases": 5,
+      "medianChurn": 1286,
+      "medianAnchoredCoverage": 0.8235294117647058,
+      "snapshots": [
+        {
+          "tag": "v0.8.1",
+          "churn": 1286,
+          "coverage": 0.5714285714285714
+        },
+        {
+          "tag": "v0.8.2",
+          "churn": 1080,
+          "coverage": 0.8235294117647058
+        },
+        {
+          "tag": "v0.8.3",
+          "churn": 1176,
+          "coverage": 0.9375
+        },
+        {
+          "tag": "v0.9.0",
+          "churn": 15901,
+          "coverage": 0.8235294117647058
+        },
+        {
+          "tag": "v0.9.1",
+          "churn": 4494,
+          "coverage": 0.8611111111111112
+        }
+      ]
+    },
+    "unverifiable": null
+  },
+  "warnings": [],
+  "truncated": false,
+  "engine": "claude-cli/haiku",
+  "linkBase": "https://github.com/cjpais/Handy",
+  "linkStyle": "github"
+}

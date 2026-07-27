@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fact check: cjpais/Handy v0.9.2</title>
+<style>
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--btn-border:#d1d9e0;--btn-hover:#e7ebf0;
+--fg:#1f2328;--detail:#333b43;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--btn-border:#30363d;--btn-hover:#30363d;
+--fg:#e6edf3;--detail:#c9d1d9;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);margin-bottom:20px}
+.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.ring{width:120px;height:120px;flex-shrink:0}
+.comp{display:flex;gap:24px;flex-wrap:wrap}
+.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:var(--muted);font-size:12px}
+.ctx{margin-left:auto;text-align:right;color:var(--muted);font-size:12px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+.seg{height:100%}
+.legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{width:100%;height:auto;border-radius:8px}
+.spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.wf-grid{stroke:var(--border);stroke-width:1}
+.wf-axis{font-size:9px;fill:var(--muted)}
+.wf-label{font-size:12px;fill:var(--fg)}
+.wf-num{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.wf-start{fill:var(--border)}
+.wf-comp{fill:#d29922}
+.wf-cap{fill:#f85149}
+.wf-adj{fill:#6e7681}
+.wf-conn{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
+.tile{stroke:var(--bg);stroke-width:1}
+.tile-sens{stroke:#e3b341;stroke-width:2.5}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+details{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:5px 0}
+summary{cursor:pointer}
+.chip{color:#ffffff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.gen{color:var(--muted);border:1px solid var(--btn-border);font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
+.conf{color:var(--muted);font-size:12px}
+.surplus{color:#d29922;font-size:12px;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.toolbar button{background:var(--card);color:var(--fg);border:1px solid var(--btn-border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:var(--btn-hover)}
+.toolbar button.active{background:var(--accent);border-color:var(--accent);color:#ffffff}
+body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
+body[data-filter="handwritten"] details:has(.gen){display:none}
+.detail{margin:8px 0 4px 4px;color:var(--detail)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;font-size:13px}th{color:var(--muted)}
+.ok{color:#3fb950}
+.note{color:var(--muted);font-size:12px}
+.banner{background:var(--card);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:14px 0}
+footer{margin-top:32px;color:var(--faint);font-size:12px}
+</style></head><body>
+<h1>Release-note fact check — cjpais/Handy</h1>
+<div class="sub">v0.9.1 → v0.9.2 · 4 commits · 8 files · +71/−80 · judge: claude-cli/haiku</div>
+
+<div class="cards">
+  <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#3fb950" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7 326.7" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">100</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">solid</text></svg>
+  <div class="comp">
+    <div><div class="n">100</div><div class="t">correctness<br>claims supported</div></div>
+    <div><div class="n">100</div><div class="t">completeness<br>churn documented</div></div>
+    <div><div class="n">100</div><div class="t">risk<br>100 − flag penalties</div></div>
+  </div>
+  <div class="ctx">repo: Rust 51% · TypeScript 35% · Nix 8% · NSIS 2% · 1.5 MB code<br>release cadence ~9 d<br>baseline (5 rel.): median churn ±1286 <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Churn per release (oldest → newest)"><title>Churn per release (oldest → newest)
+v0.8.1: 1286
+v0.8.2: 1080
+v0.8.3: 1176
+v0.9.0: 15901
+v0.9.1: 4494</title><polyline points="3.0,14.8 22.5,15.0 42.0,14.9 61.5,3.0 81.0,12.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="12.2" r="2.5" fill="var(--accent)"/></svg> · coverage 82% <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Note coverage % per release (oldest → newest)"><title>Note coverage % per release (oldest → newest)
+v0.8.1: 57
+v0.8.2: 82
+v0.8.3: 94
+v0.9.0: 82
+v0.9.1: 86</title><polyline points="3.0,15.0 22.5,6.9 42.0,3.0 61.5,6.9 81.0,5.6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="5.6" r="2.5" fill="var(--accent)"/></svg></div>
+</div>
+
+<h2>Score derivation <span class="note">— components, flag penalties and the hard cap, per <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">SCORING.md</a></span></h2>
+<svg viewBox="0 0 790 152" role="img" aria-label="Score derivation"><line x1="250.0" y1="6" x2="250.0" y2="138" class="wf-grid"/><text x="250.0" y="149" class="wf-axis" text-anchor="middle">0</text><line x1="367.5" y1="6" x2="367.5" y2="138" class="wf-grid"/><text x="367.5" y="149" class="wf-axis" text-anchor="middle">25</text><line x1="485.0" y1="6" x2="485.0" y2="138" class="wf-grid"/><text x="485.0" y="149" class="wf-axis" text-anchor="middle">50</text><line x1="602.5" y1="6" x2="602.5" y2="138" class="wf-grid"/><text x="602.5" y="149" class="wf-axis" text-anchor="middle">75</text><line x1="720.0" y1="6" x2="720.0" y2="138" class="wf-grid"/><text x="720.0" y="149" class="wf-axis" text-anchor="middle">100</text><g><title>perfect release</title><text x="240" y="21" class="wf-label" text-anchor="end">perfect release</text><rect x="250.0" y="11" width="470.0" height="13" class="wf-start"/><text x="728" y="21" class="wf-num">100</text></g><g><title>correctness 100 × 0.45
+weighted share of claims the diff supports</title><text x="240" y="47" class="wf-label" text-anchor="end">correctness 100 × 0.45</text><line x1="720.0" y1="24.0" x2="720.0" y2="50.0" class="wf-conn"/><rect x="720.0" y="37" width="1.5" height="13" class="wf-comp"/><text x="728" y="47" class="wf-num">0</text></g><g><title>completeness 100 × 0.25
+churn-weighted share of commits the notes cover</title><text x="240" y="73" class="wf-label" text-anchor="end">completeness 100 × 0.25</text><line x1="720.0" y1="50.0" x2="720.0" y2="76.0" class="wf-conn"/><rect x="720.0" y="63" width="1.5" height="13" class="wf-comp"/><text x="728" y="73" class="wf-num">0</text></g><g><title>risk 100 × 0.3
+no flag penalties</title><text x="240" y="99" class="wf-label" text-anchor="end">risk 100 × 0.3</text><line x1="720.0" y1="76.0" x2="720.0" y2="102.0" class="wf-conn"/><rect x="720.0" y="89" width="1.5" height="13" class="wf-comp"/><text x="728" y="99" class="wf-num">0</text></g><g><title>100/100 solid</title><text x="240" y="125" class="wf-label" text-anchor="end">100/100 solid</text><line x1="720.0" y1="102.0" x2="720.0" y2="128.0" class="wf-conn"/><rect x="250.0" y="115" width="470.0" height="13" fill="#3fb950"/><text x="728" y="125" class="wf-num">100</text></g></svg>
+
+<h2>Claims at a glance</h2>
+<div class="bar"><div class="seg" style="width:60.0%;background:#3fb950" title="verified: 3"></div><div class="seg" style="width:40.0%;background:#6e7681" title="skipped: 2"></div></div><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>verified 3</span><span class="lg"><span class="dot" style="background:#d29922"></span>partial 0</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>no-evidence 0</span><span class="lg"><span class="dot" style="background:#f85149"></span>contradicted 0</span><span class="lg"><span class="dot" style="background:#6e7681"></span>skipped 2</span></div>
+
+<h2>Risk flags</h2>
+<p class="ok">No risk flags.</p>
+
+<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path, click opens the diff</span></h2>
+<svg viewBox="0 0 1160 560" role="img" aria-label="Diff treemap"><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-40f60e1037245d7b8a98a7325d53890a717da9979adeb54a61a795c4ba07f9c9" target="_blank" rel="noopener"><g><rect class="tile" x="0.0" y="0.0" width="453.2" height="560.0" fill="#2ea043" fill-opacity="0.82"><title>BUILD.md
+±59 lines · evidence
+(click to open the compare view)</title></rect><text x="4.0" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">BUILD.md</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-5c3fa597431eda03ac3339ae6bf7f05e1a50d6fc7333679ec38e21b337cb6721" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="453.2" y="0.0" width="422.5" height="315.6" fill="#2ea043" fill-opacity="0.82"><title>.github/workflows/build.yml
+±31 lines · evidence · sensitive: ci/build
+(click to open the compare view)</title></rect><text x="457.2" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">build.yml</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-1ab875f0cf64365331f9c6d1ca1fc76c2580cbfa053cef00c77fe35b21a6fe4e" target="_blank" rel="noopener"><g><rect class="tile" x="453.2" y="315.6" width="422.5" height="244.4" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/src/catalog/catalog.json
+±24 lines · covered
+(click to open the compare view)</title></rect><text x="457.2" y="328.6" font-size="10" fill="#ffffff" opacity="0.92">catalog.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-fe4c6a80a21e81339e2e0faeb9134d0f9636c168987df13c8abf1927a1caee39" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="875.8" y="0.0" width="284.2" height="181.6" fill="#2ea043" fill-opacity="0.82"><title>src-tauri/Cargo.toml
+±12 lines · evidence · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="879.8" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">Cargo.toml</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-9019867f698e9a9972689773620072faf1dcb50ee67c3a2eadc059012480f4ea" target="_blank" rel="noopener"><g><rect class="tile" x="875.8" y="181.6" width="284.2" height="166.5" fill="#1f6feb" fill-opacity="0.82"><title>src/components/onboarding/Onboarding.tsx
+±11 lines · covered
+(click to open the compare view)</title></rect><text x="879.8" y="194.6" font-size="10" fill="#ffffff" opacity="0.92">Onboarding.tsx</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-91fed938c12ef6620ac89e4130fe1f2b92c58b68083fc6bbc71c3e0f381a25cd" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="875.8" y="348.1" width="203.0" height="211.9" fill="#2ea043" fill-opacity="0.82"><title>src-tauri/Cargo.lock
+±10 lines · evidence · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="879.8" y="361.1" font-size="10" fill="#ffffff" opacity="0.92">Cargo.lock</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-7ae45ad102eab3b6d7e7896acd08c427a9b25b346470d7bc6507b6481575d519" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="1078.8" y="348.1" width="81.2" height="105.9" fill="#1f6feb" fill-opacity="0.82"><title>package.json
+±2 lines · covered · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="1082.8" y="361.1" font-size="10" fill="#ffffff" opacity="0.92">package.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.1...v0.9.2#diff-fa09f1dac39604a735cd6a53957d3c35e0c3298cca9cf4829180f167abbd69b7" target="_blank" rel="noopener"><g><rect class="tile" x="1078.8" y="454.1" width="81.2" height="105.9" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/tauri.conf.json
+±2 lines · covered
+(click to open the compare view)</title></rect><text x="1082.8" y="467.1" font-size="10" fill="#ffffff" opacity="0.92">tauri.conf.js</text></g></a></svg>
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:#2ea043"></span>cited as evidence</span>
+  <span class="lg"><span class="dot" style="background:#1f6feb"></span>in documented commit</span>
+  <span class="lg"><span class="dot" style="background:#da3633"></span>undocumented</span>
+  <span class="lg"><span class="dot" style="background:#6e7681"></span>unknown</span>
+  <span class="lg"><span class="dot" style="background:#e3b341"></span>sensitive path (border)</span>
+</div>
+
+<h2>Claims in detail</h2>
+<div class="toolbar">
+  <button data-filter="all" class="active">All claims</button>
+  <button data-filter="issues">Issues only</button>
+  <button data-filter="handwritten">Handwritten only</button>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+</div>
+<h3>Notes</h3><div class="claims"><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> Fix mainly for better GPU detection and selection <span class="conf"></span></summary></details></div><h3>What&#39;s Changed</h3><div class="claims"><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> Update descriptions for Moonshine models by @MikaKrul in #1648 <span class="conf">0.90</span></summary><div class="detail">PR #1648 is in the release range (8c46721a77); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/8c46721a77cf157092802f1024c04394b22d1113">8c46721a</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> Add cancel download functionality to Onboarding component by @MikaKrul in #1653 <span class="conf">0.90</span></summary><div class="detail">PR #1653 is in the release range (38825767cf); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/38825767cf933f59b90209c3f3c5f1e3bbe98766">38825767</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> transcribe 0.1.3 by @cjpais in #1664 <span class="conf">0.90</span></summary><div class="detail">PR #1664 is in the release range (c912c6baae); auto-generated entry, title matches the squash commit.<div class="files">.github/workflows/build.yml, BUILD.md, src-tauri/Cargo.lock, src-tauri/Cargo.toml</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/c912c6baaeef20b11e5744feedffc57cab3ab69b">c912c6ba</a></div></div></details><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> **Full Changelog**: <span class="conf"></span></summary></details></div>
+
+
+<h2>Undocumented commits</h2>
+<p class="ok">All commits in the range are covered by the release notes.</p>
+
+
+<footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
+<script>
+for (const b of document.querySelectorAll(".toolbar button[data-filter]")) {
+  b.addEventListener("click", () => {
+    document.body.dataset.filter = b.dataset.filter;
+    for (const o of document.querySelectorAll(".toolbar button[data-filter]")) o.classList.toggle("active", o === b);
+  });
+}
+document.getElementById("expand").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = true;
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = false;
+});
+</script>
+</body></html>

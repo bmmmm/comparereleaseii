@@ -1,0 +1,146 @@
+{
+  "repoLabel": "anthropics/claude-code",
+  "baseRef": "v2.1.219",
+  "headRef": "v2.1.220",
+  "stats": {
+    "commits": 1,
+    "files": 2,
+    "additions": 12,
+    "deletions": 38
+  },
+  "results": [
+    {
+      "claim": {
+        "id": 0,
+        "section": "What's changed",
+        "text": "Bug fixes and reliability improvements",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only the release-notes text 'Bug fixes and reliability improvements' being added to feed.xml—a documentation artifact restating the claim itself. Per the rules, 'changelog or release-notes hunk restating the claim is NOT evidence.' No code diffs or actual bug-fix commits are shown to support the claim that such improvements were implemented.",
+      "judged": true,
+      "generated": false
+    }
+  ],
+  "uncovered": [
+    {
+      "commit": {
+        "sha": "7ef6eec9d9ba84ea6f233f26c45f1df5c5991843",
+        "subject": "chore: Update CHANGELOG.md and feed.xml",
+        "body": "",
+        "author": "actions-user",
+        "email": "actions@github.com",
+        "login": "actions-user",
+        "prNumbers": []
+      },
+      "additions": 12,
+      "deletions": 38,
+      "fileCount": 2
+    }
+  ],
+  "reverseChecked": true,
+  "metrics": {
+    "scores": {
+      "correctness": 100,
+      "completeness": 0,
+      "risk": 100,
+      "overall": 65,
+      "label": "unverified"
+    },
+    "flags": [
+      {
+        "severity": "info",
+        "kind": "not-verifiable",
+        "message": "1 claim(s) not checkable against this repo's diff",
+        "files": [],
+        "commitShas": []
+      }
+    ],
+    "files": [
+      {
+        "path": "CHANGELOG.md",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "feed.xml",
+        "churn": 42,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      }
+    ],
+    "churnCoveredRatio": 0,
+    "context": {
+      "languages": {
+        "Python": 368691,
+        "Shell": 63507,
+        "TypeScript": 23117,
+        "PowerShell": 5319,
+        "Dockerfile": 2507
+      },
+      "codeBytes": 463141,
+      "releaseCadenceDays": 1
+    },
+    "baseline": {
+      "releases": 5,
+      "medianChurn": 106,
+      "medianAnchoredCoverage": 0,
+      "snapshots": [
+        {
+          "tag": "v2.1.215",
+          "churn": 34,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.216",
+          "churn": 109,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.217",
+          "churn": 2326,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.218",
+          "churn": 92,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.219",
+          "churn": 106,
+          "coverage": 0
+        }
+      ]
+    },
+    "unverifiable": {
+      "kind": "sourceless",
+      "reason": "This release's diff contains no source-code changes — claims could not be checked against code."
+    }
+  },
+  "warnings": [],
+  "truncated": false,
+  "engine": "claude-cli/haiku",
+  "linkBase": "https://github.com/anthropics/claude-code",
+  "linkStyle": "github"
+}

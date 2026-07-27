@@ -125,12 +125,15 @@ function scoreChart(history: CheckedRelease[], level: number | null, root: strin
       return `<a href="${esc(reportHref(root, h))}">${ring}<circle cx="${cx}" cy="${cy}" r="4.5" fill="${CLASS_COLOR[cls]}" class="pt"><title>${esc(pointTitle(h))}</title></circle></a>`;
     })
     .join("");
-  // At most ~8 tag labels — the tooltips carry the rest.
+  // At most ~8 tag labels — the tooltips carry the rest. The edge labels
+  // anchor inward so neither runs off the viewport.
   const step = Math.max(1, Math.ceil(n / 8));
   const labels = history
     .map((h, i) =>
       i % step === 0 || i === n - 1
-        ? `<text x="${xAt(i, n).toFixed(1)}" y="${H - 8}" class="axis" text-anchor="middle">${esc(h.tag.length > 12 ? `${h.tag.slice(0, 11)}…` : h.tag)}</text>`
+        ? `<text x="${xAt(i, n).toFixed(1)}" y="${H - 8}" class="axis" text-anchor="${
+            i === 0 && n > 1 ? "start" : i === n - 1 ? "end" : "middle"
+          }">${esc(h.tag.length > 12 ? `${h.tag.slice(0, 11)}…` : h.tag)}</text>`
         : "",
     )
     .join("");

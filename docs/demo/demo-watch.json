@@ -1,0 +1,15 @@
+{
+  "stateFile": "watch-state.json",
+  "reportsDir": ".",
+  "maxPerRun": 4,
+  "defaults": {
+    "engine": "claude-cli"
+  },
+  "repos": [
+    { "repo": "anthropic-experimental/sandbox-runtime" },
+    { "repo": "anthropics/claude-code" },
+    { "repo": "cjpais/Handy" },
+    { "repo": "dani-garcia/vaultwarden" },
+    { "repo": "GyulyVGC/sniffnet" }
+  ]
+}

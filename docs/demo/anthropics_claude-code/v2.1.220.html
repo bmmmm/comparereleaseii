@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fact check: anthropics/claude-code v2.1.220</title>
+<style>
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--btn-border:#d1d9e0;--btn-hover:#e7ebf0;
+--fg:#1f2328;--detail:#333b43;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--btn-border:#30363d;--btn-hover:#30363d;
+--fg:#e6edf3;--detail:#c9d1d9;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);margin-bottom:20px}
+.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.ring{width:120px;height:120px;flex-shrink:0}
+.comp{display:flex;gap:24px;flex-wrap:wrap}
+.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:var(--muted);font-size:12px}
+.ctx{margin-left:auto;text-align:right;color:var(--muted);font-size:12px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+.seg{height:100%}
+.legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{width:100%;height:auto;border-radius:8px}
+.spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.wf-grid{stroke:var(--border);stroke-width:1}
+.wf-axis{font-size:9px;fill:var(--muted)}
+.wf-label{font-size:12px;fill:var(--fg)}
+.wf-num{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.wf-start{fill:var(--border)}
+.wf-comp{fill:#d29922}
+.wf-cap{fill:#f85149}
+.wf-adj{fill:#6e7681}
+.wf-conn{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
+.tile{stroke:var(--bg);stroke-width:1}
+.tile-sens{stroke:#e3b341;stroke-width:2.5}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+details{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:5px 0}
+summary{cursor:pointer}
+.chip{color:#ffffff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.gen{color:var(--muted);border:1px solid var(--btn-border);font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
+.conf{color:var(--muted);font-size:12px}
+.surplus{color:#d29922;font-size:12px;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.toolbar button{background:var(--card);color:var(--fg);border:1px solid var(--btn-border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:var(--btn-hover)}
+.toolbar button.active{background:var(--accent);border-color:var(--accent);color:#ffffff}
+body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
+body[data-filter="handwritten"] details:has(.gen){display:none}
+.detail{margin:8px 0 4px 4px;color:var(--detail)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;font-size:13px}th{color:var(--muted)}
+.ok{color:#3fb950}
+.note{color:var(--muted);font-size:12px}
+.banner{background:var(--card);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:14px 0}
+footer{margin-top:32px;color:var(--faint);font-size:12px}
+</style></head><body>
+<h1>Release-note fact check — anthropics/claude-code</h1>
+<div class="sub">v2.1.219 → v2.1.220 · 1 commits · 2 files · +12/−38 · judge: claude-cli/haiku</div>
+
+<div class="cards">
+  <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#a371f7" stroke-width="10" stroke-linecap="round" stroke-dasharray="212.4 326.7" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">65</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">unverified</text></svg>
+  <div class="comp">
+    <div><div class="n">100</div><div class="t">correctness<br>claims supported</div></div>
+    <div><div class="n">0</div><div class="t">completeness<br>churn documented</div></div>
+    <div><div class="n">100</div><div class="t">risk<br>100 − flag penalties</div></div>
+  </div>
+  <div class="ctx">repo: Python 80% · Shell 14% · TypeScript 5% · PowerShell 1% · 463 kB code<br>release cadence ~1 d<br>baseline (5 rel.): median churn ±106 <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Churn per release (oldest → newest)"><title>Churn per release (oldest → newest)
+v2.1.215: 34
+v2.1.216: 109
+v2.1.217: 2326
+v2.1.218: 92
+v2.1.219: 106</title><polyline points="3.0,15.0 22.5,14.6 42.0,3.0 61.5,14.7 81.0,14.6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="14.6" r="2.5" fill="var(--accent)"/></svg> · coverage 0% <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Note coverage % per release (oldest → newest)"><title>Note coverage % per release (oldest → newest)
+v2.1.215: 0
+v2.1.216: 0
+v2.1.217: 0
+v2.1.218: 0
+v2.1.219: 0</title><polyline points="3.0,15.0 22.5,15.0 42.0,15.0 61.5,15.0 81.0,15.0" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="15.0" r="2.5" fill="var(--accent)"/></svg></div>
+</div>
+<div class="banner"><strong>Not verifiable</strong> — This release&#39;s diff contains no source-code changes — claims could not be checked against code.</div>
+<h2>Score derivation <span class="note">— components, flag penalties and the hard cap, per <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">SCORING.md</a></span></h2>
+<svg viewBox="0 0 790 178" role="img" aria-label="Score derivation"><line x1="250.0" y1="6" x2="250.0" y2="164" class="wf-grid"/><text x="250.0" y="175" class="wf-axis" text-anchor="middle">0</text><line x1="367.5" y1="6" x2="367.5" y2="164" class="wf-grid"/><text x="367.5" y="175" class="wf-axis" text-anchor="middle">25</text><line x1="485.0" y1="6" x2="485.0" y2="164" class="wf-grid"/><text x="485.0" y="175" class="wf-axis" text-anchor="middle">50</text><line x1="602.5" y1="6" x2="602.5" y2="164" class="wf-grid"/><text x="602.5" y="175" class="wf-axis" text-anchor="middle">75</text><line x1="720.0" y1="6" x2="720.0" y2="164" class="wf-grid"/><text x="720.0" y="175" class="wf-axis" text-anchor="middle">100</text><g><title>perfect release</title><text x="240" y="21" class="wf-label" text-anchor="end">perfect release</text><rect x="250.0" y="11" width="470.0" height="13" class="wf-start"/><text x="728" y="21" class="wf-num">100</text></g><g><title>correctness 100 × 0.45
+weighted share of claims the diff supports</title><text x="240" y="47" class="wf-label" text-anchor="end">correctness 100 × 0.45</text><line x1="720.0" y1="24.0" x2="720.0" y2="50.0" class="wf-conn"/><rect x="720.0" y="37" width="1.5" height="13" class="wf-comp"/><text x="728" y="47" class="wf-num">0</text></g><g><title>completeness 0 × 0.25
+churn-weighted share of commits the notes cover</title><text x="240" y="73" class="wf-label" text-anchor="end">completeness 0 × 0.25</text><line x1="720.0" y1="50.0" x2="720.0" y2="76.0" class="wf-conn"/><rect x="602.5" y="63" width="117.5" height="13" class="wf-comp"/><text x="728" y="73" class="wf-num">−25</text></g><g><title>risk 100 × 0.3
+no flag penalties</title><text x="240" y="99" class="wf-label" text-anchor="end">risk 100 × 0.3</text><line x1="602.5" y1="76.0" x2="602.5" y2="102.0" class="wf-conn"/><rect x="602.5" y="89" width="1.5" height="13" class="wf-comp"/><text x="728" y="99" class="wf-num">0</text></g><g><title>hard cap: unverified
+claims nobody could check must not read better than checked-with-gaps</title><text x="240" y="125" class="wf-label" text-anchor="end">hard cap: unverified</text><line x1="602.5" y1="102.0" x2="602.5" y2="128.0" class="wf-conn"/><rect x="555.5" y="115" width="47.0" height="13" class="wf-cap"/><text x="728" y="125" class="wf-num">−10</text></g><g><title>65/100 unverified</title><text x="240" y="151" class="wf-label" text-anchor="end">65/100 unverified</text><line x1="555.5" y1="128.0" x2="555.5" y2="154.0" class="wf-conn"/><rect x="250.0" y="141" width="305.5" height="13" fill="#a371f7"/><text x="728" y="151" class="wf-num">65</text></g></svg>
+
+<h2>Claims at a glance</h2>
+<div class="bar"><div class="seg" style="width:100.0%;background:#bc8cff" title="no-evidence: 1"></div></div><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>verified 0</span><span class="lg"><span class="dot" style="background:#d29922"></span>partial 0</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>no-evidence 1</span><span class="lg"><span class="dot" style="background:#f85149"></span>contradicted 0</span><span class="lg"><span class="dot" style="background:#6e7681"></span>skipped 0</span></div>
+
+<h2>Risk flags</h2>
+<div class="flag" style="border-left-color:#58a6ff"><b>INFO</b> 1 claim(s) not checkable against this repo&#39;s diff</div>
+
+<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path, click opens the diff</span></h2>
+<svg viewBox="0 0 1160 560" role="img" aria-label="Diff treemap"><a href="https://github.com/anthropics/claude-code/compare/v2.1.219...v2.1.220#diff-f81c1c3a1a487a4b6e4a80f8b5a96c760e5cefbd24189a027c83724eb7beab97" target="_blank" rel="noopener"><g><rect class="tile" x="0.0" y="0.0" width="974.4" height="560.0" fill="#da3633" fill-opacity="0.82"><title>feed.xml
+±42 lines · undocumented
+(click to open the compare view)</title></rect><text x="4.0" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">feed.xml</text></g></a><a href="https://github.com/anthropics/claude-code/compare/v2.1.219...v2.1.220#diff-06572a96a58dc510037d5efa622f9bec8519bc1beab13c9f251e97e657a9d4ed" target="_blank" rel="noopener"><g><rect class="tile" x="974.4" y="0.0" width="185.6" height="560.0" fill="#da3633" fill-opacity="0.82"><title>CHANGELOG.md
+±8 lines · undocumented
+(click to open the compare view)</title></rect><text x="978.4" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">CHANGELOG.md</text></g></a></svg>
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:#2ea043"></span>cited as evidence</span>
+  <span class="lg"><span class="dot" style="background:#1f6feb"></span>in documented commit</span>
+  <span class="lg"><span class="dot" style="background:#da3633"></span>undocumented</span>
+  <span class="lg"><span class="dot" style="background:#6e7681"></span>unknown</span>
+  <span class="lg"><span class="dot" style="background:#e3b341"></span>sensitive path (border)</span>
+</div>
+
+<h2>Claims in detail</h2>
+<div class="toolbar">
+  <button data-filter="all" class="active">All claims</button>
+  <button data-filter="issues">Issues only</button>
+  <button data-filter="handwritten">Handwritten only</button>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+</div>
+<h3>What&#39;s changed</h3><div class="claims"><details data-v="no-evidence" open><summary><span class="chip" style="background:#bc8cff">no-evidence</span> Bug fixes and reliability improvements <span class="conf">0.95</span></summary><div class="detail">The diff shows only the release-notes text &#39;Bug fixes and reliability improvements&#39; being added to feed.xml—a documentation artifact restating the claim itself. Per the rules, &#39;changelog or release-notes hunk restating the claim is NOT evidence.&#39; No code diffs or actual bug-fix commits are shown to support the claim that such improvements were implemented.<div class="files">feed.xml</div></div></details></div>
+
+
+<h2>Undocumented commits</h2>
+<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th></tr><tr><td><a href="https://github.com/anthropics/claude-code/commit/7ef6eec9d9ba84ea6f233f26c45f1df5c5991843">7ef6eec9</a></td><td>chore: Update CHANGELOG.md and feed.xml</td><td>+12/−38</td><td>2</td></tr></table>
+
+
+<footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
+<script>
+for (const b of document.querySelectorAll(".toolbar button[data-filter]")) {
+  b.addEventListener("click", () => {
+    document.body.dataset.filter = b.dataset.filter;
+    for (const o of document.querySelectorAll(".toolbar button[data-filter]")) o.classList.toggle("active", o === b);
+  });
+}
+document.getElementById("expand").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = true;
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = false;
+});
+</script>
+</body></html>

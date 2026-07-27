@@ -1,0 +1,1274 @@
+{
+  "repoLabel": "anthropics/claude-code",
+  "baseRef": "v2.1.217",
+  "headRef": "v2.1.218",
+  "stats": {
+    "commits": 1,
+    "files": 2,
+    "additions": 84,
+    "deletions": 8
+  },
+  "results": [
+    {
+      "claim": {
+        "id": 0,
+        "section": "What's changed",
+        "text": "Changed `/code-review` to run as a background subagent, so review work no longer fills your conversation and keeps stacked slash commands as its review target",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/code-review"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "/code-review"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The only evidence is the feed.xml changelog entry that restates the claim itself; per the rules, a changelog hunk cannot serve as evidence for its own claims. No code changes implementing the background subagent behavior for /code-review are shown in the diff.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 1,
+        "section": "What's changed",
+        "text": "Added screen-reader announcements of deleted text for word and line deletions (`Option+Delete`, `Ctrl+W`, `Cmd+Backspace`, `Ctrl+U`, `Ctrl+K`) in `--ax-screen-reader` mode",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "Option+Delete",
+          "Ctrl+W",
+          "Cmd+Backspace",
+          "Ctrl+U",
+          "Ctrl+K",
+          "--ax-screen-reader"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.8,
+      "reasoning": "Identifiers Option+Delete, Ctrl+W, Cmd+Backspace, Ctrl+U, Ctrl+K all appear in the diff (1 file(s)).",
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "Option+Delete",
+          "Ctrl+W",
+          "Cmd+Backspace",
+          "Ctrl+U",
+          "Ctrl+K",
+          "--ax-screen-reader"
+        ],
+        "methods": [
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 2,
+        "section": "What's changed",
+        "text": "Fixed Windows paths with `\\u`-prefixed segments (like `C:\\Users\\unicorn`) being corrupted into CJK characters in tool inputs, which made those files inaccessible",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "\\u",
+          "C:\\Users\\unicorn"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.8,
+      "reasoning": "Identifiers \\u, C:\\Users\\unicorn all appear in the diff (1 file(s)).",
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "\\u",
+          "C:\\Users\\unicorn"
+        ],
+        "methods": [
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 3,
+        "section": "What's changed",
+        "text": "Fixed the left arrow key discarding the conversation with no undo: presses right after editing now ask to confirm, and Esc in the agent view returns to the conversation it backgrounded",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence shows the claim restated verbatim in the release notes feed.xml, but the rules explicitly state: 'A changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves. A claim about code behavior needs code changes as support.' No code diffs implementing the left-arrow/Esc handling changes are provided, only the documentation restatement.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 4,
+        "section": "What's changed",
+        "text": "Added HTTP status and error text to `claude mcp list` and `/mcp` when a server fails to connect, and a warning for MCP config values with hidden leading or trailing whitespace",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "claude mcp list",
+          "/mcp"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.8,
+      "reasoning": "Identifiers claude mcp list, /mcp all appear in the diff (1 file(s)).",
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "claude mcp list",
+          "/mcp"
+        ],
+        "methods": [
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 5,
+        "section": "What's changed",
+        "text": "Fixed multi-line paste collapsing into one line with `j` in place of newlines in terminals that encode pasted newlines as Ctrl+J",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "j"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "j"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence shows only feed.xml with release notes text restating the claim, which per the rules is not evidence (changelog hunks cannot prove themselves). No actual code changes are provided in the diff to demonstrate the underlying fix; docs hunks only support claims about documentation, not code behavior.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 6,
+        "section": "What's changed",
+        "text": "Fixed `/context` reporting stale pre-compact token usage after compacting from the message picker",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/context"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "/context"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only the release notes (feed.xml) restating the claim. Per the rules, a changelog hunk cannot prove itself — a claim about code behavior requires code changes as support, not documentation hunks restating the claim.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 7,
+        "section": "What's changed",
+        "text": "Fixed `/ultrareview` failing on descriptive arguments like \"review my auth changes\" — they now run a review of your current branch with the text applied as a note to the findings",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/ultrareview"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "/ultrareview"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows the claim restated verbatim in feed.xml release notes, but release-notes hunks cannot prove themselves per the rules. No linked commits are provided and the only shown files are feed.xml and CHANGELOG.md (release documentation), not code changes demonstrating the fix was implemented.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 8,
+        "section": "What's changed",
+        "text": "Fixed `/code-review ultra` silently running a local review in non-interactive sessions — it now launches the cloud review",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/code-review ultra"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "/code-review ultra"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only documentation changes (feed.xml and CHANGELOG.md entries) restating the claim. Per the rules, a changelog hunk restating a claim is not evidence; a claim about code behavior requires code changes as support. No linked commits or implementation changes are provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 9,
+        "section": "What's changed",
+        "text": "Fixed gateway spend metering to price Bedrock application-inference-profile ARNs and other config-mapped upstream model IDs at the configured model's rates",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only a feed.xml changelog entry restating the claim verbatim, which cannot serve as evidence per the rules ('docs hunks only support claims about documentation'). No code changes demonstrating the gateway spend metering fix are provided; CHANGELOG.md is listed as changed but its diff is not shown.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 10,
+        "section": "What's changed",
+        "text": "Fixed mojibake when a long IDE selection was truncated mid-emoji, and a case where a tool executor error could be silently dropped",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence contains only a changelog/release-notes hunk (feed.xml) restating the claim verbatim. Per the rules, changelog entries cannot serve as evidence for code behavior claims — code changes are required. No commits are linked and the file list shows only documentation files changed, with no actual implementation diffs provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 11,
+        "section": "What's changed",
+        "text": "Fixed an engine teardown race that could start and abandon a phantom turn, and made input pushed after close consistently rejected",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "CHANGELOG.md",
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff contains only documentation changes—changelog and feed entries that restate the claim verbatim. Per the explicit rule, 'a changelog or release-notes hunk restating the claim is NOT evidence'; a claim about code behavior requires code changes as support. No linked commits, no actual source implementation, no supporting diffs.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 12,
+        "section": "What's changed",
+        "text": "Fixed spurious \"[Request interrupted by user]\" messages after interrupted tool calls, and an unpaired `tool_use` block left in the transcript when a tool aborted mid-response",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "tool_use"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "tool_use"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The feed.xml diff restates the claim verbatim in release-notes format, but per the rules, release notes cannot prove themselves — code changes are needed to verify a behavioral fix. Only documentation files (feed.xml, and CHANGELOG.md not shown) were provided; no implementation diffs are present to support the claim about fixing spurious messages or unpaired tool_use blocks.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 13,
+        "section": "What's changed",
+        "text": "Fixed VoiceOver reading \"new line\" instead of echoing the typed space at the end of the input in `--ax-screen-reader` mode",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "--ax-screen-reader"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.8,
+      "reasoning": "Identifiers --ax-screen-reader, VoiceOver all appear in the diff (1 file(s)).",
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "--ax-screen-reader",
+          "VoiceOver"
+        ],
+        "methods": [
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 14,
+        "section": "What's changed",
+        "text": "Fixed plugin and settings panels not moving the terminal cursor to the focused row, so screen readers and magnifiers can follow arrow-key navigation",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence shows only feed.xml and CHANGELOG.md (documentation files) being changed. The diff restates the claim verbatim in the v2.1.218 release notes, but per the stated rules, 'A changelog or release-notes hunk restating the claim is NOT evidence.' A claim about code behavior (fixing terminal cursor movement) requires code changes to support it, not a changelog entry that merely repeats the claim.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 15,
+        "section": "What's changed",
+        "text": "Fixed crashes (maximum call stack exceeded) when a deeply nested watched directory tree was deleted or moved, and when rendering deeply nested UI trees",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only a release notes entry in feed.xml restating the claim verbatim; this is a changelog restatement, not evidence of code changes implementing the fix. Per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves.' No actual code changes are shown that would support the crash fix.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 16,
+        "section": "What's changed",
+        "text": "Fixed pull request events occasionally being lost when a session exited immediately after creating or linking a PR",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The feed.xml diff shows the release notes entry restating the exact claim, but per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence.' No code changes are provided (linked commits: none; only feed.xml and CHANGELOG.md shown), so there is no evidence that the bug fix was actually implemented.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 17,
+        "section": "What's changed",
+        "text": "Fixed the Bedrock setup wizard failing profile verification for assume-role profiles in partitioned AWS regions and on proxy-only networks",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only feed.xml (release notes) being updated with the claim text restated. Per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves.' Code behavior claims require code changes as support; no actual implementation diffs are provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 18,
+        "section": "What's changed",
+        "text": "Fixed rare negative or incorrect turn duration measurements after a system clock adjustment by timing turns with a monotonic clock",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence shows the claim appearing verbatim in the release notes (feed.xml), but the rules explicitly state that a changelog or release-notes hunk restating the claim is NOT evidence. A claim about code behavior (using a monotonic clock for timing) requires actual code changes as support; no implementation files are shown in the provided diffs, only documentation metadata.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 19,
+        "section": "What's changed",
+        "text": "Fixed the \"N MCP servers need authentication\" startup notice over-counting claude.ai connectors that aren't connected in claude.ai",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "claude.ai"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only feed.xml (release notes) containing the claim text verbatim; per the rules, a changelog restating the claim is not evidence. No code changes, CHANGELOG.md diff, or implementation details are provided to verify the fix actually exists.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 20,
+        "section": "What's changed",
+        "text": "Fixed prompt history entries being dropped or duplicated when history writes raced or failed",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only a release-notes entry in feed.xml restating the claim verbatim. Per the review rules, changelog entries cannot serve as evidence for code behavior claims — actual implementation changes are required. No code diffs or commit evidence supporting the fix are provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 21,
+        "section": "What's changed",
+        "text": "Fixed a retry loop that re-sent identical doomed requests after a context-overflow error with a large thinking budget; `Ctrl+B` backgrounding now applies the same background-shell caps as other paths",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "Ctrl+B"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "Ctrl+B"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only a changelog entry in feed.xml that restates the claim verbatim ('Fixed a retry loop that re-sent identical doomed requests after a context-overflow error with a large thinking budget; Ctrl+B backgrounding now applies the same background-shell caps as other paths'). Per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves. A claim about code behavior needs code changes as support.' No actual implementation changes ar",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 22,
+        "section": "What's changed",
+        "text": "Fixed agent frontmatter hooks running from untrusted folders: hooks now require the agent file's own folder to have accepted workspace trust",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence contains only the changelog entry restating the claim itself (in feed.xml), which per the rules cannot prove a code behavior change. No diffs to actual implementation code are provided, and the referenced CHANGELOG.md change is not shown in detail.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 23,
+        "section": "What's changed",
+        "text": "Fixed fork-session lineage being lost after compaction in headless and SDK sessions",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only feed.xml and CHANGELOG.md changed, both documentation. The feed.xml entry merely restates the claim; per instructions, a changelog hunk restating a claim is not evidence—a code behavior fix requires code changes as support, not a note about itself.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 24,
+        "section": "What's changed",
+        "text": "Fixed a resumed session failing every turn, or crashing on resume, when its history held a malformed delta attachment",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only feed.xml (a release-notes document) being updated with a changelog entry that restates the claim verbatim. Per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves.' No code changes are provided showing the actual fix to session resume logic or delta-attachment handling.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 25,
+        "section": "What's changed",
+        "text": "Improved `/ultrareview` error feedback so Claude can correct an invalid argument instead of retrying it unchanged",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/ultrareview"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.9,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "/ultrareview"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only feed.xml with the release-notes entry restating the claim verbatim ('Improved /ultrareview error feedback so Claude can correct an invalid argument instead of retrying it unchanged'). Per the rules, a changelog hunk cannot prove itself—code behavior claims require code changes as support. No actual implementation changes are shown in the provided evidence.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 26,
+        "section": "What's changed",
+        "text": "Improved auto mode: the dangerous-rm, background-`&`, and suspicious-Windows-path checks no longer open permission dialogs; the auto-mode classifier adjudicates them instead",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "&"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "&"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The feed.xml diff contains an HTML-encoded release note that restates the claim verbatim, but per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence' — notes cannot prove themselves. A behavioral claim about permission-dialog handling requires actual code changes, not documentation that describes the change. No code diffs or CHANGELOG.md details are provided to verify the implementation.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 27,
+        "section": "What's changed",
+        "text": "Improved sandbox command restrictions for IDE interactions",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The only evidence is the release notes entry in feed.xml that restates the claim verbatim ('Improved sandbox command restrictions for IDE interactions'). Per the rules, changelog hunks cannot prove themselves; code changes are required to support claims about behavior. No actual implementation changes are provided in the diff to show what restrictions were modified or how.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 28,
+        "section": "What's changed",
+        "text": "Improved trust dialogs to name the repository root the grant covers",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The only diff provided is feed.xml, which is release-notes documentation restating the claim itself. Per the rules, 'A changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves.' CHANGELOG.md is listed as changed but no diff is shown. No code changes demonstrating the actual implementation of the trust-dialog improvement are provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 29,
+        "section": "What's changed",
+        "text": "Changed `/deep-research` to start only when invoked manually; Claude no longer launches it on its own",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/deep-research"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "/deep-research"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The evidence is a release-note entry in feed.xml that restates the claim verbatim. Per the rules, a changelog restating the claim is not evidence—behavior claims require code changes, not documentation hunks. No implementation diff is provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 30,
+        "section": "What's changed",
+        "text": "Changed plan mode with auto to no longer prompt for Bash commands the static analyzer can't prove read-only; the auto-mode classifier judges them instead",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only feed.xml (release notes) being updated with text that restates the claim verbatim. Per the rules, a changelog or release-notes hunk restating the claim is NOT evidence — actual code changes showing the auto-mode classifier implementation are needed to verify a behavioral change claim.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 31,
+        "section": "What's changed",
+        "text": "Added an announcement when fast mode changes as a result of switching models via `/config model=<x>` or Remote Control",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/config model=<x>"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The only evidence shown is the release notes in feed.xml, which restates the claim verbatim. Per the rules, changelog entries restating a claim are not evidence—a claim about code behavior requires code changes as support. No source files or implementation diffs are provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 32,
+        "section": "What's changed",
+        "text": "Changed server-managed settings so benign feature and cost toggles no longer trigger the settings-approval prompt",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The only diff provided is feed.xml, which is the release notes feed. Per the evaluation rules, a changelog or release-notes hunk restating the claim is NOT evidence—notes cannot prove themselves. The claim requires code changes showing how server-managed settings behavior changed; no such implementation diffs are provided.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 33,
+        "section": "What's changed",
+        "text": "Changed agent markdown files to reject agent names containing `:`, which is reserved for plugin namespacing",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          ":"
+        ]
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml",
+          "CHANGELOG.md"
+        ],
+        "matchedTerms": [
+          ":"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows only documentation files (feed.xml and CHANGELOG.md) containing a release-note entry that restates the claim verbatim. Per the rules, changelog hunks cannot prove themselves — the claim requires code changes (agent file validation logic) as evidence, not documentation that describes it. No implementation files are shown in the diff.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 34,
+        "section": "What's changed",
+        "text": "Changed skills with `context: fork` to run in the background by default; opt out per skill with `background: false`",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "context: fork",
+          "background: false"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.8,
+      "reasoning": "Identifiers context: fork, background: false all appear in the diff (1 file(s)).",
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "context: fork",
+          "background: false"
+        ],
+        "methods": [
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 35,
+        "section": "What's changed",
+        "text": "Added `yes`/`no`/`on`/`off`/`1`/`0` (case-insensitive) as accepted values for skill and plugin frontmatter booleans, alongside `true`/`false`",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "yes",
+          "no",
+          "on",
+          "off",
+          "1",
+          "0",
+          "true",
+          "false"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.8,
+      "reasoning": "Identifiers yes, no, on, off, 1 all appear in the diff (1 file(s)).",
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [
+          "yes",
+          "no",
+          "on",
+          "off",
+          "1",
+          "0",
+          "true",
+          "false"
+        ],
+        "methods": [
+          "lexical"
+        ],
+        "functions": []
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 36,
+        "section": "What's changed",
+        "text": "Fixed remote sessions continuing to send heartbeats after their worker was replaced, which left long-lived desktop and IDE processes retrying a rejected request every few seconds forever",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "feed.xml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows the claim text appearing verbatim in feed.xml (release notes), but per the fact-check rules, 'a changelog or release-notes hunk restating the claim is NOT evidence — notes cannot prove themselves.' The provided evidence contains only documentation changes (feed.xml, CHANGELOG.md); no code diffs are shown to demonstrate the actual fix was implemented.",
+      "judged": true,
+      "generated": false
+    }
+  ],
+  "uncovered": [],
+  "reverseChecked": true,
+  "metrics": {
+    "scores": {
+      "correctness": 100,
+      "completeness": 100,
+      "risk": 100,
+      "overall": 65,
+      "label": "unverified"
+    },
+    "flags": [
+      {
+        "severity": "info",
+        "kind": "not-verifiable",
+        "message": "31 claim(s) not checkable against this repo's diff",
+        "files": [],
+        "commitShas": []
+      }
+    ],
+    "files": [
+      {
+        "path": "CHANGELOG.md",
+        "churn": 40,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "feed.xml",
+        "churn": 52,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      }
+    ],
+    "churnCoveredRatio": 1,
+    "context": {
+      "languages": {
+        "Python": 368691,
+        "Shell": 63507,
+        "TypeScript": 23117,
+        "PowerShell": 5319,
+        "Dockerfile": 2507
+      },
+      "codeBytes": 463141,
+      "releaseCadenceDays": 1
+    },
+    "baseline": {
+      "releases": 5,
+      "medianChurn": 114,
+      "medianAnchoredCoverage": 0,
+      "snapshots": [
+        {
+          "tag": "v2.1.212",
+          "churn": 114,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.214",
+          "churn": 131,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.215",
+          "churn": 34,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.216",
+          "churn": 109,
+          "coverage": 0
+        },
+        {
+          "tag": "v2.1.217",
+          "churn": 2326,
+          "coverage": 0
+        }
+      ]
+    },
+    "unverifiable": {
+      "kind": "sourceless",
+      "reason": "This release's diff contains no source-code changes — claims could not be checked against code."
+    }
+  },
+  "warnings": [],
+  "truncated": false,
+  "engine": "claude-cli/haiku",
+  "linkBase": "https://github.com/anthropics/claude-code",
+  "linkStyle": "github"
+}

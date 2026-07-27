@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>anthropic-experimental/sandbox-runtime — release watch history</title>
+<style>
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--fg:#1f2328;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da;--flagged-bg:#fff1f0}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--fg:#e6edf3;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb;--flagged-bg:#3c1618}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:60rem;padding:0 1rem}
+h1{font-size:1.3rem;margin-bottom:2px} h2{font-size:15px;margin:26px 0 8px;border-bottom:1px solid var(--border);padding-bottom:5px}
+.sub{color:var(--muted);margin-bottom:14px}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+a.repo{color:inherit}
+.cards{display:flex;gap:26px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:12px 0}
+.cards div{text-align:center}.cards .n{font-size:20px;font-weight:700}.cards .t{color:var(--muted);font-size:12px}
+svg{width:100%;height:auto}
+.grid{stroke:var(--border);stroke-width:1}
+.axis{font-size:9px;fill:var(--muted)}
+.series{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.median{stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3}
+.flag-ring{fill:none;stroke:#cf222e;stroke-width:1.5}
+.seg{stroke:var(--bg);stroke-width:1}
+.legend{color:var(--muted);font-size:12px;margin-top:2px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
+.score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
+.dropmark{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
+.notice{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+@media (prefers-color-scheme:dark){.notice{border-color:#d29922;color:#d29922}}
+table{border-collapse:collapse;width:100%;margin-top:6px}
+th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid var(--border);font-size:13px}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+tr.flagged{background:var(--flagged-bg)}
+.comp{color:var(--muted);white-space:nowrap}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.chip{color:#fff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+.note{color:var(--muted);font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
+footer{margin-top:28px;color:var(--faint);font-size:12px}
+</style></head><body>
+<h1><a class="repo" href="https://github.com/anthropic-experimental/sandbox-runtime" target="_blank" rel="noopener">anthropic-experimental/sandbox-runtime</a> <span class="note">release watch history</span></h1>
+<p class="sub"><a href="../index.html">&larr; all watched repos</a> · 4 checks on record · generated 2026-07-27T21:36:47.342Z</p>
+<div class="cards">
+  <div><div class="n"><span class="score good">100</span> solid</div><div class="t">latest: v0.0.68</div></div>
+  <div><div class="n">82</div><div class="t">median of recorded checks</div></div>
+  <div><div class="n">0</div><div class="t">flagged of last 4</div></div>
+</div>
+<h2>Trust score over time <span class="note">— dots open that release&#39;s report; red ring = flagged</span></h2>
+<svg viewBox="0 0 760 210" role="img" aria-label="Trust score per release"><line x1="34" y1="184.0" x2="746" y2="184.0" class="grid"/><text x="28" y="187.0" class="axis" text-anchor="end">0</text><line x1="34" y1="140.5" x2="746" y2="140.5" class="grid"/><text x="28" y="143.5" class="axis" text-anchor="end">25</text><line x1="34" y1="97.0" x2="746" y2="97.0" class="grid"/><text x="28" y="100.0" class="axis" text-anchor="end">50</text><line x1="34" y1="53.5" x2="746" y2="53.5" class="grid"/><text x="28" y="56.5" class="axis" text-anchor="end">75</text><line x1="34" y1="10.0" x2="746" y2="10.0" class="grid"/><text x="28" y="13.0" class="axis" text-anchor="end">100</text><line x1="34" y1="41.3" x2="746" y2="41.3" class="median"><title>this repo&#39;s median: 82</title></line><text x="746" y="37.3" class="axis" text-anchor="end">median 82</text><polyline points="34.0,51.8 271.3,48.3 508.7,36.1 746.0,10.0" class="series"/><a href="../anthropic-experimental_sandbox-runtime/v0.0.65.html"><circle cx="34.0" cy="51.8" r="4.5" fill="#d4a72c" class="pt"><title>v0.0.65: 76 (minor gaps)
+released 2026-07-10
+checked 2026-07-27</title></circle></a><a href="../anthropic-experimental_sandbox-runtime/v0.0.66.html"><circle cx="271.3" cy="48.3" r="4.5" fill="#d4a72c" class="pt"><title>v0.0.66: 78 (minor gaps)
+released 2026-07-17
+checked 2026-07-27</title></circle></a><a href="../anthropic-experimental_sandbox-runtime/v0.0.67.html"><circle cx="508.7" cy="36.1" r="4.5" fill="#1a7f37" class="pt"><title>v0.0.67: 85 (solid)
+released 2026-07-23
+checked 2026-07-27</title></circle></a><a href="../anthropic-experimental_sandbox-runtime/v0.0.68.html"><circle cx="746.0" cy="10.0" r="4.5" fill="#1a7f37" class="pt"><title>v0.0.68: 100 (solid)
+released 2026-07-24
+checked 2026-07-27</title></circle></a><text x="34.0" y="202" class="axis" text-anchor="start">v0.0.65</text><text x="271.3" y="202" class="axis" text-anchor="middle">v0.0.66</text><text x="508.7" y="202" class="axis" text-anchor="middle">v0.0.67</text><text x="746.0" y="202" class="axis" text-anchor="end">v0.0.68</text></svg>
+<h2>Verdicts per release <span class="note">— claim verdict composition of each check</span></h2>
+<svg viewBox="0 0 760 130" role="img" aria-label="Verdicts per release"><text x="28" y="12" class="axis" text-anchor="end">8</text><text x="28" y="122" class="axis" text-anchor="end">0</text><a href="../anthropic-experimental_sandbox-runtime/v0.0.65.html"><rect x="21.0" y="22.3" width="26.0" height="99.8" fill="#3fb950" class="seg"><title>v0.0.65: 7 verified</title></rect></a><a href="../anthropic-experimental_sandbox-runtime/v0.0.66.html"><rect x="258.3" y="8.0" width="26.0" height="114.0" fill="#3fb950" class="seg"><title>v0.0.66: 8 verified</title></rect></a><a href="../anthropic-experimental_sandbox-runtime/v0.0.67.html"><rect x="495.7" y="8.0" width="26.0" height="114.0" fill="#3fb950" class="seg"><title>v0.0.67: 8 verified</title></rect></a><a href="../anthropic-experimental_sandbox-runtime/v0.0.68.html"><rect x="733.0" y="107.8" width="26.0" height="14.3" fill="#3fb950" class="seg"><title>v0.0.68: 1 verified</title></rect></a></svg><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>✔ verified</span><span class="lg"><span class="dot" style="background:#d29922"></span>◐ partial</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>? no evidence</span><span class="lg"><span class="dot" style="background:#f85149"></span>✘ contradicted</span></div>
+<h2>Checked releases</h2>
+<table>
+<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th>checked</th></tr></thead>
+<tbody>
+<tr class="">
+<td>&#10003;</td>
+<td><a href="../anthropic-experimental_sandbox-runtime/v0.0.68.html">v0.0.68</a></td>
+<td>2026-07-24</td>
+<td><span class="score good">100</span> solid</td>
+<td class="comp">100 · 100 · 100</td>
+<td>1&#10004; 0&#9680; 0? 0&#10008;</td>
+<td></td>
+<td title="2026-07-27T21:15:43.968Z">2026-07-27</td>
+</tr>
+<tr class="">
+<td>&#10003;</td>
+<td><a href="../anthropic-experimental_sandbox-runtime/v0.0.67.html">v0.0.67</a></td>
+<td>2026-07-23</td>
+<td><span class="score good">85</span> solid</td>
+<td class="comp">100 · 50 · 90</td>
+<td>8&#10004; 0&#9680; 0? 0&#10008;</td>
+<td>1</td>
+<td title="2026-07-27T21:15:40.592Z">2026-07-27</td>
+</tr>
+<tr class="">
+<td>&#10003;</td>
+<td><a href="../anthropic-experimental_sandbox-runtime/v0.0.66.html">v0.0.66</a></td>
+<td>2026-07-17</td>
+<td><span class="score mid">78</span> minor gaps</td>
+<td class="comp">100 · 13 · 100</td>
+<td>8&#10004; 0&#9680; 0? 0&#10008;</td>
+<td></td>
+<td title="2026-07-27T21:14:43.070Z">2026-07-27</td>
+</tr>
+<tr class="">
+<td>&#10003;</td>
+<td><a href="../anthropic-experimental_sandbox-runtime/v0.0.65.html">v0.0.65</a></td>
+<td>2026-07-10</td>
+<td><span class="score mid">76</span> minor gaps</td>
+<td class="comp">100 · 27 · 80</td>
+<td>7&#10004; 0&#9680; 0? 0&#10008;</td>
+<td>2</td>
+<td title="2026-07-27T21:13:54.538Z">2026-07-27</td>
+</tr>
+</tbody></table>
+
+<footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
+</body></html>

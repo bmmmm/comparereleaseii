@@ -1,0 +1,1779 @@
+{
+  "repoLabel": "anthropic-experimental/sandbox-runtime",
+  "baseRef": "v0.0.66",
+  "headRef": "v0.0.67",
+  "stats": {
+    "commits": 23,
+    "files": 148,
+    "additions": 7237,
+    "deletions": 555
+  },
+  "results": [
+    {
+      "claim": {
+        "id": 0,
+        "section": "Windows",
+        "text": "`git.safeDirectories` config — `safe.directory` without write grants; fixes dubious-ownership on subdirectory launches (also emits on macOS/Linux) (#403)",
+        "kind": "change",
+        "prNumbers": [
+          403
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "git.safeDirectories",
+          "safe.directory"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #403 is in the release range (aa9f6f3051); identifiers safe.directory, git.safeDirectories, macOS appear in its diff.",
+      "evidence": {
+        "commitShas": [
+          "aa9f6f3051416de5285d9e3c460bef4fa2b5f074"
+        ],
+        "files": [
+          "src/sandbox/linux-sandbox-utils.ts",
+          "src/sandbox/macos-sandbox-utils.ts",
+          "src/sandbox/sandbox-config.ts",
+          "src/sandbox/sandbox-manager.ts",
+          "src/sandbox/sandbox-utils.ts",
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/winsrt.test.ts"
+        ],
+        "matchedTerms": [
+          "safe.directory",
+          "git.safeDirectories",
+          "macOS"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical"
+        ],
+        "functions": [
+          "LinuxSandboxParams",
+          "wrapCommandWithSandboxLinux",
+          "MacOSSandboxParams",
+          "wrapCommandWithSandboxMacOS",
+          "z.object",
+          "getAllowGitConfig",
+          "wrapWithSandbox",
+          "wrapWithSandboxArgv"
+        ]
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 1,
+        "section": "Windows",
+        "text": "Deny targets that don't exist yet are materialized as placeholders and stamped, closing the create-past-a-deny hole; trailing `/` marks directory targets (#404)",
+        "kind": "change",
+        "prNumbers": [
+          404
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "/"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "1172a926450f17b359ae722428a4e28af21ddeb7"
+        ],
+        "files": [
+          "src/sandbox/sandbox-manager.ts",
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/glob-expand.test.ts",
+          "vendor/srt-win-src/ci/smoke-aces.ps1",
+          "vendor/srt-win-src/src/acl.rs",
+          "vendor/srt-win-src/src/cli.rs",
+          "vendor/srt-win-src/src/path_id.rs",
+          "vendor/srt-win-src/src/state_db.rs"
+        ],
+        "matchedTerms": [
+          "/"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical",
+          "llm"
+        ],
+        "functions": [
+          "computeWindowsFsAccessSet",
+          "wrapWithSandboxArgv",
+          "uninstallWindowsSandbox",
+          "describe",
+          "SbAce",
+          "SbAceSet",
+          "AceReleaseEntry",
+          "run"
+        ]
+      },
+      "reasoning": "New `create_placeholder_chain()` function in path_id.rs materializes missing intermediates and empty leaf for non-existent deny targets. In cli.rs, `canonicalize_ace_targets()` calls this when encountering `CanonError::NotFound` on deny targets, stamping leaf with full `SbAce::Deny` and intermediates with `SbAce::DenyDelete`. Trailing-separator handling: `leaf_is_dir = p.ends_with(['\\\\', '/'])` in cli.rs; smoke test A31(d) confirms trailing `\\` materializes as directory. All changes integrated w",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 2,
+        "section": "Windows",
+        "text": "Kill-chain hardening: broker error paths always reap the runner; CI smoke rows pin the no-survivors invariant (#405)",
+        "kind": "change",
+        "prNumbers": [
+          405
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "5d9821c325f17a3f58238f8b3762c8064354be2f"
+        ],
+        "files": [
+          "vendor/srt-win-src/ci/smoke-kill.ps1",
+          "vendor/srt-win-src/src/logon.rs",
+          ".github/workflows/integration-tests.yml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "param",
+          "spawn_runner",
+          "wstr"
+        ]
+      },
+      "reasoning": "The new smoke-kill.ps1 script implements K1/K2 invariant tests asserting 'NO sandbox process survives the broker' and is wired into CI via integration-tests.yml. The logon.rs changes show the SpawnedChild guard is now never defused, with its Drop implementation calling TerminateProcess 'on every in-process exit', ensuring the runner is always reaped regardless of error paths or graceful exits.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 3,
+        "section": "Windows",
+        "text": "Persistent MITM CA: `ca.json` under the protected state dir, atomic writes, `notBefore`/`notAfter` validation, auto-load at `initialize()`, `generateCa`/`validateCaPair` exports (#406)",
+        "kind": "change",
+        "prNumbers": [
+          406
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "ca.json",
+          "notBefore",
+          "notAfter",
+          "initialize()",
+          "generateCa",
+          "validateCaPair"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #406 is in the release range (29701f19e5); identifiers generateCa, validateCaPair, notBefore, notAfter appear in its diff.",
+      "evidence": {
+        "commitShas": [
+          "29701f19e517259f1d537bfda8a007a3856fa642"
+        ],
+        "files": [
+          "src/index.ts",
+          "src/sandbox/mitm-ca.ts",
+          "src/sandbox/sandbox-manager.ts",
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/mitm-ca.test.ts",
+          "test/sandbox/winsrt.test.ts"
+        ],
+        "matchedTerms": [
+          "generateCa",
+          "validateCaPair",
+          "notBefore",
+          "notAfter",
+          "initialize()",
+          "ca.json"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical"
+        ],
+        "functions": [
+          "rsaSha256SignNative",
+          "loadCA",
+          "generateEphemeralCA",
+          "z.object",
+          "initialize",
+          "windowsTrustCa",
+          "describe",
+          "describe.if"
+        ]
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 4,
+        "section": "Windows",
+        "text": "**Breaking:** `windows.srtWin.path` is required — no implicit vendored-exe fallback; pass the exported `VENDORED_SRT_WIN_EXE` to use the packaged binary. Fact-only argv-too-long message (#413)",
+        "kind": "change",
+        "prNumbers": [
+          413
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "windows.srtWin.path",
+          "VENDORED_SRT_WIN_EXE"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #413 is in the release range (86c3294541); identifiers VENDORED_SRT_WIN_EXE, windows.srtWin.path appear in its diff.",
+      "evidence": {
+        "commitShas": [
+          "86c32945418faacf171fcc0c49a8c6f218aa1453"
+        ],
+        "files": [
+          "src/cli.ts",
+          "src/index.ts",
+          "src/sandbox/sandbox-config.ts",
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/winsrt.test.ts"
+        ],
+        "matchedTerms": [
+          "VENDORED_SRT_WIN_EXE",
+          "windows.srtWin.path"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical"
+        ],
+        "functions": [
+          "main",
+          "z.object",
+          "WindowsSandboxParams",
+          "repoRoot",
+          "RunOpts",
+          "wrapCommandWithSandboxWindows",
+          "checkWindowsDependencies",
+          "hasTool"
+        ]
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 5,
+        "section": "Windows",
+        "text": "Typed `WindowsSandboxError` codes with `.subcommand`, single-spawn `srt-win status --json` + `checkWindowsSandboxStatus()` (#414)",
+        "kind": "change",
+        "prNumbers": [
+          414
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "WindowsSandboxError",
+          ".subcommand",
+          "srt-win status --json",
+          "checkWindowsSandboxStatus()"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #414 is in the release range (c3eb609ca0); identifiers WindowsSandboxError, checkWindowsSandboxStatus, .subcommand appear in its diff.",
+      "evidence": {
+        "commitShas": [
+          "c3eb609ca0ad531288accd8d017c256cf857adea"
+        ],
+        "files": [
+          "src/index.ts",
+          "src/sandbox/sandbox-manager.ts",
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/winsrt.test.ts"
+        ],
+        "matchedTerms": [
+          "WindowsSandboxError",
+          "checkWindowsSandboxStatus",
+          ".subcommand"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical"
+        ],
+        "functions": [
+          "initialize",
+          "parseWindowsBinShell",
+          "getSrtWinPath",
+          "runSrtWin",
+          "runSrtWinJsonAllowFail",
+          "getWindowsWfpStatus",
+          "verifyWindowsWfpEgress",
+          "windowsTrustCa"
+        ]
+      },
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 6,
+        "section": "Windows",
+        "text": "Typed `mapped_drive_cwd` error (exit 16) for network-drive working directories; the broker never stats UNC literals (#415)",
+        "kind": "change",
+        "prNumbers": [
+          415
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "mapped_drive_cwd"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "482d46dd5a1d6aeb35917a2adc4f7518cf0805f7"
+        ],
+        "files": [
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/glob-expand.test.ts",
+          "vendor/srt-win-src/src/cli.rs"
+        ],
+        "matchedTerms": [
+          "mapped_drive_cwd"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical",
+          "llm"
+        ],
+        "functions": [
+          "stripExtendedPathPrefix",
+          "normalizePathForSandbox",
+          "uninstallWindowsSandbox",
+          "expandWindowsFsPaths",
+          "describe",
+          "run",
+          "spawn_runner",
+          "AsRawHandle"
+        ]
+      },
+      "reasoning": "The diff shows the typed error `MappedDriveCwd` struct in logon.rs for network-drive working directories, explicit exit code 16 in cli.rs (`std::process::exit(16)`), and a parser `parseWindowsSandboxError` in windows-sandbox-utils.ts that surfaces the error. The `isUncPath` function in sandbox-utils.ts with documentation stating 'The broker uses this to skip `stat`/`realpath` on UNC **literals**' and the test case 'passes UNC literals through without stat (broker never touches SMB)' directly con",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 7,
+        "section": "Windows",
+        "text": "Async dependency/status/install APIs (`checkDependenciesAsync` — additive, sync API unchanged); install/uninstall timeout default 120s; `windowsHide` on sync spawns (#395)",
+        "kind": "change",
+        "prNumbers": [
+          395
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "checkDependenciesAsync",
+          "windowsHide"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "reasoning": "PR #395 is in the release range (030482795e); identifiers checkDependenciesAsync, windowsHide appear in its diff.",
+      "evidence": {
+        "commitShas": [
+          "030482795e90176daee2337a799b476e4589b11b"
+        ],
+        "files": [
+          "src/sandbox/sandbox-manager.ts",
+          "src/sandbox/windows-sandbox-utils.ts",
+          "test/sandbox/check-dependencies.test.ts",
+          "test/sandbox/winsrt.test.ts"
+        ],
+        "matchedTerms": [
+          "checkDependenciesAsync",
+          "windowsHide"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical"
+        ],
+        "functions": [
+          "initialize",
+          "isSandboxingEnabled",
+          "checkDependencies",
+          "ISandboxManager",
+          "runSrtWin",
+          "runSrtWinJson",
+          "checkWindowsSandboxStatus",
+          "verifyWindowsWfpEgress"
+        ]
+      },
+      "judged": false,
+      "generated": false
+    }
+  ],
+  "uncovered": [
+    {
+      "commit": {
+        "sha": "ea824ecdda12dae5f8c38f9ae9ba54bd5e105871",
+        "subject": "Merge main (through v0.0.66, incl. #399 body substitution) into sigv4 branch",
+        "body": "Conflicts in http-proxy.ts, sandbox-manager.ts, and tls-terminate-proxy.ts\ncame from #399's body-substitution transform landing on main alongside this\nbranch's SigV4 re-signing. Resolved using the rehearsed composition from the\nlocal integration branch (merge 323d763), which was built for exactly this\npairing:\n\n- literal-hash collectBody reads through the body-substitution transform\n  (bodyTransform ? body.pipe(bodyTransform) : body) so the recomputed\n  payload hash and signature cover the substituted bytes, never the\n  sentinel-bearing bytes the client wrote\n- content-length is restored from the buffered substituted body\n  (fwdHeaders['content-length'] = String(bufferedBody.length))\n- three-way upstream pipe: buffered re-sign path sends the buffered body\n  verbatim; otherwise transform-pipe when substitution applies; else bare\n- over-cap fail-open drains via bodySource.resume() so the transform chain\n  keeps flowing\n\nAlso brings over the integration branch's composition tests\n(credential-mask-sigv4.test.ts: bodySubstitution option on makeStack plus\nthe \"body substitution composes with SigV4 re-signing\" suite).\n\nPost-rehearsal main changes (#409 GRPC_PROXY CONNECT URL, v0.0.66 bump)\nauto-merged cleanly and are unaffected by the resolutions.\n\nNo-Verification-Needed: merge-resolution reusing rehearsed, tested integration content; suite matches main baseline",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 1251,
+      "deletions": 29,
+      "fileCount": 15
+    },
+    {
+      "commit": {
+        "sha": "7bff052435c05153cba49b83fefea0be1f192657",
+        "subject": "Add SigV4 signer, classifier, and official test-suite vectors",
+        "body": "",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 1182,
+      "deletions": 0,
+      "fileCount": 116
+    },
+    {
+      "commit": {
+        "sha": "51b0e00157b0f4a0091ae2619a9be32d9af063d9",
+        "subject": "Add AWS credential pair registry and SigV4 re-sign planner",
+        "body": "",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 1028,
+      "deletions": 0,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "b3f458ae3bb3164a7e6d684eb9a2ef7ebd5eac80",
+        "subject": "Add end-to-end SigV4 re-sign integration and policy tests",
+        "body": "",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 544,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "0da2dc3dc6d78f88ae21ac486b1ee01f36cb1c20",
+        "subject": "Cap the body buffer for SigV4 literal-hash re-signing at 64 MiB",
+        "body": "collectBody buffered the entire request body with no size limit, so one\nlarge signed upload from the sandboxed process could pin arbitrary host\nmemory (awslabs/aws-sigv4-proxy has the same unbounded buffer; we fail\nclosed instead). Bodies over MAX_SIGV4_RESIGN_BODY_BYTES are denied with\nthe standard 403, the partial buffer is discarded, and the upstream\nrequest is never constructed; the denial names the limit and points at\nUNSIGNED-PAYLOAD, which streams without buffering.\n\nThe cap is injectable via createHttpProxyServer (test seam only, like\ntlsTerminateUpstreamCA) so the over-cap path is testable without a\n64 MiB fixture upload per test.",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 158,
+      "deletions": 6,
+      "fileCount": 4
+    },
+    {
+      "commit": {
+        "sha": "dcbe5ab5e34db838afebf3bcbb70ebb682c34513",
+        "subject": "Wire SigV4 re-signing into the TLS-terminating proxy",
+        "body": "",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 92,
+      "deletions": 3,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "eb1d419b16859af141ed89f51d7f6a8f07d3e016",
+        "subject": "Close the presigned-policy bypass via a non-AWS Authorization header",
+        "body": "detectSigv4 returned null whenever an Authorization header was present\nbut not classifiable as SigV4/SigV4A, without ever looking at the query\nstring. A sandboxed client could therefore attach a junk Authorization\nvalue (e.g. Basic ...) to a presigned-style URL carrying a masked\ncredential and dodge the presigned deny policy entirely.\n\nFall through to the query-parameter check whenever the Authorization\nheader does not itself classify — including SigV4-shaped values with no\nparsable Credential scope, which were the same bypass one byte away. A\nclassifiable header signature still wins over the query when both are\npresent, and unmasked presigned URLs remain untouched.",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 76,
+      "deletions": 13,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "9ff64262af5b2659b9b149fb309c1b636488b1c3",
+        "subject": "Fix Bun stream corruption in the TLS-terminate relay (pull-mode reads)",
+        "body": "Under Bun, the socket an http server delivers via its 'connect' event\ncorrupts its byte stream across the pause()/resume() cycles that pipe()\nuses for flow control, once downstream writes queue. Through the\nterminating proxy's client->inner relay this surfaced as the inner TLS\nserver failing record MAC verification mid-upload: curl exit 56 /\nbad_record_mac, near-deterministic at 16 MiB (49/50 on Bun 1.3.14),\nrare-but-real at the 256 KiB the at-cap CI test uploads (the\nmacos/arm64 flake this fixes). Node is unaffected.\n\nBisection: bare CONNECT tunnel + pipe reproduces it; the same relay\nthat never calls pause() is clean (0/160+ across 4-64 MiB, Bun\n1.3.13/1.3.14, with and without CPU load). So relay the client socket\nwith paused-mode reads ('readable' + read()), which provide identical\nbackpressure without ever pausing a flowing stream.\n\nAdds a 16 MiB literal-hash PUT regression test that fails single-shot\non the old relay and pins byte-intact delivery end to end.",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 78,
+      "deletions": 1,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "31156a270b129f42d7abb50b6b06eb5a6c65a651",
+        "subject": "Fail closed when a signed header is stripped before re-signing",
+        "body": "",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 51,
+      "deletions": 5,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "21d8f75e1bc00eede09b3103e68b2eae097110d1",
+        "subject": "Release v0.0.67 (#422)",
+        "body": "No-Verification-Needed: version bump only",
+        "author": "ig-ant",
+        "email": "ig@anthropic.com",
+        "login": "ig-ant",
+        "prNumbers": [
+          422
+        ]
+      },
+      "additions": 3,
+      "deletions": 3,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "e1bea57f57e7c8cb5f681da54db2734f6c7d9fb8",
+        "subject": "Mark vendored SigV4 test vectors linguist-generated",
+        "body": "No-Verification-Needed: gitattributes-only change, no product behavior",
+        "author": "elhajjj",
+        "email": "elhajj@anthropic.com",
+        "login": "elhajjj",
+        "prNumbers": []
+      },
+      "additions": 5,
+      "deletions": 0,
+      "fileCount": 1
+    }
+  ],
+  "reverseChecked": true,
+  "metrics": {
+    "scores": {
+      "correctness": 100,
+      "completeness": 50,
+      "risk": 90,
+      "overall": 85,
+      "label": "solid"
+    },
+    "flags": [
+      {
+        "severity": "warn",
+        "kind": "undocumented-sensitive",
+        "message": "Undocumented changes in dependencies paths",
+        "files": [
+          "package-lock.json",
+          "package.json"
+        ],
+        "commitShas": [
+          "ea824ecdda12dae5f8c38f9ae9ba54bd5e105871",
+          "21d8f75e1bc00eede09b3103e68b2eae097110d1"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": ".gitattributes",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".github/workflows/integration-tests.yml",
+        "churn": 5,
+        "sensitive": "ci/build",
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "package-lock.json",
+        "churn": 4,
+        "sensitive": "dependencies",
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "package.json",
+        "churn": 2,
+        "sensitive": "dependencies",
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "src/cli.ts",
+        "churn": 38,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "main"
+        ]
+      },
+      {
+        "path": "src/index.ts",
+        "churn": 34,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "src/sandbox/aws-sigv4.ts",
+        "churn": 354,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "src/sandbox/credential-aws-pairs.ts",
+        "churn": 383,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "src/sandbox/http-proxy.ts",
+        "churn": 20,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "HttpProxyServerOptions",
+          "createHttpProxyServer"
+        ]
+      },
+      {
+        "path": "src/sandbox/linux-sandbox-utils.ts",
+        "churn": 30,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "LinuxSandboxParams",
+          "wrapCommandWithSandboxLinux"
+        ]
+      },
+      {
+        "path": "src/sandbox/macos-sandbox-utils.ts",
+        "churn": 27,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "MacOSSandboxParams",
+          "wrapCommandWithSandboxMacOS"
+        ]
+      },
+      {
+        "path": "src/sandbox/mitm-ca.ts",
+        "churn": 215,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "rsaSha256SignNative",
+          "loadCA",
+          "generateEphemeralCA"
+        ]
+      },
+      {
+        "path": "src/sandbox/request-filter.ts",
+        "churn": 11,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "decideAndRespond"
+        ]
+      },
+      {
+        "path": "src/sandbox/sandbox-config.ts",
+        "churn": 206,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "z.object"
+        ]
+      },
+      {
+        "path": "src/sandbox/sandbox-manager.ts",
+        "churn": 251,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "SandboxViolationStore",
+          "buildBodyCredentialInjector",
+          "startMuxProxyServer",
+          "initialize",
+          "isSandboxingEnabled",
+          "checkDependencies",
+          "getCredentialRestrictions",
+          "computeWindowsFsAccessSet",
+          "getAllowGitConfig",
+          "wrapWithSandbox"
+        ]
+      },
+      {
+        "path": "src/sandbox/sandbox-utils.ts",
+        "churn": 157,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "stripExtendedPathPrefix",
+          "normalizePathForSandbox",
+          "generateProxyEnvVars"
+        ]
+      },
+      {
+        "path": "src/sandbox/tls-terminate-proxy.ts",
+        "churn": 174,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "peekForClientHello",
+          "terminateAndForward",
+          "forwardUpstream"
+        ]
+      },
+      {
+        "path": "src/sandbox/windows-sandbox-utils.ts",
+        "churn": 1318,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "parseWindowsBinShell",
+          "WindowsSandboxParams",
+          "repoRoot",
+          "getSrtWinPath",
+          "RunOpts",
+          "runSrtWin",
+          "runSrtWinJsonAllowFail",
+          "verifyWindowsWfpEgress",
+          "windowsTrustCa",
+          "WindowsInstallOptions"
+        ]
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/NOTICE",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/README.md",
+        "churn": 19,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-key-duplicate/get-header-key-duplicate.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-key-duplicate/get-header-key-duplicate.creq",
+        "churn": 9,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-key-duplicate/get-header-key-duplicate.req",
+        "churn": 6,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-key-duplicate/get-header-key-duplicate.sreq",
+        "churn": 7,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-key-duplicate/get-header-key-duplicate.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-value-trim/get-header-value-trim.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-value-trim/get-header-value-trim.creq",
+        "churn": 10,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-value-trim/get-header-value-trim.req",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-value-trim/get-header-value-trim.sreq",
+        "churn": 6,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-header-value-trim/get-header-value-trim.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-unreserved/get-unreserved.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-unreserved/get-unreserved.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-unreserved/get-unreserved.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-unreserved/get-unreserved.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-unreserved/get-unreserved.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-utf8/get-utf8.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-utf8/get-utf8.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-utf8/get-utf8.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-utf8/get-utf8.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-utf8/get-utf8.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-order-key-case/get-vanilla-query-order-key-case.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-order-key-case/get-vanilla-query-order-key-case.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-order-key-case/get-vanilla-query-order-key-case.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-order-key-case/get-vanilla-query-order-key-case.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-order-key-case/get-vanilla-query-order-key-case.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-unreserved/get-vanilla-query-unreserved.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-unreserved/get-vanilla-query-unreserved.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-unreserved/get-vanilla-query-unreserved.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-unreserved/get-vanilla-query-unreserved.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query-unreserved/get-vanilla-query-unreserved.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query/get-vanilla-query.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query/get-vanilla-query.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query/get-vanilla-query.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query/get-vanilla-query.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-query/get-vanilla-query.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-with-session-token/get-vanilla-with-session-token.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-with-session-token/get-vanilla-with-session-token.creq",
+        "churn": 9,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-with-session-token/get-vanilla-with-session-token.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-with-session-token/get-vanilla-with-session-token.sreq",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla-with-session-token/get-vanilla-with-session-token.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla/get-vanilla.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla/get-vanilla.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla/get-vanilla.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla/get-vanilla.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/get-vanilla/get-vanilla.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative-relative/get-relative-relative.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative-relative/get-relative-relative.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative-relative/get-relative-relative.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative-relative/get-relative-relative.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative-relative/get-relative-relative.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative/get-relative.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative/get-relative.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative/get-relative.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative/get-relative.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-relative/get-relative.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-dot-slash/get-slash-dot-slash.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-dot-slash/get-slash-dot-slash.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-dot-slash/get-slash-dot-slash.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-dot-slash/get-slash-dot-slash.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-dot-slash/get-slash-dot-slash.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-pointless-dot/get-slash-pointless-dot.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-pointless-dot/get-slash-pointless-dot.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-pointless-dot/get-slash-pointless-dot.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-pointless-dot/get-slash-pointless-dot.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash-pointless-dot/get-slash-pointless-dot.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash/get-slash.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash/get-slash.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash/get-slash.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash/get-slash.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slash/get-slash.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slashes/get-slashes.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slashes/get-slashes.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slashes/get-slashes.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slashes/get-slashes.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-slashes/get-slashes.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-space/get-space.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-space/get-space.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-space/get-space.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-space/get-space.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-space/get-space.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-special-character/get-special-character.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-special-character/get-special-character.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-special-character/get-special-character.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-special-character/get-special-character.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/get-special-character/get-special-character.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/normalize-path/normalize-path.txt",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-after/post-sts-header-after.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-after/post-sts-header-after.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-after/post-sts-header-after.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-after/post-sts-header-after.sreq",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-after/post-sts-header-after.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-before/post-sts-header-before.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-before/post-sts-header-before.creq",
+        "churn": 9,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-before/post-sts-header-before.req",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-before/post-sts-header-before.sreq",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/post-sts-header-before/post-sts-header-before.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-sts-token/readme.txt",
+        "churn": 15,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla-query/post-vanilla-query.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla-query/post-vanilla-query.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla-query/post-vanilla-query.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla-query/post-vanilla-query.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla-query/post-vanilla-query.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla/post-vanilla.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla/post-vanilla.creq",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla/post-vanilla.req",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla/post-vanilla.sreq",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-vanilla/post-vanilla.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-x-www-form-urlencoded/post-x-www-form-urlencoded.authz",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-x-www-form-urlencoded/post-x-www-form-urlencoded.creq",
+        "churn": 9,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-x-www-form-urlencoded/post-x-www-form-urlencoded.req",
+        "churn": 6,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-x-www-form-urlencoded/post-x-www-form-urlencoded.sreq",
+        "churn": 7,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/fixtures/aws-sigv4-suite/post-x-www-form-urlencoded/post-x-www-form-urlencoded.sts",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/sandbox/aws-sigv4.test.ts",
+        "churn": 361,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/sandbox/check-dependencies.test.ts",
+        "churn": 26,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "describe"
+        ]
+      },
+      {
+        "path": "test/sandbox/credential-aws-pairs.test.ts",
+        "churn": 645,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/sandbox/credential-mask-sigv4.test.ts",
+        "churn": 823,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "test/sandbox/glob-expand.test.ts",
+        "churn": 136,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "describe"
+        ]
+      },
+      {
+        "path": "test/sandbox/mitm-ca.test.ts",
+        "churn": 72,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "describe"
+        ]
+      },
+      {
+        "path": "test/sandbox/winsrt.test.ts",
+        "churn": 811,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "hasTool",
+          "createTestConfig",
+          "describe",
+          "describe.if"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/ci/cleanup.ps1",
+        "churn": 3,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "param"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/ci/smoke-aces.ps1",
+        "churn": 85,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "vendor/srt-win-src/ci/smoke-kill.ps1",
+        "churn": 145,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "vendor/srt-win-src/src/acl.rs",
+        "churn": 21,
+        "sensitive": "auth/crypto",
+        "coverage": "evidence",
+        "functions": [
+          "SbAce",
+          "SbAceSet"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/src/cli.rs",
+        "churn": 370,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "AceReleaseEntry",
+          "run"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/src/logon.rs",
+        "churn": 177,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "spawn_runner",
+          "AsRawHandle"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/src/path_id.rs",
+        "churn": 290,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "std::fmt::Display",
+          "canonicalize_path"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/src/state_db.rs",
+        "churn": 77,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "std::str::FromStr",
+          "ace_holders",
+          "open_db",
+          "Locked",
+          "recompose_at"
+        ]
+      },
+      {
+        "path": "vendor/srt-win-src/src/util.rs",
+        "churn": 11,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "wstr"
+        ]
+      }
+    ],
+    "churnCoveredRatio": 0.5011567698578826,
+    "context": {
+      "languages": {
+        "TypeScript": 1543178,
+        "JavaScript": 17977,
+        "Shell": 34
+      },
+      "codeBytes": 1561189,
+      "releaseCadenceDays": 6
+    },
+    "baseline": {
+      "releases": 5,
+      "medianChurn": 7797,
+      "medianAnchoredCoverage": 0.22580645161290322,
+      "snapshots": [
+        {
+          "tag": "v0.0.62",
+          "churn": 7797,
+          "coverage": 0.43478260869565216
+        },
+        {
+          "tag": "v0.0.63",
+          "churn": 10552,
+          "coverage": 0.17142857142857143
+        },
+        {
+          "tag": "v0.0.64",
+          "churn": 14212,
+          "coverage": 0.4074074074074074
+        },
+        {
+          "tag": "v0.0.65",
+          "churn": 3488,
+          "coverage": 0.22580645161290322
+        },
+        {
+          "tag": "v0.0.66",
+          "churn": 3812,
+          "coverage": 0.18604651162790697
+        }
+      ]
+    },
+    "unverifiable": null
+  },
+  "warnings": [],
+  "truncated": false,
+  "engine": "claude-cli/haiku",
+  "linkBase": "https://github.com/anthropic-experimental/sandbox-runtime",
+  "linkStyle": "github"
+}

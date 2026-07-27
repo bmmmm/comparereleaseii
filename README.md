@@ -10,6 +10,15 @@ atomic claims, and checks each claim against the real diff between the
 release and its predecessor — plus the reverse direction: which code changes
 are *not* covered by any note (silent changes).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/report-dark.jpg">
+  <img src="docs/assets/report-light.jpg" alt="HTML report for GyulyVGC/sniffnet v1.5.1: trust-score ring with components, a score-derivation waterfall from 100 down past the critical-flag hard cap to 45, and critical risk flags for undocumented binary files" width="830">
+</picture>
+
+*A real report ([browse the demo](https://bmmmm.github.io/comparereleaseii/demo/)): 92 % of sniffnet's
+claims check out, but two binary databases changed without a note — the
+waterfall shows exactly how that turns into 45/100.*
+
 ## Quick start
 
 Works with any GitHub repository, any other forge by URL, or a local git
@@ -217,6 +226,27 @@ cheap and alerts single-shot, `reports/index.html` is the dashboard, and
 `--notify <cmd>` pipes flagged releases to ntfy/mail/webhook. Config format,
 judge setup, cron/launchd snippets and a scheduled-CI variant:
 [docs/watchdog.md](docs/watchdog.md).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/watch-index-dark.jpg">
+  <img src="docs/assets/watch-index-light.jpg" alt="Watch dashboard: aggregate tiles with a score distribution, a sortable table with the one flagged repo on top, per-repo trend dots and history links, and a cross-repo release feed" width="830">
+</picture>
+
+The dashboard aggregates the watchlist (tiles, score distribution, sortable
+columns, a flagged-only filter), links every repo to a full history page —
+score series against the repo's own median, verdict composition, promise
+ledger — and doubles as a static Atom feed (`reports/feed.xml`). Everything
+is plain files; `scp` the directory anywhere and it serves.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/history-dark.jpg">
+  <img src="docs/assets/history-light.jpg" alt="Per-repo history page: trust score over four releases climbing from 76 to 100 around its median line, and the verdict composition of each check" width="830">
+</picture>
+
+All three pages above are real output — a watch pass over five public
+repos, browsable at
+[bmmmm.github.io/comparereleaseii/demo](https://bmmmm.github.io/comparereleaseii/demo/)
+and reproducible from [docs/demo/](docs/demo/).
 
 ### In CI — the GitHub Action
 

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fact check: cjpais/Handy v0.9.3</title>
+<style>
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--btn-border:#d1d9e0;--btn-hover:#e7ebf0;
+--fg:#1f2328;--detail:#333b43;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--btn-border:#30363d;--btn-hover:#30363d;
+--fg:#e6edf3;--detail:#c9d1d9;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);margin-bottom:20px}
+.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.ring{width:120px;height:120px;flex-shrink:0}
+.comp{display:flex;gap:24px;flex-wrap:wrap}
+.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:var(--muted);font-size:12px}
+.ctx{margin-left:auto;text-align:right;color:var(--muted);font-size:12px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+.seg{height:100%}
+.legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{width:100%;height:auto;border-radius:8px}
+.spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.wf-grid{stroke:var(--border);stroke-width:1}
+.wf-axis{font-size:9px;fill:var(--muted)}
+.wf-label{font-size:12px;fill:var(--fg)}
+.wf-num{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.wf-start{fill:var(--border)}
+.wf-comp{fill:#d29922}
+.wf-cap{fill:#f85149}
+.wf-adj{fill:#6e7681}
+.wf-conn{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
+.tile{stroke:var(--bg);stroke-width:1}
+.tile-sens{stroke:#e3b341;stroke-width:2.5}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+details{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:5px 0}
+summary{cursor:pointer}
+.chip{color:#ffffff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.gen{color:var(--muted);border:1px solid var(--btn-border);font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
+.conf{color:var(--muted);font-size:12px}
+.surplus{color:#d29922;font-size:12px;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.toolbar button{background:var(--card);color:var(--fg);border:1px solid var(--btn-border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:var(--btn-hover)}
+.toolbar button.active{background:var(--accent);border-color:var(--accent);color:#ffffff}
+body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
+body[data-filter="handwritten"] details:has(.gen){display:none}
+.detail{margin:8px 0 4px 4px;color:var(--detail)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;font-size:13px}th{color:var(--muted)}
+.ok{color:#3fb950}
+.note{color:var(--muted);font-size:12px}
+.banner{background:var(--card);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:14px 0}
+footer{margin-top:32px;color:var(--faint);font-size:12px}
+</style></head><body>
+<h1>Release-note fact check — cjpais/Handy</h1>
+<div class="sub">v0.9.2 → v0.9.3 · 6 commits · 11 files · +508/−193 · judge: claude-cli/haiku</div>
+
+<div class="cards">
+  <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#3fb950" stroke-width="10" stroke-linecap="round" stroke-dasharray="316.9 326.7" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">97</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">solid</text></svg>
+  <div class="comp">
+    <div><div class="n">100</div><div class="t">correctness<br>claims supported</div></div>
+    <div><div class="n">99</div><div class="t">completeness<br>churn documented</div></div>
+    <div><div class="n">90</div><div class="t">risk<br>100 − flag penalties</div></div>
+  </div>
+  <div class="ctx">repo: Rust 51% · TypeScript 35% · Nix 8% · NSIS 2% · 1.5 MB code<br>release cadence ~9 d<br>baseline (5 rel.): median churn ±1176 <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Churn per release (oldest → newest)"><title>Churn per release (oldest → newest)
+v0.8.2: 1080
+v0.8.3: 1176
+v0.9.0: 15901
+v0.9.1: 4494
+v0.9.2: 151</title><polyline points="3.0,14.3 22.5,14.2 42.0,3.0 61.5,11.7 81.0,15.0" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="15.0" r="2.5" fill="var(--accent)"/></svg> · coverage 82% <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Note coverage % per release (oldest → newest)"><title>Note coverage % per release (oldest → newest)
+v0.8.2: 82
+v0.8.3: 94
+v0.9.0: 82
+v0.9.1: 86
+v0.9.2: 75</title><polyline points="3.0,10.6 22.5,3.0 42.0,10.6 61.5,8.1 81.0,15.0" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="15.0" r="2.5" fill="var(--accent)"/></svg></div>
+</div>
+
+<h2>Score derivation <span class="note">— components, flag penalties and the hard cap, per <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">SCORING.md</a></span></h2>
+<svg viewBox="0 0 790 152" role="img" aria-label="Score derivation"><line x1="250.0" y1="6" x2="250.0" y2="138" class="wf-grid"/><text x="250.0" y="149" class="wf-axis" text-anchor="middle">0</text><line x1="367.5" y1="6" x2="367.5" y2="138" class="wf-grid"/><text x="367.5" y="149" class="wf-axis" text-anchor="middle">25</text><line x1="485.0" y1="6" x2="485.0" y2="138" class="wf-grid"/><text x="485.0" y="149" class="wf-axis" text-anchor="middle">50</text><line x1="602.5" y1="6" x2="602.5" y2="138" class="wf-grid"/><text x="602.5" y="149" class="wf-axis" text-anchor="middle">75</text><line x1="720.0" y1="6" x2="720.0" y2="138" class="wf-grid"/><text x="720.0" y="149" class="wf-axis" text-anchor="middle">100</text><g><title>perfect release</title><text x="240" y="21" class="wf-label" text-anchor="end">perfect release</text><rect x="250.0" y="11" width="470.0" height="13" class="wf-start"/><text x="728" y="21" class="wf-num">100</text></g><g><title>correctness 100 × 0.45
+weighted share of claims the diff supports</title><text x="240" y="47" class="wf-label" text-anchor="end">correctness 100 × 0.45</text><line x1="720.0" y1="24.0" x2="720.0" y2="50.0" class="wf-conn"/><rect x="720.0" y="37" width="1.5" height="13" class="wf-comp"/><text x="728" y="47" class="wf-num">0</text></g><g><title>completeness 99 × 0.25
+churn-weighted share of commits the notes cover</title><text x="240" y="73" class="wf-label" text-anchor="end">completeness 99 × 0.25</text><line x1="720.0" y1="50.0" x2="720.0" y2="76.0" class="wf-conn"/><rect x="718.8" y="63" width="1.5" height="13" class="wf-comp"/><text x="728" y="73" class="wf-num">−0.3</text></g><g><title>risk 90 × 0.3
+0 critical × −25 · 1 warn × −10</title><text x="240" y="99" class="wf-label" text-anchor="end">risk 90 × 0.3</text><line x1="718.8" y1="76.0" x2="718.8" y2="102.0" class="wf-conn"/><rect x="704.7" y="89" width="14.1" height="13" class="wf-comp"/><text x="728" y="99" class="wf-num">−3</text></g><g><title>97/100 solid</title><text x="240" y="125" class="wf-label" text-anchor="end">97/100 solid</text><line x1="705.9" y1="102.0" x2="705.9" y2="128.0" class="wf-conn"/><rect x="250.0" y="115" width="455.9" height="13" fill="#3fb950"/><text x="728" y="125" class="wf-num">97</text></g></svg>
+
+<h2>Claims at a glance</h2>
+<div class="bar"><div class="seg" style="width:62.5%;background:#3fb950" title="verified: 5"></div><div class="seg" style="width:37.5%;background:#6e7681" title="skipped: 3"></div></div><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>verified 5</span><span class="lg"><span class="dot" style="background:#d29922"></span>partial 0</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>no-evidence 0</span><span class="lg"><span class="dot" style="background:#f85149"></span>contradicted 0</span><span class="lg"><span class="dot" style="background:#6e7681"></span>skipped 3</span></div>
+
+<h2>Risk flags</h2>
+<div class="flag" style="border-left-color:#d29922"><b>WARN</b> First-time author(s) changing sensitive paths (not seen in the last 5 releases): @JavaGT<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/b00ae666c57e972b2d3494fc76d8166ffa59032e">b00ae666</a></div></div>
+
+<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path, click opens the diff</span></h2>
+<svg viewBox="0 0 1160 560" role="img" aria-label="Diff treemap"><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-91fed938c12ef6620ac89e4130fe1f2b92c58b68083fc6bbc71c3e0f381a25cd" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="0.0" y="0.0" width="724.8" height="560.0" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/Cargo.lock
+±438 lines · covered · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="4.0" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">Cargo.lock</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-00c64e07bd1165887872312afc3f135c5859b9c57570f530024e827f5e61162e" target="_blank" rel="noopener"><g><rect class="tile" x="724.8" y="0.0" width="248.7" height="283.2" fill="#1f6feb" fill-opacity="0.82"><title>.nix/bun.nix
+±76 lines · covered
+(click to open the compare view)</title></rect><text x="728.8" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">bun.nix</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-58be2dfb300b8798597241f7f9df97038ab377505e5b6534bc79c2cd5d05f536" target="_blank" rel="noopener"><g><rect class="tile" x="973.5" y="0.0" width="186.5" height="283.2" fill="#1f6feb" fill-opacity="0.82"><title>src/components/ui/AudioPlayer.tsx
+±57 lines · covered
+fns: AudioPlayerProps
+(click to open the compare view)</title></rect><text x="977.5" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">AudioPlayer.tsx</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-bfd0ef82a01108fa1e836c2500b98b7de8a92bb1ae352a8efcbd9d6ffcaabd60" target="_blank" rel="noopener"><g><rect class="tile" x="724.8" y="283.2" width="214.3" height="147.1" fill="#1f6feb" fill-opacity="0.82"><title>bun.lock
+±34 lines · covered
+(click to open the compare view)</title></rect><text x="728.8" y="296.2" font-size="10" fill="#ffffff" opacity="0.92">bun.lock</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-48b6eb276f4a9834ba6d4c83a9f0191a52957f7eeaf2b308d99f0e3e3fe888a9" target="_blank" rel="noopener"><g><rect class="tile" x="724.8" y="430.2" width="214.3" height="129.8" fill="#1f6feb" fill-opacity="0.82"><title>src/components/settings/history/HistorySettings.tsx
+±30 lines · covered
+fns: React.FC
+(click to open the compare view)</title></rect><text x="728.8" y="443.2" font-size="10" fill="#ffffff" opacity="0.92">HistorySettings.tsx</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-fcffe9823960ab2159a56ba42df14a6a2fcaf8f8cd45b13b10caf34c14685a77" target="_blank" rel="noopener"><g><rect class="tile" x="939.0" y="283.2" width="128.5" height="180.3" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/src/overlay.rs
+±25 lines · covered
+fns: is_mouse_within_monitor, calculate_overlay_position
+(click to open the compare view)</title></rect><text x="943.0" y="296.2" font-size="10" fill="#ffffff" opacity="0.92">overlay.rs</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-fe4c6a80a21e81339e2e0faeb9134d0f9636c168987df13c8abf1927a1caee39" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="1067.5" y="283.2" width="92.5" height="180.3" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/Cargo.toml
+±18 lines · covered · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="1071.5" y="296.2" font-size="10" fill="#ffffff" opacity="0.92">Cargo.toml</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-cb6a8a6945537467574838b64e5ea3cf161503eaa9c9d549d2a1ca649ed24610" target="_blank" rel="noopener"><g><rect class="tile" x="939.0" y="463.5" width="124.9" height="96.5" fill="#1f6feb" fill-opacity="0.82"><title>src/components/onboarding/ModelCard.tsx
+±13 lines · covered
+(click to open the compare view)</title></rect><text x="943.0" y="476.5" font-size="10" fill="#ffffff" opacity="0.92">ModelCard.tsx</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-7ae45ad102eab3b6d7e7896acd08c427a9b25b346470d7bc6507b6481575d519" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="1063.9" y="463.5" width="96.1" height="57.9" fill="#1f6feb" fill-opacity="0.82"><title>package.json
+±6 lines · covered · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="1067.9" y="476.5" font-size="10" fill="#ffffff" opacity="0.92">package.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-dd400caea63392ace6046d7b2736096e75d012aad38b2698869ec77ba18f56d3" target="_blank" rel="noopener"><g><rect class="tile" x="1063.9" y="521.4" width="48.0" height="38.6" fill="#1f6feb" fill-opacity="0.82"><title>.nix/bun-lock-hash
+±2 lines · covered
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.2...v0.9.3#diff-fa09f1dac39604a735cd6a53957d3c35e0c3298cca9cf4829180f167abbd69b7" target="_blank" rel="noopener"><g><rect class="tile" x="1112.0" y="521.4" width="48.0" height="38.6" fill="#da3633" fill-opacity="0.82"><title>src-tauri/tauri.conf.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a></svg>
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:#2ea043"></span>cited as evidence</span>
+  <span class="lg"><span class="dot" style="background:#1f6feb"></span>in documented commit</span>
+  <span class="lg"><span class="dot" style="background:#da3633"></span>undocumented</span>
+  <span class="lg"><span class="dot" style="background:#6e7681"></span>unknown</span>
+  <span class="lg"><span class="dot" style="background:#e3b341"></span>sensitive path (border)</span>
+</div>
+
+<h2>Claims in detail</h2>
+<div class="toolbar">
+  <button data-filter="all" class="active">All claims</button>
+  <button data-filter="issues">Issues only</button>
+  <button data-filter="handwritten">Handwritten only</button>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+</div>
+<h3>What&#39;s Changed</h3><div class="claims"><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> fix(models): handle Hugging Face linked size headers by @JavaGT in #1678 <span class="conf">0.90</span></summary><div class="detail">PR #1678 is in the release range (b00ae666c5); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/b00ae666c57e972b2d3494fc76d8166ffa59032e">b00ae666</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> bump tauri version and Mac dock fixes by @cjpais in #1675 <span class="conf">0.90</span></summary><div class="detail">PR #1675 is in the release range (5a7c0eac1a); auto-generated entry, title matches the squash commit.<div class="files">fns: is_mouse_within_monitor, calculate_overlay_position</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/5a7c0eac1ac250142b9fe58a898cbf79cf9f1814">5a7c0eac</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> Declutter model cards (only show quantization label on modelcard in debug mode) by @MikaKrul in #1685 <span class="conf">0.90</span></summary><div class="detail">PR #1685 is in the release range (4357c728d9); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/4357c728d9670381b1acabb6a92d937ceb629ad3">4357c728</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> fix: prevent history audio players from playing simultaneously by @j1gc in #1665 <span class="conf">0.90</span></summary><div class="detail">PR #1665 is in the release range (4be7911d4d); auto-generated entry, title matches the squash commit.<div class="files">fns: React.FC, AudioPlayerProps</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/4be7911d4de7935eeb2a6b817dc4b506ed7ca911">4be7911d</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> fix(models): don&#39;t reload the already-active model when its card is clicked by @kud in #1662 <span class="conf">0.95</span></summary><div class="detail">The diff removes `status === &quot;active&quot;` from the isClickable condition, making model cards unclickable when they are the currently active model. The added comment explicitly states: &#39;The active model is already loaded — re-selecting it just reloads it for no gain, so it is deliberately not clickable.&#39; This directly implements the claimed behavior of preventing reload of the already-active model when its card is clicked.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/497653014c3293be09adc082305c14e6abdfa3f0">49765301</a></div></div></details></div><h3>New Contributors</h3><div class="claims"><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> @JavaGT made their first contribution in #1678 <span class="conf"></span></summary></details><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> @j1gc made their first contribution in #1665 <span class="conf"></span></summary></details><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> **Full Changelog**: <span class="conf"></span></summary></details></div>
+
+
+<h2>Undocumented commits</h2>
+<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/b9925d01972a933544d0344a2e62360580368f18">b9925d01</a></td><td>release v0.9.3</td><td>+4/−4</td><td>4</td></tr></table>
+
+
+<footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
+<script>
+for (const b of document.querySelectorAll(".toolbar button[data-filter]")) {
+  b.addEventListener("click", () => {
+    document.body.dataset.filter = b.dataset.filter;
+    for (const o of document.querySelectorAll(".toolbar button[data-filter]")) o.classList.toggle("active", o === b);
+  });
+}
+document.getElementById("expand").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = true;
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = false;
+});
+</script>
+</body></html>

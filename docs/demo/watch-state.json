@@ -1,0 +1,481 @@
+{
+  "version": 1,
+  "repos": {
+    "anthropic-experimental/sandbox-runtime": {
+      "lastPublishedAt": "2026-07-24T19:24:28Z",
+      "lastTag": "v0.0.68",
+      "history": [
+        {
+          "tag": "v0.0.65",
+          "publishedAt": "2026-07-10T16:45:20Z",
+          "checkedAt": "2026-07-27T21:13:54.538Z",
+          "score": 76,
+          "scoreLabel": "minor gaps",
+          "components": {
+            "correctness": 100,
+            "completeness": 27,
+            "risk": 80
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 2,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 7,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "anthropic-experimental_sandbox-runtime/v0.0.65.html",
+          "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.65"
+        },
+        {
+          "tag": "v0.0.66",
+          "publishedAt": "2026-07-17T22:05:27Z",
+          "checkedAt": "2026-07-27T21:14:43.070Z",
+          "score": 78,
+          "scoreLabel": "minor gaps",
+          "components": {
+            "correctness": 100,
+            "completeness": 13,
+            "risk": 100
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 0,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 8,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "anthropic-experimental_sandbox-runtime/v0.0.66.html",
+          "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.66"
+        },
+        {
+          "tag": "v0.0.67",
+          "publishedAt": "2026-07-23T03:23:58Z",
+          "checkedAt": "2026-07-27T21:15:40.592Z",
+          "score": 85,
+          "scoreLabel": "solid",
+          "components": {
+            "correctness": 100,
+            "completeness": 50,
+            "risk": 90
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 1,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 8,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "anthropic-experimental_sandbox-runtime/v0.0.67.html",
+          "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.67"
+        },
+        {
+          "tag": "v0.0.68",
+          "publishedAt": "2026-07-24T19:24:28Z",
+          "checkedAt": "2026-07-27T21:15:43.968Z",
+          "score": 100,
+          "scoreLabel": "solid",
+          "components": {
+            "correctness": 100,
+            "completeness": 100,
+            "risk": 100
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 0,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 1,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": 78,
+          "report": "anthropic-experimental_sandbox-runtime/v0.0.68.html",
+          "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.68"
+        }
+      ],
+      "latest": {
+        "tag": "v0.0.68",
+        "publishedAt": "2026-07-24T19:24:28Z",
+        "checkedAt": "2026-07-27T21:15:43.968Z",
+        "score": 100,
+        "scoreLabel": "solid",
+        "components": {
+          "correctness": 100,
+          "completeness": 100,
+          "risk": 100
+        },
+        "exitCode": 0,
+        "criticalFlags": 0,
+        "flagCount": 0,
+        "flagged": false,
+        "engine": "claude-cli/haiku",
+        "verdicts": {
+          "verified": 1,
+          "partial": 0,
+          "noEvidence": 0,
+          "contradicted": 0
+        },
+        "scoreLevel": 78,
+        "report": "anthropic-experimental_sandbox-runtime/v0.0.68.html",
+        "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.68"
+      }
+    },
+    "anthropics/claude-code": {
+      "lastPublishedAt": "2026-07-25T01:35:55Z",
+      "lastTag": "v2.1.220",
+      "history": [
+        {
+          "tag": "v2.1.218",
+          "publishedAt": "2026-07-22T21:24:56Z",
+          "checkedAt": "2026-07-27T21:20:27.615Z",
+          "score": 65,
+          "scoreLabel": "unverified",
+          "components": {
+            "correctness": 100,
+            "completeness": 100,
+            "risk": 100
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 1,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 6,
+            "partial": 0,
+            "noEvidence": 31,
+            "contradicted": 0
+          },
+          "unverifiable": "sourceless",
+          "scoreLevel": null,
+          "report": "anthropics_claude-code/v2.1.218.html",
+          "releaseUrl": "https://github.com/anthropics/claude-code/releases/tag/v2.1.218"
+        },
+        {
+          "tag": "v2.1.219",
+          "publishedAt": "2026-07-24T17:14:23Z",
+          "checkedAt": "2026-07-27T21:24:06.507Z",
+          "score": 65,
+          "scoreLabel": "unverified",
+          "components": {
+            "correctness": 100,
+            "completeness": 100,
+            "risk": 100
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 1,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 5,
+            "partial": 0,
+            "noEvidence": 21,
+            "contradicted": 0
+          },
+          "unverifiable": "sourceless",
+          "scoreLevel": null,
+          "report": "anthropics_claude-code/v2.1.219.html",
+          "releaseUrl": "https://github.com/anthropics/claude-code/releases/tag/v2.1.219"
+        },
+        {
+          "tag": "v2.1.220",
+          "publishedAt": "2026-07-25T01:35:55Z",
+          "checkedAt": "2026-07-27T21:24:45.556Z",
+          "score": 65,
+          "scoreLabel": "unverified",
+          "components": {
+            "correctness": 100,
+            "completeness": 0,
+            "risk": 100
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 1,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 0,
+            "partial": 0,
+            "noEvidence": 1,
+            "contradicted": 0
+          },
+          "unverifiable": "sourceless",
+          "scoreLevel": null,
+          "report": "anthropics_claude-code/v2.1.220.html",
+          "releaseUrl": "https://github.com/anthropics/claude-code/releases/tag/v2.1.220"
+        }
+      ],
+      "latest": {
+        "tag": "v2.1.220",
+        "publishedAt": "2026-07-25T01:35:55Z",
+        "checkedAt": "2026-07-27T21:24:45.556Z",
+        "score": 65,
+        "scoreLabel": "unverified",
+        "components": {
+          "correctness": 100,
+          "completeness": 0,
+          "risk": 100
+        },
+        "exitCode": 0,
+        "criticalFlags": 0,
+        "flagCount": 1,
+        "flagged": false,
+        "engine": "claude-cli/haiku",
+        "verdicts": {
+          "verified": 0,
+          "partial": 0,
+          "noEvidence": 1,
+          "contradicted": 0
+        },
+        "unverifiable": "sourceless",
+        "scoreLevel": null,
+        "report": "anthropics_claude-code/v2.1.220.html",
+        "releaseUrl": "https://github.com/anthropics/claude-code/releases/tag/v2.1.220"
+      }
+    },
+    "cjpais/Handy": {
+      "lastPublishedAt": "2026-07-21T08:13:47Z",
+      "lastTag": "v0.9.4",
+      "history": [
+        {
+          "tag": "v0.9.2",
+          "publishedAt": "2026-07-12T12:56:33Z",
+          "checkedAt": "2026-07-27T21:24:53.544Z",
+          "score": 100,
+          "scoreLabel": "solid",
+          "components": {
+            "correctness": 100,
+            "completeness": 100,
+            "risk": 100
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 0,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 3,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "cjpais_Handy/v0.9.2.html",
+          "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.2"
+        },
+        {
+          "tag": "v0.9.3",
+          "publishedAt": "2026-07-15T13:43:59Z",
+          "checkedAt": "2026-07-27T21:25:07.327Z",
+          "score": 97,
+          "scoreLabel": "solid",
+          "components": {
+            "correctness": 100,
+            "completeness": 99,
+            "risk": 90
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 1,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 5,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "cjpais_Handy/v0.9.3.html",
+          "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.3"
+        },
+        {
+          "tag": "v0.9.4",
+          "publishedAt": "2026-07-21T08:13:47Z",
+          "checkedAt": "2026-07-27T21:26:03.568Z",
+          "score": 91,
+          "scoreLabel": "solid",
+          "components": {
+            "correctness": 100,
+            "completeness": 77,
+            "risk": 90
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 1,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 7,
+            "partial": 0,
+            "noEvidence": 0,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "cjpais_Handy/v0.9.4.html",
+          "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.4"
+        }
+      ],
+      "latest": {
+        "tag": "v0.9.4",
+        "publishedAt": "2026-07-21T08:13:47Z",
+        "checkedAt": "2026-07-27T21:26:03.568Z",
+        "score": 91,
+        "scoreLabel": "solid",
+        "components": {
+          "correctness": 100,
+          "completeness": 77,
+          "risk": 90
+        },
+        "exitCode": 0,
+        "criticalFlags": 0,
+        "flagCount": 1,
+        "flagged": false,
+        "engine": "claude-cli/haiku",
+        "verdicts": {
+          "verified": 7,
+          "partial": 0,
+          "noEvidence": 0,
+          "contradicted": 0
+        },
+        "scoreLevel": null,
+        "report": "cjpais_Handy/v0.9.4.html",
+        "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.4"
+      }
+    },
+    "dani-garcia/vaultwarden": {
+      "lastPublishedAt": "2026-07-24T17:04:39Z",
+      "lastTag": "1.37.0",
+      "history": [
+        {
+          "tag": "1.37.0",
+          "publishedAt": "2026-07-24T17:04:39Z",
+          "checkedAt": "2026-07-27T21:29:19.753Z",
+          "score": 79,
+          "scoreLabel": "minor gaps",
+          "components": {
+            "correctness": 86,
+            "completeness": 100,
+            "risk": 50
+          },
+          "exitCode": 0,
+          "criticalFlags": 0,
+          "flagCount": 7,
+          "flagged": false,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 33,
+            "partial": 1,
+            "noEvidence": 2,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "dani-garcia_vaultwarden/1.37.0.html",
+          "releaseUrl": "https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0"
+        }
+      ],
+      "latest": {
+        "tag": "1.37.0",
+        "publishedAt": "2026-07-24T17:04:39Z",
+        "checkedAt": "2026-07-27T21:29:19.753Z",
+        "score": 79,
+        "scoreLabel": "minor gaps",
+        "components": {
+          "correctness": 86,
+          "completeness": 100,
+          "risk": 50
+        },
+        "exitCode": 0,
+        "criticalFlags": 0,
+        "flagCount": 7,
+        "flagged": false,
+        "engine": "claude-cli/haiku",
+        "verdicts": {
+          "verified": 33,
+          "partial": 1,
+          "noEvidence": 2,
+          "contradicted": 0
+        },
+        "scoreLevel": null,
+        "report": "dani-garcia_vaultwarden/1.37.0.html",
+        "releaseUrl": "https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0"
+      }
+    },
+    "GyulyVGC/sniffnet": {
+      "lastPublishedAt": "2026-07-22T07:54:30Z",
+      "lastTag": "v1.5.1",
+      "history": [
+        {
+          "tag": "v1.5.1",
+          "publishedAt": "2026-07-22T07:54:30Z",
+          "checkedAt": "2026-07-27T21:31:32.442Z",
+          "score": 45,
+          "scoreLabel": "questionable",
+          "components": {
+            "correctness": 92,
+            "completeness": 30,
+            "risk": 20
+          },
+          "exitCode": 0,
+          "criticalFlags": 2,
+          "flagCount": 6,
+          "flagged": true,
+          "engine": "claude-cli/haiku",
+          "verdicts": {
+            "verified": 17,
+            "partial": 1,
+            "noEvidence": 1,
+            "contradicted": 0
+          },
+          "scoreLevel": null,
+          "report": "GyulyVGC_sniffnet/v1.5.1.html",
+          "releaseUrl": "https://github.com/GyulyVGC/sniffnet/releases/tag/v1.5.1"
+        }
+      ],
+      "latest": {
+        "tag": "v1.5.1",
+        "publishedAt": "2026-07-22T07:54:30Z",
+        "checkedAt": "2026-07-27T21:31:32.442Z",
+        "score": 45,
+        "scoreLabel": "questionable",
+        "components": {
+          "correctness": 92,
+          "completeness": 30,
+          "risk": 20
+        },
+        "exitCode": 0,
+        "criticalFlags": 2,
+        "flagCount": 6,
+        "flagged": true,
+        "engine": "claude-cli/haiku",
+        "verdicts": {
+          "verified": 17,
+          "partial": 1,
+          "noEvidence": 1,
+          "contradicted": 0
+        },
+        "scoreLevel": null,
+        "report": "GyulyVGC_sniffnet/v1.5.1.html",
+        "releaseUrl": "https://github.com/GyulyVGC/sniffnet/releases/tag/v1.5.1"
+      }
+    }
+  }
+}

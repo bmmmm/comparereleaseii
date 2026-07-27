@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fact check: cjpais/Handy v0.9.4</title>
+<style>
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--btn-border:#d1d9e0;--btn-hover:#e7ebf0;
+--fg:#1f2328;--detail:#333b43;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--btn-border:#30363d;--btn-hover:#30363d;
+--fg:#e6edf3;--detail:#c9d1d9;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);margin-bottom:20px}
+.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.ring{width:120px;height:120px;flex-shrink:0}
+.comp{display:flex;gap:24px;flex-wrap:wrap}
+.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:var(--muted);font-size:12px}
+.ctx{margin-left:auto;text-align:right;color:var(--muted);font-size:12px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+.seg{height:100%}
+.legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{width:100%;height:auto;border-radius:8px}
+.spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.wf-grid{stroke:var(--border);stroke-width:1}
+.wf-axis{font-size:9px;fill:var(--muted)}
+.wf-label{font-size:12px;fill:var(--fg)}
+.wf-num{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.wf-start{fill:var(--border)}
+.wf-comp{fill:#d29922}
+.wf-cap{fill:#f85149}
+.wf-adj{fill:#6e7681}
+.wf-conn{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
+.tile{stroke:var(--bg);stroke-width:1}
+.tile-sens{stroke:#e3b341;stroke-width:2.5}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+details{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:5px 0}
+summary{cursor:pointer}
+.chip{color:#ffffff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.gen{color:var(--muted);border:1px solid var(--btn-border);font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
+.conf{color:var(--muted);font-size:12px}
+.surplus{color:#d29922;font-size:12px;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.toolbar button{background:var(--card);color:var(--fg);border:1px solid var(--btn-border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:var(--btn-hover)}
+.toolbar button.active{background:var(--accent);border-color:var(--accent);color:#ffffff}
+body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
+body[data-filter="handwritten"] details:has(.gen){display:none}
+.detail{margin:8px 0 4px 4px;color:var(--detail)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;font-size:13px}th{color:var(--muted)}
+.ok{color:#3fb950}
+.note{color:var(--muted);font-size:12px}
+.banner{background:var(--card);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:14px 0}
+footer{margin-top:32px;color:var(--faint);font-size:12px}
+</style></head><body>
+<h1>Release-note fact check — cjpais/Handy</h1>
+<div class="sub">v0.9.3 → v0.9.4 · 14 commits · 43 files · +1335/−301 · judge: claude-cli/haiku</div>
+
+<div class="cards">
+  <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#3fb950" stroke-width="10" stroke-linecap="round" stroke-dasharray="297.3 326.7" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">91</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">solid</text></svg>
+  <div class="comp">
+    <div><div class="n">100</div><div class="t">correctness<br>claims supported</div></div>
+    <div><div class="n">77</div><div class="t">completeness<br>churn documented</div></div>
+    <div><div class="n">90</div><div class="t">risk<br>100 − flag penalties</div></div>
+  </div>
+  <div class="ctx">repo: Rust 51% · TypeScript 35% · Nix 8% · NSIS 2% · 1.5 MB code<br>release cadence ~9 d<br>baseline (5 rel.): median churn ±1176 <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Churn per release (oldest → newest)"><title>Churn per release (oldest → newest)
+v0.8.3: 1176
+v0.9.0: 15901
+v0.9.1: 4494
+v0.9.2: 151
+v0.9.3: 701</title><polyline points="3.0,14.2 22.5,3.0 42.0,11.7 61.5,15.0 81.0,14.6" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="14.6" r="2.5" fill="var(--accent)"/></svg> · coverage 83% <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Note coverage % per release (oldest → newest)"><title>Note coverage % per release (oldest → newest)
+v0.8.3: 94
+v0.9.0: 82
+v0.9.1: 86
+v0.9.2: 75
+v0.9.3: 83</title><polyline points="3.0,3.0 22.5,10.6 42.0,8.1 61.5,15.0 81.0,9.9" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="9.9" r="2.5" fill="var(--accent)"/></svg></div>
+</div>
+
+<h2>Score derivation <span class="note">— components, flag penalties and the hard cap, per <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">SCORING.md</a></span></h2>
+<svg viewBox="0 0 790 152" role="img" aria-label="Score derivation"><line x1="250.0" y1="6" x2="250.0" y2="138" class="wf-grid"/><text x="250.0" y="149" class="wf-axis" text-anchor="middle">0</text><line x1="367.5" y1="6" x2="367.5" y2="138" class="wf-grid"/><text x="367.5" y="149" class="wf-axis" text-anchor="middle">25</text><line x1="485.0" y1="6" x2="485.0" y2="138" class="wf-grid"/><text x="485.0" y="149" class="wf-axis" text-anchor="middle">50</text><line x1="602.5" y1="6" x2="602.5" y2="138" class="wf-grid"/><text x="602.5" y="149" class="wf-axis" text-anchor="middle">75</text><line x1="720.0" y1="6" x2="720.0" y2="138" class="wf-grid"/><text x="720.0" y="149" class="wf-axis" text-anchor="middle">100</text><g><title>perfect release</title><text x="240" y="21" class="wf-label" text-anchor="end">perfect release</text><rect x="250.0" y="11" width="470.0" height="13" class="wf-start"/><text x="728" y="21" class="wf-num">100</text></g><g><title>correctness 100 × 0.45
+weighted share of claims the diff supports</title><text x="240" y="47" class="wf-label" text-anchor="end">correctness 100 × 0.45</text><line x1="720.0" y1="24.0" x2="720.0" y2="50.0" class="wf-conn"/><rect x="720.0" y="37" width="1.5" height="13" class="wf-comp"/><text x="728" y="47" class="wf-num">0</text></g><g><title>completeness 77 × 0.25
+churn-weighted share of commits the notes cover</title><text x="240" y="73" class="wf-label" text-anchor="end">completeness 77 × 0.25</text><line x1="720.0" y1="50.0" x2="720.0" y2="76.0" class="wf-conn"/><rect x="693.0" y="63" width="27.0" height="13" class="wf-comp"/><text x="728" y="73" class="wf-num">−5.8</text></g><g><title>risk 90 × 0.3
+0 critical × −25 · 1 warn × −10</title><text x="240" y="99" class="wf-label" text-anchor="end">risk 90 × 0.3</text><line x1="693.0" y1="76.0" x2="693.0" y2="102.0" class="wf-conn"/><rect x="678.9" y="89" width="14.1" height="13" class="wf-comp"/><text x="728" y="99" class="wf-num">−3</text></g><g><title>91/100 solid</title><text x="240" y="125" class="wf-label" text-anchor="end">91/100 solid</text><line x1="677.7" y1="102.0" x2="677.7" y2="128.0" class="wf-conn"/><rect x="250.0" y="115" width="427.7" height="13" fill="#3fb950"/><text x="728" y="125" class="wf-num">91</text></g></svg>
+
+<h2>Claims at a glance</h2>
+<div class="bar"><div class="seg" style="width:63.6%;background:#3fb950" title="verified: 7"></div><div class="seg" style="width:36.4%;background:#6e7681" title="skipped: 4"></div></div><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>verified 7</span><span class="lg"><span class="dot" style="background:#d29922"></span>partial 0</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>no-evidence 0</span><span class="lg"><span class="dot" style="background:#f85149"></span>contradicted 0</span><span class="lg"><span class="dot" style="background:#6e7681"></span>skipped 4</span></div>
+
+<h2>Risk flags</h2>
+<div class="flag" style="border-left-color:#d29922"><b>WARN</b> Undocumented changes in dependencies paths<div class="files">package.json</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/59ec6959b8649afd9f9562fdb6ce25e911e1dd08">59ec6959</a>, <a href="https://github.com/cjpais/Handy/commit/17d6c763413e3e29ec5cee76aa19ad01eccb73b2">17d6c763</a></div></div>
+
+<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path, click opens the diff</span></h2>
+<svg viewBox="0 0 1160 560" role="img" aria-label="Diff treemap"><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-91d84201529dde4e681975e29332091e77dd7076899221e079ee1585bf36ef6a" target="_blank" rel="noopener"><g><rect class="tile" x="0.0" y="0.0" width="451.7" height="560.0" fill="#1f6feb" fill-opacity="0.82"><title>src/i18n/locales/hi/translation.json
+±637 lines · covered
+(click to open the compare view)</title></rect><text x="4.0" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">translation.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-8b1fbd410bdf5f022e77c54f3f6db6460835e34fcd1ea3996d4a7f94c209a9c7" target="_blank" rel="noopener"><g><rect class="tile" x="451.7" y="0.0" width="251.0" height="303.7" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/src/managers/transcription.rs
+±192 lines · covered
+fns: TranscriptionManager, post_process_transcription_text, init_transcribe_backend, describe_compute_devices, resolve_device_index, select_transcribe_backend, GpuDeviceOption, AvailableAccelerators, get_available_accelerators
+(click to open the compare view)</title></rect><text x="455.7" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">transcription.rs</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-ea6668d23880e7809382c0ed5b5df837ad2dffeac25995912b5ee84a466801fe" target="_blank" rel="noopener"><g><rect class="tile" x="451.7" y="303.7" width="251.0" height="256.3" fill="#1f6feb" fill-opacity="0.82"><title>src/i18n/locales/es/translation.json
+±162 lines · covered
+(click to open the compare view)</title></rect><text x="455.7" y="316.7" font-size="10" fill="#ffffff" opacity="0.92">translation.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-efec6154dd70654e7d74d1226e342c3ae323807729b4e4bc3dd1e7bca7e055c9" target="_blank" rel="noopener"><g><rect class="tile" x="702.7" y="0.0" width="279.5" height="171.9" fill="#da3633" fill-opacity="0.82"><title>src-tauri/src/audio_toolkit/text.rs
+±121 lines · undocumented
+fns: build_custom_word_match_keys, find_best_match, apply_custom_words, preserve_case_pattern
+(click to open the compare view)</title></rect><text x="706.7" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">text.rs</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-7d1ef5b0b986fee369d8f5fa4361f21fa3075601e5416738ba4f4d1ea5dfb2ed" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="982.1" y="0.0" width="177.9" height="171.9" fill="#2ea043" fill-opacity="0.82"><title>src-tauri/build.rs
+±77 lines · evidence · sensitive: ci/build
+fns: main, stage_onnxruntime_dll, stage_transcribe_runtime_libs
+(click to open the compare view)</title></rect><text x="986.1" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">build.rs</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-4f274dd1ca75182d02776a1d87a862ed1ec42410077ba81ee4bae33f0949bfae" target="_blank" rel="noopener"><g><rect class="tile" x="702.7" y="171.9" width="139.1" height="205.5" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/src/utils.rs
+±72 lines · covered
+fns: is_kde_plasma
+(click to open the compare view)</title></rect><text x="706.7" y="184.9" font-size="10" fill="#ffffff" opacity="0.92">utils.rs</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-91fed938c12ef6620ac89e4130fe1f2b92c58b68083fc6bbc71c3e0f381a25cd" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="702.7" y="377.4" width="139.1" height="182.6" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/Cargo.lock
+±64 lines · covered · sensitive: dependencies
+(click to open the compare view)</title></rect><text x="706.7" y="390.4" font-size="10" fill="#ffffff" opacity="0.92">Cargo.lock</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-5c3fa597431eda03ac3339ae6bf7f05e1a50d6fc7333679ec38e21b337cb6721" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="841.8" y="171.9" width="182.8" height="117.3" fill="#2ea043" fill-opacity="0.82"><title>.github/workflows/build.yml
+±54 lines · evidence · sensitive: ci/build
+(click to open the compare view)</title></rect><text x="845.8" y="184.9" font-size="10" fill="#ffffff" opacity="0.92">build.yml</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-eabcebd0ae5c9b77a5247e1bdbdb88b1869fc0c932d0ef0cf2ecf9ee5221be7c" target="_blank" rel="noopener"><g><rect class="tile" x="1024.6" y="171.9" width="135.4" height="117.3" fill="#da3633" fill-opacity="0.82"><title>src-tauri/src/lib.rs
+±40 lines · undocumented
+fns: show_main_window_command, run
+(click to open the compare view)</title></rect><text x="1028.6" y="184.9" font-size="10" fill="#ffffff" opacity="0.92">lib.rs</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-00f90ee79d05a0ee25b76272b88ad402cb381b53d10004bd49fe98e4e4b9186a" target="_blank" rel="noopener"><g><rect class="tile" x="841.8" y="289.2" width="102.6" height="154.7" fill="#1f6feb" fill-opacity="0.82"><title>src/components/settings/AccelerationSelector.tsx
+±40 lines · covered
+(click to open the compare view)</title></rect><text x="845.8" y="302.2" font-size="10" fill="#ffffff" opacity="0.92">AccelerationSelec</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-aa6d7029ead4a9901df742bc4094d18738fba74273ee41b0a191b36a65c618ff" target="_blank" rel="noopener"><g><rect class="tile" x="841.8" y="443.9" width="102.6" height="116.1" fill="#2ea043" fill-opacity="0.82"><title>src/components/settings/PasteMethod.tsx
+±30 lines · evidence
+fns: React.memo
+(click to open the compare view)</title></rect><text x="845.8" y="456.9" font-size="10" fill="#ffffff" opacity="0.92">PasteMethod.tsx</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-65885770f3e595a5ff8efeca49fe98b048681a8a9b55dc35ce780e40db0c3706" target="_blank" rel="noopener"><g><rect class="tile" x="944.5" y="289.2" width="107.8" height="73.7" fill="#1f6feb" fill-opacity="0.82"><title>src/i18n/locales/de/translation.json
+±20 lines · covered
+(click to open the compare view)</title></rect><text x="948.5" y="302.2" font-size="10" fill="#ffffff" opacity="0.92">translation.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-05ce347ae1fb673bd1f76261a2f67401fda90560d12206baf903cd9b3923e182" target="_blank" rel="noopener"><g><rect class="tile" x="1052.2" y="289.2" width="107.8" height="73.7" fill="#1f6feb" fill-opacity="0.82"><title>src/i18n/locales/fr/translation.json
+±20 lines · covered
+(click to open the compare view)</title></rect><text x="1056.2" y="302.2" font-size="10" fill="#ffffff" opacity="0.92">translation.json</text></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-fe4c6a80a21e81339e2e0faeb9134d0f9636c168987df13c8abf1927a1caee39" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="944.5" y="362.9" width="64.5" height="104.7" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/Cargo.toml
+±17 lines · covered · sensitive: dependencies
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-a6104fd89b4d208cb04ecafe0248e7830ff4cdb1581edf05c9091eb943793d2d" target="_blank" rel="noopener"><g><rect class="tile" x="944.5" y="467.6" width="64.5" height="49.3" fill="#1f6feb" fill-opacity="0.82"><title>src/i18n/locales/it/translation.json
+±8 lines · covered
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-40f60e1037245d7b8a98a7325d53890a717da9979adeb54a61a795c4ba07f9c9" target="_blank" rel="noopener"><g><rect class="tile" x="944.5" y="516.9" width="64.5" height="43.1" fill="#2ea043" fill-opacity="0.82"><title>BUILD.md
+±7 lines · evidence
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-b12f28894e13dfa970d961c2f95838618cad048743b4285208430744b9e0c406" target="_blank" rel="noopener"><g><rect class="tile" x="1008.9" y="362.9" width="55.7" height="49.9" fill="#da3633" fill-opacity="0.82"><title>src-tauri/src/managers/model.rs
+±7 lines · undocumented
+fns: ModelManager
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-00c64e07bd1165887872312afc3f135c5859b9c57570f530024e827f5e61162e" target="_blank" rel="noopener"><g><rect class="tile" x="1064.6" y="362.9" width="47.7" height="49.9" fill="#da3633" fill-opacity="0.82"><title>.nix/bun.nix
+±6 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-bfd0ef82a01108fa1e836c2500b98b7de8a92bb1ae352a8efcbd9d6ffcaabd60" target="_blank" rel="noopener"><g><rect class="tile" x="1112.3" y="362.9" width="47.7" height="49.9" fill="#da3633" fill-opacity="0.82"><title>bun.lock
+±6 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-fa09f1dac39604a735cd6a53957d3c35e0c3298cca9cf4829180f167abbd69b7" target="_blank" rel="noopener"><g><rect class="tile" x="1008.9" y="412.8" width="37.8" height="63.1" fill="#2ea043" fill-opacity="0.82"><title>src-tauri/tauri.conf.json
+±6 lines · evidence
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-7ae45ad102eab3b6d7e7896acd08c427a9b25b346470d7bc6507b6481575d519" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="1008.9" y="475.9" width="37.8" height="42.0" fill="#da3633" fill-opacity="0.82"><title>package.json
+±4 lines · undocumented · sensitive: dependencies
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-76e0dbdb0245ff6ebd9533b44e021b8665b9212ec45d9f1490d3c697cce45e49" target="_blank" rel="noopener"><g><rect class="tile" x="1008.9" y="518.0" width="37.8" height="42.0" fill="#da3633" fill-opacity="0.82"><title>src/components/update-checker/UpdateChecker.tsx
+±4 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-bbb526440a427b37873174cca3ce941caa85128f681fc7525062d89bd1327ff7" target="_blank" rel="noopener"><g><rect class="tile" x="1046.7" y="412.8" width="37.8" height="31.5" fill="#1f6feb" fill-opacity="0.82"><title>src-tauri/.gitignore
+±3 lines · covered
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-dd400caea63392ace6046d7b2736096e75d012aad38b2698869ec77ba18f56d3" target="_blank" rel="noopener"><g><rect class="tile" x="1084.5" y="412.8" width="25.2" height="31.5" fill="#da3633" fill-opacity="0.82"><title>.nix/bun-lock-hash
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-c1dd3464175786ca02458ab6a99f3ef135daf73b21320ce67b281f6b1ac2c439" target="_blank" rel="noopener"><g><rect class="tile" x="1109.6" y="412.8" width="25.2" height="31.5" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/ar/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-1a4755236e95cf924f578c1b6a45d7da7f7cc300bf38e97d1c9e943dd7ac6605" target="_blank" rel="noopener"><g><rect class="tile" x="1134.8" y="412.8" width="25.2" height="31.5" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/bg/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-700b70ab960016a5806622dd80bf104a2fb82adb13126f4e007c7ea273373fc5" target="_blank" rel="noopener"><g><rect class="tile" x="1046.7" y="444.4" width="28.3" height="28.0" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/cs/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-97b816b73032872750fcb1fc269ee9cb095d3c41d356dedaeb277edaf6ab57a6" target="_blank" rel="noopener"><g><rect class="tile" x="1075.0" y="444.4" width="28.3" height="28.0" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/en/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-d44e05fd3c234134b562c1d00a07cfff7103df4b6bbef8151dd50071474d83f3" target="_blank" rel="noopener"><g><rect class="tile" x="1103.3" y="444.4" width="28.3" height="28.0" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/he/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-aeca3fa08a198a66892c37e799ded4ac7a81fd70d96cda13274b7826b6204e8f" target="_blank" rel="noopener"><g><rect class="tile" x="1131.7" y="444.4" width="28.3" height="28.0" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/ja/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-d7cb783deebe31c0c9ad041b7f2eae69e57d5917b891eb3df22da4e63190f7e4" target="_blank" rel="noopener"><g><rect class="tile" x="1046.7" y="472.4" width="27.2" height="29.2" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/ko/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-1e2a7f6356012ac190850408eb88a596373e01f8bb04bf9d0b206093ae2c2bae" target="_blank" rel="noopener"><g><rect class="tile" x="1046.7" y="501.6" width="27.2" height="29.2" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/ne/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-05e287612f4a27f3b4e3206261f04fab5b745c2079a33a7dd5358e0e78ec9430" target="_blank" rel="noopener"><g><rect class="tile" x="1046.7" y="530.8" width="27.2" height="29.2" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/nl/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-5886b1b1ea5a9a4f4b592122a1b42beffd9a937557d52f24ec641d290f50930b" target="_blank" rel="noopener"><g><rect class="tile" x="1073.9" y="472.4" width="28.7" height="27.7" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/pl/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-1ae2140ca55a78bb09c2adf33431fbd22b126ce43e39c6d395f1e1830210e5b1" target="_blank" rel="noopener"><g><rect class="tile" x="1102.6" y="472.4" width="28.7" height="27.7" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/pt/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-838e496e257eff336ba579725dacf7255082476595531cd07d2c6572c2071072" target="_blank" rel="noopener"><g><rect class="tile" x="1131.3" y="472.4" width="28.7" height="27.7" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/ru/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-5d635a6403ea23ee1ad117701d932caa2d6a47e4f2c43bcd8ff77bce6c679a68" target="_blank" rel="noopener"><g><rect class="tile" x="1073.9" y="500.1" width="26.5" height="30.0" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/sv/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-ff81ac7af80e3db59d19896340c2eacad341415101dc7f01df30ec04521f9e19" target="_blank" rel="noopener"><g><rect class="tile" x="1073.9" y="530.0" width="26.5" height="30.0" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/tr/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-feeee64029bc8324c85ac701f3004b1652c1fc8a0b01fd5e11e9239d3eff7ca9" target="_blank" rel="noopener"><g><rect class="tile" x="1100.4" y="500.1" width="29.8" height="26.6" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/uk/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-f181777682c1022ca0c16066910981357c3db95c14694bf8694bbc244308ba9a" target="_blank" rel="noopener"><g><rect class="tile" x="1130.2" y="500.1" width="29.8" height="26.6" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/vi/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-9e0fc60f7a973ba85f5816ba4d24e19fae5daf909a95234baac301da458dfe9f" target="_blank" rel="noopener"><g><rect class="tile" x="1100.4" y="526.7" width="23.8" height="33.3" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/zh-TW/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-7a472ab7f0e17f098aeef828c28330db6e3d29a596a1cf2876098f5c21f167ae" target="_blank" rel="noopener"><g><rect class="tile" x="1124.2" y="526.7" width="23.8" height="33.3" fill="#da3633" fill-opacity="0.82"><title>src/i18n/locales/zh/translation.json
+±2 lines · undocumented
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/cjpais/Handy/compare/v0.9.3...v0.9.4#diff-38613095573480f3fecae84cd111cedadb4bcca330e32f3512c2bebe43159aa6" target="_blank" rel="noopener"><g><rect class="tile" x="1148.1" y="526.7" width="11.9" height="33.3" fill="#1f6feb" fill-opacity="0.82"><title>src/i18n/languages.ts
+±1 lines · covered
+(click to open the compare view)</title></rect></g></a></svg>
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:#2ea043"></span>cited as evidence</span>
+  <span class="lg"><span class="dot" style="background:#1f6feb"></span>in documented commit</span>
+  <span class="lg"><span class="dot" style="background:#da3633"></span>undocumented</span>
+  <span class="lg"><span class="dot" style="background:#6e7681"></span>unknown</span>
+  <span class="lg"><span class="dot" style="background:#e3b341"></span>sensitive path (border)</span>
+</div>
+
+<h2>Claims in detail</h2>
+<div class="toolbar">
+  <button data-filter="all" class="active">All claims</button>
+  <button data-filter="issues">Issues only</button>
+  <button data-filter="handwritten">Handwritten only</button>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+</div>
+<h3>Notes</h3><div class="claims"><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> lots of minor bug fixes <span class="conf"></span></summary></details></div><h3>What&#39;s Changed</h3><div class="claims"><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> chore(i18n): update and correct Spanish translation by @Jo-Con-El in #1697 <span class="conf">0.90</span></summary><div class="detail">PR #1697 is in the release range (bd8e549a74); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/bd8e549a742eaf9c1f54a6bf111bc53929375320">bd8e549a</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> feat: add Hindi (hi) translation by @Punit-Dethe in #1701 <span class="conf">0.90</span></summary><div class="detail">PR #1701 is in the release range (d861e24bc8); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/d861e24bc825c699ccf7215a430684c6e322131c">d861e24b</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> drop &#39;direct&#39; paste method from the ui for macOS by @cjpais in #1708 <span class="conf">0.90</span></summary><div class="detail">PR #1708 is in the release range (3cbbe58272); auto-generated entry, title matches the squash commit.<div class="files">src/components/settings/PasteMethod.tsx</div><div class="files">fns: React.memo</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/3cbbe58272e2067b05645f42a65b7b79b36a83dc">3cbbe582</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> Add missing translations by @MikaKrul in #1709 <span class="conf">0.90</span></summary><div class="detail">PR #1709 is in the release range (cdbc223909); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/cdbc22390987643237756382ef367f7244b2844f">cdbc2239</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> install app-private libs to /usr/lib/Handy by @cjpais in #1727 <span class="conf">0.99</span></summary><div class="detail">The diff comprehensively implements the claimed change: build.rs rpath is updated to look in `$ORIGIN/../lib/Handy` for deb/rpm (line +10); build.yml test patterns change from `usr/lib/` to `usr/lib/Handy/` (lines +674-676) and a new guard explicitly rejects libs installed to `/usr/lib/` directly (lines +679-685); tauri.conf.json and build.rs stage_transcribe_runtime_libs() are refactored to place libraries only in `/usr/lib/Handy/` with versioning deduplication logic; BUILD.md documentation upd<div class="files">src-tauri/build.rs, src-tauri/tauri.conf.json, .github/workflows/build.yml, BUILD.md</div><div class="files">fns: main, stage_onnxruntime_dll, stage_transcribe_runtime_libs</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/d1180c42ceb344c8219ac419ba6a71c7c938d15c">d1180c42</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> fix windows not shutting down cleanly because of handy by @cjpais in #1732 <span class="conf">0.90</span></summary><div class="detail">PR #1732 is in the release range (0470d9ad17); auto-generated entry, title matches the squash commit.<div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/0470d9ad1745ae25af6b50d4cad9affd0d1acc65">0470d9ad</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span><span class="gen">gen</span> guard vulkan so only available to true x86 host, not emulated by @cjpais in #1731 <span class="conf">0.90</span></summary><div class="detail">PR #1731 is in the release range (46d6a2aec8); auto-generated entry, title matches the squash commit.<div class="files">fns: init_transcribe_backend, describe_compute_devices, resolve_device_index, select_transcribe_backend, GpuDeviceOption, AvailableAccelerators, get_available_accelerators, is_kde_plasma</div><div class="files">commits: <a href="https://github.com/cjpais/Handy/commit/46d6a2aec85560b1a5f627a17423d2f0dbf94960">46d6a2ae</a></div></div></details></div><h3>New Contributors</h3><div class="claims"><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> @Jo-Con-El made their first contribution in #1697 <span class="conf"></span></summary></details><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> @Punit-Dethe made their first contribution in #1701 <span class="conf"></span></summary></details><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> **Full Changelog**: <span class="conf"></span></summary></details></div>
+
+
+<h2>Undocumented commits</h2>
+<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/2203a826c62a83022fc40d0ea6314d218c73f9c0">2203a826</a></td><td>fix: prevent custom-word correction from losing transcriptions</td><td>+210/−73</td><td>26</td></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/2281b8b2dfaa56a29e208b9207c04c1f155455b0">2281b8b2</a></td><td>bump tauri global shortcut</td><td>+20/−34</td><td>1</td></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/59ec6959b8649afd9f9562fdb6ce25e911e1dd08">59ec6959</a></td><td>bump tauri global shortcut package.json</td><td>+7/−9</td><td>4</td></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/17d6c763413e3e29ec5cee76aa19ad01eccb73b2">17d6c763</a></td><td>release v0.9.4</td><td>+4/−4</td><td>4</td></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/68af495ea6fbe129e8bb23b335a76a21a43765b9">68af495e</a></td><td>dont use hf env</td><td>+5/−2</td><td>1</td></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/468129fdf1f7b1b8275f4b40c572f28b91d7f701">468129fd</a></td><td>bump to handy-keys 0.3.1</td><td>+3/−3</td><td>2</td></tr><tr><td><a href="https://github.com/cjpais/Handy/commit/86616891af0f1ba43620f4f9601593a38e71f320">86616891</a></td><td>fix update checker overlay</td><td>+2/−2</td><td>1</td></tr></table>
+
+
+<footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
+<script>
+for (const b of document.querySelectorAll(".toolbar button[data-filter]")) {
+  b.addEventListener("click", () => {
+    document.body.dataset.filter = b.dataset.filter;
+    for (const o of document.querySelectorAll(".toolbar button[data-filter]")) o.classList.toggle("active", o === b);
+  });
+}
+document.getElementById("expand").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = true;
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = false;
+});
+</script>
+</body></html>

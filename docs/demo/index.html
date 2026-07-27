@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>comparereleaseii watch</title>
+<style>
+body{font:14px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:75rem;padding:0 1rem;color:#1f2328;background:#fff}
+h1{font-size:1.3rem} .sub{color:#59636e}
+h2{font-size:1rem;margin-top:1.6rem}
+.note{color:#59636e;font-size:.85em;font-weight:400}
+.cards{display:flex;gap:26px;flex-wrap:wrap;align-items:center;background:#f6f8fa;border:1px solid #d1d9e0;border-radius:10px;padding:10px 16px;margin:12px 0}
+.cards>div{text-align:center}.cards .n{font-size:20px;font-weight:700}.cards .t{color:#59636e;font-size:12px}
+.distcard{min-width:180px;flex:1;text-align:left!important}
+.dist{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:4px 0 2px}
+.dist .seg{height:100%;border-right:2px solid #f6f8fa}.dist .seg:last-child{border-right:0}
+.seg.good,.dot.good{background:#1a7f37}.seg.mid,.dot.mid{background:#d4a72c}.seg.bad,.dot.bad{background:#cf222e}.seg.unverified,.dot.unverified{background:#8250df}
+.legend{color:#59636e;font-size:11px}.lg{margin-right:10px}
+button{background:#f6f8fa;color:#1f2328;border:1px solid #d1d9e0;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px}
+button.active{background:#cf222e;border-color:#cf222e;color:#fff}
+body.only-flagged tr[data-href]:not(.flagged),body.only-flagged tr.pending{display:none}
+table{border-collapse:collapse;width:100%;margin-top:1rem}
+th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid #d1d9e0}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:#59636e}
+th[data-sort]{cursor:pointer;white-space:nowrap}
+th[data-sort]::after{content:" \2195";color:#818b98}
+th[data-sort].sorted[data-dir="asc"]::after{content:" \2191";color:#1f2328}
+th[data-sort].sorted[data-dir="desc"]::after{content:" \2193";color:#1f2328}
+.feed{list-style:none;padding:0;margin:.5rem 0}
+.feed li{padding:.28rem 0;border-bottom:1px solid #d1d9e0}
+.feed .when{color:#59636e;font-variant-numeric:tabular-nums;margin-right:.3rem}
+tr.flagged{background:#fff1f0}
+tr[data-href]{cursor:pointer}
+tr[data-href]:hover{background:#f6f8fa}
+tr.flagged[data-href]:hover{background:#ffe3e0}
+tr.pending td{color:#59636e}
+.score{display:inline-block;min-width:2.2em;text-align:center;border-radius:.6em;padding:0 .35em;font-weight:600;color:#fff}
+.tag{display:inline-block;border:1px solid #58a6ff;color:#58a6ff;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.drop{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
+.incomplete{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.level{color:#8b949e;font-size:.8em}
+.score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
+.comp{color:#59636e;white-space:nowrap}
+.dot{display:inline-block;width:.55em;height:.55em;border-radius:50%;margin-right:2px}
+.dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}.dot.unverified{background:#8250df}
+a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
+a.repo{color:inherit}a.ext{font-size:.85em}
+a.hist{color:#59636e;font-size:.85em;white-space:nowrap}
+@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}.incomplete{border-color:#d29922;color:#d29922}
+.cards{background:#161b22;border-color:#30363d}.cards .t,.sub,.note,.legend,.feed .when{color:#8d96a0}
+.dist .seg{border-color:#161b22}
+button{background:#161b22;color:#e6edf3;border-color:#30363d}button.active{background:#cf222e;border-color:#cf222e;color:#fff}
+th[data-sort]::after{color:#484f58}
+th[data-sort].sorted[data-dir="asc"]::after,th[data-sort].sorted[data-dir="desc"]::after{color:#e6edf3}
+.feed li{border-color:#30363d}a.hist{color:#8d96a0}}
+</style></head><body>
+<h1>Release watch</h1>
+<p class="sub">generated 2026-07-27T21:36:47.342Z by comparereleaseii · <a href="feed.xml">atom feed</a></p>
+<div class="cards">
+<div><div class="n">5</div><div class="t">repos watched</div></div>
+<div><div class="n">1</div><div class="t">flagged</div></div>
+<div><div class="n">0</div><div class="t">broken promises</div></div>
+<div class="distcard"><div class="t">latest scores</div><div class="dist" role="img" aria-label="score distribution"><div class="seg good" style="width:40.0%" title="2 repo(s) at 85+"></div><div class="seg mid" style="width:20.0%" title="1 repo(s) at 65–84"></div><div class="seg bad" style="width:20.0%" title="1 repo(s) at &lt;65"></div><div class="seg unverified" style="width:20.0%" title="1 repo(s) at unverified"></div></div><div class="legend"><span class="lg"><span class="dot good"></span>85+ 2</span><span class="lg"><span class="dot mid"></span>65–84 1</span><span class="lg"><span class="dot bad"></span>&lt;65 1</span><span class="lg"><span class="dot unverified"></span>unverified 1</span></div></div>
+</div>
+<p class="sub"><button id="flagged-only" type="button">&#9888; flagged only</button> <span class="note">columns with &#8597; sort on click</span></p>
+<table>
+<thead><tr><th></th><th data-sort="repo">repo</th><th>release</th><th data-sort="released">released</th><th data-sort="score">trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th data-sort="flags">flags</th><th>trend</th><th data-sort="checked">checked</th></tr></thead>
+<tbody>
+<tr class="flagged" data-href="GyulyVGC_sniffnet/v1.5.1.html" data-repo="gyulyvgc/sniffnet" data-released="2026-07-22T07:54:30Z" data-score="45" data-flags="2006" data-checked="2026-07-27T21:31:32.442Z">
+<td>&#9888;</td>
+<td><a class="repo" href="https://github.com/GyulyVGC/sniffnet" target="_blank" rel="noopener">GyulyVGC/sniffnet</a></td>
+<td><a href="GyulyVGC_sniffnet/v1.5.1.html">v1.5.1</a> <a class="ext" href="https://github.com/GyulyVGC/sniffnet/releases/tag/v1.5.1" target="_blank" rel="noopener" title="release on its forge">&#8599;</a></td>
+<td>2026-07-22</td>
+<td><span class="score bad" title="judge: claude-cli/haiku">45</span> questionable</td>
+<td class="comp">92 · 30 · 20</td>
+<td>17&#10004; 1&#9680; 1? 0&#10008;</td>
+<td><b>2 critical</b></td>
+<td><a class="hist" href="GyulyVGC_sniffnet/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
+<td title="2026-07-27T21:31:32.442Z">2026-07-27</td>
+</tr>
+<tr class="" data-href="dani-garcia_vaultwarden/1.37.0.html" data-repo="dani-garcia/vaultwarden" data-released="2026-07-24T17:04:39Z" data-score="79" data-flags="7" data-checked="2026-07-27T21:29:19.753Z">
+<td>&#10003;</td>
+<td><a class="repo" href="https://github.com/dani-garcia/vaultwarden" target="_blank" rel="noopener">dani-garcia/vaultwarden</a></td>
+<td><a href="dani-garcia_vaultwarden/1.37.0.html">1.37.0</a> <a class="ext" href="https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0" target="_blank" rel="noopener" title="release on its forge">&#8599;</a></td>
+<td>2026-07-24</td>
+<td><span class="score mid" title="judge: claude-cli/haiku">79</span> minor gaps</td>
+<td class="comp">86 · 100 · 50</td>
+<td>33&#10004; 1&#9680; 2? 0&#10008;</td>
+<td>7</td>
+<td><a class="hist" href="dani-garcia_vaultwarden/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
+<td title="2026-07-27T21:29:19.753Z">2026-07-27</td>
+</tr>
+<tr class="" data-href="cjpais_Handy/v0.9.4.html" data-repo="cjpais/handy" data-released="2026-07-21T08:13:47Z" data-score="91" data-flags="1" data-checked="2026-07-27T21:26:03.568Z">
+<td>&#10003;</td>
+<td><a class="repo" href="https://github.com/cjpais/Handy" target="_blank" rel="noopener">cjpais/Handy</a></td>
+<td><a href="cjpais_Handy/v0.9.4.html">v0.9.4</a> <a class="ext" href="https://github.com/cjpais/Handy/releases/tag/v0.9.4" target="_blank" rel="noopener" title="release on its forge">&#8599;</a></td>
+<td>2026-07-21</td>
+<td><span class="score good" title="judge: claude-cli/haiku">91</span> solid</td>
+<td class="comp">100 · 77 · 90</td>
+<td>7&#10004; 0&#9680; 0? 0&#10008;</td>
+<td>1</td>
+<td><a href="cjpais_Handy/v0.9.2.html" title="v0.9.2: 100"><span class="dot good"></span></a><a href="cjpais_Handy/v0.9.3.html" title="v0.9.3: 97"><span class="dot good"></span></a><a href="cjpais_Handy/v0.9.4.html" title="v0.9.4: 91"><span class="dot good"></span></a> <a class="hist" href="cjpais_Handy/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
+<td title="2026-07-27T21:26:03.568Z">2026-07-27</td>
+</tr>
+<tr class="" data-href="anthropics_claude-code/v2.1.220.html" data-repo="anthropics/claude-code" data-released="2026-07-25T01:35:55Z" data-score="65" data-flags="1" data-checked="2026-07-27T21:24:45.556Z">
+<td>&#10003;</td>
+<td><a class="repo" href="https://github.com/anthropics/claude-code" target="_blank" rel="noopener">anthropics/claude-code</a></td>
+<td><a href="anthropics_claude-code/v2.1.220.html">v2.1.220</a> <a class="ext" href="https://github.com/anthropics/claude-code/releases/tag/v2.1.220" target="_blank" rel="noopener" title="release on its forge">&#8599;</a></td>
+<td>2026-07-25</td>
+<td><span class="score unverified" title="judge: claude-cli/haiku">65</span> unverified <span class="tag" title="This release&#39;s diff contains no source-code changes — its claims could not be checked against code.">no source</span></td>
+<td class="comp">100 · 0 · 100</td>
+<td>0&#10004; 0&#9680; 1? 0&#10008;</td>
+<td>1</td>
+<td><a href="anthropics_claude-code/v2.1.218.html" title="v2.1.218: 65"><span class="dot unverified"></span></a><a href="anthropics_claude-code/v2.1.219.html" title="v2.1.219: 65"><span class="dot unverified"></span></a><a href="anthropics_claude-code/v2.1.220.html" title="v2.1.220: 65"><span class="dot unverified"></span></a> <a class="hist" href="anthropics_claude-code/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
+<td title="2026-07-27T21:24:45.556Z">2026-07-27</td>
+</tr>
+<tr class="" data-href="anthropic-experimental_sandbox-runtime/v0.0.68.html" data-repo="anthropic-experimental/sandbox-runtime" data-released="2026-07-24T19:24:28Z" data-score="100" data-flags="0" data-checked="2026-07-27T21:15:43.968Z">
+<td>&#10003;</td>
+<td><a class="repo" href="https://github.com/anthropic-experimental/sandbox-runtime" target="_blank" rel="noopener">anthropic-experimental/sandbox-runtime</a></td>
+<td><a href="anthropic-experimental_sandbox-runtime/v0.0.68.html">v0.0.68</a> <a class="ext" href="https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.68" target="_blank" rel="noopener" title="release on its forge">&#8599;</a></td>
+<td>2026-07-24</td>
+<td><span class="score good" title="judge: claude-cli/haiku · this repo's median: 78">100</span> solid <span class="level" title="this repo's median is 78">~median</span></td>
+<td class="comp">100 · 100 · 100</td>
+<td>1&#10004; 0&#9680; 0? 0&#10008;</td>
+<td></td>
+<td><a href="anthropic-experimental_sandbox-runtime/v0.0.65.html" title="v0.0.65: 76"><span class="dot mid"></span></a><a href="anthropic-experimental_sandbox-runtime/v0.0.66.html" title="v0.0.66: 78"><span class="dot mid"></span></a><a href="anthropic-experimental_sandbox-runtime/v0.0.67.html" title="v0.0.67: 85"><span class="dot good"></span></a><a href="anthropic-experimental_sandbox-runtime/v0.0.68.html" title="v0.0.68: 100"><span class="dot good"></span></a> <a class="hist" href="anthropic-experimental_sandbox-runtime/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
+<td title="2026-07-27T21:15:43.968Z">2026-07-27</td>
+</tr>
+
+</tbody></table>
+<h2>Release feed <span class="note">— every checked release across the watchlist, newest first · <a href="feed.xml">atom</a></span></h2>
+<ol class="feed">
+<li><span class="when">2026-07-25</span> &#10003; <b>anthropics/claude-code</b> <a href="anthropics_claude-code/v2.1.220.html">v2.1.220</a> <span class="score unverified">65</span> unverified</li>
+<li><span class="when">2026-07-24</span> &#10003; <b>anthropic-experimental/sandbox-runtime</b> <a href="anthropic-experimental_sandbox-runtime/v0.0.68.html">v0.0.68</a> <span class="score good">100</span> solid</li>
+<li><span class="when">2026-07-24</span> &#10003; <b>anthropics/claude-code</b> <a href="anthropics_claude-code/v2.1.219.html">v2.1.219</a> <span class="score unverified">65</span> unverified</li>
+<li><span class="when">2026-07-24</span> &#10003; <b>dani-garcia/vaultwarden</b> <a href="dani-garcia_vaultwarden/1.37.0.html">1.37.0</a> <span class="score mid">79</span> minor gaps</li>
+<li><span class="when">2026-07-23</span> &#10003; <b>anthropic-experimental/sandbox-runtime</b> <a href="anthropic-experimental_sandbox-runtime/v0.0.67.html">v0.0.67</a> <span class="score good">85</span> solid</li>
+<li><span class="when">2026-07-22</span> &#10003; <b>anthropics/claude-code</b> <a href="anthropics_claude-code/v2.1.218.html">v2.1.218</a> <span class="score unverified">65</span> unverified</li>
+<li><span class="when">2026-07-22</span> &#9888; <b>GyulyVGC/sniffnet</b> <a href="GyulyVGC_sniffnet/v1.5.1.html">v1.5.1</a> <span class="score bad">45</span> questionable</li>
+<li><span class="when">2026-07-21</span> &#10003; <b>cjpais/Handy</b> <a href="cjpais_Handy/v0.9.4.html">v0.9.4</a> <span class="score good">91</span> solid</li>
+<li><span class="when">2026-07-17</span> &#10003; <b>anthropic-experimental/sandbox-runtime</b> <a href="anthropic-experimental_sandbox-runtime/v0.0.66.html">v0.0.66</a> <span class="score mid">78</span> minor gaps</li>
+<li><span class="when">2026-07-15</span> &#10003; <b>cjpais/Handy</b> <a href="cjpais_Handy/v0.9.3.html">v0.9.3</a> <span class="score good">97</span> solid</li>
+<li><span class="when">2026-07-12</span> &#10003; <b>cjpais/Handy</b> <a href="cjpais_Handy/v0.9.2.html">v0.9.2</a> <span class="score good">100</span> solid</li>
+<li><span class="when">2026-07-10</span> &#10003; <b>anthropic-experimental/sandbox-runtime</b> <a href="anthropic-experimental_sandbox-runtime/v0.0.65.html">v0.0.65</a> <span class="score mid">76</span> minor gaps</li>
+</ol>
+<p class="sub">rows: &#10003; passed &middot; &#9888; flagged &middot; &#8943; waiting &mdash;
+verdicts: &#10004; verified &middot; &#9680; partial &middot; ? no evidence &middot; &#10008; contradicted &mdash;
+c &middot; c &middot; r = correctness &middot; completeness &middot; risk</p>
+<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; history opens the repo&#39;s full record &middot; &#8599; opens the release on its forge</p>
+<script>
+for (const tr of document.querySelectorAll("tr[data-href]")) {
+  tr.addEventListener("click", (e) => {
+    if (e.target.closest("a")) return;
+    location.href = tr.dataset.href;
+  });
+}
+const tbody = document.querySelector("tbody");
+const pendingRows = [...tbody.querySelectorAll("tr.pending")];
+let sortKey = null;
+let dir = 1;
+for (const th of document.querySelectorAll("th[data-sort]")) {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    // Repo names read naturally ascending; numbers and dates start with the
+    // biggest/newest on top. A second click flips.
+    dir = key === sortKey ? -dir : key === "repo" ? 1 : -1;
+    sortKey = key;
+    const numeric = key === "score" || key === "flags";
+    const rows = [...tbody.querySelectorAll("tr[data-href]")].sort((a, b) => {
+      const va = a.dataset[key] ?? "";
+      const vb = b.dataset[key] ?? "";
+      return dir * (numeric ? Number(va) - Number(vb) : va.localeCompare(vb));
+    });
+    for (const r of rows) tbody.appendChild(r);
+    for (const r of pendingRows) tbody.appendChild(r);
+    for (const o of document.querySelectorAll("th[data-sort]")) {
+      o.classList.toggle("sorted", o === th);
+      if (o === th) o.dataset.dir = dir > 0 ? "asc" : "desc";
+      else delete o.dataset.dir;
+    }
+  });
+}
+document.getElementById("flagged-only").addEventListener("click", (e) => {
+  document.body.classList.toggle("only-flagged");
+  e.currentTarget.classList.toggle("active");
+});
+</script>
+</body></html>

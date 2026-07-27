@@ -1,0 +1,2736 @@
+{
+  "repoLabel": "GyulyVGC/sniffnet",
+  "baseRef": "v1.5.0",
+  "headRef": "v1.5.1",
+  "stats": {
+    "commits": 146,
+    "files": 68,
+    "additions": 2483,
+    "deletions": 1319
+  },
+  "results": [
+    {
+      "claim": {
+        "id": 0,
+        "section": "New features",
+        "text": "Show latency of connections (#1194 — fixes #845 )",
+        "kind": "change",
+        "prNumbers": [
+          1194,
+          845
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "df2176184b8678440ef80081fac0317783ac320b"
+        ],
+        "files": [
+          "src/networking/types/latency.rs",
+          "src/gui/pages/connection_details_page.rs",
+          ".github/workflows/package.yml",
+          ".github/workflows/rust.yml"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "page_content",
+          "page_header",
+          "col_info",
+          "get_button_copy",
+          "Sniffer",
+          "Icon"
+        ]
+      },
+      "reasoning": "A new latency measurement module with ICMP ping functionality is added (latency.rs), exposing a `measure_latency(ip)` async function that returns `LatencyStatus::Measured(Duration)`. The connection_details_page integrates it by importing `LatencyStatus`, adding `latency_target: IpAddr` parameter to `col_info`, and computing a `measure_latency` boolean based on capture context and traffic type. Workflows enable unprivileged ICMP for tests. The infrastructure to measure and display connection late",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 1,
+        "section": "New features",
+        "text": "Added Hungarian translation 🇭🇺 (#1197 )",
+        "kind": "change",
+        "prNumbers": [
+          1197
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.96,
+      "evidence": {
+        "commitShas": [
+          "25c3c67f5b947aed32c7060e55ebba1aa4f4f41b"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "start_translation",
+          "address_translation",
+          "protocol_translation",
+          "traffic_rate_translation",
+          "settings_translation",
+          "yes_translation",
+          "ask_quit_translation",
+          "quit_analysis_translation"
+        ]
+      },
+      "reasoning": "The diff shows Hungarian (HU) added to the Language enum with doc comment, the ALL array size incremented from 23 to 24 with Language::HU inserted, and multiple translation functions gaining Hungarian entries (e.g., 'Kezdés!' for start_translation, 'Cím' for address_translation, plus commented entries). This directly implements language addition as claimed.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 2,
+        "section": "New features",
+        "text": "Added Sinhala translation 🇱🇰 (#1239 )",
+        "kind": "change",
+        "prNumbers": [
+          1239
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "22263cb1b1f7beea2bc288a2339c83c70209f162"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "main",
+          "start_translation",
+          "address_translation",
+          "protocol_translation",
+          "traffic_rate_translation",
+          "settings_translation",
+          "yes_translation",
+          "ask_quit_translation"
+        ]
+      },
+      "reasoning": "The diff adds Language::LK variant to the enum (marked as Sinhala), increases ALL array from 24 to 25 elements, and adds Sinhala translation strings across multiple functions (start, address, protocol, traffic_rate, settings). The commit message directly names issue #1239 as adding Sinhala translation.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 3,
+        "section": "Improvements",
+        "text": "Support CIDR ranges in imported IP blacklists (#1181 )",
+        "kind": "change",
+        "prNumbers": [
+          1181
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "d3227759088efe01eea00db02797f907183b8d24"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "IpBlacklist"
+        ]
+      },
+      "reasoning": "The diff shows `IpBlacklist::from_file()` now parses CIDR notation via `first.parse::<IpNet>()` and stores them in a `networks` field using `JointPrefixSet`. The `contains()` method checks membership with longest-prefix-match (`self.networks.get_lpm(&IpNet::from(*ip)).is_some()`). Three new test files demonstrate CIDR ranges like `209.186.20.0/22` and `1.2.3.0/24` are correctly parsed and matched, with boundary-condition assertions confirming range semantics work.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 4,
+        "section": "Improvements",
+        "text": "Show number of IP addresses and CIDR ranges in imported IP blacklists (#1183 )",
+        "kind": "change",
+        "prNumbers": [
+          1183
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "bd8b8bdced04a2fe721bc5f3e5e43b0cc5320c66"
+        ],
+        "files": [
+          "src/networking/types/ip_blacklist.rs",
+          "src/gui/pages/settings_general_page.rs"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "blacklist_selection",
+          "IpBlacklist"
+        ]
+      },
+      "reasoning": "The diff adds `imported_items_info()` method in `ip_blacklist.rs` that returns a formatted string showing counts of IPs and CIDRs (lines showing `format!(\"(IPs: {ips})\")`, `format!(\"(CIDRs: {cidrs})\")`, and mixed format). The GUI integrates this via `settings_general_page.rs` with `.push(ip_blacklist.imported_items_info().map(|info| Text::new(info)...))` to display counts. Tests verify counts are returned correctly (e.g., `Some(\"(IPs: 4)\".to_string())`, `Some(\"(IPs: 2, CIDRs: 4)\".to_string())`).",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 5,
+        "section": "Improvements",
+        "text": "Add relevant keywords to the `.desktop` file (#1248 )",
+        "kind": "change",
+        "prNumbers": [
+          1248
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          ".desktop"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.98,
+      "evidence": {
+        "commitShas": [
+          "f932c62613ec81bf34e28ddbab8fe748e3ec6da9"
+        ],
+        "files": [
+          "resources/packaging/linux/sniffnet.desktop"
+        ],
+        "matchedTerms": [
+          ".desktop"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows a new `Keywords=` line added to `sniffnet.desktop` with values `traffic;inspect;monitor;internet;network;`. These keywords are relevant to the application's functionality (network traffic inspection). The change directly implements the claim.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 6,
+        "section": "Improvements",
+        "text": "Updated some of the existing translations to v1.5:",
+        "kind": "change",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "carriedOverFrom": "v1.5.0"
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Carried over verbatim from v1.5.0 — describes the product, not this release.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 7,
+        "section": "Improvements",
+        "text": "Ukrainian (#1039 )",
+        "kind": "change",
+        "prNumbers": [
+          1039
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.98,
+      "evidence": {
+        "commitShas": [
+          "dccc7062b5dc93ae81d35a5c67257b23a49dca78"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "share_feedback_translation",
+          "capture_file_translation",
+          "select_file_translation",
+          "reading_from_pcap_translation",
+          "data_exceeded_translation",
+          "bits_exceeded_translation",
+          "bits_translation",
+          "pause_translation"
+        ]
+      },
+      "reasoning": "The diff shows multiple `Language::UK =>` entries with Ukrainian translations added across translations_4.rs and translations_5.rs (e.g., 'Надіслати відгук', 'Захопити файл', 'Фільтр трафіку', 'Програма', etc.). These additions directly implement Ukrainian language support in the codebase, matching PR #1039.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 8,
+        "section": "Improvements",
+        "text": "German (#1122 )",
+        "kind": "change",
+        "prNumbers": [
+          1122
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "71abd8eb805b065ec1c049c179e0e39176ccfa06"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "traffic_rate_translation",
+          "hide_translation",
+          "no_addresses_translation",
+          "notifications_title_translation",
+          "appearance_title_translation",
+          "threshold_translation",
+          "bytes_exceeded_translation",
+          "packets_exceeded_translation"
+        ]
+      },
+      "reasoning": "The diff shows extensive updates to German translations across five translation files: corrected typos (Wähl→Wähle), improved terminology (Schwellenwert→Grenzwert), added 8+ missing German translations in translations_5.rs (Datenverkehr filtern, Datenquelle, Remote-Benachrichtigungen, IP-Blacklist, etc.), and consolidated entries (NL and DE now share Verbergen). The commit message confirms this is PR #1122 for German translation updates.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 9,
+        "section": "Improvements",
+        "text": "French (#1123 )",
+        "kind": "change",
+        "prNumbers": [
+          1123
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "8a91265376b46db20aacae554431595a46c1fa73"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation",
+          "blacklisted_transmitted_translation",
+          "only_show_blacklisted_translation",
+          "program_translation",
+          "no_favorites_saved_translation"
+        ]
+      },
+      "reasoning": "The diff shows multiple French translation entries (`Language::FR => \"…\"`) being added to translation functions in src/translations/translations_5.rs across 8 separate translation strings, directly implementing the claim that French language support was added in PR #1123.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 10,
+        "section": "Improvements",
+        "text": "Spanish (#1140 )",
+        "kind": "change",
+        "prNumbers": [
+          1140
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.9,
+      "evidence": {
+        "commitShas": [
+          "f720c8c8ca541a7448b3890636dc8582a3d28b89"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation",
+          "blacklisted_transmitted_translation",
+          "only_show_blacklisted_translation",
+          "program_translation",
+          "no_favorites_saved_translation"
+        ]
+      },
+      "reasoning": "The diff clearly shows Spanish (Language::ES) translation entries being systematically added to multiple translation functions in src/translations/translations_5.rs (e.g., 'Filtrar tráfico', 'Fuente de tráfico', 'Notificaciones remotas', etc.). The commit message explicitly names this as 'spanish-translation', and the pattern of additions across at least 8 functions strongly supports that Spanish language support was added in PR #1140.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 11,
+        "section": "Improvements",
+        "text": "Indonesian (#1145 )",
+        "kind": "change",
+        "prNumbers": [
+          1145
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "8b84c66ffbf0dc257242f3d1f83ab05be7804b36"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation",
+          "blacklisted_transmitted_translation",
+          "only_show_blacklisted_translation",
+          "no_favorites_saved_translation"
+        ]
+      },
+      "reasoning": "The diff shows multiple Indonesian (Language::ID) translation strings added across various UI functions in translations_5.rs (filter traffic, traffic source, remote notifications, IP blacklist, etc.), matching the commit message for PR #1145. This directly confirms the claim that Indonesian language support was added.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 12,
+        "section": "Improvements",
+        "text": "Swedish (#1068 )",
+        "kind": "change",
+        "prNumbers": [
+          1068
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.98,
+      "evidence": {
+        "commitShas": [
+          "ed74fbfd3c53b4e07a88355fffc63f1b12a706d0"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "reserved_address_translation",
+          "share_feedback_translation",
+          "capture_file_translation",
+          "select_file_translation",
+          "reading_from_pcap_translation",
+          "data_exceeded_translation",
+          "bits_exceeded_translation",
+          "bits_translation"
+        ]
+      },
+      "reasoning": "The diff shows multiple Swedish translations (`Language::SV`) being added across `translations_4.rs` and `translations_5.rs`, including Swedish text for at least 18 UI strings (reserved address, feedback sharing, file operations, data/bit limits, resume, traffic filtering, IP blacklist, favorites, etc.). The commit message confirms this is a Swedish translation update from PR #1068.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 13,
+        "section": "Improvements",
+        "text": "Greek (#1175 )",
+        "kind": "change",
+        "prNumbers": [
+          1175
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.98,
+      "evidence": {
+        "commitShas": [
+          "0185d76892c1218ce2b07847e451cb53f9171bad"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "bytes_translation",
+          "bytes_exceeded_translation",
+          "domain_translation",
+          "capture_file_translation",
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation"
+        ]
+      },
+      "reasoning": "The diff shows Greek language (Language::EL) translations being added and corrected across five translation files: new Greek strings added for 'filter traffic' (Φιλτράρισμα ροής), 'traffic source' (Πηγή ροής), 'remote notifications' (Απομακρυσμένες ειδοποιήσεις), 'IP blacklist' (Λίστα μπλοκαρισμένων διευθύνσεων), and several others; existing Greek translations corrected for grammar (e.g., Τομέα→Τομέας, Αρχείου→Αρχείο); and Language::EL added to language feature handling in types/language.rs. The",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 14,
+        "section": "Improvements",
+        "text": "Persian (#1196 )",
+        "kind": "change",
+        "prNumbers": [
+          1196
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "no-evidence",
+      "confidence": 0.98,
+      "evidence": {
+        "commitShas": [
+          "7c32877024bcfba8c65c3d0fdd9d6f0d60896a7d"
+        ],
+        "files": [
+          "src/translations/translations.rs"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation",
+          "blacklisted_transmitted_translation",
+          "only_show_blacklisted_translation",
+          "program_translation",
+          "no_favorites_saved_translation"
+        ]
+      },
+      "reasoning": "The diff shows multiple additions of Language::HU (Hungarian) and Language::SI (Sinhala) translations throughout the file, but contains no additions of Language::FA (Persian) or any Persian language support. The branch name mentions 'add-persian-translations' but the actual merged code adds Hungarian and Sinhala instead.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 15,
+        "section": "Improvements",
+        "text": "Russian (#1224 )",
+        "kind": "change",
+        "prNumbers": [
+          1224
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [
+          "1a06cdef724fb40209b9ecbd5f740fca247883db"
+        ],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "pr-anchor",
+          "llm"
+        ],
+        "functions": [
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation",
+          "blacklisted_transmitted_translation",
+          "only_show_blacklisted_translation",
+          "program_translation",
+          "no_favorites_saved_translation"
+        ]
+      },
+      "reasoning": "The diff shows Russian language translations (Language::RU) being added to 8+ translation functions in src/translations/translations_5.rs, with authentic Cyrillic strings. The commit directly references PR #1224 about russian-translation-v1_5. While the Language enum definition itself is not shown, the fact that Language::RU is used consistently across match arms and this code was released indicates it was properly defined.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 16,
+        "section": "Fixes",
+        "text": "Use a thread pool for reverse DNS lookups to avoid stalling hosts resolutions (fixes #1257 )",
+        "kind": "change",
+        "prNumbers": [
+          1257
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.99,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "src/networking/parse_packets.rs"
+        ],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows a loop (lines 66-77) replacing a single-thread spawn with a thread pool of 5 threads sharing an `async_channel::unbounded()` queue. The inline comment explicitly states 'a pool of threads shares the request queue, so one slow blocking lookup doesn't stall the others', directly implementing the claim to avoid stalling via parallelism. Channel type changed from `std::sync::mpsc` to `async_channel::Sender` to support multi-thread sharing; send call changed to `try_send()` for pool se",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 17,
+        "section": "Fixes",
+        "text": "Fix unseen hosts and services not appearing dimmed in thumbnail mode (fixes #1142 )",
+        "kind": "change",
+        "prNumbers": [
+          1142
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The diff shows two concrete implementations matching the claim. In src/gui/pages/thumbnail_page.rs, the host_col function now checks `is_dimmed = data_info_host.data_info.tot_data(DataRepr::Packets) == 0` and applies both reduced opacity (`alpha_chart_badge`) to the flag and `TextType::Dimmed` class to the host text. The service_col function applies the same dimming logic: checking if packets are 0 and applying `TextType::Dimmed` class to unseen services. Both changes directly implement the dimm",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 18,
+        "section": "Fixes",
+        "text": "Fix `X-AppImage-Version` field in Linux AppImage metadata to correctly reflect the app version (#1174 — fixes #1003 )",
+        "kind": "change",
+        "prNumbers": [
+          1174,
+          1003
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "X-AppImage-Version"
+        ]
+      },
+      "verdict": "partial",
+      "confidence": 0.72,
+      "evidence": {
+        "commitShas": [
+          "5c89eb1c5894abd632b6837b56912d0c0a7d1c85"
+        ],
+        "files": [
+          ".github/workflows/package.yml"
+        ],
+        "matchedTerms": [
+          "AppImage"
+        ],
+        "methods": [
+          "pr-anchor",
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "The workflow extracts the app version from Cargo.toml and uses it in a sed replacement for the AppImage YAML file, plus adds NO_GLIBC_VERSION=1 environment variable—all consistent with fixing AppImage version metadata. However, the actual sniffnet.yml file (where X-AppImage-Version is likely defined) is not in the diff, so the concrete change to the metadata field itself is not visible.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 19,
+        "section": "Fixes",
+        "text": "Fix Linux packages failing to run on distros with `glibc` older than 2.39 (fixes #1256 )",
+        "kind": "change",
+        "prNumbers": [
+          1256
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          "glibc"
+        ]
+      },
+      "verdict": "verified",
+      "confidence": 0.95,
+      "evidence": {
+        "commitShas": [],
+        "files": [
+          "Cross.toml",
+          ".github/workflows/package.yml"
+        ],
+        "matchedTerms": [
+          "glibc"
+        ],
+        "methods": [
+          "lexical",
+          "llm"
+        ],
+        "functions": []
+      },
+      "reasoning": "Cross.toml pins all Linux targets to the 0.2.5 image with explicit comment citing glibc 2.23 floor vs upstream's glibc 2.39 (Ubuntu 24.04), matching the claim. package.yml adds PKG_CONFIG handling for the 0.2.5 image and references it in build step comments, confirming the fix targets the pinned image.",
+      "judged": true,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 20,
+        "section": "Thanks to:",
+        "text": "@recallai, @coderabbitai, @ipinfo, @cthulu201, @golanbenoni, @ZEROF, @wahn, @orhun, @3kh0 for sponsoring Sniffnet 💖",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 21,
+        "section": "Thanks to:",
+        "text": "NLnet for supporting the development of this version via the NGI Zero Commons Fund",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "carriedOverFrom": "v1.5.0"
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 22,
+        "section": "Thanks to:",
+        "text": "@ethical-buddy for helping with connections latency",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 23,
+        "section": "Thanks to:",
+        "text": "@pml68 for adding Hungarian translation",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 24,
+        "section": "Thanks to:",
+        "text": "@thambaru for adding Sinhala translation",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 25,
+        "section": "Thanks to:",
+        "text": "@TheMasterOfDisasters for improving the IP blacklist functionality",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 26,
+        "section": "Thanks to:",
+        "text": "@toboil-features for adding keywords to the `.desktop` file",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [
+          ".desktop"
+        ]
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 27,
+        "section": "Thanks to:",
+        "text": "@DmytroGaiduk, @HiProfession, @Charpy, @FrancoB4, @nubikripto, @Elyrial, @GeorgeLS, @Hurdadd, @EfesX for updating the existing translations",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 28,
+        "section": "Thanks to:",
+        "text": "<h3> Support Sniffnet </h3>",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "carriedOverFrom": "v1.5.0"
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    },
+    {
+      "claim": {
+        "id": 29,
+        "section": "Thanks to:",
+        "text": "<h3> Stay in the loop </h3>",
+        "kind": "meta",
+        "prNumbers": [],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": [],
+        "carriedOverFrom": "v1.5.0"
+      },
+      "verdict": "skipped",
+      "confidence": 1,
+      "evidence": {
+        "commitShas": [],
+        "files": [],
+        "matchedTerms": [],
+        "methods": [
+          "none"
+        ]
+      },
+      "reasoning": "Informational entry, nothing to verify against the diff.",
+      "judged": false,
+      "generated": false
+    }
+  ],
+  "uncovered": [
+    {
+      "commit": {
+        "sha": "15210a5a352bbc580163e5a1e038dc956b351efe",
+        "subject": "update deps",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 307,
+      "deletions": 244,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "6c55c27f17a0f3ba052366f2985491ab079d7bc1",
+        "subject": "update deps",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 243,
+      "deletions": 263,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "495377d01022a1ab3968bc9d8b706a4c8ef49d81",
+        "subject": "replace IpCollection with ipnet::IpNet for use with bogons",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 36,
+      "deletions": 360,
+      "fileCount": 5
+    },
+    {
+      "commit": {
+        "sha": "7f139ecb36b484f5042e4c07bd2cdb6579fcc3e7",
+        "subject": "update deps",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 67,
+      "deletions": 230,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "10c609b744fb0bfa25fd4e7da374b1178d476380",
+        "subject": "update deps",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 154,
+      "deletions": 139,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "7eb9e43bf0589ca1610b46c3a10e0a205494ccdf",
+        "subject": "Use surge-ping for latency checks",
+        "body": "Switch latency measurement away from spawning ping and parsing platform-specific output.\n\nThe new path keeps reusable IPv4 and IPv6 surge-ping clients, uses unique sequences for measurements, and keeps the loopback coverage end to end.",
+        "author": "ethical-buddy",
+        "email": "suryanshdeshwal@gmail.com",
+        "login": "ethical-buddy",
+        "prNumbers": []
+      },
+      "additions": 131,
+      "deletions": 105,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "7c13a5755ffdffd9b5caf8fc59cd8c8f6ec0aca0",
+        "subject": "replace unmaintained winres with winresource",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 118,
+      "deletions": 116,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "3c5e510949c47c78400f69605b237e95b1170d61",
+        "subject": "Add latency check to connection details",
+        "body": "",
+        "author": "ethical-buddy",
+        "email": "suryanshdeshwal@gmail.com",
+        "login": "ethical-buddy",
+        "prNumbers": []
+      },
+      "additions": 230,
+      "deletions": 2,
+      "fileCount": 6
+    },
+    {
+      "commit": {
+        "sha": "35ab8385ac142628e97b13188b80ea426204f9be",
+        "subject": "improve latency_row",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 119,
+      "deletions": 105,
+      "fileCount": 8
+    },
+    {
+      "commit": {
+        "sha": "7a2445073fd403dba6c0d3890829ff984d5e83bd",
+        "subject": "update Sinhala language code from LK to SI",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 104,
+      "deletions": 103,
+      "fileCount": 7
+    },
+    {
+      "commit": {
+        "sha": "19a9fe00b0d431da512a54ee70a7fd5d9ee454ad",
+        "subject": "feat: add Sinhala translations for various UI elements and messages",
+        "body": "",
+        "author": "thambaru",
+        "email": "4795173+thambaru@users.noreply.github.com",
+        "login": "thambaru",
+        "prNumbers": []
+      },
+      "additions": 112,
+      "deletions": 94,
+      "fileCount": 5
+    },
+    {
+      "commit": {
+        "sha": "236c1b367d278957404520f31da286a8e77d2e84",
+        "subject": "feat: add Hungarian translations",
+        "body": "",
+        "author": "pml68",
+        "email": "contact@pml68.dev",
+        "login": "pml68",
+        "prNumbers": []
+      },
+      "additions": 175,
+      "deletions": 14,
+      "fileCount": 7
+    },
+    {
+      "commit": {
+        "sha": "4fe3718fc3c132587a85babbcba9fa7d83b0d9e5",
+        "subject": "update deps",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 60,
+      "deletions": 77,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "739ab44aad085fdc91d2cab802623ad6440869a6",
+        "subject": "update docs to include official sniffnet emails",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 120,
+      "deletions": 2,
+      "fileCount": 6
+    },
+    {
+      "commit": {
+        "sha": "1f3ce035259eff7c71cb59694ddd82e81ff73491",
+        "subject": "add THREAT_MODEL.md",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 113,
+      "deletions": 2,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "64b98fd50c4673cbab0f208d93af179b50d58c77",
+        "subject": "Create codeql.yml",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "100347457+GyulyVGC@users.noreply.github.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 101,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "68b57c5a39425144c0a792792b6459aca9885a42",
+        "subject": "enable CodeQL security-extended suite and clean up workflow",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 21,
+      "deletions": 80,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "e44586a171c623c19de81dddfd8ed2d1d5695ade",
+        "subject": "merge Sinhala glyphs into original font file",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 61,
+      "deletions": 27,
+      "fileCount": 13
+    },
+    {
+      "commit": {
+        "sha": "ca0eab5525626875e94ffd2bf68ca7f22cbc4f4f",
+        "subject": "minor fixes",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 33,
+      "deletions": 32,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "388c56469cb15b0eb219ed011a22f2205b3dfe95",
+        "subject": "remove redundant test in manage_packets.rs",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 56,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "ae333ca26ed23ea32ee0f7f39c26a1001f76e498",
+        "subject": "add INCIDENT_RESPONSE.md",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 42,
+      "deletions": 1,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "ab4340abe8efff0fc16e96dda1f9916e3adb623b",
+        "subject": "docs: add ahassany as a contributor for ideas (#1186)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1186
+        ]
+      },
+      "additions": 26,
+      "deletions": 14,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "4269a289f511b25b7da18dd9543063c636f9ec6d",
+        "subject": "update domain to sniffnet.app",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 22,
+      "deletions": 18,
+      "fileCount": 9
+    },
+    {
+      "commit": {
+        "sha": "7130d673c3df6c0db9036c7c2272fd055816e121",
+        "subject": "docs: add coderabbitai as a contributor for financial (#1246)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1246
+        ]
+      },
+      "additions": 25,
+      "deletions": 13,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "8dad7213819c6095cb8c7f1d08b15ea787c8f7b2",
+        "subject": "fix various minor bugs",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 13,
+      "deletions": 22,
+      "fileCount": 5
+    },
+    {
+      "commit": {
+        "sha": "d2566f8e457ab86dfb533e1c17fa045b94cc009e",
+        "subject": "minor fixes to HU and FA translations; updated CHANGELOG",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 22,
+      "deletions": 13,
+      "fileCount": 9
+    },
+    {
+      "commit": {
+        "sha": "f6d04ba141ff7a4860e2300b8797db88b67aaab4",
+        "subject": "docs: add HiProfession as a contributor for translation (#1171)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1171
+        ]
+      },
+      "additions": 22,
+      "deletions": 12,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "e0cc04c9f9e4199fbafb0d6bc69d1a955c6f9510",
+        "subject": "docs: add DmytroGaiduk as a contributor for translation (#1170)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1170
+        ]
+      },
+      "additions": 22,
+      "deletions": 10,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "6ba3250e3d543029f25ce8ee62f03547d782f41a",
+        "subject": "docs: add FrancoB4 as a contributor for translation (#1172)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1172
+        ]
+      },
+      "additions": 20,
+      "deletions": 10,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "28ceaf088248d1a1b4b48d589dff6ddd3a3630fb",
+        "subject": "docs: add Elyrial as a contributor for translation (#1173)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1173
+        ]
+      },
+      "additions": 20,
+      "deletions": 10,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "6bf415a19a02d59574aadeff229475b0bf09a2e3",
+        "subject": "docs: add abiton-glenn as a contributor for financial (#1155)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1155
+        ]
+      },
+      "additions": 19,
+      "deletions": 9,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "4cb0bcbec6dbac0eebe08df099ba7a4b561dd6e8",
+        "subject": "docs: add GeorgeLS as a contributor for translation (#1177)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1177
+        ]
+      },
+      "additions": 19,
+      "deletions": 9,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "06a249c1680e4f89c67ac909e24790ff70f9e1d2",
+        "subject": "docs: add Hurdadd as a contributor for translation (#1211)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1211
+        ]
+      },
+      "additions": 19,
+      "deletions": 9,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "9bba250a7322ac7138b34468906762e9a2815509",
+        "subject": "docs: add EfesX as a contributor for translation (#1240)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1240
+        ]
+      },
+      "additions": 19,
+      "deletions": 9,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "5d099cb895b78e9f2e62353117066c542cea0764",
+        "subject": "Update README.md social links to fix GitHub broken rendering",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "100347457+GyulyVGC@users.noreply.github.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 20,
+      "deletions": 7,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "b1e6c664c4a38f73cc3af3e463a404ef03d5e35c",
+        "subject": "docs: add SimplyClever96 as a contributor for financial (#1180)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1180
+        ]
+      },
+      "additions": 18,
+      "deletions": 8,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "6a0d5a7cff16e799931987f81c56f7e8276338b2",
+        "subject": "perf: use prefix-trie for blacklist network lookups",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 18,
+      "deletions": 4,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "7650b9f1e5f0cf84eb752b311bf6b46f7a1fd44d",
+        "subject": "docs: add orbisai0security as a contributor for security (#1244)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1244
+        ]
+      },
+      "additions": 16,
+      "deletions": 6,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "8794b55ffabe83aa858d7b86d0c98caba89a222e",
+        "subject": "docs: add pml68 as a contributor for translation (#1210)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1210
+        ]
+      },
+      "additions": 15,
+      "deletions": 5,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "40a7ecdb68c456959a4fab2059a057eff641fb2f",
+        "subject": "Bump actions/checkout from 6 to 7",
+        "body": "Bumps [actions/checkout](https://github.com/actions/checkout) from 6 to 7.\n- [Release notes](https://github.com/actions/checkout/releases)\n- [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/actions/checkout/compare/v6...v7)\n\n---\nupdated-dependencies:\n- dependency-name: actions/checkout\n  dependency-version: '7'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+        "author": "dependabot[bot]",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "login": "dependabot[bot]",
+        "prNumbers": []
+      },
+      "additions": 10,
+      "deletions": 10,
+      "fileCount": 5
+    },
+    {
+      "commit": {
+        "sha": "5668bcabf88de0dc580bef591f5cfdcad40160cd",
+        "subject": "Fix UK translations after merge",
+        "body": "Fix UK translations after merge, added missing translations.",
+        "author": "DmytroGaiduk",
+        "email": "dmitry.gaiduk@gmail.com",
+        "login": "DmytroGaiduk",
+        "prNumbers": []
+      },
+      "additions": 17,
+      "deletions": 0,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "8365353d562f94de49f95dcf38979aabf290551e",
+        "subject": "fix new Rust 1.95 clippy lints",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 8,
+      "deletions": 8,
+      "fileCount": 5
+    },
+    {
+      "commit": {
+        "sha": "e4534b0e0f1a34edd69d2d98f839ed9a2c040b6c",
+        "subject": "docs: add TheMasterOfDisasters as a contributor for code (#1182)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1182
+        ]
+      },
+      "additions": 13,
+      "deletions": 3,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "4c9ccbb095735af9d9f493836e67d9bf566489af",
+        "subject": "docs: add golanbenoni as a contributor for financial (#1204)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1204
+        ]
+      },
+      "additions": 12,
+      "deletions": 2,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "292dc95b31fe31ebfa1d63011ab77df93f142d63",
+        "subject": "update CHANGELOG and fully translated languages",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 13,
+      "deletions": 0,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "d49e8a700fcf043a8a81a953810645ff47b233ba",
+        "subject": "Change translation of threshold from \"Schwellenwert\" to \"Grenzwert\"",
+        "body": "- I find `Grenzwert` to be more commonly used",
+        "author": "HiProfession",
+        "email": "sunnyhappyhops@gmail.com",
+        "login": null,
+        "prNumbers": []
+      },
+      "additions": 6,
+      "deletions": 6,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "ee5379ad81fdae6081c4f3d233156493492799e1",
+        "subject": "add note to services.txt stating the file is auto-generated",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 11,
+      "deletions": 1,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "fac5d69107a3ba5f84ab9252c98b67795f67fd2f",
+        "subject": "docs: add toboil-features as a contributor for platform (#1250)",
+        "body": "",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1250
+        ]
+      },
+      "additions": 11,
+      "deletions": 1,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "aadbd1bd7553a466f67535aa2083cecb33ed9ba4",
+        "subject": "docs: add ethical-buddy as a contributor for code (#1255)",
+        "body": "* docs: update CONTRIBUTORS.md [skip ci]\n\n* docs: update .all-contributorsrc [skip ci]\n\n---------\n\nCo-authored-by: allcontributors[bot] <46447321+allcontributors[bot]@users.noreply.github.com>",
+        "author": "allcontributors[bot]",
+        "email": "46447321+allcontributors[bot]@users.noreply.github.com",
+        "login": "allcontributors[bot]",
+        "prNumbers": [
+          1255
+        ]
+      },
+      "additions": 11,
+      "deletions": 1,
+      "fileCount": 2
+    },
+    {
+      "commit": {
+        "sha": "d86e711d0488d3383255326b31a6f3a29fddfbc6",
+        "subject": "Add remaining translations for v1.5",
+        "body": "",
+        "author": "Elyrial",
+        "email": "elyrial@proton.me",
+        "login": "Elyrial",
+        "prNumbers": []
+      },
+      "additions": 8,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "09ff6eaddfa6b161ce332abda987fbe7eedec792",
+        "subject": "fix new Rust 1.97 clippy lints",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 3,
+      "deletions": 3,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "8fed9c59ff7ad9e8b14b8f815724b27a3486441a",
+        "subject": "bump version to 1.5.1",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 3,
+      "deletions": 3,
+      "fileCount": 3
+    },
+    {
+      "commit": {
+        "sha": "7d95224bca23a633295ee0c2b0e895d005a1c8fc",
+        "subject": "tweak which suite of queries CodeQL is using for Actions and Rust",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 4,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "bffa42114cafc76b24db4ec12a3ecbfd5ecd223f",
+        "subject": "update CHANGELOG",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 3,
+      "deletions": 2,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "953060098aa56f7cbbf8033a70ee715f36534026",
+        "subject": "don't rely on shields.io for README badges",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "100347457+GyulyVGC@users.noreply.github.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 2,
+      "deletions": 2,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "6073f76fd2e1a9ff63ee35b6ceda645ff9a6a0db",
+        "subject": "fix: package_managers.dependabot.dependabot-missing-cooldown.dependabot-missing-cooldown security vulnerability",
+        "body": "Automated security fix generated by OrbisAI Security",
+        "author": "orbisai0security",
+        "email": "mediratta01.pally@gmail.com",
+        "login": "orbisai0security",
+        "prNumbers": []
+      },
+      "additions": 4,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "64264cc4d11d1f463720c993a336ef4a9fd663c5",
+        "subject": "add CodeRabbit as sponsor in README",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 2,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "580598df6b29a5916e62570da42c1bcab3743ba8",
+        "subject": "update .dockerignore to include embedded icons",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "858f6c9262d00c33282ff3c64584f3b0ff17284a",
+        "subject": "Bump actions/checkout from 4 to 6",
+        "body": "Bumps [actions/checkout](https://github.com/actions/checkout) from 4 to 6.\n- [Release notes](https://github.com/actions/checkout/releases)\n- [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/actions/checkout/compare/v4...v6)\n\n---\nupdated-dependencies:\n- dependency-name: actions/checkout\n  dependency-version: '6'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+        "author": "dependabot[bot]",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "login": "dependabot[bot]",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "a96cd8cdae754fe2e580ea11e4c878806e63da27",
+        "subject": "Fix formatting",
+        "body": "",
+        "author": "DmytroGaiduk",
+        "email": "dmitry.gaiduk@gmail.com",
+        "login": "DmytroGaiduk",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "3f7a00d4399089b3349008fdf6c7f881f8500721",
+        "subject": "update sniffnet website repo name ref",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "8e6041a797ec74491ae45a41cb824a1efda92c6f",
+        "subject": "perf: pre-size mac_from_dec_to_hex String with capacity",
+        "body": "Avoids 6 reallocations (0->1->2->4->8->16->32 bytes) per packet\nby pre-allocating 17 bytes (6*2 hex chars + 5 colons).\n\nThis function runs on every captured packet in the hot path.\n\n```\ntest result: ok. 171 passed; 0 failed\n``",
+        "author": "LeandroPG19",
+        "email": "leandropatodo@gmail.com",
+        "login": "LeandroPG19",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "b719ce48d614abe2d5012724d279ac324dc35fd5",
+        "subject": "fix CodeQL: drop invalid 'default' queries value for Actions job",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 0,
+      "deletions": 1,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "70f9ecfc97238c31c3dec01fbf32d5fc82d5c5e7",
+        "subject": "update CHANGELOG",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "6b8313a783c161b8109df401e74592e02357b109",
+        "subject": "update CHANGELOG",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "e93efd8eea8e686ef4f13e8ec5312546e3c4d96a",
+        "subject": "add Golan Ben-Oni as sponsor in README",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "4adfc6f2c659aa1150283624ed64e525f5ff55ea",
+        "subject": "fix clippy pedantic",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 1,
+      "deletions": 0,
+      "fileCount": 1
+    },
+    {
+      "commit": {
+        "sha": "1918019f018fe26aca9cd942d06a4fb802100844",
+        "subject": "update MMDBs",
+        "body": "",
+        "author": "GyulyVGC",
+        "email": "gyulyvgc99@gmail.com",
+        "login": "GyulyVGC",
+        "prNumbers": []
+      },
+      "additions": 0,
+      "deletions": 0,
+      "fileCount": 2
+    }
+  ],
+  "reverseChecked": true,
+  "metrics": {
+    "scores": {
+      "correctness": 92,
+      "completeness": 30,
+      "risk": 20,
+      "overall": 45,
+      "label": "questionable"
+    },
+    "flags": [
+      {
+        "severity": "critical",
+        "kind": "opaque-change",
+        "message": "no reviewable patch: resources/DB/GeoLite2-ASN.mmdb — not covered by any note",
+        "files": [
+          "resources/DB/GeoLite2-ASN.mmdb"
+        ],
+        "commitShas": [
+          "d542feea26bb01ed9f074232d63c7672a51a9871",
+          "1918019f018fe26aca9cd942d06a4fb802100844",
+          "1575c1d71ea720058aca36e8b460d7b8dc3c8d1c"
+        ]
+      },
+      {
+        "severity": "critical",
+        "kind": "opaque-change",
+        "message": "no reviewable patch: resources/DB/GeoLite2-Country.mmdb — not covered by any note",
+        "files": [
+          "resources/DB/GeoLite2-Country.mmdb"
+        ],
+        "commitShas": [
+          "d542feea26bb01ed9f074232d63c7672a51a9871",
+          "1918019f018fe26aca9cd942d06a4fb802100844",
+          "1575c1d71ea720058aca36e8b460d7b8dc3c8d1c"
+        ]
+      },
+      {
+        "severity": "warn",
+        "kind": "unsupported-claim",
+        "message": "1 claim(s) with no supporting evidence in the diff",
+        "files": [],
+        "commitShas": []
+      },
+      {
+        "severity": "warn",
+        "kind": "undocumented-sensitive",
+        "message": "Undocumented changes in ci/build paths",
+        "files": [
+          ".github/dependabot.yml",
+          ".github/workflows/codeql.yml",
+          ".github/workflows/crates.yml",
+          ".github/workflows/docker.yml",
+          "build.rs"
+        ],
+        "commitShas": [
+          "64b98fd50c4673cbab0f208d93af179b50d58c77",
+          "68b57c5a39425144c0a792792b6459aca9885a42",
+          "7d95224bca23a633295ee0c2b0e895d005a1c8fc",
+          "b719ce48d614abe2d5012724d279ac324dc35fd5",
+          "51431a9829ca210945900d9261d3ddf5592aafc8"
+        ]
+      },
+      {
+        "severity": "warn",
+        "kind": "new-author-sensitive",
+        "message": "First-time author(s) changing sensitive paths (not seen in the last 5 releases): @HiProfession, @Charpy, @DmytroGaiduk, @TheMasterOfDisasters, @ethical-buddy, @thambaru, @orbisai0security",
+        "files": [],
+        "commitShas": [
+          "51431a9829ca210945900d9261d3ddf5592aafc8",
+          "1a5b8bcdf537985b1da204b0ec2749b455db2179",
+          "d542feea26bb01ed9f074232d63c7672a51a9871",
+          "9b9dcfc010249c6a1466ef1555f7a83aaa58734e",
+          "7eb9e43bf0589ca1610b46c3a10e0a205494ccdf"
+        ]
+      },
+      {
+        "severity": "info",
+        "kind": "new-dependency",
+        "message": "New dependencies in Cargo.toml: ipnet, prefix-trie, surge-ping",
+        "files": [
+          "Cargo.toml"
+        ],
+        "commitShas": [
+          "d542feea26bb01ed9f074232d63c7672a51a9871",
+          "10c609b744fb0bfa25fd4e7da374b1178d476380",
+          "c42603e9f6a4ccfdb7644774c9539cd7266d8c17",
+          "7051bdf7666ca4d42d6f40d7fbc7ac6135a4415a",
+          "70ee002134e05276c5a354955489d46dc82a4aae"
+        ]
+      }
+    ],
+    "files": [
+      {
+        "path": ".all-contributorsrc",
+        "churn": 171,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".design/README.md",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".dockerignore",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".github/dependabot.yml",
+        "churn": 4,
+        "sensitive": "ci/build",
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".github/workflows/codeql.yml",
+        "churn": 44,
+        "sensitive": "ci/build",
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".github/workflows/crates.yml",
+        "churn": 2,
+        "sensitive": "ci/build",
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".github/workflows/docker.yml",
+        "churn": 2,
+        "sensitive": "ci/build",
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": ".github/workflows/package.yml",
+        "churn": 42,
+        "sensitive": "ci/build",
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": ".github/workflows/rust.yml",
+        "churn": 11,
+        "sensitive": "ci/build",
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": ".well-known/funding-manifest-urls",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "CHANGELOG.md",
+        "churn": 22,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "CODE_OF_CONDUCT.md",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "CONTRIBUTORS.md",
+        "churn": 61,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "Sniffnet"
+        ]
+      },
+      {
+        "path": "Cargo.lock",
+        "churn": 1425,
+        "sensitive": "dependencies",
+        "coverage": "covered"
+      },
+      {
+        "path": "Cargo.toml",
+        "churn": 39,
+        "sensitive": "dependencies",
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "Cross.toml",
+        "churn": 32,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "Dockerfile",
+        "churn": 6,
+        "sensitive": "ci/build",
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "INCIDENT_RESPONSE.md",
+        "churn": 45,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "README.md",
+        "churn": 44,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "SECURITY.md",
+        "churn": 11,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "THREAT_MODEL.md",
+        "churn": 108,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "build.rs",
+        "churn": 8,
+        "sensitive": "ci/build",
+        "coverage": "undocumented",
+        "functions": [
+          "main",
+          "build_services_phf"
+        ]
+      },
+      {
+        "path": "giscus.json",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "resources/DB/GeoLite2-ASN.mmdb",
+        "churn": 0,
+        "sensitive": null,
+        "coverage": "undocumented"
+      },
+      {
+        "path": "resources/DB/GeoLite2-Country.mmdb",
+        "churn": 0,
+        "sensitive": null,
+        "coverage": "undocumented"
+      },
+      {
+        "path": "resources/fonts/full/sarasa-mono-sc-regular.ttf",
+        "churn": 0,
+        "sensitive": null,
+        "coverage": "undocumented"
+      },
+      {
+        "path": "resources/fonts/full/subset_characters.txt",
+        "churn": 58,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "resources/fonts/subset/sarasa-mono-sc-regular.subset.ttf",
+        "churn": 0,
+        "sensitive": null,
+        "coverage": "covered"
+      },
+      {
+        "path": "resources/logos/raw/rect.svg",
+        "churn": 108,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "resources/packaging/linux/sniffnet.desktop",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "resources/scripts/services.sh",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "resources/test/ip_blacklist_real_cidr_ranges.txt",
+        "churn": 6,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "resources/test/ip_blacklist_valid_cidr_only.txt",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "resources/test/ip_blacklist_valid_with_cidr.txt",
+        "churn": 9,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "services.txt",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": []
+      },
+      {
+        "path": "src/gui/components/ellipsized_text.rs",
+        "churn": 9,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/gui/pages/connection_details_page.rs",
+        "churn": 99,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "page_content",
+          "page_header",
+          "col_info",
+          "get_button_copy"
+        ]
+      },
+      {
+        "path": "src/gui/pages/inspect_page.rs",
+        "churn": 23,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "row_report_entry",
+          "filter_input",
+          "filter_combobox"
+        ]
+      },
+      {
+        "path": "src/gui/pages/overview_page.rs",
+        "churn": 64,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "item_bar",
+          "col_device"
+        ]
+      },
+      {
+        "path": "src/gui/pages/settings_general_page.rs",
+        "churn": 10,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "scale_factor_slider",
+          "blacklist_selection"
+        ]
+      },
+      {
+        "path": "src/gui/pages/thumbnail_page.rs",
+        "churn": 33,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "host_col",
+          "service_col"
+        ]
+      },
+      {
+        "path": "src/gui/sniffer.rs",
+        "churn": 57,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "Sniffer"
+        ]
+      },
+      {
+        "path": "src/gui/styles/container.rs",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "ContainerType"
+        ]
+      },
+      {
+        "path": "src/gui/styles/text.rs",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "highlight"
+        ]
+      },
+      {
+        "path": "src/gui/types/message.rs",
+        "churn": 5,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/networking/manage_packets.rs",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "analyze_network_header",
+          "is_my_address"
+        ]
+      },
+      {
+        "path": "src/networking/parse_packets.rs",
+        "churn": 51,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "parse_packets",
+          "from_linux_sll",
+          "reverse_dns_lookups",
+          "AddressesResolutionState",
+          "maybe_send_tick_run_live"
+        ]
+      },
+      {
+        "path": "src/networking/traffic_preview.rs",
+        "churn": 4,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "traffic_preview"
+        ]
+      },
+      {
+        "path": "src/networking/types/bogon.rs",
+        "churn": 67,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/networking/types/ip_blacklist.rs",
+        "churn": 127,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": [
+          "IpBlacklist"
+        ]
+      },
+      {
+        "path": "src/networking/types/ip_collection.rs",
+        "churn": 324,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/networking/types/latency.rs",
+        "churn": 121,
+        "sensitive": null,
+        "coverage": "evidence",
+        "functions": []
+      },
+      {
+        "path": "src/networking/types/mod.rs",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/networking/types/my_link_type.rs",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "MyLinkType"
+        ]
+      },
+      {
+        "path": "src/networking/types/service_query.rs",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "phf_shared::PhfBorrow"
+        ]
+      },
+      {
+        "path": "src/notifications/notify_and_log.rs",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "notify_and_log"
+        ]
+      },
+      {
+        "path": "src/report/types/search_parameters.rs",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "FilterInputType"
+        ]
+      },
+      {
+        "path": "src/translations/mod.rs",
+        "churn": 1,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/translations/translations.rs",
+        "churn": 162,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "start_translation",
+          "address_translation",
+          "protocol_translation",
+          "traffic_rate_translation",
+          "settings_translation",
+          "yes_translation",
+          "ask_quit_translation",
+          "quit_analysis_translation",
+          "ask_clear_all_translation",
+          "clear_all_translation"
+        ]
+      },
+      {
+        "path": "src/translations/translations_2.rs",
+        "churn": 51,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "new_version_available_translation",
+          "inspect_translation",
+          "connection_details_translation",
+          "dropped_translation",
+          "data_representation_translation",
+          "host_translation",
+          "only_top_30_items_translation",
+          "local_translation",
+          "unknown_translation",
+          "your_network_adapter_translation"
+        ]
+      },
+      {
+        "path": "src/translations/translations_3.rs",
+        "churn": 45,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "general_translation",
+          "zoom_translation",
+          "mmdb_files_translation",
+          "params_not_editable_translation",
+          "custom_style_translation",
+          "copy_translation",
+          "port_translation",
+          "messages_translation",
+          "link_type_translation",
+          "unsupported_link_type_translation"
+        ]
+      },
+      {
+        "path": "src/translations/translations_4.rs",
+        "churn": 88,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "reserved_address_translation",
+          "share_feedback_translation",
+          "capture_file_translation",
+          "select_file_translation",
+          "reading_from_pcap_translation",
+          "data_exceeded_translation",
+          "bits_exceeded_translation",
+          "bits_translation",
+          "pause_translation",
+          "resume_translation"
+        ]
+      },
+      {
+        "path": "src/translations/translations_5.rs",
+        "churn": 89,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "filter_traffic_translation",
+          "traffic_source_translation",
+          "remote_notifications_translation",
+          "ip_blacklist_translation",
+          "blacklisted_transmitted_translation",
+          "only_show_blacklisted_translation",
+          "no_favorites_saved_translation"
+        ]
+      },
+      {
+        "path": "src/translations/translations_6.rs",
+        "churn": 11,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": []
+      },
+      {
+        "path": "src/translations/types/language.rs",
+        "churn": 26,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "Language",
+          "fmt::Display"
+        ]
+      },
+      {
+        "path": "src/utils/formatted_strings.rs",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "print_cli_welcome_message",
+          "clip_text"
+        ]
+      },
+      {
+        "path": "src/utils/types/icon.rs",
+        "churn": 2,
+        "sensitive": null,
+        "coverage": "covered",
+        "functions": [
+          "Icon"
+        ]
+      },
+      {
+        "path": "src/utils/types/web_page.rs",
+        "churn": 8,
+        "sensitive": null,
+        "coverage": "undocumented",
+        "functions": [
+          "WebPage"
+        ]
+      }
+    ],
+    "churnCoveredRatio": 0.3029810298102981,
+    "context": {
+      "languages": {
+        "Rust": 1053512,
+        "Rich Text Format": 10415,
+        "Shell": 1445,
+        "Dockerfile": 653
+      },
+      "codeBytes": 1066025,
+      "releaseCadenceDays": 80
+    },
+    "baseline": {
+      "releases": 5,
+      "medianChurn": 6816,
+      "medianAnchoredCoverage": 0.0625,
+      "snapshots": [
+        {
+          "tag": "v1.3.2",
+          "churn": 6816,
+          "coverage": 0.0625
+        },
+        {
+          "tag": "v1.4.0",
+          "churn": 14684,
+          "coverage": 0.048
+        },
+        {
+          "tag": "v1.4.1",
+          "churn": 8474,
+          "coverage": 0.1118421052631579
+        },
+        {
+          "tag": "v1.4.2",
+          "churn": 2189,
+          "coverage": 0.07547169811320754
+        },
+        {
+          "tag": "v1.5.0",
+          "churn": 4197,
+          "coverage": 0.036
+        }
+      ]
+    },
+    "unverifiable": null
+  },
+  "warnings": [],
+  "truncated": false,
+  "engine": "claude-cli/haiku",
+  "linkBase": "https://github.com/GyulyVGC/sniffnet",
+  "linkStyle": "github"
+}

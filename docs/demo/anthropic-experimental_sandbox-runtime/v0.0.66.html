@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fact check: anthropic-experimental/sandbox-runtime v0.0.66</title>
+<style>
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--btn-border:#d1d9e0;--btn-hover:#e7ebf0;
+--fg:#1f2328;--detail:#333b43;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--btn-border:#30363d;--btn-hover:#30363d;
+--fg:#e6edf3;--detail:#c9d1d9;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);margin-bottom:20px}
+.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.ring{width:120px;height:120px;flex-shrink:0}
+.comp{display:flex;gap:24px;flex-wrap:wrap}
+.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:var(--muted);font-size:12px}
+.ctx{margin-left:auto;text-align:right;color:var(--muted);font-size:12px}
+.bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
+.seg{height:100%}
+.legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+svg{width:100%;height:auto;border-radius:8px}
+.spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.wf-grid{stroke:var(--border);stroke-width:1}
+.wf-axis{font-size:9px;fill:var(--muted)}
+.wf-label{font-size:12px;fill:var(--fg)}
+.wf-num{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.wf-start{fill:var(--border)}
+.wf-comp{fill:#d29922}
+.wf-cap{fill:#f85149}
+.wf-adj{fill:#6e7681}
+.wf-conn{stroke:var(--faint);stroke-width:1;stroke-dasharray:2 2}
+.tile{stroke:var(--bg);stroke-width:1}
+.tile-sens{stroke:#e3b341;stroke-width:2.5}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+details{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:5px 0}
+summary{cursor:pointer}
+.chip{color:#ffffff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.gen{color:var(--muted);border:1px solid var(--btn-border);font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
+.conf{color:var(--muted);font-size:12px}
+.surplus{color:#d29922;font-size:12px;margin-top:4px}
+.toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
+.toolbar button{background:var(--card);color:var(--fg);border:1px solid var(--btn-border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:var(--btn-hover)}
+.toolbar button.active{background:var(--accent);border-color:var(--accent);color:#ffffff}
+body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
+body[data-filter="handwritten"] details:has(.gen){display:none}
+.detail{margin:8px 0 4px 4px;color:var(--detail)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;font-size:13px}th{color:var(--muted)}
+.ok{color:#3fb950}
+.note{color:var(--muted);font-size:12px}
+.banner{background:var(--card);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:14px 0}
+footer{margin-top:32px;color:var(--faint);font-size:12px}
+</style></head><body>
+<h1>Release-note fact check — anthropic-experimental/sandbox-runtime</h1>
+<div class="sub">v0.0.65 → v0.0.66 · 43 commits · 24 files · +3732/−80 · judge: claude-cli/haiku</div>
+
+<div class="cards">
+  <svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="52" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#d29922" stroke-width="10" stroke-linecap="round" stroke-dasharray="254.8 326.7" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">78</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">minor gaps</text></svg>
+  <div class="comp">
+    <div><div class="n">100</div><div class="t">correctness<br>claims supported</div></div>
+    <div><div class="n">13</div><div class="t">completeness<br>churn documented</div></div>
+    <div><div class="n">100</div><div class="t">risk<br>100 − flag penalties</div></div>
+  </div>
+  <div class="ctx">repo: TypeScript 99% · JavaScript 1% · Shell 0% · 1.6 MB code<br>release cadence ~6 d<br>baseline (5 rel.): median churn ±7797 <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Churn per release (oldest → newest)"><title>Churn per release (oldest → newest)
+v0.0.61: 4451
+v0.0.62: 7797
+v0.0.63: 10552
+v0.0.64: 14212
+v0.0.65: 3488</title><polyline points="3.0,13.9 22.5,10.2 42.0,7.1 61.5,3.0 81.0,15.0" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="15.0" r="2.5" fill="var(--accent)"/></svg> · coverage 23% <svg class="spark" viewBox="0 0 84 18" role="img" aria-label="Note coverage % per release (oldest → newest)"><title>Note coverage % per release (oldest → newest)
+v0.0.61: 23
+v0.0.62: 43
+v0.0.63: 17
+v0.0.64: 41
+v0.0.65: 23</title><polyline points="3.0,12.2 22.5,3.0 42.0,15.0 61.5,3.9 81.0,12.2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="81.0" cy="12.2" r="2.5" fill="var(--accent)"/></svg></div>
+</div>
+
+<h2>Score derivation <span class="note">— components, flag penalties and the hard cap, per <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">SCORING.md</a></span></h2>
+<svg viewBox="0 0 790 152" role="img" aria-label="Score derivation"><line x1="250.0" y1="6" x2="250.0" y2="138" class="wf-grid"/><text x="250.0" y="149" class="wf-axis" text-anchor="middle">0</text><line x1="367.5" y1="6" x2="367.5" y2="138" class="wf-grid"/><text x="367.5" y="149" class="wf-axis" text-anchor="middle">25</text><line x1="485.0" y1="6" x2="485.0" y2="138" class="wf-grid"/><text x="485.0" y="149" class="wf-axis" text-anchor="middle">50</text><line x1="602.5" y1="6" x2="602.5" y2="138" class="wf-grid"/><text x="602.5" y="149" class="wf-axis" text-anchor="middle">75</text><line x1="720.0" y1="6" x2="720.0" y2="138" class="wf-grid"/><text x="720.0" y="149" class="wf-axis" text-anchor="middle">100</text><g><title>perfect release</title><text x="240" y="21" class="wf-label" text-anchor="end">perfect release</text><rect x="250.0" y="11" width="470.0" height="13" class="wf-start"/><text x="728" y="21" class="wf-num">100</text></g><g><title>correctness 100 × 0.45
+weighted share of claims the diff supports</title><text x="240" y="47" class="wf-label" text-anchor="end">correctness 100 × 0.45</text><line x1="720.0" y1="24.0" x2="720.0" y2="50.0" class="wf-conn"/><rect x="720.0" y="37" width="1.5" height="13" class="wf-comp"/><text x="728" y="47" class="wf-num">0</text></g><g><title>completeness 13 × 0.25
+churn-weighted share of commits the notes cover</title><text x="240" y="73" class="wf-label" text-anchor="end">completeness 13 × 0.25</text><line x1="720.0" y1="50.0" x2="720.0" y2="76.0" class="wf-conn"/><rect x="617.8" y="63" width="102.2" height="13" class="wf-comp"/><text x="728" y="73" class="wf-num">−21.8</text></g><g><title>risk 100 × 0.3
+no flag penalties</title><text x="240" y="99" class="wf-label" text-anchor="end">risk 100 × 0.3</text><line x1="617.8" y1="76.0" x2="617.8" y2="102.0" class="wf-conn"/><rect x="617.8" y="89" width="1.5" height="13" class="wf-comp"/><text x="728" y="99" class="wf-num">0</text></g><g><title>78/100 minor gaps</title><text x="240" y="125" class="wf-label" text-anchor="end">78/100 minor gaps</text><line x1="616.6" y1="102.0" x2="616.6" y2="128.0" class="wf-conn"/><rect x="250.0" y="115" width="366.6" height="13" fill="#d29922"/><text x="728" y="125" class="wf-num">78</text></g></svg>
+
+<h2>Claims at a glance</h2>
+<div class="bar"><div class="seg" style="width:80.0%;background:#3fb950" title="verified: 8"></div><div class="seg" style="width:20.0%;background:#6e7681" title="skipped: 2"></div></div><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>verified 8</span><span class="lg"><span class="dot" style="background:#d29922"></span>partial 0</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>no-evidence 0</span><span class="lg"><span class="dot" style="background:#f85149"></span>contradicted 0</span><span class="lg"><span class="dot" style="background:#6e7681"></span>skipped 2</span></div>
+
+<h2>Risk flags</h2>
+<p class="ok">No risk flags.</p>
+
+<h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path, click opens the diff</span></h2>
+<svg viewBox="0 0 1160 560" role="img" aria-label="Diff treemap"><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-c162f29c9ae3dbf742d90228cb161aa1a7c87fe8c20bc4443ed50d13b830ba4f" target="_blank" rel="noopener"><g><rect class="tile" x="0.0" y="0.0" width="392.9" height="310.6" fill="#2ea043" fill-opacity="0.82"><title>test/sandbox/credential-mask-files.test.ts
+±716 lines · evidence
+fns: describe, describe.if
+(click to open the compare view)</title></rect><text x="4.0" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">credential-mask-files.test.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-4963be146d4108d5ec9c6ade979a0254216399026a2241520fcefc0ed6e01e41" target="_blank" rel="noopener"><g><rect class="tile" x="0.0" y="310.6" width="392.9" height="249.4" fill="#2ea043" fill-opacity="0.82"><title>test/sandbox/credential-mask.test.ts
+±575 lines · evidence
+fns: describe, describe.if
+(click to open the compare view)</title></rect><text x="4.0" y="323.6" font-size="10" fill="#ffffff" opacity="0.92">credential-mask.test.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-4a806591a842f3a00981e6bd31d7807e8d1c681d42e924bcbd05552ad7d7d6d9" target="_blank" rel="noopener"><g><rect class="tile" x="392.9" y="0.0" width="257.4" height="312.4" fill="#1f6feb" fill-opacity="0.82"><title>test/sandbox/credential-mask-body.test.ts
+±472 lines · covered
+(click to open the compare view)</title></rect><text x="396.9" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">credential-mask-body.test.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-f1e1362d2ec327316bab1ee1f6f95bdd7147dd8904ea46b16f486b7a9b182fa6" target="_blank" rel="noopener"><g><rect class="tile" x="392.9" y="312.4" width="257.4" height="247.6" fill="#2ea043" fill-opacity="0.82"><title>test/config-validation.test.ts
+±374 lines · evidence
+fns: describe
+(click to open the compare view)</title></rect><text x="396.9" y="325.4" font-size="10" fill="#ffffff" opacity="0.92">config-validation.test.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-65433fb6c39bef19df96be9e9a7af26c285181532981b38e24444a6278733337" target="_blank" rel="noopener"><g><rect class="tile" x="650.3" y="0.0" width="270.8" height="176.2" fill="#1f6feb" fill-opacity="0.82"><title>test/sandbox/credential-decode.test.ts
+±280 lines · covered
+(click to open the compare view)</title></rect><text x="654.3" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">credential-decode.test.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-37d1cb6e75f6ab613b513eef5d2dd25cb4f1b145d51bc337257104687e8b4e19" target="_blank" rel="noopener"><g><rect class="tile" x="921.1" y="0.0" width="238.9" height="176.2" fill="#2ea043" fill-opacity="0.82"><title>src/sandbox/sandbox-config.ts
+±247 lines · evidence
+fns: z.string, z.object
+(click to open the compare view)</title></rect><text x="925.1" y="13.0" font-size="10" fill="#ffffff" opacity="0.92">sandbox-config.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-9c32e33016f3fa726ae1a7e348bf89797189bcc2c369a7b9ffa2e70c231edb5c" target="_blank" rel="noopener"><g><rect class="tile" x="650.3" y="176.2" width="167.4" height="216.8" fill="#1f6feb" fill-opacity="0.82"><title>test/sandbox/body-substitution.test.ts
+±213 lines · covered
+(click to open the compare view)</title></rect><text x="654.3" y="189.2" font-size="10" fill="#ffffff" opacity="0.92">body-substitution.test.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-a66f4d3023139d525914796ca25b003f711a4f9dcdd9f70ddd3db7703466f12a" target="_blank" rel="noopener"><g><rect class="tile" x="650.3" y="393.0" width="167.4" height="167.0" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/body-substitution.ts
+±164 lines · covered
+(click to open the compare view)</title></rect><text x="654.3" y="406.0" font-size="10" fill="#ffffff" opacity="0.92">body-substitution.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-1596f912b2ba99f7a41822c221c7967b4fe5613fd352575fb3d1022b9994094d" target="_blank" rel="noopener"><g><rect class="tile" x="817.7" y="176.2" width="177.7" height="155.3" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/credential-decode.ts
+±162 lines · covered
+(click to open the compare view)</title></rect><text x="821.7" y="189.2" font-size="10" fill="#ffffff" opacity="0.92">credential-decode.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-1aa9852190221f9ada879ee98c119699dafccb7280b5eab3ce0eb3ee00cc3913" target="_blank" rel="noopener"><g><rect class="tile" x="995.4" y="176.2" width="164.6" height="155.3" fill="#2ea043" fill-opacity="0.82"><title>src/sandbox/credential-mask-files.ts
+±150 lines · evidence
+fns: MaskedFileBuildResult, buildMaskedFileBinds
+(click to open the compare view)</title></rect><text x="999.4" y="189.2" font-size="10" fill="#ffffff" opacity="0.92">credential-mask-files.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-9f7f28f50f2a2c2e4a11c1390ac21a88b51bed9080ce6ff2b93b1259501bff44" target="_blank" rel="noopener"><g><rect class="tile" x="817.7" y="331.5" width="139.5" height="127.1" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/credential-sentinel.ts
+±104 lines · covered
+fns: SentinelEntry, SentinelRegistry
+(click to open the compare view)</title></rect><text x="821.7" y="344.5" font-size="10" fill="#ffffff" opacity="0.92">credential-sentinel.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-2e7c567205dcd9b3b24a4c2e7303acd5f80dbcabe7c3a77442a8c9dc1b7a829a" target="_blank" rel="noopener"><g><rect class="tile" x="817.7" y="458.6" width="139.5" height="101.4" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/credential-mask-env.ts
+±83 lines · covered
+fns: MaskedEnvBuildResult, buildMaskedEnvVars
+(click to open the compare view)</title></rect><text x="821.7" y="471.6" font-size="10" fill="#ffffff" opacity="0.92">credential-mask-env.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-8cdf84b9a82ad856b79d249979ea6b8a01fa6347634d2e792f5ab5696961d5d5" target="_blank" rel="noopener"><g><rect class="tile" x="957.1" y="331.5" width="103.7" height="73.9" fill="#2ea043" fill-opacity="0.82"><title>src/sandbox/sandbox-utils.ts
+±45 lines · evidence
+fns: generateProxyEnvVars
+(click to open the compare view)</title></rect><text x="961.1" y="344.5" font-size="10" fill="#ffffff" opacity="0.92">sandbox-utils.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-40a5496816bde353cefb0aa020ef35da98a64e7d1e1926ae1ff3ad0df5b7ec14" target="_blank" rel="noopener"><g><rect class="tile" x="1060.9" y="331.5" width="99.1" height="73.9" fill="#2ea043" fill-opacity="0.82"><title>test/sandbox/proxy-env-vars.test.ts
+±43 lines · evidence
+fns: describe
+(click to open the compare view)</title></rect><text x="1064.9" y="344.5" font-size="10" fill="#ffffff" opacity="0.92">proxy-env-vars.t</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-81a24763acdae7b2fd0602df3e9ee22e49fea4d83c5dc6e6a2e949f8cd711fae" target="_blank" rel="noopener"><g><rect class="tile" x="957.1" y="405.4" width="88.2" height="79.2" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/http-proxy.ts
+±41 lines · covered
+fns: HttpProxyServerOptions, createHttpProxyServer
+(click to open the compare view)</title></rect><text x="961.1" y="418.4" font-size="10" fill="#ffffff" opacity="0.92">http-proxy.ts</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-6e637bf10083a7f253ae45252c69e72f0561c769e1426784e253065f367fcf06" target="_blank" rel="noopener"><g><rect class="tile" x="957.1" y="484.6" width="88.2" height="75.4" fill="#1f6feb" fill-opacity="0.82"><title>test/sandbox/credential-mask-env.test.ts
+±39 lines · covered
+fns: describe.if
+(click to open the compare view)</title></rect><text x="961.1" y="497.6" font-size="10" fill="#ffffff" opacity="0.92">credential-mas</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-48d762b1ae87f6bae24bbd6631faa2f9e18a168ea97ddb8d17c31f2f531690f3" target="_blank" rel="noopener"><g><rect class="tile" x="1045.3" y="405.4" width="70.4" height="84.7" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/tls-terminate-proxy.ts
+±35 lines · covered
+fns: terminateAndForward, forwardUpstream
+(click to open the compare view)</title></rect><text x="1049.3" y="418.4" font-size="10" fill="#ffffff" opacity="0.92">tls-termina</text></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-7d74fdf714661a782b7551ea1f2597ee243a589190b39fb9c3d15cb29c73aae9" target="_blank" rel="noopener"><g><rect class="tile" x="1115.7" y="405.4" width="44.3" height="84.7" fill="#2ea043" fill-opacity="0.82"><title>src/sandbox/sandbox-manager.ts
+±22 lines · evidence
+fns: buildCredentialInjector, startMuxProxyServer, checkDependencies
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-e6dddc479d76d27f2bb99cd19309a4dfe4727d8b3cb4190458e5bbee76592c25" target="_blank" rel="noopener"><g><rect class="tile" x="1045.3" y="490.1" width="46.4" height="69.9" fill="#2ea043" fill-opacity="0.82"><title>test/sandbox/wrap-with-sandbox.test.ts
+±19 lines · evidence
+fns: describe
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-58a167e6edb80084d6d0b62ee421a7e4cbf775460ef61ffbb045aadbe2ea3f1d" target="_blank" rel="noopener"><g><rect class="tile" x="1091.7" y="490.1" width="37.6" height="49.9" fill="#2ea043" fill-opacity="0.82"><title>src/sandbox/linux-sandbox-utils.ts
+±11 lines · evidence
+fns: wrapCommandWithSandboxLinux
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-20289e0cd8c31b57fa204d0b33e56dda8634c85784cca5a3b258e02b8b5539d6" target="_blank" rel="noopener"><g><rect class="tile" x="1129.3" y="490.1" width="30.7" height="49.9" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/credential-extract.ts
+±9 lines · covered
+fns: ReplacementSpan, extractAndSubstitute
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-053150b640a7ce75eff69d1a22cae7f0f94ad64ce9a855db544dda0929316519" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="1091.7" y="540.0" width="34.2" height="20.0" fill="#2ea043" fill-opacity="0.82"><title>package-lock.json
+±4 lines · evidence · sensitive: dependencies
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-7ae45ad102eab3b6d7e7896acd08c427a9b25b346470d7bc6507b6481575d519" target="_blank" rel="noopener"><g><rect class="tile tile-sens" x="1125.8" y="540.0" width="17.1" height="20.0" fill="#2ea043" fill-opacity="0.82"><title>package.json
+±2 lines · evidence · sensitive: dependencies
+(click to open the compare view)</title></rect></g></a><a href="https://github.com/anthropic-experimental/sandbox-runtime/compare/v0.0.65...v0.0.66#diff-ce339c7b37518327c8ba43378a1154d4c01e2cba449e7458ed3bd5f66d1fa919" target="_blank" rel="noopener"><g><rect class="tile" x="1142.9" y="540.0" width="17.1" height="20.0" fill="#1f6feb" fill-opacity="0.82"><title>src/sandbox/request-filter.ts
+±2 lines · covered
+fns: MutateForwardedHeaders
+(click to open the compare view)</title></rect></g></a></svg>
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:#2ea043"></span>cited as evidence</span>
+  <span class="lg"><span class="dot" style="background:#1f6feb"></span>in documented commit</span>
+  <span class="lg"><span class="dot" style="background:#da3633"></span>undocumented</span>
+  <span class="lg"><span class="dot" style="background:#6e7681"></span>unknown</span>
+  <span class="lg"><span class="dot" style="background:#e3b341"></span>sensitive path (border)</span>
+</div>
+
+<h2>Claims in detail</h2>
+<div class="toolbar">
+  <button data-filter="all" class="active">All claims</button>
+  <button data-filter="issues">Issues only</button>
+  <button data-filter="handwritten">Handwritten only</button>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+</div>
+<h3>What&#39;s Changed</h3><div class="claims"><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Add maskClaims for claim-level masking inside decoded JWTs by @elhajjj in #373 <span class="conf">0.95</span></summary><div class="detail">The diff adds a `maskClaims` configuration field to CredentialFileConfigSchema in sandbox-config.ts with full documentation; implements claim-level masking in credential-mask-files.ts via a new conditional block that calls `maskJwtClaims()` and registers per-claim sentinels; and includes comprehensive unit and end-to-end tests in credential-mask-files.test.ts demonstrating the feature masks named claims inside JWT payloads while preserving other claims real.<div class="files">src/sandbox/credential-mask-files.ts, src/sandbox/sandbox-config.ts, test/config-validation.test.ts, test/sandbox/credential-mask-files.test.ts</div><div class="files">fns: mintFakeJwt, MaskedFileBuildResult, buildMaskedFileBinds, z.string, z.object, describe, describe.if</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/2acd4d8cd8405bf82d948b46137a1f36cdfb40a7">2acd4d8c</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Add decode:&quot;jwt&quot; for env vars holding JWTs by @elhajjj in #374 <span class="conf">0.95</span></summary><div class="detail">The diff adds `decode: z.enum([&#39;jwt&#39;]).optional()` to CredentialEnvVarConfigSchema in sandbox-config.ts. Implementation in sandbox-manager.ts (line 729+) checks `if (v.decode === &#39;jwt&#39;)`, verifies the value with `verifyJwt()`, and replaces it with a fake JWT via `mintFakeJwt()`. Comprehensive test coverage in credential-mask.test.ts validates the feature end-to-end, including verification, fake-JWT generation, proxy token substitution, and fail-open behavior for non-JWT values.<div class="files">fns: z.object, checkDependencies, getCredentialRestrictions, describe, describe.if</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/a989994bfa928fcb34836019d342a30c41a38f06">a989994b</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Add maskClaims for env vars holding JWTs by @elhajjj in #376 <span class="conf">0.95</span></summary><div class="detail">The diff shows two new test suites (&#39;env maskClaims masking on Linux (bwrap)&#39; and &#39;end-to-end env maskClaims via SandboxManager&#39;) with comprehensive tests for maskClaims on JWT environment variables, including sentinel replacement, registry mappings, and proxy substitution. Configuration validation code in sandbox-config.ts enforces maskClaims constraints for envVars (requires decode, rejects empty list). The tests explicitly verify that named claims are masked with sentinels while other claims <div class="files">src/sandbox/credential-mask-files.ts, src/sandbox/sandbox-config.ts, src/sandbox/sandbox-manager.ts, test/config-validation.test.ts, test/sandbox/credential-mask-files.test.ts, test/sandbox/credential-mask.test.ts</div><div class="files">fns: mintFakeJwt, MaskedFileBuildResult, buildMaskedFileBinds, z.string, z.object, checkDependencies, getCredentialRestrictions, describe</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/e9d60942281fb5ed9d30a0fdf75796f724fdd76b">e9d60942</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Add decode option for encoded credential formats, starting with JWT by @elhajjj in #362 <span class="conf">0.98</span></summary><div class="detail">The diff adds a new `decode` configuration option for credentials: src/sandbox/credential-decode.ts introduces JWT verification and masking functions (verifyJwt, maskJwtClaims, mintFakeJwt), and src/sandbox/credential-mask-env.ts implements the logic checking `if (v.decode === &#39;jwt&#39;)` to apply JWT-specific masking. Comprehensive tests in credential-decode.test.ts verify the JWT implementation. This directly implements the claimed feature.<div class="files">fns: ReplacementSpan, extractAndSubstitute, MaskedEnvBuildResult, buildMaskedEnvVars, MaskedFileBuildResult, buildMaskedFileBinds, SentinelEntry, SentinelRegistry</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/6def568333d12cbe46df2006fc459909af596e0e">6def5683</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> fix(linux): force --unshare-user + --cap-drop ALL in secure bwrap branch (H1 #3845682) by @seanyeoh-ant in #390 <span class="conf">0.95</span></summary><div class="detail">The diff shows `bwrapArgs.push(&#39;--unshare-user&#39;, &#39;--cap-drop&#39;, &#39;ALL&#39;, &#39;--proc&#39;, &#39;/proc&#39;)` added to the secure branch (`if (!enableWeakerNestedSandbox)`), replacing the previous `--proc /proc` only. A test has been added that explicitly asserts both `--unshare-user` and `--cap-drop ALL` are present in secure-mode output.<div class="files">src/sandbox/linux-sandbox-utils.ts, test/sandbox/wrap-with-sandbox.test.ts</div><div class="files">fns: wrapCommandWithSandboxLinux, describe</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/cf24a43eba92c9ab4140c380d11ca55771be9db2">cf24a43e</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Substitute masked credentials in request bodies at the TLS-terminating proxy by @elhajjj in #399 <span class="conf">0.95</span></summary><div class="detail">The diff shows a complete implementation of masked-credential substitution in request bodies: new `body-substitution.ts` module handles streaming sentinel→real substitution; `tls-terminate-proxy.ts` integrates it via `prepareBodySubstitution()` call; `http-proxy.ts` adds `getBodySubstitutions` option for the TLS-terminated path; comprehensive test file (`credential-mask-body.test.ts`) validates substitution across JSON, form-urlencoded, and multipart body formats.<div class="files">fns: SentinelRegistry, HttpProxyServerOptions, createHttpProxyServer, MutateForwardedHeaders, buildCredentialInjector, startMuxProxyServer, terminateAndForward, forwardUpstream</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/e5b3778e8b3171f753c62812a3b1b4b42a5b783a">e5b3778e</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Advertise the HTTP CONNECT proxy in GRPC_PROXY instead of socks5h by @shawnm-anthropic in #409 <span class="conf">0.98</span></summary><div class="detail">The diff shows GRPC_PROXY/grpc_proxy variables changed from `socks5h://${auth}localhost:${socksProxyPort}` (removed code) to `${connectProxyUrl}` where connectProxyUrl resolves to `http://${auth}localhost:${httpProxyPort}` when an HTTP proxy port exists. Tests confirm the new behavior advertises http:// URLs with fallback to socks5h only when no HTTP proxy is configured. Comments explain gRPC C-core compatibility requirements for HTTP CONNECT proxies.<div class="files">src/sandbox/sandbox-utils.ts, test/sandbox/proxy-env-vars.test.ts</div><div class="files">fns: generateProxyEnvVars, describe</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/48b9f1d917f7c385a23be5cf602db5b8d0e4d943">48b9f1d9</a></div></div></details><details data-v="verified"><summary><span class="chip" style="background:#3fb950">verified</span> Release v0.0.66 by @shawnm-anthropic in #410 <span class="conf">0.95</span></summary><div class="detail">The diff shows package.json version bumped from 0.0.65 to 0.0.66, and the linked commit explicitly states &#39;Merge pull request #410 from anthropic-experimental/release/v0.0.66 (by shawnm-anthropic)&#39;, directly confirming all three elements of the claim: the v0.0.66 release, authorship by shawnm-anthropic, and PR #410.<div class="files">package.json, package-lock.json</div><div class="files">commits: <a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/03bcd3daaffb3f8bfe6973cd55afe7722f1b7a2d">03bcd3da</a></div></div></details></div><h3>New Contributors</h3><div class="claims"><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> @seanyeoh-ant made their first contribution in #390 <span class="conf"></span></summary></details><details data-v="skipped"><summary><span class="chip" style="background:#6e7681">skipped</span> **Full Changelog**: <span class="conf"></span></summary></details></div>
+
+
+<h2>Undocumented commits</h2>
+<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/3248f1f68262a214056f12766629e4638a120a5f">3248f1f6</a></td><td>Merge main (through #389) into decode stack</td><td>+7881/−9975</td><td>56</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/0924646b87dbe3062541bc9f11cb0818851e058a">0924646b</a></td><td>Merge main (#333 onExtractNoMatch) into decode: jwt</td><td>+1548/−2216</td><td>16</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/fb8e15df1766934fdd9e2e6d7fa7652ae603c086">fb8e15df</a></td><td>Merge main (#361 maskDuplicates) into decode: jwt</td><td>+1440/−1575</td><td>27</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/b0e6565551c8712581aa913c37479c8b2f7f7761">b0e65655</a></td><td>Integration tests: body substitution through the terminating proxy (JSON, form, multipart, gzip, framing)</td><td>+472/−0</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/1938728a50fb2d94b9c8bbae231201cee5cc1601">1938728a</a></td><td>Unit tests: boundary-offset sweep, backpressure, framing gates for body substitution</td><td>+200/−0</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/515ebe642c3d0ad6088379f7dc6a67db556a8b6c">515ebe64</a></td><td>Wire body sentinel substitution into the TLS-terminated and plaintext proxy paths</td><td>+118/−4</td><td>4</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/e134ba2b4dec3d4821edfcdbdd62c9e5ca7e825c">e134ba2b</a></td><td>Add streaming sentinel substitution transform for request bodies</td><td>+109/−0</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/d6ef651f70f27cc40187da0c66ea52bd69d138d0">d6ef651f</a></td><td>feat(credentials): maskJwtClaims helper — rebuild token with per-claim sentinels</td><td>+76/−0</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/bb928bd510e678bc1d3519847c6a65c16a9ffe38">bb928bd5</a></td><td>Registry: length-matched sentinel minting and per-host sentinel pairs accessor</td><td>+57/−2</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/c0a7836a3530b1fd304bec00fb026bd7b1cf6bcd">c0a7836a</a></td><td>Add JWT verification helper and default extraction pattern</td><td>+48/−0</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/af0299bd285d2d7c73e5a37a23ba967df0642d6a">af0299bd</a></td><td>Support caller-minted sentinels in SentinelRegistry</td><td>+38/−4</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/2e10cbb5a71c15108dcc0a16551e32573eeecc41">2e10cbb5</a></td><td>Add mintFakeJwt helper for JWT-shaped sentinels</td><td>+40/−2</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/2e7f0bdc80280e3cf5ce9c1ea08f94fcfcb716fe">2e7f0bdc</a></td><td>e2e: sandboxed POST body reaches injectHost with the real secret via SandboxManager</td><td>+32/−2</td><td>1</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/be94f5b1494f535c88582d5695cab33844cac1df">be94f5b1</a></td><td>Substitute in bodyless-method requests that declare a body (GET-with-body)</td><td>+22/−1</td><td>2</td></tr><tr><td><a href="https://github.com/anthropic-experimental/sandbox-runtime/commit/916504c61e2eb456ee930823feb56ee35be5f10b">916504c6</a></td><td>Document the no-nested-sentinels caller contract and the scan&#39;s earliest-match discipline</td><td>+9/−1</td><td>2</td></tr></table>
+
+
+<footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
+<script>
+for (const b of document.querySelectorAll(".toolbar button[data-filter]")) {
+  b.addEventListener("click", () => {
+    document.body.dataset.filter = b.dataset.filter;
+    for (const o of document.querySelectorAll(".toolbar button[data-filter]")) o.classList.toggle("active", o === b);
+  });
+}
+document.getElementById("expand").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = true;
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  for (const d of document.querySelectorAll("details")) d.open = false;
+});
+</script>
+</body></html>
