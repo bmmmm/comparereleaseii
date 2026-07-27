@@ -16,6 +16,8 @@ import {
   toWatchAtomFeed,
   carriedFromLedger,
   capLedger,
+  updateAuthorLedger,
+  MAX_AUTHOR_LEDGER,
   MAX_PROMISE_LEDGER,
   type ReleaseInfo,
   type WatchState,
@@ -657,4 +659,42 @@ test("a release tagged index cannot take over the history page's filename", () =
   assert.equal(sanitizeTag("INDEX"), "INDEX_", "case-insensitive filesystems collide too");
   assert.equal(sanitizeTag("v1.0/../index"), "v1.0_.._index");
   assert.equal(sanitizeTag("v1.2.3"), "v1.2.3");
+});
+
+function activity(key: string, commits: number, over: Record<string, unknown> = {}) {
+  return { key, name: key, commits, sensitiveCommits: 0, binaryCommits: 0, ...over };
+}
+
+test("the author ledger accumulates identities and firstSeen never moves", () => {
+  const r1 = updateAuthorLedger(undefined, [activity("a@x", 3), activity("b@x", 1)], "v1");
+  assert.equal(r1.newAuthors, 2);
+  assert.equal(r1.dropped, 0);
+  const r2 = updateAuthorLedger(
+    r1.ledger,
+    [activity("a@x", 2, { name: "A renamed", logins: ["a-login"] })],
+    "v2",
+  );
+  assert.equal(r2.newAuthors, 0, "a known identity is not new");
+  const a = r2.ledger.find((x) => x.key === "a@x")!;
+  assert.equal(a.firstSeen, "v1", "firstSeen is immutable");
+  assert.equal(a.lastSeen, "v2");
+  assert.equal(a.releases, 2);
+  assert.equal(a.commits, 5);
+  assert.equal(a.name, "A renamed");
+  const r3 = updateAuthorLedger(r2.ledger, [activity("a@x", 1, { logins: [null] })], "v3");
+  assert.deepEqual(r3.ledger.find((x) => x.key === "a@x")!.logins, ["a-login", null],
+    "attribution changes accumulate — that shift is the fact worth keeping");
+});
+
+test("the author ledger cap keeps this release's identities, then the busiest", () => {
+  let ledger = updateAuthorLedger(
+    undefined,
+    Array.from({ length: MAX_AUTHOR_LEDGER }, (_, i) => activity(`old${i}@x`, i + 2)),
+    "v1",
+  ).ledger;
+  const update = updateAuthorLedger(ledger, [activity("fresh@x", 1)], "v2");
+  assert.equal(update.ledger.length, MAX_AUTHOR_LEDGER);
+  assert.equal(update.dropped, 1);
+  assert.ok(update.ledger.some((a) => a.key === "fresh@x"), "the active identity survives the cap");
+  assert.ok(!update.ledger.some((a) => a.key === "old0@x"), "the least active is what drops");
 });

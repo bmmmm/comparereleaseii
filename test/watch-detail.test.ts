@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reportDirOf, scoreClass, toRepoDetailHtml } from "../src/watch-detail.ts";
+import { isBotAuthor, reportDirOf, scoreClass, toRepoDetailHtml } from "../src/watch-detail.ts";
 import { STALE_AFTER } from "../src/promises.ts";
 import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch.ts";
 import type { PromiseCheck } from "../src/types.ts";
@@ -202,4 +202,49 @@ test("a legacy nested layout climbs the right number of levels", () => {
   );
   assert.ok(html.includes('href="../../index.html"'), "back link climbs two levels");
   assert.ok(html.includes('href="../../zen-browser/desktop/v2.html"'), "report links climb too");
+});
+
+test("the authors section states ledger facts, bot chip and attribution changes", () => {
+  const rs: RepoState = {
+    ...state([check("v3", 80, { authors: { total: 3, new: 1, top1Share: 0.62 } })]),
+    authors: [
+      {
+        key: "r@x", name: "renovate[bot]", logins: ["renovate[bot]"],
+        firstSeen: "v1", lastSeen: "v3", releases: 3, commits: 12,
+        sensitiveCommits: 9, binaryCommits: 0,
+      },
+      {
+        key: "j@x", name: `Jia<img src=x>`, logins: ["jiat75", null],
+        firstSeen: "v2", lastSeen: "v3", releases: 2, commits: 40,
+        sensitiveCommits: 2, binaryCommits: 1,
+      },
+      {
+        key: "s@x", name: "Solo", firstSeen: "v1", lastSeen: "v1",
+        releases: 1, commits: 1, sensitiveCommits: 0, binaryCommits: 0,
+      },
+    ],
+  };
+  const html = toRepoDetailHtml(ENTRY, rs, null, "t");
+  assert.ok(html.includes("Authors"));
+  assert.equal(html.match(/class="bot"/g)?.length, 1, "only the bot wears the chip");
+  assert.ok(html.includes("@jiat75, no account"), "attribution history is listed");
+  assert.ok(html.includes("attribution changed across releases"));
+  assert.ok(!html.includes("<img"), "hostile author names stay text");
+  assert.ok(html.indexOf("Jia") < html.indexOf("renovate[bot]"), "busiest identity first");
+  assert.ok(html.includes("not a trust rating"), "the neutral framing is on the page");
+  // Release rows carry the per-release author facts.
+  assert.ok(html.includes("1 new"));
+  assert.ok(html.includes("62% of this release"));
+  // No ledger, no section.
+  assert.ok(!toRepoDetailHtml(ENTRY, state([check("v1", 90)]), null, "t").includes(">Authors<"));
+});
+
+test("isBotAuthor stays narrow: word-bounded, known bots, no human false positives", () => {
+  assert.equal(isBotAuthor("dependabot[bot]"), true);
+  assert.equal(isBotAuthor("renovate"), true);
+  assert.equal(isBotAuthor("cool-bot"), true);
+  assert.equal(isBotAuthor("Some Human", ["github-actions"]), true);
+  assert.equal(isBotAuthor("Botond"), false);
+  assert.equal(isBotAuthor("Abbot"), false);
+  assert.equal(isBotAuthor("Jia Tan"), false);
 });

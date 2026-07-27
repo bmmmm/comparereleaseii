@@ -7,7 +7,7 @@
 import { safeSegment } from "./paths.ts";
 import { STALE_AFTER } from "./promises.ts";
 import type { PromiseCheck } from "./types.ts";
-import type { CheckedRelease, RepoState, WatchedEntry } from "./watch.ts";
+import type { AuthorRecord, CheckedRelease, RepoState, WatchedEntry } from "./watch.ts";
 
 /**
  * Where a repo's reports live, relative to the reports root — derived from
@@ -201,6 +201,11 @@ function releasesTable(history: CheckedRelease[], root: string): string {
       const comp = h.components
         ? `${h.components.correctness} · ${h.components.completeness ?? "–"} · ${h.components.risk}`
         : "";
+      const authors = h.authors
+        ? `<span title="top identity authored ${Math.round(h.authors.top1Share * 100)}% of this release's commits">${h.authors.total}${
+            h.authors.new ? ` <span class="notice" title="identities this watcher had never seen before">${h.authors.new} new</span>` : ""
+          }</span>`
+        : "";
       return `<tr class="${h.flagged ? "flagged" : ""}">
 <td>${h.flagged ? "&#9888;" : "&#10003;"}</td>
 <td><a href="${esc(reportHref(root, h))}">${esc(h.tag)}</a></td>
@@ -209,12 +214,56 @@ function releasesTable(history: CheckedRelease[], root: string): string {
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${h.criticalFlags ? `<b>${h.criticalFlags} critical</b> / ${h.flagCount}` : h.flagCount || ""}</td>
+<td>${authors}</td>
 <td title="${esc(h.checkedAt)}">${esc(h.checkedAt.slice(0, 10))}</td>
 </tr>`;
     })
     .join("\n");
   return `<table>
-<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th>checked</th></tr></thead>
+<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th title="identities with commits in the release (new = never seen by this watcher)">authors</th><th>checked</th></tr></thead>
+<tbody>
+${rows}
+</tbody></table>`;
+}
+
+/**
+ * Name or account says it's automation. Word-bounded so Botond and Abbot
+ * stay human; a wrong "bot" chip on a person is a mislabel, so the pattern
+ * errs narrow.
+ */
+export function isBotAuthor(name: string, logins?: Array<string | null>): boolean {
+  // Each candidate on its own — joining them would break the ^ anchors.
+  const re = /\[bot\]|(^|[^a-z])bot([^a-z]|$)|^(dependabot|renovate|github-actions)/i;
+  return [name, ...(logins ?? [])].some((s) => s !== null && re.test(s));
+}
+
+/** How the forge attribution reads as a neutral fact. */
+function accountCell(logins: Array<string | null> | undefined): string {
+  if (!logins || logins.length === 0) return `<span class="mutedcell">—</span>`;
+  const parts = logins.map((l) => (l === null ? "no account" : `@${esc(l)}`));
+  const changed = logins.length > 1;
+  return `<span${changed ? ' class="notice" title="attribution changed across releases — the git email is forgeable, the account is not"' : ""}>${parts.join(", ")}</span>`;
+}
+
+/** The accumulated ledger as a table — facts per identity, no ratings. */
+function authorsSection(ledger: AuthorRecord[]): string {
+  const rows = [...ledger]
+    .sort((x, y) => y.commits - x.commits)
+    .map(
+      (a) => `<tr>
+<td>${esc(a.name)}${isBotAuthor(a.name, a.logins) ? ` <span class="bot">bot</span>` : ""}</td>
+<td>${accountCell(a.logins)}</td>
+<td>${esc(a.firstSeen)}</td>
+<td>${a.releases}</td>
+<td>${a.commits}</td>
+<td>${a.sensitiveCommits || ""}</td>
+<td>${a.binaryCommits || ""}</td>
+</tr>`,
+    )
+    .join("\n");
+  return `<h2>Authors <span class="note">— identity facts accumulated over the checked releases; not a trust rating in either direction</span></h2>
+<table>
+<thead><tr><th>author</th><th>account</th><th>first seen</th><th>releases</th><th>commits</th><th title="commits touching dependency manifests, CI or auth/crypto paths">sensitive</th><th title="commits changing opaque binary files">binary</th></tr></thead>
 <tbody>
 ${rows}
 </tbody></table>`;
@@ -284,6 +333,8 @@ svg{width:100%;height:auto}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
 .dropmark{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
 .notice{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.bot{display:inline-block;border:1px solid var(--muted);color:var(--muted);border-radius:.6em;padding:0 .4em;font-size:.8em}
+.mutedcell{color:var(--muted)}
 @media (prefers-color-scheme:dark){.notice{border-color:#d29922;color:#d29922}}
 table{border-collapse:collapse;width:100%;margin-top:6px}
 th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid var(--border);font-size:13px}
@@ -321,6 +372,7 @@ ${scoreChart(history, level, root)}
 ${verdictChart(history, root)}
 <h2>Checked releases</h2>
 ${releasesTable(history, root)}
+${rs.authors?.length ? authorsSection(rs.authors) : ""}
 ${rs.promises?.length ? promisesSection(rs.promises) : ""}
 <footer>generated by <a href="https://github.com/bmmmm/comparereleaseii">comparereleaseii</a> · <a href="https://github.com/bmmmm/comparereleaseii/blob/main/SCORING.md">how the score works</a></footer>
 </body></html>

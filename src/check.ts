@@ -14,7 +14,7 @@ import { fetchForgeReleases, parseRepoUrl, type ForgeListing } from "./sources/f
 import { parseClaims, markCarriedOver } from "./claims.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
-import { computeMetrics } from "./metrics.ts";
+import { authorActivity, computeMetrics } from "./metrics.ts";
 import { checkPromises, type CarriedPromise } from "./promises.ts";
 import {
   buildSnapshots,
@@ -346,5 +346,9 @@ export async function analyzeRelease(
     linkBase: link?.base,
     linkStyle: link?.style,
     promises: promises.length ? promises : undefined,
+    // Computed after the metrics are fixed — display and ledger data only.
+    authors: data.commits.length
+      ? authorActivity(data.commits, coverage?.commitFiles ?? null)
+      : undefined,
   };
 }

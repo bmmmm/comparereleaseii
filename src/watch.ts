@@ -22,7 +22,7 @@ import { toHtml } from "./html.ts";
 import { reportDirOf, toRepoDetailHtml } from "./watch-detail.ts";
 import { safeSegment } from "./paths.ts";
 
-import type { PromiseCheck, UnverifiableKind } from "./types.ts";
+import type { AuthorActivity, PromiseCheck, UnverifiableKind } from "./types.ts";
 import type { CarriedPromise } from "./promises.ts";
 
 type FailOn = "none" | "contradicted" | "no-evidence";
@@ -120,6 +120,12 @@ export interface CheckedRelease {
   brokenPromises?: number;
   engine: string;
   verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
+  /**
+   * Author facts of this release: identities total, identities the ledger
+   * had never seen, and the top identity's share of commits (0–1) — a
+   * single-maintainer release is a supply-chain fact worth showing.
+   */
+  authors?: { total: number; new: number; top1Share: number };
   /** HTML report path relative to the reports directory. */
   report: string;
   /**
@@ -167,6 +173,86 @@ export interface RepoState {
    * and the reason target-less promises cannot ride forever.
    */
   promises?: PromiseCheck[];
+  /** Author ledger — per-identity facts accumulated across checked releases. */
+  authors?: AuthorRecord[];
+}
+
+/**
+ * One identity's record across every release this watcher checked — the
+ * promise-ledger pattern applied to authors. Facts only, accumulated, never
+ * scored; the settled framing is behaviors per release, no person-level
+ * trust labels in either direction.
+ */
+export interface AuthorRecord {
+  key: string;
+  /** Latest display name seen for this identity. */
+  name: string;
+  /** Distinct forge attributions across releases; `null` = explicitly none. */
+  logins?: Array<string | null>;
+  /** Tag of the first checked release this identity appeared in. */
+  firstSeen: string;
+  lastSeen: string;
+  /** Checked releases this identity had commits in. */
+  releases: number;
+  commits: number;
+  sensitiveCommits: number;
+  binaryCommits: number;
+}
+
+/** Hard bound on the per-repo author ledger — same reasoning as the promise
+ * cap: state must not grow without limit, and the drop is announced. */
+export const MAX_AUTHOR_LEDGER = 100;
+
+/**
+ * Fold one release's author activity into the ledger. `firstSeen` is
+ * immutable once recorded — it is the one fact the ledger exists to answer
+ * ("since when has this identity been here?"). When the cap bites, this
+ * release's active identities always survive (they are what the next
+ * check's "new" count is measured against), then the busiest.
+ */
+export function updateAuthorLedger(
+  ledger: AuthorRecord[] | undefined,
+  activity: AuthorActivity[] | undefined,
+  tag: string,
+): { ledger: AuthorRecord[]; newAuthors: number; dropped: number } {
+  const byKey = new Map((ledger ?? []).map((a) => [a.key, { ...a }]));
+  let newAuthors = 0;
+  for (const act of activity ?? []) {
+    let rec = byKey.get(act.key);
+    if (!rec) {
+      newAuthors++;
+      rec = {
+        key: act.key,
+        name: act.name,
+        firstSeen: tag,
+        lastSeen: tag,
+        releases: 0,
+        commits: 0,
+        sensitiveCommits: 0,
+        binaryCommits: 0,
+      };
+      byKey.set(act.key, rec);
+    }
+    rec.name = act.name;
+    rec.lastSeen = tag;
+    rec.releases++;
+    rec.commits += act.commits;
+    rec.sensitiveCommits += act.sensitiveCommits;
+    rec.binaryCommits += act.binaryCommits;
+    for (const login of act.logins ?? []) {
+      if (!(rec.logins ?? []).includes(login)) rec.logins = [...(rec.logins ?? []), login];
+    }
+  }
+  const all = [...byKey.values()];
+  if (all.length <= MAX_AUTHOR_LEDGER) return { ledger: all, newAuthors, dropped: 0 };
+  const active = new Set((activity ?? []).map((a) => a.key));
+  const keep = all.filter((a) => active.has(a.key));
+  const rest = all.filter((a) => !active.has(a.key)).sort((x, y) => y.commits - x.commits);
+  return {
+    ledger: [...keep, ...rest].slice(0, MAX_AUTHOR_LEDGER),
+    newAuthors,
+    dropped: all.length - MAX_AUTHOR_LEDGER,
+  };
 }
 
 export interface WatchState {
@@ -963,6 +1049,17 @@ export async function runWatch(
           contradicted: report.results.filter((r) => r.verdict === "contradicted").length,
         };
         const releaseUrl = releaseWebUrl(link, rel.tag);
+        // The ledger update precedes the CheckedRelease so "new" means "new
+        // to everything this watcher has seen", not "new to this run".
+        const authorUpdate = updateAuthorLedger(repoState.authors, report.authors, rel.tag);
+        if (authorUpdate.dropped > 0) {
+          console.error(
+            `${key}: author ledger capped at ${MAX_AUTHOR_LEDGER} identities ` +
+              `(${authorUpdate.dropped} least-active dropped).`,
+          );
+        }
+        repoState.authors = authorUpdate.ledger;
+        const totalCommits = (report.authors ?? []).reduce((s, a) => s + a.commits, 0);
         const checkedRelease: CheckedRelease = {
           tag: rel.tag,
           publishedAt: rel.publishedAt,
@@ -984,6 +1081,17 @@ export async function runWatch(
             : {}),
           engine: report.engine,
           verdicts,
+          ...(report.authors?.length
+            ? {
+                authors: {
+                  total: report.authors.length,
+                  new: authorUpdate.newAuthors,
+                  top1Share:
+                    Math.round(((report.authors[0]?.commits ?? 0) / (totalCommits || 1)) * 100) /
+                    100,
+                },
+              }
+            : {}),
           unverifiable: report.metrics.unverifiable?.kind,
           scoreLevel,
           report: `${dirKey}/${base}.html`,

@@ -7,6 +7,7 @@ import {
   opacityIssue,
   computeScores,
   scoreBreakdown,
+  authorActivity,
   isSourceFile,
   isSourcelessDiff,
   classifyUnverifiable,
@@ -16,7 +17,7 @@ import {
   lockfileSources,
 } from "../src/metrics.ts";
 import { layoutTreemap } from "../src/html.ts";
-import type { ClaimResult, DiffFile, FileInsight, ReleaseData, Report, RiskFlag } from "../src/types.ts";
+import type { ClaimResult, Commit, DiffFile, FileInsight, ReleaseData, Report, RiskFlag } from "../src/types.ts";
 import type { Baseline } from "../src/history.ts";
 import type { Coverage } from "../src/verify.ts";
 
@@ -837,4 +838,32 @@ test("a flag list that does not itemize the stored risk says so instead of asser
   const risk = scoreBreakdown(report).find((s) => s.label.startsWith("risk"));
   assert.ok(risk?.detail?.includes("does not itemize the stored risk of 90"), risk?.detail ?? "no detail");
   assert.ok(!scoreBreakdown(report).some((s) => s.kind === "adjustment"), "totals still reconcile");
+});
+
+test("authorActivity groups by email key across spellings and counts path facts", () => {
+  const commit = (sha: string, author: string, email: string, extra: Partial<Commit> = {}): Commit =>
+    ({ sha, subject: "s", body: "", author, email, prNumbers: [], ...extra });
+  const commits = [
+    commit("a1", "Jia Tan", "jia@example.com", { login: "jiat75" }),
+    commit("a2", "JiaT75", "JIA@example.com", { login: null }),
+    commit("b1", "Maint", "m@example.com"),
+  ];
+  const files = new Map<string, DiffFile[]>([
+    ["a1", [{ path: "src/auth/x.rs", status: "modified", additions: 1, deletions: 0 }]],
+    ["a2", [{ path: "vendor/blob.so", status: "added", additions: 0, deletions: 0 }]],
+    ["b1", [{ path: "README.md", status: "modified", additions: 1, deletions: 0 }]],
+  ]);
+  const acts = authorActivity(commits, files);
+  assert.equal(acts.length, 2, "case-folded email is one identity");
+  const [jia, maint] = acts;
+  assert.equal(jia.commits, 2);
+  assert.equal(jia.name, "JiaT75", "latest display spelling wins");
+  assert.deepEqual(jia.logins, ["jiat75", null], "every distinct attribution is recorded");
+  assert.equal(jia.sensitiveCommits, 1);
+  assert.equal(jia.binaryCommits, 1);
+  assert.equal(maint.logins, undefined, "a source without attribution stays undefined");
+  assert.equal(maint.sensitiveCommits, 0);
+  // Without coverage the path facts drop to zero, the counts stay.
+  assert.equal(authorActivity(commits, null)[0].sensitiveCommits, 0);
+  assert.equal(authorActivity(commits, null)[0].commits, 2);
 });

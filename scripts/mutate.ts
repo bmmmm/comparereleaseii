@@ -217,6 +217,12 @@ const MUTANTS: Mutant[] = [
     find: '} else if (flags.some((f) => f.severity === "critical") && Math.round(total) > 45) {',
     replace: "} else if (false) {",
   },
+  {
+    guard: "an author's firstSeen is immutable once recorded",
+    file: "src/watch.ts",
+    find: "    rec.name = act.name;\n    rec.lastSeen = tag;",
+    replace: "    rec.name = act.name;\n    rec.firstSeen = tag;\n    rec.lastSeen = tag;",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

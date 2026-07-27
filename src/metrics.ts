@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import type {
+  AuthorActivity,
   ClaimResult,
+  Commit,
   DiffFile,
   FileCoverage,
   FileInsight,
@@ -814,6 +816,37 @@ export function scoreBreakdown(report: Report): ScoreStep[] {
   }
   steps.push({ label: `${s.overall}/100 ${s.label}`, delta: 0, total: s.overall, kind: "final" });
   return steps;
+}
+
+/**
+ * Per-identity activity in one release, keyed like the baseline's author
+ * check (email across sources). Facts for display and for the watch
+ * ledger — never a score input: the flags that DO score (new-author,
+ * email-spoof) live in baselineFlags and are unchanged by this.
+ */
+export function authorActivity(
+  commits: Commit[],
+  commitFiles: Map<string, DiffFile[]> | null,
+): AuthorActivity[] {
+  const byKey = new Map<string, AuthorActivity>();
+  for (const commit of commits) {
+    const key = authorKey(commit);
+    let a = byKey.get(key);
+    if (!a) {
+      a = { key, name: commit.author, commits: 0, sensitiveCommits: 0, binaryCommits: 0 };
+      byKey.set(key, a);
+    }
+    a.commits++;
+    a.name = commit.author;
+    if (commit.login !== undefined && !(a.logins ?? []).includes(commit.login)) {
+      a.logins = [...(a.logins ?? []), commit.login];
+    }
+    const files = commitFiles?.get(commit.sha) ?? [];
+    if (files.some((f) => sensitiveCategory(f.path) !== null)) a.sensitiveCommits++;
+    if (files.some((f) => opacityIssue(f) === "binary file")) a.binaryCommits++;
+  }
+  // Busiest first; ties keep commit order — deterministic either way.
+  return [...byKey.values()].sort((x, y) => y.commits - x.commits);
 }
 
 /** Anomalies relative to the repo's own release history. */

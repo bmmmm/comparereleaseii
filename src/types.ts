@@ -236,6 +236,30 @@ export interface Metrics {
   } | null;
 }
 
+/**
+ * One identity's activity within a single release — facts only, stated
+ * neutrally. This never carries a judgement: "trusted contributor" is
+ * exactly the false comfort the xz backdoor exploited, and "suspicious"
+ * is an accusation built from heuristics. The reader gets numbers.
+ */
+export interface AuthorActivity {
+  /** Cross-source identity key — lowercased git-header email, name fallback. */
+  key: string;
+  /** Display name from the git header (latest spelling). */
+  name: string;
+  /**
+   * Distinct forge attributions seen in this release. Absent when the
+   * source carries no attribution at all (clone); `null` inside the list
+   * means the forge explicitly mapped the email to no account.
+   */
+  logins?: Array<string | null>;
+  commits: number;
+  /** Commits touching at least one sensitive path (deps, CI, auth/crypto). */
+  sensitiveCommits: number;
+  /** Commits changing opaque binary files. */
+  binaryCommits: number;
+}
+
 export interface Report {
   repoLabel: string;
   baseRef: string;
@@ -255,4 +279,6 @@ export interface Report {
   linkStyle?: "github" | "gitlab";
   /** Earlier releases' promises checked against this diff — informational, never scored. */
   promises?: PromiseCheck[];
+  /** Per-identity activity in this release — informational, never scored. */
+  authors?: AuthorActivity[];
 }
