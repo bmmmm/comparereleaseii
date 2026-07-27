@@ -127,6 +127,16 @@ export function extractChangelogSection(changelog: string, tag: string): string 
   return lines.slice(start + 1, end).join("\n").trim();
 }
 
+/** The tag's section under whichever v-prefix convention the CHANGELOG uses —
+ * tags and headings routinely disagree about the `v` in both directions. */
+function changelogSectionFor(changelog: string, tag: string): string | null {
+  return (
+    extractChangelogSection(changelog, tag) ??
+    extractChangelogSection(changelog, tag.replace(/^v/, "")) ??
+    (tag.startsWith("v") ? null : extractChangelogSection(changelog, `v${tag}`))
+  );
+}
+
 /**
  * Tag suffixes that mark something the maintainer did not consider finished.
  * A baseline built from release candidates measures the churn of a repo's
@@ -174,9 +184,7 @@ export async function changelogReleases(
     const date = line.slice(0, sep);
     const tag = line.slice(sep + 1);
     if (PRERELEASE_TAG.test(tag)) continue;
-    const notes =
-      extractChangelogSection(changelog, tag) ??
-      extractChangelogSection(changelog, tag.replace(/^v/, ""));
+    const notes = changelogSectionFor(changelog, tag);
     if (notes === null) continue;
     releases.push({ tag, notes, date: date || null });
   }
@@ -371,9 +379,7 @@ export async function loadLocalRelease(opts: {
         `No release notes: pass --notes-file <file> or add a CHANGELOG.md with a "${head}" section to the repo.`,
       );
     }
-    const section =
-      extractChangelogSection(changelog, head) ??
-      extractChangelogSection(changelog, head.replace(/^v/, ""));
+    const section = changelogSectionFor(changelog, head);
     if (!section) {
       throw new Error(
         `CHANGELOG.md has no section for "${head}". Pass --notes-file <file> instead.`,

@@ -27,6 +27,9 @@ tool is checked with the tool itself before it ships.
 - **`--local .` names the repository after its directory, not ".".** Report
   headers read `Cost estimate — . v0.1.2 → v0.2.0`; the path is resolved
   before its basename becomes the label.
+- **A bare tag now finds its `v`-prefixed changelog heading.** Tag `1.0.0`
+  with heading `## v1.0.0` failed with "no section" — only the opposite
+  mismatch was normalized.
 - **Numeric flags reject garbage instead of silently disabling features.**
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number

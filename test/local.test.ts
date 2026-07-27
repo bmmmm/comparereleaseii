@@ -302,3 +302,20 @@ test("the repo label resolves the path before taking its basename", async () => 
   assert.notEqual(dotted.repoLabel, ".");
   assert.equal(dotted.repoLabel, repo.split("/").pop());
 });
+
+test("a bare tag finds its v-prefixed changelog heading", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "crii-vprefix-"));
+  const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
+  await git("init", "-q");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(repo, "a.txt"), "one\n");
+  // Tag without v, heading with v — the mismatch nobody normalized until now.
+  await writeFile(join(repo, "CHANGELOG.md"), "# Changelog\n\n## v1.0.0\n\n- First (#1)\n");
+  await git("add", ".");
+  await git("commit", "-q", "-m", "first");
+  await git("tag", "1.0.0");
+
+  const data = await loadLocalRelease({ repo, head: "1.0.0" });
+  assert.ok(data.notes.includes("First"), `notes not found: ${JSON.stringify(data.notes)}`);
+});
