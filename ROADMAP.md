@@ -333,6 +333,47 @@ with the 12 repos, state, reports) sits in the iteration-2 worktree under
 `~/release-watch/` as a new top-level home directory is the user's call —
 ask before creating it.
 
+### Next — presentation, analytics, and the author dimension (ideas 2026-07-27 — NOT settled, prioritize in a fresh session)
+
+Context: the HTML layer is the least-built side. The report renders well but
+nobody is shown it (README carries zero screenshots, no demo); the watch
+state holds up to 20 checks per repo of which the index renders six trend
+dots; the promise ledger and the score derivation are invisible; author data
+(identity keys, email→account pairings, first-time/spoof flags) exists in
+snapshots but has no view. Candidate blocks, roughly in recommended order:
+
+- **P1 — repo detail page** (`reports/<repo>/index.html`, written by watch):
+  full score time series from the state history, flag history, verdict
+  composition over time, promise-ledger view with carry countdowns ("carry
+  7/10 until stale"). All from data that already exists.
+- **P4 — author ledger:** accumulate per-identity history in the watch state
+  (the promise-ledger pattern): first seen, commits per release, share of
+  sensitive-path touches, binary contributions, pairing stability, bot
+  detection; a new-author timeline per release; concentration metrics
+  (top-1 commit share — single-maintainer is a supply-chain risk too).
+  Framing decision, settled now: behavioral anomalies per release, stated
+  neutrally — **no person-level trust labels**. "Friendly/trusted user" is
+  exactly the false comfort the xz backdoor exploited (the attacker WAS the
+  established co-maintainer); "suspicious user" is a public accusation built
+  from heuristics with false positives. Show facts ("since 14 releases, 212
+  commits"), flag behaviors, leave the verdict to the reader.
+- **P5 — promotion:** README screenshots (report + index), a static demo
+  page (GitHub Pages serving a real example report), optionally a per-repo
+  SVG trust badge.
+- **P2 — index upgrades:** aggregate tiles (watched/flagged/broken promises/
+  score distribution), column sort + flagged-only filter (self-contained
+  vanilla JS), a chronological cross-repo release feed as the second axis —
+  optionally as a static Atom feed (pull counterpart to the ntfy push).
+- **P3 — score decomposition in the report:** a small waterfall from
+  components through caps and flag deductions to the final number — the
+  visible version of SCORING.md.
+
+Constraints that stand: static files only (`watch serve` stays unbuilt);
+every new view is score-neutral (pure display never moves a number; anything
+that would faces the A/B measurement discipline). Open: prioritization; how
+deep author history reaches (baseline window vs. accumulating in state —
+lean state-accumulating); whether badges are wanted at all.
+
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target
   at all. If not: a one-hour actionable error ("diff exceeds 64 MB — narrow
