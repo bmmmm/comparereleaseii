@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { detectPromise } from "../src/claims.ts";
-import { checkPromises, targetReached } from "../src/promises.ts";
+import { checkPromises, targetReached, STALE_AFTER } from "../src/promises.ts";
 import { analyzeRelease } from "../src/check.ts";
 import type { ReleaseData, RepoContext } from "../src/types.ts";
 
@@ -141,6 +141,50 @@ test("carried promises are re-checked and deduplicated against base notes", () =
   const xml = checks.find((c) => c.from === "v1.5.0");
   assert.equal(xml?.status, "kept");
   assert.deepEqual(xml?.files, ["src/xml.ts"]);
+  // Base-note promises come first: the watch ledger cap drops from the tail,
+  // which must be the oldest carried entries, never this release's own.
+  assert.deepEqual(checks.map((c) => c.from), ["v1.9.0", "v1.5.0"]);
+});
+
+test("a target-less promise ages out as stale instead of riding forever", () => {
+  const carry = (carriedFor?: number) => [
+    {
+      text: "The `legacyAuth` helper will be removed in a future release",
+      from: "v1.0.0",
+      kind: "removal" as const,
+      carriedFor,
+    },
+  ];
+  const data = dataWith({});
+
+  // Each check is one more carry, and the count rides in the result so the
+  // watch state can hand it back next release.
+  const [first] = checkPromises(data, carry());
+  assert.equal(first.status, "still-open");
+  assert.equal(first.carriedFor, 1);
+  const [almost] = checkPromises(data, carry(STALE_AFTER - 2));
+  assert.equal(almost.status, "still-open");
+  assert.equal(almost.carriedFor, STALE_AFTER - 1);
+
+  // The STALE_AFTER-th carry is the visible exit — status, not a silent drop.
+  const [aged] = checkPromises(data, carry(STALE_AFTER - 1));
+  assert.equal(aged.status, "stale");
+  assert.match(aged.note, /aged out/);
+
+  // A promise the diff resolves is never stale, however long it rode.
+  const kept = dataWith({
+    files: [
+      {
+        path: "src/auth.ts",
+        status: "modified",
+        additions: 0,
+        deletions: 1,
+        patch: "@@ -1,2 +1,1 @@\n context\n-  legacyAuth();",
+      },
+    ],
+  });
+  const [resolved] = checkPromises(kept, carry(STALE_AFTER + 3));
+  assert.equal(resolved.status, "kept");
 });
 
 test("promises inform but never score: flag is info, numbers unchanged", async () => {

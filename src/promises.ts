@@ -15,7 +15,18 @@ export interface CarriedPromise {
   from: string;
   kind: PromiseCheck["kind"];
   target?: string;
+  /** Releases already carried across (the check being run adds one more). */
+  carriedFor?: number;
 }
+
+/**
+ * A still-open promise ages out after this many carries. Target-less
+ * promises can never resolve to broken — without an exit they accumulate
+ * forever. Aging is visible (status `stale` in the report), never a silent
+ * drop; a maintainer who still means it will re-state the promise, which
+ * restarts the clock.
+ */
+export const STALE_AFTER = 10;
 
 /**
  * Version-aware "is the named target release reached?". Tolerant of tag
@@ -53,7 +64,14 @@ function provingLines(patch: string, kind: PromiseCheck["kind"]): string {
 }
 
 function checkOne(promise: CarriedPromise, identifiers: string[], data: ReleaseData): PromiseCheck {
-  const base = { text: promise.text, from: promise.from, kind: promise.kind, target: promise.target };
+  const carriedFor = promise.carriedFor ?? 0;
+  const base = {
+    text: promise.text,
+    from: promise.from,
+    kind: promise.kind,
+    target: promise.target,
+    ...(carriedFor ? { carriedFor } : {}),
+  };
   const verb = promise.kind === "removal" ? "removal" : "addition";
 
   if (!identifiers.length) {
@@ -131,7 +149,10 @@ export function checkPromises(data: ReleaseData, carried: CarriedPromise[] = [])
   const seen = new Set(fromBase.map((e) => key(e.promise)));
   const all = [
     ...fromBase,
-    ...carried.filter((p) => !seen.has(key(p))).map((promise) => ({ promise, claim: null })),
+    ...carried
+      .filter((p) => !seen.has(key(p)))
+      // This check is one more release the promise has ridden without resolving.
+      .map((p) => ({ promise: { ...p, carriedFor: (p.carriedFor ?? 0) + 1 }, claim: null })),
   ];
 
   return all.map(({ promise, claim }) => {
@@ -147,6 +168,16 @@ export function checkPromises(data: ReleaseData, carried: CarriedPromise[] = [])
           advisories: [],
           codeSpans: [...promise.text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]),
         });
-    return checkOne(promise, identifiers, data);
+    const res = checkOne(promise, identifiers, data);
+    if (res.status === "still-open" && (res.carriedFor ?? 0) >= STALE_AFTER) {
+      return {
+        ...res,
+        status: "stale" as const,
+        note:
+          `carried unresolved across ${res.carriedFor} releases — aged out of tracking; ` +
+          `a re-stated promise restarts the clock`,
+      };
+    }
+    return res;
   });
 }

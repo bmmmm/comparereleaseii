@@ -162,6 +162,12 @@ const MUTANTS: Mutant[] = [
     find: 'const marker = kind === "removal" ? "-" : "+";',
     replace: 'const marker = "+";',
   },
+  {
+    guard: "a still-open promise ages out as stale after STALE_AFTER carries",
+    file: "src/promises.ts",
+    find: 'if (res.status === "still-open" && (res.carriedFor ?? 0) >= STALE_AFTER) {',
+    replace: "if (false) {",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

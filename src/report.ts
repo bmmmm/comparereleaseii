@@ -190,7 +190,13 @@ export function printTerminal(report: Report): void {
     console.log(c.bold("\nPromises from earlier releases:"));
     for (const p of report.promises) {
       const mark =
-        p.status === "kept" ? c.green("✓") : p.status === "broken" ? c.red("✗") : c.dim("…");
+        p.status === "kept"
+          ? c.green("✓")
+          : p.status === "broken"
+            ? c.red("✗")
+            : p.status === "stale"
+              ? c.dim("∅")
+              : c.dim("…");
       console.log(`  ${mark} ${p.status} (${p.from}) ${p.text.slice(0, 100)}`);
       console.log(c.dim(`    ${p.note}${p.files.length ? ` — ${p.files.slice(0, 3).join(", ")}` : ""}`));
     }

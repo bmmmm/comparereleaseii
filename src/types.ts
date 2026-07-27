@@ -69,7 +69,14 @@ export interface PromiseCheck {
   from: string;
   kind: ClaimPromise["kind"];
   target?: string;
-  status: "kept" | "broken" | "still-open";
+  /** `stale`: carried unresolved for so long the ledger stops tracking it. */
+  status: "kept" | "broken" | "still-open" | "stale";
+  /**
+   * Releases this promise has been carried across without resolving. A
+   * target-less promise can never break, so without this it would ride the
+   * watch ledger forever.
+   */
+  carriedFor?: number;
   /** Files whose diff decided a kept verdict. */
   files: string[];
   note: string;

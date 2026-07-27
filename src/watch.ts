@@ -169,6 +169,13 @@ export function countSkipped(
 const BASELINE_MIN_CHECKS = 3;
 /** A drop this far below the repo's own median is the alarm. */
 const SCORE_DROP = 20;
+/**
+ * Hard bound on the per-repo promise ledger. Promises dedupe on normalized
+ * text, so notes that reword the same commitment every release would grow the
+ * state without limit; aging (STALE_AFTER carries) is the ordinary exit, this
+ * cap is the backstop — and it is announced, never silent.
+ */
+export const MAX_PROMISE_LEDGER = 50;
 
 /**
  * The repo's own normal score — median of its past checks, or null while
@@ -572,10 +579,17 @@ export async function runWatch(
           baseline: rc.baseline ?? 5,
           history: githubHistory(rc.repo),
           // Promises older than the base release live only here: the state
-          // carries every still-open one until a later diff resolves it.
+          // carries every still-open one until a later diff resolves it — or
+          // until it ages out as stale (checkPromises counts the carries).
           carriedPromises: (repoState.promises ?? [])
             .filter((p) => p.status === "still-open")
-            .map((p) => ({ text: p.text, from: p.from, kind: p.kind, target: p.target })),
+            .map((p) => ({
+              text: p.text,
+              from: p.from,
+              kind: p.kind,
+              target: p.target,
+              carriedFor: p.carriedFor,
+            })),
         };
         const { data, context } = await loadGithubReleaseData(rc.repo, {
           tag: rel.tag,
@@ -655,9 +669,20 @@ export async function runWatch(
         repoState.history = [...repoState.history, checkedRelease].slice(-20);
         // The ledger is replaced wholesale: carried promises were all
         // re-checked this run, resolved ones keep their final status here and
-        // only still-open entries ride along to the next release.
+        // only still-open entries ride along to the next release. The cap
+        // bounds it — the dedupe key is normalized text, so notes that reword
+        // a promise every release would otherwise multiply entries without
+        // limit. Report order puts this release's own promises first, so the
+        // oldest carried entries (nearest to stale anyway) are what drops.
         if (report.promises?.length || repoState.promises?.length) {
-          repoState.promises = report.promises ?? [];
+          const ledger = report.promises ?? [];
+          if (ledger.length > MAX_PROMISE_LEDGER) {
+            console.error(
+              `${key}: promise ledger capped at ${MAX_PROMISE_LEDGER} entries ` +
+                `(${ledger.length} tracked) — dropping the oldest carried promises.`,
+            );
+          }
+          repoState.promises = ledger.slice(0, MAX_PROMISE_LEDGER);
         }
         state.repos[key] = repoState;
         codes.push(ec);

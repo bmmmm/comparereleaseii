@@ -6,6 +6,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **The watch promise ledger is bounded now: promises age out visibly instead of riding forever.** A target-less promise ("will be removed in a future release") can never resolve to broken, so it stayed still-open in the watch state indefinitely — and since promises dedupe on normalized text, notes rewording the same commitment every release multiplied entries without limit. Each carry now counts (`carriedFor` rides in the state); after 10 unresolved carries the promise reports as **stale** ("aged out of tracking — a re-stated promise restarts the clock") and leaves the ledger, and the ledger itself is capped at 50 entries with the drop announced on stderr, this release's own promises kept first. A resolved promise is never stale, however long it rode; a mutation guard pins the aging.
+
 - **A known author email with no known forge account is its own warn now.** Keying identity by the git-header email (0.3.0) opened a gap on API sources: the email is attacker-chosen, so a commit forging a known maintainer's email passed the first-time-author check that the login match used to catch. Baseline snapshots built from an API now also record which forge accounts authored each release, and a sensitive-path commit whose email the baseline knows but whose account it does not — including "no account at all", which a forged unregistered email produces — raises `author-email-spoof` (warn). Clone-built baselines and clone-loaded commits carry no attribution, so the check stays silent there instead of guessing; a mutation guard pins it.
 
 ## 0.3.0 — 2026-07-27
