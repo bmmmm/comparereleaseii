@@ -357,6 +357,11 @@ export async function loadLocalRelease(opts: {
   notesFile?: string;
   /** Published notes from a forge API — outrank the CHANGELOG, not a file. */
   notes?: string;
+  /**
+   * The base release's notes, when the forge API had them. Feeds the
+   * carried-over dedupe and promise tracking, same as on the GitHub path.
+   */
+  baseNotes?: string;
   /** Label for the report; defaults to the clone's directory name. */
   repoLabel?: string;
 }): Promise<ReleaseData> {
@@ -385,6 +390,7 @@ export async function loadLocalRelease(opts: {
   }
 
   let notes: string;
+  let baseNotes = opts.baseNotes;
   if (opts.notesFile) {
     notes = await readFile(opts.notesFile, "utf8");
   } else if (opts.notes !== undefined) {
@@ -405,6 +411,14 @@ export async function loadLocalRelease(opts: {
       );
     }
     notes = section;
+    // Same medium for both sides: when the head notes come out of the
+    // CHANGELOG, the base release's section is right there — that is what
+    // carried-over dedupe and promise tracking compare against. Notes from
+    // a forge API get their baseNotes from the same API (the caller), never
+    // mixed with the CHANGELOG's wording of the same release.
+    if (baseNotes === undefined && base !== EMPTY_TREE) {
+      baseNotes = changelogSectionFor(changelog, base) ?? undefined;
+    }
   }
 
   const range = await loadLocalRange(opts.repo, base, head);
@@ -414,6 +428,7 @@ export async function loadLocalRelease(opts: {
     baseRef: base,
     headRef: head,
     notes,
+    ...(baseNotes !== undefined ? { baseNotes } : {}),
     ...range,
     warnings,
   };

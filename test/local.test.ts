@@ -228,6 +228,10 @@ test("--repo-url checks a forge nobody wrote an API client for", async () => {
   // Notes came from the CHANGELOG section for the head tag, no forge API.
   assert.match(data.notes, /parseToken/);
   assert.ok(!data.notes.includes("First"), "only the section for this release");
+  // The base release's section rides along from the same CHANGELOG — that is
+  // what carried-over dedupe and promise tracking compare against.
+  assert.match(data.baseNotes ?? "", /First/);
+  assert.ok(!data.baseNotes?.includes("parseToken"), "base notes are the base's section only");
 });
 
 test("a fetch that fails costs freshness, not the cached clone", async () => {
@@ -291,6 +295,20 @@ test("loadLocalRelease skips prerelease tags when picking the base for a stable 
     notesFile: join(repo, "CHANGELOG.md"),
   });
   assert.equal(rc.baseRef, "v0.1.0");
+  // Notes from a file have no base counterpart to compare against.
+  assert.equal(rc.baseNotes, undefined);
+
+  // Forge-supplied notes take forge-supplied base notes — passed through,
+  // never mixed with the CHANGELOG's wording of the same release.
+  const forge = await loadLocalRelease({
+    repo,
+    head: "v0.2.0",
+    notes: "- from the API",
+    baseNotes: "- base from the API",
+  });
+  assert.equal(forge.baseNotes, "- base from the API");
+  const forgeWithoutBase = await loadLocalRelease({ repo, head: "v0.2.0", notes: "- from the API" });
+  assert.equal(forgeWithoutBase.baseNotes, undefined);
 });
 
 test("added lines whose content starts with ++ or -- are still counted", () => {
