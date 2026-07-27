@@ -203,6 +203,18 @@ file.)
 
 ## Scheduling
 
+### The short way: `watch setup`
+
+`comparerelease watch setup` asks the four operating questions interactively —
+home directory (config, state, reports and log in one place, default
+`~/release-watch/`), judge (detected from this machine, with the calibration
+gate one answer away for a local model), schedule, and an optional notify
+hook (test-fired once) — then writes the config and the launchd plist or
+crontab line and **prints** the command that activates the schedule. It only
+ever writes files; nothing is installed. An existing config or state file is
+adopted, not overwritten. The recipes below are what it generates, for anyone
+wiring things by hand.
+
 ### cron
 
 ```cron

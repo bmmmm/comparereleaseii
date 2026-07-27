@@ -20,7 +20,7 @@ export interface RepoCandidate {
   description: string | null;
 }
 
-const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
+export const REPO_RE = /^[\w.-]+\/[\w.-]+$/;
 
 /** "1,3-5" → [1,3,4,5]; "a"/"all" → every index; null on anything invalid. */
 export function parseSelection(input: string, max: number): number[] | null {
@@ -359,12 +359,21 @@ export async function runWatchAdd(opts: {
 }
 
 /**
- * The same probe-then-add contract the GitHub path has: a repo that cannot be
- * watched is refused at add time with the reason, not discovered as a
- * permanent per-run error later. Watching needs a release API to poll — a
- * plain git host has nothing that answers "is there a new release?".
+ * Probe a forge URL for watchability: parseable owner/repo AND a release API
+ * that answers. The same probe-then-add contract the GitHub path has — a repo
+ * that cannot be watched is refused at add time with the reason, not
+ * discovered as a permanent per-run error later. Watching needs a release API
+ * to poll; a plain git host has nothing that answers "is there a new
+ * release?".
  */
-async function runWatchAddUrl(configPath: string, repoUrl: string): Promise<number> {
+export async function probeForgeUrl(repoUrl: string): Promise<{
+  url: string;
+  owner: string;
+  repo: string;
+  origin: string;
+  kind: "forgejo" | "gitlab";
+  hasStableRelease: boolean;
+}> {
   const url = assertCloneUrl(repoUrl.replace(/\/+$/, ""));
   const parsed = parseRepoUrl(url);
   if (!parsed) {
@@ -381,16 +390,28 @@ async function runWatchAddUrl(configPath: string, repoUrl: string): Promise<numb
         `check works without it: --repo-url ${url}.`,
     );
   }
+  return {
+    url,
+    owner: parsed.owner,
+    repo: parsed.repo,
+    origin: parsed.origin,
+    kind: forge.kind,
+    hasStableRelease: forge.releases.some((r) => !r.draft && !r.prerelease),
+  };
+}
+
+async function runWatchAddUrl(configPath: string, repoUrl: string): Promise<number> {
+  const probe = await probeForgeUrl(repoUrl);
   const { config, existed } = await loadConfig(configPath);
-  if (!addRepoUrl(config, url)) {
-    console.error(`${url} is already in ${configPath}.`);
+  if (!addRepoUrl(config, probe.url)) {
+    console.error(`${probe.url} is already in ${configPath}.`);
     return 0;
   }
   await saveConfig(configPath, config);
   console.error(
-    `${parsed.owner}/${parsed.repo} (${forge.kind} at ${parsed.origin}) added to ${configPath}${existed ? "" : " (created)"}.`,
+    `${probe.owner}/${probe.repo} (${probe.kind} at ${probe.origin}) added to ${configPath}${existed ? "" : " (created)"}.`,
   );
-  if (!forge.releases.some((r) => !r.draft && !r.prerelease)) {
+  if (!probe.hasStableRelease) {
     console.error("note: no stable releases yet — it stays a cheap no-op until the first one.");
   }
   return 0;

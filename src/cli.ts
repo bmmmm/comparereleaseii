@@ -39,6 +39,7 @@ import {
 } from "./check.ts";
 import { runWatch } from "./watch.ts";
 import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
+import { runWatchSetup } from "./setup.ts";
 import { loadGuidelines } from "./guidelines.ts";
 import type { Report } from "./types.ts";
 
@@ -53,6 +54,7 @@ Usage:
   ${PROG} --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
   ${PROG} watch --config <file> [--notify <cmd>]
   ${PROG} watch init|add|remove|list [--config <file>]
+  ${PROG} watch setup
   ${PROG} guidelines [--full]
 
 Options:
@@ -125,6 +127,14 @@ Watch mode (continuous release monitoring):
                                      (needs that forge's release API to poll)
   ${PROG} watch remove <owner/repo|url>  drop a repo from the config
   ${PROG} watch list                 show the watched repos
+
+  From a bare machine to a scheduled routine (interactive):
+  ${PROG} watch setup
+      Picks a home directory (config, state, reports, log in one place),
+      detects the judges this machine offers — with the calibration gate one
+      answer away for a local model — writes the launchd plist or crontab
+      line, and test-fires the optional notify hook. Only writes files and
+      PRINTS the command that activates the schedule; installs nothing.
 
 Guidelines (hand release-note writing rules to an LLM coding agent):
   ${PROG} guidelines >> AGENTS.md
@@ -476,6 +486,16 @@ async function main(): Promise<number> {
 }
 
 async function runWatchCli(argv: string[]): Promise<number> {
+  if (argv[0] === "setup") {
+    if (argv.slice(1).some((a) => a !== "-h" && a !== "--help")) {
+      throw new Error(`watch setup takes no arguments (got "${argv.slice(1).join(" ")}") — it asks everything interactively.`);
+    }
+    if (argv.includes("-h") || argv.includes("--help")) {
+      console.log(USAGE);
+      return 0;
+    }
+    return runWatchSetup();
+  }
   if (["init", "add", "remove", "list"].includes(argv[0])) {
     return runWatchListCli(argv[0] as "init" | "add" | "remove" | "list", argv.slice(1));
   }

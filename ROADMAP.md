@@ -284,6 +284,17 @@ the config file.
 **Done when:** a Forgejo/Gitea repo in the watchlist is picked up on a new
 release exactly like a GitHub one — state, report files, index row,
 alerting — verified live (gitea.com, or this repo's own Forgejo origin).
+- **Landed 2026-07-27** (`cb24f8f`). The CLI's `--repo-url` block became two
+  shared functions (`prepareForgeTarget` + `loadForgeRelease`) so watch and
+  the CLI are one code path; the poll stays one API call, the clone waits for
+  an actual new release. Two things the plan did not spell out: the index
+  needed `releaseUrl` in the state (old GitHub states fall back to the
+  derived URL, and a URL-shaped key is never pinned on github.com — mutation-
+  guarded), and `watch add --repo-url` probes the release API at add time so
+  an unwatchable host is refused with the reason instead of erroring every
+  run. Verified live against gitea.com: first run picks up `gitea/tea`
+  v0.14.2 (state keyed by URL, three report files, forge-linked index row,
+  flagged), second run is a no-op.
 
 #### Block B — `watch setup`: from bare machine to running routine
 The operating decisions are undocumented handwork today: where config/
@@ -305,6 +316,15 @@ silently:
 **Done when:** on a machine with nothing but the checkout and a judge,
 `watch setup` ends with a scheduled routine whose first run produces the
 index — without opening the docs.
+- **Landed 2026-07-27** (`src/setup.ts`). All five steps as planned; answers
+  first, every write after the last answer, so a cancel mid-flow writes
+  nothing. The schedule runs through `sh -lc` (cron/launchd's bare PATH knows
+  neither gh nor claude), paths are shell-quoted and XML-escaped, and a
+  local model failing the calibration gate is demoted to `judge: off` unless
+  kept deliberately. `remove`/`list`/URL-adds stopped demanding gh along the
+  way. Verified end to end: a piped-answer setup run wrote config + plist,
+  and its printed first-run command produced state, reports and index for a
+  gitea.com entry.
 
 Operational notes for the next session: a complete working setup (config
 with the 12 repos, state, reports) sits in the iteration-2 worktree under

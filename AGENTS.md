@@ -42,6 +42,7 @@ not add a dependency, a build step, or a framework.
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
 | `src/watch.ts` | Watch mode: state, per-repo runs, dashboard index, `--notify` |
 | `src/watchlist.ts` | `watch init/add/remove/list` — repo list from your GitHub account |
+| `src/setup.ts` | `watch setup` — interactive home dir, judge + calibration gate, schedule file, notify |
 | `src/guidelines.ts` | `guidelines` — agent checklist extracted from `docs/` |
 | `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction |
 | `src/types.ts` | Data model — read this first |

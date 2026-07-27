@@ -204,14 +204,19 @@ Details, calibration numbers and quirks: [docs/local-models.md](docs/local-model
 
 ### On your machine — the release watchdog
 
-`watch init` builds the repo
-list from what your GitHub account already follows (watched, starred,
-release notifications), then `comparerelease watch --config watch.json`
-runs from cron/launchd: every new release is fact-checked the moment it
-appears, per-repo state keeps re-runs cheap and alerts single-shot,
-`reports/index.html` is the dashboard, and `--notify <cmd>` pipes flagged
-releases to ntfy/mail/webhook. Config format, judge setup, cron/launchd
-snippets and a scheduled-CI variant: [docs/watchdog.md](docs/watchdog.md).
+`watch setup` takes a bare
+machine to a scheduled routine in one interactive command: home directory,
+judge (with the calibration gate for a local model), launchd/cron file,
+notify hook — it only writes files and prints the activation command.
+`watch init` builds the repo list from what your GitHub account already
+follows (watched, starred, release notifications); any Forgejo/Gitea or
+GitLab repo joins by URL via `watch add --repo-url`. Then
+`comparerelease watch --config watch.json` runs from cron/launchd: every new
+release is fact-checked the moment it appears, per-repo state keeps re-runs
+cheap and alerts single-shot, `reports/index.html` is the dashboard, and
+`--notify <cmd>` pipes flagged releases to ntfy/mail/webhook. Config format,
+judge setup, cron/launchd snippets and a scheduled-CI variant:
+[docs/watchdog.md](docs/watchdog.md).
 
 ### In CI — the GitHub Action
 
