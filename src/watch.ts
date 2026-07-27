@@ -19,6 +19,7 @@ import {
 import { githubHistory } from "./history.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
+import { toRepoDetailHtml } from "./watch-detail.ts";
 import { safeSegment } from "./paths.ts";
 
 import type { PromiseCheck, UnverifiableKind } from "./types.ts";
@@ -153,7 +154,7 @@ export function releaseWebUrl(link: RepoLink | null, tag: string): string | unde
     : `${link.base}/releases/tag/${t}`;
 }
 
-interface RepoState {
+export interface RepoState {
   lastPublishedAt: string | null;
   lastTag: string | null;
   latest?: CheckedRelease;
@@ -419,7 +420,11 @@ export function toWatchIndexHtml(
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
-<td>${trend}</td>
+<td>${trend}${
+        l.report.includes("/")
+          ? `${trend ? " " : ""}<a class="hist" href="${esc(l.report.slice(0, l.report.lastIndexOf("/")))}/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a>`
+          : ""
+      }</td>
 <td title="${esc(l.checkedAt)}">${esc(l.checkedAt.slice(0, 10))}</td>
 </tr>`;
     })
@@ -459,6 +464,7 @@ tr.pending td{color:#59636e}
 .dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}.dot.unverified{background:#8250df}
 a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
 a.repo{color:inherit}a.ext{font-size:.85em}
+a.hist{color:#59636e;font-size:.85em;white-space:nowrap}
 @media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}.incomplete{border-color:#d29922;color:#d29922}}
 </style></head><body>
 <h1>Release watch</h1>
@@ -472,7 +478,7 @@ ${pendingRows}
 <p class="sub">rows: &#10003; passed &middot; &#9888; flagged &middot; &#8943; waiting &mdash;
 verdicts: &#10004; verified &middot; &#9680; partial &middot; ? no evidence &middot; &#10008; contradicted &mdash;
 c &middot; c &middot; r = correctness &middot; completeness &middot; risk</p>
-<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; &#8599; opens the release on its forge</p>
+<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; history opens the repo&#39;s full record &middot; &#8599; opens the release on its forge</p>
 <script>
 for (const tr of document.querySelectorAll("tr[data-href]")) {
   tr.addEventListener("click", (e) => {
@@ -629,13 +635,23 @@ export async function runWatch(
     return { key: entryKey(rc), repo: rc.repo! };
   });
   // Regenerated after every check, not just at the end — a long first run
-  // over many repos should have a live dashboard, not a blank page.
+  // over many repos should have a live dashboard, not a blank page. The
+  // per-repo history pages ride along: they render from the same state, so
+  // regenerating them here is what keeps every page's numbers in step.
   const writeIndex = async () => {
     await mkdir(reportsDir, { recursive: true });
-    await writeFile(
-      join(reportsDir, "index.html"),
-      toWatchIndexHtml(state, new Date().toISOString(), configured),
-    );
+    const now = new Date().toISOString();
+    await writeFile(join(reportsDir, "index.html"), toWatchIndexHtml(state, now, configured));
+    for (const e of configured) {
+      const rs = state.repos[e.key];
+      if (!rs?.latest) continue;
+      const dir = join(reportsDir, safeSegment(e.key));
+      await mkdir(dir, { recursive: true });
+      await writeFile(
+        join(dir, "index.html"),
+        toRepoDetailHtml(e, rs, scoreBaseline(rs.history), now),
+      );
+    }
   };
 
   for (const entry of config.repos) {

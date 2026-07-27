@@ -513,3 +513,21 @@ test("countSkipped ignores releases that would never be checked", () => {
   // First run checks only the latest by design — nothing counts as skipped.
   assert.equal(countSkipped(releases, null, { cap: 1 }), 0);
 });
+
+test("toWatchIndexHtml links each checked repo row to its history page", () => {
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "good/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 95, false),
+        history: [checked("v1", 95, false)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t", [{ key: "good/repo", repo: "good/repo" }]);
+  // The history dir is derived from the report path, so old states keep
+  // working whatever their directory naming was.
+  assert.ok(html.includes('href="x/index.html"'), "trend cell links the history page");
+});

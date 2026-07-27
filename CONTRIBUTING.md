@@ -43,6 +43,7 @@ that way — a dependency needs a strong argument.
 | `src/promises.ts` | Promise tracking — forward-looking notes checked against later releases |
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
 | `src/watch.ts` | Watch mode: state file, per-repo runs, dashboard index, `--notify` |
+| `src/watch-detail.ts` | Per-repo history page: score series, verdict composition, promise ledger |
 | `src/watchlist.ts` | `watch init/add/remove/list` — build the repo list from your GitHub account |
 | `src/setup.ts` | `watch setup` — interactive: home dir, judge + calibration gate, launchd/cron file, notify hook |
 | `src/guidelines.ts` | `guidelines` — the agent checklist extracted from `docs/` |
