@@ -3,10 +3,8 @@
 import { parseArgs } from "node:util";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { assertCloneUrl, ensureClone, loadLocalRelease, localRepoContext } from "./sources/local.ts";
-import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
-import { pickBaseRelease } from "./sources/github.ts";
-import { cloneDirFor, VERSION } from "./paths.ts";
+import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
+import { VERSION } from "./paths.ts";
 import { parseClaims } from "./claims.ts";
 import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
 import {
@@ -28,10 +26,17 @@ import {
   cloneHistory,
   githubHistory,
   printTimeline,
-  type HistoryRelease,
   type HistorySource,
 } from "./history.ts";
-import { analyzeRelease, loadGithubReleaseData, type CheckSettings, type RepoLink } from "./check.ts";
+import {
+  analyzeRelease,
+  loadForgeRelease,
+  loadGithubReleaseData,
+  prepareForgeTarget,
+  type CheckSettings,
+  type ForgeTarget,
+  type RepoLink,
+} from "./check.ts";
 import { runWatch } from "./watch.ts";
 import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
 import { loadGuidelines } from "./guidelines.ts";
@@ -54,10 +59,10 @@ Options:
   --tag <tag>         Release tag to check (default: latest release)
   --base <ref>        Base tag/ref to diff against (default: previous release/tag)
   --local <path>      Use a local git repo instead of the GitHub API
-  --repo-url <url>    Any forge: clone the URL (cached) and check it like
-                      --local. Works with Forgejo, GitLab, private and
-                      air-gapped repos — no forge API, so the notes come from
-                      --notes-file or the CHANGELOG section
+  --repo-url <url>    Any forge: clone the URL (cached) and check it. Notes
+                      and past releases come from the forge's release API
+                      (Forgejo/Gitea, GitLab); a host without one falls back
+                      to --notes-file or the CHANGELOG section
   --head <ref>        Head ref for --local/--repo-url (default: latest tag;
                       --tag means the same thing there)
   --notes-file <file> Check this notes file instead of the published notes
@@ -115,8 +120,10 @@ Watch mode (continuous release monitoring):
   ${PROG} watch init [--from watched,starred,notifications]
       Pick repos interactively from what YOUR GitHub account already follows:
       watched repos, stars, and repos whose release notifications you got.
-  ${PROG} watch add <owner/repo>     add one repo (scripts/CI-friendly)
-  ${PROG} watch remove <owner/repo>  drop a repo from the config
+  ${PROG} watch add <owner/repo>     add one GitHub repo (scripts/CI-friendly)
+  ${PROG} watch add --repo-url <url> add a Forgejo/Gitea/GitLab repo by URL
+                                     (needs that forge's release API to poll)
+  ${PROG} watch remove <owner/repo|url>  drop a repo from the config
   ${PROG} watch list                 show the watched repos
 
 Guidelines (hand release-note writing rules to an LLM coding agent):
@@ -230,86 +237,28 @@ async function main(): Promise<number> {
   // air-gapped mirror, a token nobody exported — the CHANGELOG section is the
   // fallback, which is what --local has always used.
   let localPath = values.local;
-  let cloneUrl: string | undefined;
-  let forgeNotes: string | undefined;
-  let forgeBase: string | undefined;
-  let forgeLabel: string | undefined;
-  let forgeReleases: HistoryRelease[] | undefined;
+  let forgeTarget: ForgeTarget | undefined;
   let repoLink: RepoLink | null = null;
   if (values["repo-url"]) {
-    const url = assertCloneUrl(values["repo-url"]);
-    const dir = await cloneDirFor(url);
-    if (!dir) {
-      throw new Error(
-        "--repo-url needs a private directory to clone into — set XDG_CACHE_HOME to a writable path.",
-      );
-    }
-    cloneUrl = url;
-    localPath = dir;
-    console.error(`Cloning ${url} (cached at ${localPath})…`);
-    await ensureClone(url, localPath);
-
-    const target = parseRepoUrl(url);
-    const forge = target && (await fetchForgeReleases(target));
-    if (target) {
-      forgeLabel = `${target.owner}/${target.repo}`;
-      // The web origin is known even when the host has no release API; the
-      // path dialect comes from the API detect, host name as the fallback.
-      repoLink = {
-        base: `${target.origin}/${target.owner}/${target.repo}`,
-        style: forge
-          ? forge.kind === "gitlab"
-            ? "gitlab"
-            : "github"
-          : /gitlab/i.test(target.origin)
-            ? "gitlab"
-            : "github",
-      };
-    }
-    if (forge) {
-      const wanted = values.tag ?? values.head;
-      const release = wanted
-        ? forge.releases.find((r) => r.tag_name === wanted)
-        : forge.releases.find((r) => !r.draft && !r.prerelease);
-      forgeReleases = forge.releases
-        .filter((r) => !r.draft && !r.prerelease)
-        .map((r) => ({
-          tag: r.tag_name,
-          notes: r.body,
-          date: r.published_at?.slice(0, 10) ?? null,
-        }));
-      if (release) {
-        forgeNotes = release.body;
-        forgeBase = pickBaseRelease(forge.releases, release.tag_name) ?? undefined;
-        values.head ??= release.tag_name;
-        console.error(
-          `Published notes for ${release.tag_name} from the ${forge.kind} API at ${target!.origin}.`,
-        );
-      } else if (wanted) {
-        console.error(
-          `${wanted} is not a published release on ${target!.origin} — falling back to the CHANGELOG section.`,
-        );
-      }
-    } else if (target) {
-      console.error(
-        `No Forgejo/Gitea or GitLab release API at ${target.origin} — using the CHANGELOG section for the notes.`,
-      );
-    }
+    forgeTarget = await prepareForgeTarget(values["repo-url"]);
+    localPath = forgeTarget.dir;
+    repoLink = forgeTarget.link;
   }
 
   // Where the baseline reads the repo's past releases. The clone answers the
   // diffs either way; the notes come from the forge when it has an API and
   // from the CHANGELOG when it does not.
-  const history: HistorySource | null = localPath
-    ? cloneHistory({
-        dir: localPath,
-        slug: forgeLabel ?? basename(localPath),
-        cacheKey: cloneUrl ?? `local:${localPath}`,
-        releases: forgeReleases,
-      })
-    : positionals[0]
-      ? githubHistory(positionals[0])
-      : null;
+  const history: HistorySource | null = forgeTarget
+    ? forgeTarget.history
+    : localPath
+      ? cloneHistory({
+          dir: localPath,
+          slug: basename(localPath),
+          cacheKey: `local:${localPath}`,
+        })
+      : positionals[0]
+        ? githubHistory(positionals[0])
+        : null;
 
   if (historyCount !== null) {
     if (!history) {
@@ -399,23 +348,20 @@ async function main(): Promise<number> {
   console.error(`Loading release data${localPath ? ` from ${localPath}` : ` for ${positionals[0]}`}…`);
   let data;
   let context;
-  if (localPath) {
+  if (forgeTarget) {
+    // --tag is what a reader types for "this release"; for a clone that is
+    // the head ref, and there is no separate release object to name.
+    ({ data, context } = await loadForgeRelease(forgeTarget, {
+      head: values.head ?? values.tag,
+      base: values.base,
+      notesFile: values["notes-file"],
+    }));
+  } else if (localPath) {
     data = await loadLocalRelease({
       repo: localPath,
-      // --tag is what a reader types for "this release"; for a clone that is
-      // the head ref, and there is no separate release object to name.
       head: values.head ?? values.tag,
-      // An explicit --base always wins; otherwise the forge's own release
-      // order beats "the tag before this one", which is what a clone can see.
-      base: values.base ?? forgeBase,
+      base: values.base,
       notesFile: values["notes-file"],
-      notes: forgeNotes,
-      // The list fetched for base-picking carries every body — the base's
-      // notes cost no extra request. Resolution happens inside, against the
-      // base the load actually uses (git describe may pick one this scope
-      // cannot know).
-      publishedReleases: forgeReleases,
-      repoLabel: forgeLabel,
     });
     context = await localRepoContext(localPath, data.headRef);
   } else {
@@ -581,14 +527,21 @@ async function runWatchListCli(
   if (cmd === "init") {
     options.from = { type: "string", default: "watched,starred,notifications" };
   }
+  if (cmd === "add") {
+    options["repo-url"] = { type: "string" };
+  }
   const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options });
   if (values.help) {
     console.log(USAGE);
     return 0;
   }
-  if (!(await commandExists("gh"))) {
+  const repoUrl = values["repo-url"] as string | undefined;
+  // Only the GitHub-backed commands need gh — a forge URL is polled over its
+  // own API, and remove/list never leave the config file.
+  const needsGh = cmd === "init" || (cmd === "add" && repoUrl === undefined);
+  if (needsGh && !(await commandExists("gh"))) {
     throw new Error(
-      "The GitHub CLI (gh) is required — install it from https://cli.github.com and run `gh auth login`.",
+      "The GitHub CLI (gh) is required — install it from https://cli.github.com and run `gh auth login`. Forge repos can be added without it: watch add --repo-url <url>.",
     );
   }
   const configPath = values.config as string;
@@ -600,8 +553,19 @@ async function runWatchListCli(
       ? runWatchInit({ configPath, from: values.from as string })
       : runWatchList({ configPath });
   }
+  if (cmd === "add" && repoUrl !== undefined) {
+    if (positionals.length) {
+      throw new Error(
+        `watch add takes owner/repo OR --repo-url <url>, not both (got "${positionals.join(" ")}").`,
+      );
+    }
+    return runWatchAdd({ configPath, repoUrl });
+  }
   if (positionals.length !== 1) {
-    throw new Error(`watch ${cmd} needs exactly one repo: ${PROG} watch ${cmd} owner/repo`);
+    throw new Error(
+      `watch ${cmd} needs exactly one repo: ${PROG} watch ${cmd} owner/repo` +
+        (cmd === "add" ? ` — or ${PROG} watch add --repo-url <url>` : ""),
+    );
   }
   return cmd === "add"
     ? runWatchAdd({ configPath, repo: positionals[0] })

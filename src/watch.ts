@@ -4,8 +4,18 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { assertRepoSlug, ghApi } from "./sources/github.ts";
+import { fetchForgeReleases, parseRepoUrl, type ForgeListing } from "./sources/forge.ts";
+import { assertCloneUrl } from "./sources/local.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
-import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
+import {
+  analyzeRelease,
+  loadForgeRelease,
+  loadGithubReleaseData,
+  prepareForgeTarget,
+  type CheckSettings,
+  type ForgeTarget,
+  type RepoLink,
+} from "./check.ts";
 import { githubHistory } from "./history.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
@@ -27,8 +37,16 @@ const UNVERIFIABLE_TITLE: Record<UnverifiableKind, string> = {
 };
 
 export interface WatchRepoConfig {
-  /** owner/repo on GitHub. */
-  repo: string;
+  /** owner/repo on GitHub. Exactly one of `repo` and `repoUrl` per entry. */
+  repo?: string;
+  /**
+   * Any forge with a release API instead: a Forgejo/Gitea or GitLab
+   * repository URL. Polled over that API, checked through a cached clone —
+   * the same path the CLI's --repo-url takes. A plain git host without a
+   * release API cannot be watched (nothing answers "is there a new
+   * release?"); it can still be checked one-off with --repo-url.
+   */
+  repoUrl?: string;
   /** State key and report directory — defaults to `repo`. Needed when the
    * same repo appears twice (e.g. once with a notesFile override). */
   label?: string;
@@ -103,12 +121,29 @@ export interface CheckedRelease {
   verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
   /** HTML report path relative to the reports directory. */
   report: string;
+  /**
+   * The release's own web page. States written before forges joined lack it;
+   * the index then derives the GitHub URL, which is all those states watched.
+   */
+  releaseUrl?: string;
 }
 
 /** One configured watch entry, for rendering the index: key = label ?? repo. */
 export interface WatchedEntry {
   key: string;
+  /** owner/repo — display, and the GitHub link when `url` is absent. */
   repo: string;
+  /** The repo's web page on its forge — set for repoUrl entries. */
+  url?: string;
+}
+
+/** Where a release lives on the web — GitLab spells the route differently. */
+export function releaseWebUrl(link: RepoLink | null, tag: string): string | undefined {
+  if (!link) return undefined;
+  const t = encodeURIComponent(tag);
+  return link.style === "gitlab"
+    ? `${link.base}/-/releases/${t}`
+    : `${link.base}/releases/tag/${t}`;
 }
 
 interface RepoState {
@@ -288,9 +323,10 @@ export function toWatchIndexHtml(
   generatedAt: string,
   configured?: WatchedEntry[],
 ): string {
-  const entries: Array<{ key: string; repo: string; rs: RepoState | undefined }> = configured
-    ? configured.map((e) => ({ ...e, rs: state.repos[e.key] }))
-    : Object.entries(state.repos).map(([key, rs]) => ({ key, repo: key, rs }));
+  const entries: Array<{ key: string; repo: string; url?: string; rs: RepoState | undefined }> =
+    configured
+      ? configured.map((e) => ({ ...e, rs: state.repos[e.key] }))
+      : Object.entries(state.repos).map(([key, rs]) => ({ key, repo: key, rs }));
   const withData = entries
     .filter((e) => e.rs?.latest)
     .sort((a, b) => {
@@ -305,12 +341,18 @@ export function toWatchIndexHtml(
   // "could not be checked" must not look like a genuinely scored 65-84.
   const scoreClass = (h: { score: number; scoreLabel: string }) =>
     h.scoreLabel === "unverified" ? "unverified" : h.score >= 85 ? "good" : h.score >= 65 ? "mid" : "bad";
-  const repoCell = (key: string, repo: string) =>
-    repo.includes("/")
-      ? `<a class="repo" href="https://github.com/${esc(repo)}" target="_blank" rel="noopener"${key === repo ? "" : ` title="${esc(repo)}"`}>${esc(key)}</a>`
+  // A forge entry carries its own web URL; only plain owner/repo entries mean
+  // GitHub. A URL-shaped `repo` (unparseable repoUrl) must not be pinned on
+  // github.com just because it contains a slash.
+  const repoCell = (key: string, repo: string, url?: string) => {
+    const href =
+      url ?? (repo.includes("/") && !repo.includes("://") ? `https://github.com/${repo}` : null);
+    return href
+      ? `<a class="repo" href="${esc(href)}" target="_blank" rel="noopener"${key === repo ? "" : ` title="${esc(repo)}"`}>${esc(key)}</a>`
       : esc(key);
+  };
   const rows = withData
-    .map(({ key, repo, rs }) => {
+    .map(({ key, repo, url, rs }) => {
       const l = rs!.latest!;
       const v = l.verdicts;
       // A single dot would just repeat the score column — the trend earns
@@ -329,12 +371,17 @@ export function toWatchIndexHtml(
       const comp = l.components
         ? `${l.components.correctness} · ${l.components.completeness ?? "–"} · ${l.components.risk}`
         : "";
-      const releaseUrl = repo.includes("/")
-        ? ` <a class="ext" href="https://github.com/${esc(repo)}/releases/tag/${encodeURIComponent(l.tag)}" target="_blank" rel="noopener" title="release on GitHub">&#8599;</a>`
+      const releaseHref =
+        l.releaseUrl ??
+        (repo.includes("/") && !url && !repo.includes("://")
+          ? `https://github.com/${repo}/releases/tag/${encodeURIComponent(l.tag)}`
+          : null);
+      const releaseUrl = releaseHref
+        ? ` <a class="ext" href="${esc(releaseHref)}" target="_blank" rel="noopener" title="release on its forge">&#8599;</a>`
         : "";
       return `<tr class="${l.flagged ? "flagged" : ""}" data-href="${esc(l.report)}">
 <td>${l.flagged ? "&#9888;" : "&#10003;"}</td>
-<td>${repoCell(key, repo)}</td>
+<td>${repoCell(key, repo, url)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
 <td><span class="score ${scoreClass(l)}" title="judge: ${esc(l.engine)}${
@@ -368,9 +415,9 @@ export function toWatchIndexHtml(
     .join("\n");
   const pendingRows = pending
     .map(
-      ({ key, repo }) => `<tr class="pending">
+      ({ key, repo, url }) => `<tr class="pending">
 <td>&#8943;</td>
-<td>${repoCell(key, repo)}</td>
+<td>${repoCell(key, repo, url)}</td>
 <td colspan="8">waiting for the first release check</td>
 </tr>`,
     )
@@ -414,7 +461,7 @@ ${pendingRows}
 <p class="sub">rows: &#10003; passed &middot; &#9888; flagged &middot; &#8943; waiting &mdash;
 verdicts: &#10004; verified &middot; &#9680; partial &middot; ? no evidence &middot; &#10008; contradicted &mdash;
 c &middot; c &middot; r = correctness &middot; completeness &middot; risk</p>
-<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; &#8599; opens the release on GitHub</p>
+<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; &#8599; opens the release on its forge</p>
 <script>
 for (const tr of document.querySelectorAll("tr[data-href]")) {
   tr.addEventListener("click", (e) => {
@@ -500,8 +547,22 @@ export async function runWatch(
     throw new Error('Watch config needs a non-empty "repos" array — see docs/watchdog.md.');
   }
   for (const r of config.repos) {
-    if (!r.repo?.includes("/")) {
-      throw new Error(`Watch config: every repos[] entry needs "repo": "owner/name" (got ${JSON.stringify(r.repo)}).`);
+    if (r.repo && r.repoUrl) {
+      throw new Error(
+        `Watch config: "repo" and "repoUrl" name the same thing — pass one per entry (got both for ${JSON.stringify(r.repo)}).`,
+      );
+    }
+    if (r.repoUrl) {
+      assertCloneUrl(r.repoUrl);
+      if (!parseRepoUrl(r.repoUrl)) {
+        throw new Error(
+          `Watch config: cannot read owner/repo from "repoUrl": ${JSON.stringify(r.repoUrl)} — expected a forge URL like https://forge.example.com/owner/repo.`,
+        );
+      }
+    } else if (!r.repo?.includes("/")) {
+      throw new Error(
+        `Watch config: every repos[] entry needs "repo": "owner/name" (GitHub) or "repoUrl": "https://forge.example.com/owner/repo" (got ${JSON.stringify(r.repo)}).`,
+      );
     }
   }
   // CLI overrides resolve against the working directory, config-file paths
@@ -535,7 +596,15 @@ export async function runWatch(
 
   const configured: WatchedEntry[] = config.repos.map((entry) => {
     const rc: WatchRepoConfig = { ...config.defaults, ...entry };
-    return { key: rc.label ?? rc.repo, repo: rc.repo };
+    if (rc.repoUrl) {
+      const parsed = parseRepoUrl(rc.repoUrl);
+      return {
+        key: rc.label ?? rc.repoUrl,
+        repo: parsed ? `${parsed.owner}/${parsed.repo}` : rc.repoUrl,
+        ...(parsed ? { url: `${parsed.origin}/${parsed.owner}/${parsed.repo}` } : {}),
+      };
+    }
+    return { key: rc.label ?? rc.repo!, repo: rc.repo! };
   });
   // Regenerated after every check, not just at the end — a long first run
   // over many repos should have a live dashboard, not a blank page.
@@ -549,23 +618,43 @@ export async function runWatch(
 
   for (const entry of config.repos) {
     const rc: WatchRepoConfig = { ...config.defaults, ...entry };
-    const key = rc.label ?? rc.repo;
+    const key = rc.label ?? rc.repo ?? rc.repoUrl!;
     const repoState: RepoState = state.repos[key] ?? {
       lastPublishedAt: null,
       lastTag: null,
       history: [],
     };
+    // The poll stays one API call per repo either way; a repoUrl entry's
+    // clone happens only once a new release is actually there to check.
     let releases: ReleaseInfo[];
+    let forge: ForgeListing | null = null;
     try {
-      const raw = await ghApi<
-        Array<{ tag_name: string; published_at: string | null; prerelease: boolean; draft: boolean }>
-      >(`repos/${assertRepoSlug(rc.repo)}/releases?per_page=30`);
-      releases = raw.map((r) => ({
-        tag: r.tag_name,
-        publishedAt: r.published_at,
-        prerelease: r.prerelease,
-        draft: r.draft,
-      }));
+      if (rc.repoUrl) {
+        forge = await fetchForgeReleases(parseRepoUrl(rc.repoUrl)!);
+        if (!forge) {
+          throw new Error(
+            `no Forgejo/Gitea or GitLab release API answered for ${rc.repoUrl} — watch polls the ` +
+              "release list, so it needs one. A private repo needs FORGEJO_TOKEN/GITEA_TOKEN or " +
+              `GITLAB_TOKEN exported; a host without the API can still be checked one-off with --repo-url.`,
+          );
+        }
+        releases = forge.releases.map((r) => ({
+          tag: r.tag_name,
+          publishedAt: r.published_at ?? null,
+          prerelease: r.prerelease,
+          draft: r.draft,
+        }));
+      } else {
+        const raw = await ghApi<
+          Array<{ tag_name: string; published_at: string | null; prerelease: boolean; draft: boolean }>
+        >(`repos/${assertRepoSlug(rc.repo!)}/releases?per_page=30`);
+        releases = raw.map((r) => ({
+          tag: r.tag_name,
+          publishedAt: r.published_at,
+          prerelease: r.prerelease,
+          draft: r.draft,
+        }));
+      }
     } catch (err) {
       console.error(`${key}: listing releases failed — ${(err as Error).message}`);
       codes.push(2);
@@ -591,9 +680,13 @@ export async function runWatch(
       );
     }
 
+    let target: ForgeTarget | undefined;
     for (const rel of fresh) {
       console.error(`${key}: checking ${rel.tag}…`);
       try {
+        // The clone is per repo, not per release — the first fresh release
+        // pays it, later ones in the same batch reuse it.
+        if (rc.repoUrl && !target) target = await prepareForgeTarget(rc.repoUrl, { forge });
         const { engine, escalate } = await engines({
           judgeMode: rc.judge ?? "auto",
           engine: rc.engine ?? "claude-cli",
@@ -610,26 +703,28 @@ export async function runWatch(
           concurrency: rc.concurrency ?? 4,
           reverse: true,
           baseline: rc.baseline ?? 5,
-          history: githubHistory(rc.repo),
+          history: target ? target.history : githubHistory(rc.repo!),
           // Promises older than the base release live only here: the state
           // carries every still-open one until a later diff resolves it — or
           // until it ages out as stale (checkPromises counts the carries).
           carriedPromises: carriedFromLedger(repoState.promises),
         };
-        const { data, context } = await loadGithubReleaseData(rc.repo, {
-          tag: rel.tag,
-          notesFile: rc.notesFile ? resolve(configDir, rc.notesFile) : undefined,
-        });
-        const report = await analyzeRelease(
-          data,
-          context,
-          { base: `https://github.com/${rc.repo}`, style: "github" },
-          settings,
-        );
+        const notesFile = rc.notesFile ? resolve(configDir, rc.notesFile) : undefined;
+        let data;
+        let context;
+        let link: RepoLink | null;
+        if (target) {
+          ({ data, context } = await loadForgeRelease(target, { head: rel.tag, notesFile }));
+          link = target.link;
+        } else {
+          ({ data, context } = await loadGithubReleaseData(rc.repo!, { tag: rel.tag, notesFile }));
+          link = { base: `https://github.com/${rc.repo}`, style: "github" };
+        }
+        const report = await analyzeRelease(data, context, link, settings);
         // A labeled entry is not the repo's own release (e.g. a fabricated
         // negative control, or draft notes) — say so in the report header
         // instead of pinning the result on the innocent upstream repo.
-        if (rc.label) report.repoLabel = `${rc.repo} (${rc.label})`;
+        if (rc.label) report.repoLabel = `${rc.repo ?? target?.slug ?? rc.repoUrl} (${rc.label})`;
 
         // The tag went through a sanitizer and the key did not — a config
         // with `label: "../.."` wrote outside the reports directory.
@@ -663,6 +758,7 @@ export async function runWatch(
           noEvidence: report.results.filter((r) => r.verdict === "no-evidence").length,
           contradicted: report.results.filter((r) => r.verdict === "contradicted").length,
         };
+        const releaseUrl = releaseWebUrl(link, rel.tag);
         const checkedRelease: CheckedRelease = {
           tag: rel.tag,
           publishedAt: rel.publishedAt,
@@ -687,6 +783,7 @@ export async function runWatch(
           unverifiable: report.metrics.unverifiable?.kind,
           scoreLevel,
           report: `${dirKey}/${base}.html`,
+          ...(releaseUrl ? { releaseUrl } : {}),
         };
         repoState.lastPublishedAt = rel.publishedAt;
         repoState.lastTag = rel.tag;

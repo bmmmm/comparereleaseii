@@ -193,6 +193,18 @@ const MUTANTS: Mutant[] = [
     find: "return [...open, ...resolved].slice(0, MAX_PROMISE_LEDGER);",
     replace: "return promises.slice(0, MAX_PROMISE_LEDGER);",
   },
+  {
+    guard: "a forge watch entry links to its forge, never pinned on github.com",
+    file: "src/watch.ts",
+    find: "url ?? (repo.includes(\"/\") && !repo.includes(\"://\") ? `https://github.com/${repo}` : null);",
+    replace: "repo.includes(\"/\") ? `https://github.com/${repo}` : null;",
+  },
+  {
+    guard: "release web URLs speak GitLab's /-/ route dialect",
+    file: "src/watch.ts",
+    find: "return link.style === \"gitlab\"\n    ? `${link.base}/-/releases/${t}`\n    : `${link.base}/releases/tag/${t}`;",
+    replace: "return `${link.base}/releases/tag/${t}`;",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

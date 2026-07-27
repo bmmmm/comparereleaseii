@@ -1,14 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { cloneDirFor } from "./paths.ts";
-import { loadGithubRelease, fetchGithubContext } from "./sources/github.ts";
-import { ensureClone, loadLocalRange } from "./sources/local.ts";
+import { loadGithubRelease, fetchGithubContext, pickBaseRelease } from "./sources/github.ts";
+import {
+  assertCloneUrl,
+  ensureClone,
+  loadLocalRange,
+  loadLocalRelease,
+  localRepoContext,
+} from "./sources/local.ts";
+import { fetchForgeReleases, parseRepoUrl, type ForgeListing } from "./sources/forge.ts";
 import { parseClaims, markCarriedOver } from "./claims.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { computeMetrics } from "./metrics.ts";
 import { checkPromises, type CarriedPromise } from "./promises.ts";
-import { buildSnapshots, summarizeBaseline, type HistorySource } from "./history.ts";
+import {
+  buildSnapshots,
+  cloneHistory,
+  summarizeBaseline,
+  type HistoryRelease,
+  type HistorySource,
+} from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
 import type { ReleaseData, Report, RepoContext } from "./types.ts";
 
@@ -89,6 +103,141 @@ export interface RepoLink {
   base: string;
   /** GitLab spells commit/compare routes with a `/-/`; every other forge doesn't. */
   style: "github" | "gitlab";
+}
+
+/**
+ * A forge repository readied for checking: the cached clone, the release
+ * API's answer (null when no API answered — the CHANGELOG then carries the
+ * notes, which is what --local has always done), web links, and the history
+ * source the baseline reads. Built once per repo; each release check on top
+ * of it is loadForgeRelease.
+ */
+export interface ForgeTarget {
+  url: string;
+  /** Cached clone directory — the check runs the --local path against it. */
+  dir: string;
+  /** owner/repo when the URL parses to one; labels reports and cache slugs. */
+  slug: string | null;
+  /** Web origin (scheme + host), when the URL parses. */
+  origin: string | null;
+  link: RepoLink | null;
+  forge: ForgeListing | null;
+  /** Stable published releases, newest first — base notes and the baseline. */
+  releases: HistoryRelease[] | undefined;
+  history: HistorySource;
+}
+
+/**
+ * Clone (cached) and probe the forge's release API. `opts.forge` reuses an
+ * earlier fetchForgeReleases answer — watch polls the list before deciding
+ * whether to clone at all, and one probe per run is enough.
+ */
+export async function prepareForgeTarget(
+  url: string,
+  opts: { forge?: ForgeListing | null } = {},
+): Promise<ForgeTarget> {
+  const cloneUrl = assertCloneUrl(url);
+  const dir = await cloneDirFor(cloneUrl);
+  if (!dir) {
+    throw new Error(
+      "checking a repository URL needs a private directory to clone into — set XDG_CACHE_HOME to a writable path.",
+    );
+  }
+  console.error(`Cloning ${cloneUrl} (cached at ${dir})…`);
+  await ensureClone(cloneUrl, dir);
+
+  const target = parseRepoUrl(cloneUrl);
+  const forge =
+    opts.forge !== undefined ? opts.forge : target && (await fetchForgeReleases(target));
+  if (target && !forge) {
+    console.error(
+      `No Forgejo/Gitea or GitLab release API at ${target.origin} — using the CHANGELOG section for the notes.`,
+    );
+  }
+  const slug = target ? `${target.owner}/${target.repo}` : null;
+  // The web origin is known even when the host has no release API; the
+  // path dialect comes from the API detect, host name as the fallback.
+  const link: RepoLink | null = target
+    ? {
+        base: `${target.origin}/${target.owner}/${target.repo}`,
+        style:
+          forge?.kind === "gitlab" || (!forge && /gitlab/i.test(target.origin))
+            ? "gitlab"
+            : "github",
+      }
+    : null;
+  const releases: HistoryRelease[] | undefined = forge
+    ? forge.releases
+        .filter((r) => !r.draft && !r.prerelease)
+        .map((r) => ({
+          tag: r.tag_name,
+          notes: r.body,
+          date: r.published_at?.slice(0, 10) ?? null,
+        }))
+    : undefined;
+  return {
+    url: cloneUrl,
+    dir,
+    slug,
+    origin: target?.origin ?? null,
+    link,
+    forge,
+    releases,
+    history: cloneHistory({
+      dir,
+      slug: slug ?? basename(dir),
+      cacheKey: cloneUrl,
+      releases,
+    }),
+  };
+}
+
+/**
+ * One release of a prepared forge target: published notes and the forge's
+ * base pick when the API knows the release, the CHANGELOG section otherwise
+ * — then the --local load against the clone.
+ */
+export async function loadForgeRelease(
+  t: ForgeTarget,
+  opts: { head?: string; base?: string; notesFile?: string } = {},
+): Promise<{ data: ReleaseData; context: RepoContext }> {
+  let head = opts.head;
+  let base = opts.base;
+  let notes: string | undefined;
+  if (t.forge) {
+    const release = head
+      ? t.forge.releases.find((r) => r.tag_name === head)
+      : t.forge.releases.find((r) => !r.draft && !r.prerelease);
+    if (release) {
+      notes = release.body;
+      // An explicit base always wins; otherwise the forge's own release
+      // order beats "the tag before this one", which is what a clone can see.
+      base ??= pickBaseRelease(t.forge.releases, release.tag_name) ?? undefined;
+      head ??= release.tag_name;
+      console.error(
+        `Published notes for ${release.tag_name} from the ${t.forge.kind} API at ${t.origin}.`,
+      );
+    } else if (head) {
+      console.error(
+        `${head} is not a published release on ${t.origin} — falling back to the CHANGELOG section.`,
+      );
+    }
+  }
+  const data = await loadLocalRelease({
+    repo: t.dir,
+    head,
+    base,
+    notesFile: opts.notesFile,
+    notes,
+    // The list fetched for base-picking carries every body — the base's
+    // notes cost no extra request. Resolution happens inside, against the
+    // base the load actually uses (git describe may pick one this scope
+    // cannot know).
+    publishedReleases: t.releases,
+    repoLabel: t.slug ?? undefined,
+  });
+  const context = await localRepoContext(t.dir, data.headRef);
+  return { data, context };
 }
 
 /**

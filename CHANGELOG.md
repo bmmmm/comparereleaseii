@@ -4,6 +4,11 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **The watchdog leaves GitHub: any Forgejo/Gitea or GitLab repo joins the watchlist by URL.** A watch entry now takes `"repoUrl": "https://forge.example.com/owner/repo"` as the alternative to `"repo": "owner/repo"` — polled with one call to that forge's release API (which also answers base-picking), checked through the same cached clone the CLI's `--repo-url` uses, with published notes, base notes, baseline snapshots, promise tracking, state, reports, index row and alerting all working exactly as for a GitHub entry. The state key is the URL unless `label` renames it; the index links repo and release to their forge instead of assuming github.com. `watch add --repo-url <url>` validates at add time that a release API actually answers — a plain git host has nothing that says "there is a new release", so it is refused with the reason instead of becoming a permanent per-run error (one-off checks still work API-less via `--repo-url`). `watch remove` takes the URL; `watch init` stays GitHub-only by design (it reads a GitHub account). `remove`, `list` and URL adds no longer demand the `gh` CLI, which the GitHub paths still need. Verified live against gitea.com: first run picks up `gitea/tea` v0.14.2 (state, three report files, forge-linked index row, flagged), second run is a no-op.
+- The `--repo-url` help text still claimed "no forge API"; it now describes the release-API path that has existed since 0.2.0, with the CHANGELOG fallback for hosts without one.
+
 ## 0.4.0 — 2026-07-27
 
 ### Changed

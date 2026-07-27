@@ -120,6 +120,12 @@ async function getJson(url: string, headers: Record<string, string>): Promise<un
   }
 }
 
+/** What a forge's release API answered: which dialect, and the releases. */
+export interface ForgeListing {
+  kind: "forgejo" | "gitlab";
+  releases: GhRelease[];
+}
+
 /**
  * Releases newest-first in the shape the GitHub path already speaks, so
  * base-picking and note selection stay one code path.
@@ -133,7 +139,7 @@ async function getJson(url: string, headers: Record<string, string>): Promise<un
 export async function fetchForgeReleases(
   target: ForgeRepo,
   opts: { limit?: number } = {},
-): Promise<{ kind: "forgejo" | "gitlab"; releases: GhRelease[] } | null> {
+): Promise<ForgeListing | null> {
   const limit = opts.limit ?? 100;
   const path = `${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
 

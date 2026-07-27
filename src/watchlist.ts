@@ -5,6 +5,8 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { ghApi } from "./sources/github.ts";
+import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
+import { assertCloneUrl } from "./sources/local.ts";
 import { c, stripControl } from "./util.ts";
 import type { WatchConfig } from "./watch.ts";
 
@@ -81,10 +83,18 @@ export function addRepos(
   return { added, skipped };
 }
 
-/** Remove every entry for the repo; returns how many were removed. */
+/** Add a forge-URL entry unless the URL is already watched. */
+export function addRepoUrl(config: WatchConfig, repoUrl: string): boolean {
+  if (config.repos.some((r) => r.repoUrl === repoUrl)) return false;
+  config.repos.push({ repoUrl });
+  return true;
+}
+
+/** Remove every entry for the repo — owner/repo or a forge URL; returns how
+ * many were removed. */
 export function removeRepo(config: WatchConfig, repo: string): number {
   const before = config.repos.length;
-  config.repos = config.repos.filter((r) => r.repo !== repo);
+  config.repos = config.repos.filter((r) => (r.repo ?? r.repoUrl) !== repo);
   return before - config.repos.length;
 }
 
@@ -310,9 +320,14 @@ export async function runWatchInit(opts: {
 
 export async function runWatchAdd(opts: {
   configPath: string;
-  repo: string;
+  repo?: string;
+  /** A Forgejo/Gitea/GitLab repository URL instead of a GitHub slug. */
+  repoUrl?: string;
 }): Promise<number> {
-  if (!REPO_RE.test(opts.repo)) {
+  if (opts.repoUrl !== undefined) {
+    return runWatchAddUrl(opts.configPath, opts.repoUrl);
+  }
+  if (!opts.repo || !REPO_RE.test(opts.repo)) {
     throw new Error(`watch add expects owner/repo (got "${opts.repo}").`);
   }
   let meta: GhRepoSummary;
@@ -343,6 +358,44 @@ export async function runWatchAdd(opts: {
   return 0;
 }
 
+/**
+ * The same probe-then-add contract the GitHub path has: a repo that cannot be
+ * watched is refused at add time with the reason, not discovered as a
+ * permanent per-run error later. Watching needs a release API to poll — a
+ * plain git host has nothing that answers "is there a new release?".
+ */
+async function runWatchAddUrl(configPath: string, repoUrl: string): Promise<number> {
+  const url = assertCloneUrl(repoUrl.replace(/\/+$/, ""));
+  const parsed = parseRepoUrl(url);
+  if (!parsed) {
+    throw new Error(
+      `Cannot read owner/repo from "${url}" — expected a forge URL like https://forge.example.com/owner/repo.`,
+    );
+  }
+  const forge = await fetchForgeReleases(parsed);
+  if (!forge) {
+    throw new Error(
+      `No Forgejo/Gitea or GitLab release API answered for ${parsed.owner}/${parsed.repo} at ${parsed.origin} — ` +
+        "the repository may not exist, be private (export FORGEJO_TOKEN/GITEA_TOKEN or GITLAB_TOKEN), " +
+        "or the host has no release API. watch polls the release list, so it needs one; a one-off " +
+        `check works without it: --repo-url ${url}.`,
+    );
+  }
+  const { config, existed } = await loadConfig(configPath);
+  if (!addRepoUrl(config, url)) {
+    console.error(`${url} is already in ${configPath}.`);
+    return 0;
+  }
+  await saveConfig(configPath, config);
+  console.error(
+    `${parsed.owner}/${parsed.repo} (${forge.kind} at ${parsed.origin}) added to ${configPath}${existed ? "" : " (created)"}.`,
+  );
+  if (!forge.releases.some((r) => !r.draft && !r.prerelease)) {
+    console.error("note: no stable releases yet — it stays a cheap no-op until the first one.");
+  }
+  return 0;
+}
+
 export async function runWatchRemove(opts: {
   configPath: string;
   repo: string;
@@ -369,11 +422,12 @@ export async function runWatchList(opts: { configPath: string }): Promise<number
     return 0;
   }
   for (const entry of config.repos) {
+    const name = entry.repo ?? entry.repoUrl ?? "?";
     const extras = Object.entries(entry)
-      .filter(([k]) => k !== "repo")
+      .filter(([k]) => k !== "repo" && k !== "repoUrl")
       .map(([k, v]) => `${k}=${v}`)
       .join(" ");
-    console.log(extras ? `${entry.repo}  ${c.dim(extras)}` : entry.repo);
+    console.log(extras ? `${name}  ${c.dim(extras)}` : name);
   }
   return 0;
 }

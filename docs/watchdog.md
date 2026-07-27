@@ -3,7 +3,9 @@
 `comparerelease watch` turns the checker into a supply-chain watchdog: point
 it at a list of repos, run it from cron/launchd, and every NEW release gets a
 full fact-check the moment it appears. No new releases means a no-op run
-(one GitHub API call per repo).
+(one API call per repo). GitHub repos are listed as `owner/repo`; any
+Forgejo/Gitea or GitLab repo joins the same list by URL (`repoUrl`) — polled
+over that forge's release API, checked through a cached clone.
 
 This page uses the short `comparerelease` name throughout, because a
 scheduler wants one command it can call. From inside a checkout:
@@ -22,7 +24,7 @@ watch: 4 repos · 1 new release(s) checked · 0 flagged · index reports/index.h
 Each checked release writes `reports/<repo>/<tag>.{html,md,json}` and
 regenerates `reports/index.html` — a one-page overview with red rows for
 flagged releases; every row links to its full report (click anywhere in the
-row), repo and release link out to GitHub, and the score components
+row), repo and release link out to their forge, and the score components
 (correctness · completeness · risk) sit next to the trust score. Repos that
 haven't had a release since being added are listed as waiting, so the index
 always mirrors the configured list.
@@ -70,6 +72,21 @@ $ comparerelease watch remove restic/restic
 $ comparerelease watch list
 ```
 
+`watch init` is GitHub-only by design (it reads a GitHub account). Repos on
+any other forge join by URL — validated the same way: the add fails with the
+reason if no release API answers, because the poll needs one:
+
+```console
+$ comparerelease watch add --repo-url https://gitea.com/gitea/tea
+gitea/tea (forgejo at https://gitea.com) added to watch.json.
+$ comparerelease watch remove https://gitea.com/gitea/tea
+```
+
+Private forge repos need the matching token exported where watch runs:
+`FORGEJO_TOKEN`/`GITEA_TOKEN` or `GITLAB_TOKEN`. A plain git host without a
+release API cannot be watched (nothing answers "is there a new release?") —
+those repos can still be checked one-off with `--repo-url`.
+
 All list commands default to `./watch.json`; pass `--config <file>` to use
 another path. They only touch the `repos` array — `defaults`, `notify` and
 every other setting survive edits. `add` and `remove` are idempotent:
@@ -91,16 +108,20 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
     { "repo": "restic/restic" },
     { "repo": "juanfont/headscale" },
     { "repo": "orhun/git-cliff" },
-    { "repo": "dani-garcia/vaultwarden", "baseline": 8 }
+    { "repo": "dani-garcia/vaultwarden", "baseline": 8 },
+    { "repoUrl": "https://gitea.com/gitea/tea" }
   ]
 }
 ```
 
-`defaults` applies to every repo; each entry can override it. Per-repo
-options: `judge`, `engine`, `model`, `openaiUrl`, `escalate`,
-`escalateModel`, `failOn`, `baseline`, `concurrency`, `includePrerelease`,
-`notifyBelow`, `notesFile`, `label`. Relative paths (`reportsDir`,
-`stateFile`, `notesFile`) resolve against the config file's directory.
+`defaults` applies to every repo; each entry can override it. Exactly one of
+`repo` (GitHub) and `repoUrl` (any Forgejo/Gitea/GitLab URL) per entry; a
+`repoUrl` entry's state key and report directory are the URL unless `label`
+renames them. Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
+`escalate`, `escalateModel`, `failOn`, `baseline`, `concurrency`,
+`includePrerelease`, `notifyBelow`, `notesFile`, `label`. Relative paths
+(`reportsDir`, `stateFile`, `notesFile`) resolve against the config file's
+directory.
 
 The judge defaults shown above are the recommended watchdog setup: a local
 OpenAI-compatible model (Ollama/MLX/vLLM) does the bulk verification for

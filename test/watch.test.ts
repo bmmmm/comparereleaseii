@@ -6,7 +6,9 @@ import {
   pickNewReleases,
   isFlagged,
   hasDrifted,
+  releaseWebUrl,
   runNotify,
+  runWatch,
   scoreBaseline,
   worstExit,
   toWatchIndexHtml,
@@ -404,6 +406,84 @@ test("the notify command cannot be extended by the report path", async () => {
 
   await assert.rejects(stat(marker), "the path opened a shell");
   assert.equal(await readFile(seen, "utf8"), hostile, "the path did not arrive intact");
+});
+
+test("releaseWebUrl speaks each forge's route dialect", () => {
+  assert.equal(
+    releaseWebUrl({ base: "https://gitea.com/gitea/tea", style: "github" }, "v0.14.2"),
+    "https://gitea.com/gitea/tea/releases/tag/v0.14.2",
+  );
+  assert.equal(
+    releaseWebUrl({ base: "https://gitlab.com/group/proj", style: "gitlab" }, "v1.0"),
+    "https://gitlab.com/group/proj/-/releases/v1.0",
+  );
+  // Tags may carry slashes — one path component, always.
+  assert.equal(
+    releaseWebUrl({ base: "https://x.example/o/r", style: "github" }, "cli/v2.0"),
+    "https://x.example/o/r/releases/tag/cli%2Fv2.0",
+  );
+  assert.equal(releaseWebUrl(null, "v1"), undefined);
+});
+
+test("toWatchIndexHtml links forge entries to their forge, never to GitHub", () => {
+  const forgeRel = checked("v0.14.2", 88, false);
+  forgeRel.releaseUrl = "https://gitea.com/gitea/tea/releases/tag/v0.14.2";
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "https://gitea.com/gitea/tea": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v0.14.2",
+        latest: forgeRel,
+        history: [forgeRel],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z", [
+    { key: "https://gitea.com/gitea/tea", repo: "gitea/tea", url: "https://gitea.com/gitea/tea" },
+  ]);
+  assert.ok(html.includes('href="https://gitea.com/gitea/tea"'), "repo cell links to the forge");
+  assert.ok(
+    html.includes('href="https://gitea.com/gitea/tea/releases/tag/v0.14.2"'),
+    "release links to the forge's release page",
+  );
+  assert.ok(!html.includes("github.com"), "nothing points at GitHub for a forge entry");
+});
+
+test("a URL-shaped repo without a forge link is not pinned on github.com", () => {
+  // States written by older versions carry no releaseUrl; a forge entry whose
+  // URL never parsed renders as plain text rather than a fabricated link.
+  const rel = checked("v1", 80, false);
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      weird: {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: rel,
+        history: [rel],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t", [{ key: "weird", repo: "ssh://host/x/y" }]);
+  assert.ok(!html.includes("github.com"), "no GitHub link fabricated from a URL");
+});
+
+test("watch config validation: exactly one of repo and repoUrl per entry", async () => {
+  const opts = { configPath: "watch.json", cache: false };
+  await assert.rejects(
+    runWatch({ repos: [{ repo: "o/r", repoUrl: "https://forge.example/o/r" }] }, opts),
+    /pass one per entry/,
+  );
+  await assert.rejects(runWatch({ repos: [{}] }, opts), /needs "repo"/);
+  await assert.rejects(
+    runWatch({ repos: [{ repoUrl: "https://forge.example" }] }, opts),
+    /cannot read owner\/repo/,
+  );
+  await assert.rejects(
+    runWatch({ repos: [{ repoUrl: "--upload-pack=evil" }] }, opts),
+    /may not start with "-"/,
+  );
 });
 
 test("countSkipped ignores releases that would never be checked", () => {

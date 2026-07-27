@@ -8,6 +8,7 @@ import {
   parseSelection,
   mergeCandidates,
   addRepos,
+  addRepoUrl,
   removeRepo,
   loadConfig,
   saveConfig,
@@ -162,4 +163,15 @@ test("loadConfig: missing repos key becomes an empty array, keys survive", async
   const { config } = await loadConfig(path);
   assert.deepEqual(config.repos, []);
   assert.equal(config.notify, "cmd");
+});
+
+test("addRepoUrl dedupes on the URL; removeRepo drops URL entries by URL", () => {
+  const config: WatchConfig = { repos: [{ repo: "o/r" }] };
+  assert.equal(addRepoUrl(config, "https://gitea.com/gitea/tea"), true);
+  assert.equal(addRepoUrl(config, "https://gitea.com/gitea/tea"), false);
+  assert.deepEqual(config.repos, [{ repo: "o/r" }, { repoUrl: "https://gitea.com/gitea/tea" }]);
+  // A GitHub slug never collides with a URL entry, and vice versa.
+  assert.equal(removeRepo(config, "https://gitea.com/gitea/tea"), 1);
+  assert.equal(removeRepo(config, "o/r"), 1);
+  assert.equal(config.repos.length, 0);
 });
