@@ -374,6 +374,29 @@ that would faces the A/B measurement discipline). Open: prioritization; how
 deep author history reaches (baseline window vs. accumulating in state —
 lean state-accumulating); whether badges are wanted at all.
 
+- **The presentation blocks landed 2026-07-27** (P1, P2, P3, P5 — the
+  session read "Presentation" as excluding the author dimension, so **P4
+  stays open**, its neutral-framing decision still standing). Order
+  deviated deliberately: P5 last, so the screenshots show the finished
+  surface. P1 as `src/watch-detail.ts` (score series vs. own median,
+  verdict composition, releases table, promise-ledger carry countdowns),
+  plus a follow-up the old 12-repo state exposed: one derivation
+  (`reportDirOf`) now decides where the page lands, where the index links,
+  and how many levels its relative links climb — legacy nested layouts
+  included. P2 as tiles + sort/filter + cross-repo release feed + static
+  Atom (`feed.xml`, relative links, stable ids). P3 as `scoreBreakdown()`
+  next to `computeScores` — reconciles by construction, surfaces any
+  future drift as an "unexplained adjustment" bar, two mutants guard it.
+  P5: README opens on a real sniffnet report, watchdog section shows
+  dashboard + history page (light/dark `<picture>` pairs); `docs/demo/` is
+  an unedited watch pass over five public repos (12 checks, claude-cli
+  judge, config + seeded state included). The verdict/score palettes were
+  run through a CVD validator: they fail as *categorical* colors but serve
+  as *status* colors — kept, with the standing rule that color never
+  carries identity alone (symbols, counts and tooltips everywhere).
+  Waiting on the user: enable GitHub Pages (main, `/docs`) so the demo
+  links resolve, and the P5 badge question stays open.
+
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target
   at all. If not: a one-hour actionable error ("diff exceeds 64 MB — narrow
