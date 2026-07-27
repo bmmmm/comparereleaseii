@@ -8,7 +8,7 @@
         {
           "tag": "v0.0.65",
           "publishedAt": "2026-07-10T16:45:20Z",
-          "checkedAt": "2026-07-27T21:13:54.538Z",
+          "checkedAt": "2026-07-27T22:23:17.730Z",
           "score": 76,
           "scoreLabel": "minor gaps",
           "components": {
@@ -27,6 +27,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 4,
+            "new": 4,
+            "top1Share": 0.39
+          },
           "scoreLevel": null,
           "report": "anthropic-experimental_sandbox-runtime/v0.0.65.html",
           "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.65"
@@ -34,7 +39,7 @@
         {
           "tag": "v0.0.66",
           "publishedAt": "2026-07-17T22:05:27Z",
-          "checkedAt": "2026-07-27T21:14:43.070Z",
+          "checkedAt": "2026-07-27T22:23:23.925Z",
           "score": 78,
           "scoreLabel": "minor gaps",
           "components": {
@@ -53,6 +58,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 3,
+            "new": 1,
+            "top1Share": 0.74
+          },
           "scoreLevel": null,
           "report": "anthropic-experimental_sandbox-runtime/v0.0.66.html",
           "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.66"
@@ -60,7 +70,7 @@
         {
           "tag": "v0.0.67",
           "publishedAt": "2026-07-23T03:23:58Z",
-          "checkedAt": "2026-07-27T21:15:40.592Z",
+          "checkedAt": "2026-07-27T22:23:28.983Z",
           "score": 85,
           "scoreLabel": "solid",
           "components": {
@@ -79,6 +89,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 3,
+            "new": 0,
+            "top1Share": 0.57
+          },
           "scoreLevel": null,
           "report": "anthropic-experimental_sandbox-runtime/v0.0.67.html",
           "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.67"
@@ -86,7 +101,7 @@
         {
           "tag": "v0.0.68",
           "publishedAt": "2026-07-24T19:24:28Z",
-          "checkedAt": "2026-07-27T21:15:43.968Z",
+          "checkedAt": "2026-07-27T22:23:31.373Z",
           "score": 100,
           "scoreLabel": "solid",
           "components": {
@@ -105,6 +120,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 1,
+            "new": 1,
+            "top1Share": 1
+          },
           "scoreLevel": 78,
           "report": "anthropic-experimental_sandbox-runtime/v0.0.68.html",
           "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.68"
@@ -113,7 +133,7 @@
       "latest": {
         "tag": "v0.0.68",
         "publishedAt": "2026-07-24T19:24:28Z",
-        "checkedAt": "2026-07-27T21:15:43.968Z",
+        "checkedAt": "2026-07-27T22:23:31.373Z",
         "score": 100,
         "scoreLabel": "solid",
         "components": {
@@ -132,6 +152,11 @@
           "noEvidence": 0,
           "contradicted": 0
         },
+        "authors": {
+          "total": 1,
+          "new": 1,
+          "top1Share": 1
+        },
         "scoreLevel": 78,
         "report": "anthropic-experimental_sandbox-runtime/v0.0.68.html",
         "releaseUrl": "https://github.com/anthropic-experimental/sandbox-runtime/releases/tag/v0.0.68"
@@ -144,7 +169,7 @@
         {
           "tag": "v2.1.218",
           "publishedAt": "2026-07-22T21:24:56Z",
-          "checkedAt": "2026-07-27T21:20:27.615Z",
+          "checkedAt": "2026-07-27T22:23:37.023Z",
           "score": 65,
           "scoreLabel": "unverified",
           "components": {
@@ -163,6 +188,11 @@
             "noEvidence": 31,
             "contradicted": 0
           },
+          "authors": {
+            "total": 1,
+            "new": 1,
+            "top1Share": 1
+          },
           "unverifiable": "sourceless",
           "scoreLevel": null,
           "report": "anthropics_claude-code/v2.1.218.html",
@@ -171,7 +201,7 @@
         {
           "tag": "v2.1.219",
           "publishedAt": "2026-07-24T17:14:23Z",
-          "checkedAt": "2026-07-27T21:24:06.507Z",
+          "checkedAt": "2026-07-27T22:23:41.075Z",
           "score": 65,
           "scoreLabel": "unverified",
           "components": {
@@ -190,6 +220,11 @@
             "noEvidence": 21,
             "contradicted": 0
           },
+          "authors": {
+            "total": 1,
+            "new": 0,
+            "top1Share": 1
+          },
           "unverifiable": "sourceless",
           "scoreLevel": null,
           "report": "anthropics_claude-code/v2.1.219.html",
@@ -198,7 +233,7 @@
         {
           "tag": "v2.1.220",
           "publishedAt": "2026-07-25T01:35:55Z",
-          "checkedAt": "2026-07-27T21:24:45.556Z",
+          "checkedAt": "2026-07-27T22:23:44.889Z",
           "score": 65,
           "scoreLabel": "unverified",
           "components": {
@@ -217,6 +252,11 @@
             "noEvidence": 1,
             "contradicted": 0
           },
+          "authors": {
+            "total": 1,
+            "new": 0,
+            "top1Share": 1
+          },
           "unverifiable": "sourceless",
           "scoreLevel": null,
           "report": "anthropics_claude-code/v2.1.220.html",
@@ -226,7 +266,7 @@
       "latest": {
         "tag": "v2.1.220",
         "publishedAt": "2026-07-25T01:35:55Z",
-        "checkedAt": "2026-07-27T21:24:45.556Z",
+        "checkedAt": "2026-07-27T22:23:44.889Z",
         "score": 65,
         "scoreLabel": "unverified",
         "components": {
@@ -245,6 +285,11 @@
           "noEvidence": 1,
           "contradicted": 0
         },
+        "authors": {
+          "total": 1,
+          "new": 0,
+          "top1Share": 1
+        },
         "unverifiable": "sourceless",
         "scoreLevel": null,
         "report": "anthropics_claude-code/v2.1.220.html",
@@ -258,7 +303,7 @@
         {
           "tag": "v0.9.2",
           "publishedAt": "2026-07-12T12:56:33Z",
-          "checkedAt": "2026-07-27T21:24:53.544Z",
+          "checkedAt": "2026-07-27T22:23:50.671Z",
           "score": 100,
           "scoreLabel": "solid",
           "components": {
@@ -277,6 +322,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 2,
+            "new": 2,
+            "top1Share": 0.5
+          },
           "scoreLevel": null,
           "report": "cjpais_Handy/v0.9.2.html",
           "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.2"
@@ -284,7 +334,7 @@
         {
           "tag": "v0.9.3",
           "publishedAt": "2026-07-15T13:43:59Z",
-          "checkedAt": "2026-07-27T21:25:07.327Z",
+          "checkedAt": "2026-07-27T22:23:55.461Z",
           "score": 97,
           "scoreLabel": "solid",
           "components": {
@@ -303,6 +353,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 5,
+            "new": 3,
+            "top1Share": 0.33
+          },
           "scoreLevel": null,
           "report": "cjpais_Handy/v0.9.3.html",
           "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.3"
@@ -310,7 +365,7 @@
         {
           "tag": "v0.9.4",
           "publishedAt": "2026-07-21T08:13:47Z",
-          "checkedAt": "2026-07-27T21:26:03.568Z",
+          "checkedAt": "2026-07-27T22:24:00.456Z",
           "score": 91,
           "scoreLabel": "solid",
           "components": {
@@ -329,6 +384,11 @@
             "noEvidence": 0,
             "contradicted": 0
           },
+          "authors": {
+            "total": 4,
+            "new": 2,
+            "top1Share": 0.79
+          },
           "scoreLevel": null,
           "report": "cjpais_Handy/v0.9.4.html",
           "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.4"
@@ -337,7 +397,7 @@
       "latest": {
         "tag": "v0.9.4",
         "publishedAt": "2026-07-21T08:13:47Z",
-        "checkedAt": "2026-07-27T21:26:03.568Z",
+        "checkedAt": "2026-07-27T22:24:00.456Z",
         "score": 91,
         "scoreLabel": "solid",
         "components": {
@@ -356,6 +416,11 @@
           "noEvidence": 0,
           "contradicted": 0
         },
+        "authors": {
+          "total": 4,
+          "new": 2,
+          "top1Share": 0.79
+        },
         "scoreLevel": null,
         "report": "cjpais_Handy/v0.9.4.html",
         "releaseUrl": "https://github.com/cjpais/Handy/releases/tag/v0.9.4"
@@ -368,7 +433,7 @@
         {
           "tag": "1.37.0",
           "publishedAt": "2026-07-24T17:04:39Z",
-          "checkedAt": "2026-07-27T21:29:19.753Z",
+          "checkedAt": "2026-07-27T22:24:06.616Z",
           "score": 79,
           "scoreLabel": "minor gaps",
           "components": {
@@ -387,6 +452,11 @@
             "noEvidence": 2,
             "contradicted": 0
           },
+          "authors": {
+            "total": 12,
+            "new": 12,
+            "top1Share": 0.37
+          },
           "scoreLevel": null,
           "report": "dani-garcia_vaultwarden/1.37.0.html",
           "releaseUrl": "https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0"
@@ -395,7 +465,7 @@
       "latest": {
         "tag": "1.37.0",
         "publishedAt": "2026-07-24T17:04:39Z",
-        "checkedAt": "2026-07-27T21:29:19.753Z",
+        "checkedAt": "2026-07-27T22:24:06.616Z",
         "score": 79,
         "scoreLabel": "minor gaps",
         "components": {
@@ -414,6 +484,11 @@
           "noEvidence": 2,
           "contradicted": 0
         },
+        "authors": {
+          "total": 12,
+          "new": 12,
+          "top1Share": 0.37
+        },
         "scoreLevel": null,
         "report": "dani-garcia_vaultwarden/1.37.0.html",
         "releaseUrl": "https://github.com/dani-garcia/vaultwarden/releases/tag/1.37.0"
@@ -426,7 +501,7 @@
         {
           "tag": "v1.5.1",
           "publishedAt": "2026-07-22T07:54:30Z",
-          "checkedAt": "2026-07-27T21:31:32.442Z",
+          "checkedAt": "2026-07-27T22:24:20.952Z",
           "score": 45,
           "scoreLabel": "questionable",
           "components": {
@@ -445,6 +520,11 @@
             "noEvidence": 1,
             "contradicted": 0
           },
+          "authors": {
+            "total": 21,
+            "new": 21,
+            "top1Share": 0.4
+          },
           "scoreLevel": null,
           "report": "GyulyVGC_sniffnet/v1.5.1.html",
           "releaseUrl": "https://github.com/GyulyVGC/sniffnet/releases/tag/v1.5.1"
@@ -453,7 +533,7 @@
       "latest": {
         "tag": "v1.5.1",
         "publishedAt": "2026-07-22T07:54:30Z",
-        "checkedAt": "2026-07-27T21:31:32.442Z",
+        "checkedAt": "2026-07-27T22:24:20.952Z",
         "score": 45,
         "scoreLabel": "questionable",
         "components": {
@@ -471,6 +551,11 @@
           "partial": 1,
           "noEvidence": 1,
           "contradicted": 0
+        },
+        "authors": {
+          "total": 21,
+          "new": 21,
+          "top1Share": 0.4
         },
         "scoreLevel": null,
         "report": "GyulyVGC_sniffnet/v1.5.1.html",

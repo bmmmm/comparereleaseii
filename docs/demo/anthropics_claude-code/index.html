@@ -28,6 +28,8 @@ svg{width:100%;height:auto}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
 .dropmark{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
 .notice{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.bot{display:inline-block;border:1px solid var(--muted);color:var(--muted);border-radius:.6em;padding:0 .4em;font-size:.8em}
+.mutedcell{color:var(--muted)}
 @media (prefers-color-scheme:dark){.notice{border-color:#d29922;color:#d29922}}
 table{border-collapse:collapse;width:100%;margin-top:6px}
 th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid var(--border);font-size:13px}
@@ -41,7 +43,7 @@ tr.flagged{background:var(--flagged-bg)}
 footer{margin-top:28px;color:var(--faint);font-size:12px}
 </style></head><body>
 <h1><a class="repo" href="https://github.com/anthropics/claude-code" target="_blank" rel="noopener">anthropics/claude-code</a> <span class="note">release watch history</span></h1>
-<p class="sub"><a href="../index.html">&larr; all watched repos</a> · 3 checks on record · generated 2026-07-27T22:03:56.722Z</p>
+<p class="sub"><a href="../index.html">&larr; all watched repos</a> · 3 checks on record · generated 2026-07-27T22:24:20.956Z</p>
 <div class="cards">
   <div><div class="n"><span class="score unverified">65</span> unverified</div><div class="t">latest: v2.1.220</div></div>
   <div><div class="n">65</div><div class="t">median of recorded checks</div></div>
@@ -59,7 +61,7 @@ checked 2026-07-27</title></circle></a><text x="34.0" y="202" class="axis" text-
 <svg viewBox="0 0 760 130" role="img" aria-label="Verdicts per release"><text x="28" y="12" class="axis" text-anchor="end">37</text><text x="28" y="122" class="axis" text-anchor="end">0</text><a href="../anthropics_claude-code/v2.1.218.html"><rect x="21.0" y="103.5" width="26.0" height="18.5" fill="#3fb950" class="seg"><title>v2.1.218: 6 verified</title></rect><rect x="21.0" y="8.0" width="26.0" height="95.5" fill="#bc8cff" class="seg"><title>v2.1.218: 31 no-evidence</title></rect></a><a href="../anthropics_claude-code/v2.1.219.html"><rect x="377.0" y="106.6" width="26.0" height="15.4" fill="#3fb950" class="seg"><title>v2.1.219: 5 verified</title></rect><rect x="377.0" y="41.9" width="26.0" height="64.7" fill="#bc8cff" class="seg"><title>v2.1.219: 21 no-evidence</title></rect></a><a href="../anthropics_claude-code/v2.1.220.html"><rect x="733.0" y="118.9" width="26.0" height="3.1" fill="#bc8cff" class="seg"><title>v2.1.220: 1 no-evidence</title></rect></a></svg><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>✔ verified</span><span class="lg"><span class="dot" style="background:#d29922"></span>◐ partial</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>? no evidence</span><span class="lg"><span class="dot" style="background:#f85149"></span>✘ contradicted</span></div>
 <h2>Checked releases</h2>
 <table>
-<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th>checked</th></tr></thead>
+<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th title="identities with commits in the release (new = never seen by this watcher)">authors</th><th>checked</th></tr></thead>
 <tbody>
 <tr class="">
 <td>&#10003;</td>
@@ -69,7 +71,8 @@ checked 2026-07-27</title></circle></a><text x="34.0" y="202" class="axis" text-
 <td class="comp">100 · 0 · 100</td>
 <td>0&#10004; 0&#9680; 1? 0&#10008;</td>
 <td>1</td>
-<td title="2026-07-27T21:24:45.556Z">2026-07-27</td>
+<td><span title="top identity authored 100% of this release's commits">1</span></td>
+<td title="2026-07-27T22:23:44.889Z">2026-07-27</td>
 </tr>
 <tr class="">
 <td>&#10003;</td>
@@ -79,7 +82,8 @@ checked 2026-07-27</title></circle></a><text x="34.0" y="202" class="axis" text-
 <td class="comp">100 · 100 · 100</td>
 <td>5&#10004; 0&#9680; 21? 0&#10008;</td>
 <td>1</td>
-<td title="2026-07-27T21:24:06.507Z">2026-07-27</td>
+<td><span title="top identity authored 100% of this release's commits">1</span></td>
+<td title="2026-07-27T22:23:41.075Z">2026-07-27</td>
 </tr>
 <tr class="">
 <td>&#10003;</td>
@@ -89,7 +93,22 @@ checked 2026-07-27</title></circle></a><text x="34.0" y="202" class="axis" text-
 <td class="comp">100 · 100 · 100</td>
 <td>6&#10004; 0&#9680; 31? 0&#10008;</td>
 <td>1</td>
-<td title="2026-07-27T21:20:27.615Z">2026-07-27</td>
+<td><span title="top identity authored 100% of this release's commits">1 <span class="notice" title="identities this watcher had never seen before">1 new</span></span></td>
+<td title="2026-07-27T22:23:37.023Z">2026-07-27</td>
+</tr>
+</tbody></table>
+<h2>Authors <span class="note">— identity facts accumulated over the checked releases; not a trust rating in either direction</span></h2>
+<table>
+<thead><tr><th>author</th><th>account</th><th>first seen</th><th>releases</th><th>commits</th><th title="commits touching dependency manifests, CI or auth/crypto paths">sensitive</th><th title="commits changing opaque binary files">binary</th></tr></thead>
+<tbody>
+<tr>
+<td>actions-user</td>
+<td><span>@actions-user</span></td>
+<td>v2.1.218</td>
+<td>3</td>
+<td>3</td>
+<td></td>
+<td></td>
 </tr>
 </tbody></table>
 

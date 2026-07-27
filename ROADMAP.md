@@ -396,6 +396,15 @@ lean state-accumulating); whether badges are wanted at all.
   carries identity alone (symbols, counts and tooltips everywhere).
   Waiting on the user: enable GitHub Pages (main, `/docs`) so the demo
   links resolve, and the P5 badge question stays open.
+- **P4 followed 2026-07-28** (user: "pages sollte an sein, weiter" — Pages
+  source corrected to main + `/docs` the same day). State-accumulating, as
+  leaned: `Report.authors[]` (computed after scoring, feeds nothing back)
+  → per-repo `AuthorRecord` ledger (firstSeen immutable, mutation-guarded;
+  attribution changes accumulate; cap keeps active-then-busiest) → history
+  page renders the facts table (bot chip, attribution history) and per
+  release count / new-to-this-watcher / top-1 commit share. The neutral
+  framing is printed on the page itself. Still open: only the P5 badge
+  question.
 
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target

@@ -5,9 +5,12 @@ on 2026-07-27 against five public repositories with the `claude-cli` judge
 (Haiku): the dashboard (`index.html`), one Atom feed (`feed.xml`), and per
 repo a history page plus the HTML and Markdown report of every checked
 release. Serve the directory statically — GitHub Pages, any web server, or
-a plain browser — and every link works. The `--json` reports are the one
-thing deliberately not committed: they carry upstream commit-author e-mail
-addresses, which this demo has no business republishing.
+a plain browser — and every link works. Two things are deliberately not
+committed because they carry upstream commit-author e-mail addresses,
+which this demo has no business republishing: the `--json` reports, and
+the author-ledger arrays inside `watch-state.json` (their identity keys
+are e-mails; the rendered author tables show only names and forge
+handles). A reproduced run rebuilds the ledger from its own checks.
 
 Reproduce it from a checkout:
 

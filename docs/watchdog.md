@@ -34,7 +34,12 @@ feed lists every checked release across repos, newest first. The same feed
 is written as static Atom to `reports/feed.xml` (relative links — serve the
 reports directory and any feed reader can subscribe), and each repo row
 links a `history` page (`reports/<repo>/index.html`) with the full score
-series, verdict composition per release and the promise ledger.
+series, verdict composition per release, the promise ledger, and an author
+ledger — per-identity facts accumulated across checked releases (first
+seen, commits, sensitive-path and binary commits, forge-attribution
+history, bot tag) plus each release's identity count, first-appearances
+and top-identity commit share. Facts only, by design: no trust ratings on
+people in either direction.
 
 ## How state works
 

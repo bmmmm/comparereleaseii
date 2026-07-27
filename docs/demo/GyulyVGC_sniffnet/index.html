@@ -28,6 +28,8 @@ svg{width:100%;height:auto}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
 .dropmark{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
 .notice{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.bot{display:inline-block;border:1px solid var(--muted);color:var(--muted);border-radius:.6em;padding:0 .4em;font-size:.8em}
+.mutedcell{color:var(--muted)}
 @media (prefers-color-scheme:dark){.notice{border-color:#d29922;color:#d29922}}
 table{border-collapse:collapse;width:100%;margin-top:6px}
 th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid var(--border);font-size:13px}
@@ -41,7 +43,7 @@ tr.flagged{background:var(--flagged-bg)}
 footer{margin-top:28px;color:var(--faint);font-size:12px}
 </style></head><body>
 <h1><a class="repo" href="https://github.com/GyulyVGC/sniffnet" target="_blank" rel="noopener">GyulyVGC/sniffnet</a> <span class="note">release watch history</span></h1>
-<p class="sub"><a href="../index.html">&larr; all watched repos</a> · 1 check on record · generated 2026-07-27T22:03:56.722Z</p>
+<p class="sub"><a href="../index.html">&larr; all watched repos</a> · 1 check on record · generated 2026-07-27T22:24:20.956Z</p>
 <div class="cards">
   <div><div class="n"><span class="score bad">45</span> questionable</div><div class="t">latest: v1.5.1</div></div>
   <div><div class="n">–</div><div class="t">median of recorded checks</div></div>
@@ -56,7 +58,7 @@ checked 2026-07-27
 <svg viewBox="0 0 760 130" role="img" aria-label="Verdicts per release"><text x="28" y="12" class="axis" text-anchor="end">19</text><text x="28" y="122" class="axis" text-anchor="end">0</text><a href="../GyulyVGC_sniffnet/v1.5.1.html"><rect x="377.0" y="20.0" width="26.0" height="102.0" fill="#3fb950" class="seg"><title>v1.5.1: 17 verified</title></rect><rect x="377.0" y="14.0" width="26.0" height="6.0" fill="#d29922" class="seg"><title>v1.5.1: 1 partial</title></rect><rect x="377.0" y="8.0" width="26.0" height="6.0" fill="#bc8cff" class="seg"><title>v1.5.1: 1 no-evidence</title></rect></a></svg><div class="legend"><span class="lg"><span class="dot" style="background:#3fb950"></span>✔ verified</span><span class="lg"><span class="dot" style="background:#d29922"></span>◐ partial</span><span class="lg"><span class="dot" style="background:#bc8cff"></span>? no evidence</span><span class="lg"><span class="dot" style="background:#f85149"></span>✘ contradicted</span></div>
 <h2>Checked releases</h2>
 <table>
-<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th>checked</th></tr></thead>
+<thead><tr><th></th><th>release</th><th>released</th><th>trust score</th><th>c &middot; c &middot; r</th><th>verdicts</th><th>flags</th><th title="identities with commits in the release (new = never seen by this watcher)">authors</th><th>checked</th></tr></thead>
 <tbody>
 <tr class="flagged">
 <td>&#9888;</td>
@@ -66,7 +68,202 @@ checked 2026-07-27
 <td class="comp">92 · 30 · 20</td>
 <td>17&#10004; 1&#9680; 1? 0&#10008;</td>
 <td><b>2 critical</b> / 6</td>
-<td title="2026-07-27T21:31:32.442Z">2026-07-27</td>
+<td><span title="top identity authored 40% of this release's commits">21 <span class="notice" title="identities this watcher had never seen before">21 new</span></span></td>
+<td title="2026-07-27T22:24:20.952Z">2026-07-27</td>
+</tr>
+</tbody></table>
+<h2>Authors <span class="note">— identity facts accumulated over the checked releases; not a trust rating in either direction</span></h2>
+<table>
+<thead><tr><th>author</th><th>account</th><th>first seen</th><th>releases</th><th>commits</th><th title="commits touching dependency manifests, CI or auth/crypto paths">sensitive</th><th title="commits changing opaque binary files">binary</th></tr></thead>
+<tbody>
+<tr>
+<td>GyulyVGC</td>
+<td><span>@GyulyVGC</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>59</td>
+<td>23</td>
+<td></td>
+</tr>
+<tr>
+<td>GyulyVGC</td>
+<td><span>@GyulyVGC</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>31</td>
+<td>13</td>
+<td></td>
+</tr>
+<tr>
+<td>allcontributors[bot] <span class="bot">bot</span></td>
+<td><span>@allcontributors[bot]</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>19</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>DmytroGaiduk</td>
+<td><span>@DmytroGaiduk</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>5</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>TheMasterOfDisasters</td>
+<td><span>@TheMasterOfDisasters</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>4</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>ethical-buddy</td>
+<td><span>@ethical-buddy</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>4</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>dependabot[bot] <span class="bot">bot</span></td>
+<td><span>@dependabot[bot]</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>3</td>
+<td>3</td>
+<td></td>
+</tr>
+<tr>
+<td>thambaru</td>
+<td><span>@thambaru</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>3</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>HiProfession</td>
+<td><span>no account</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Charpy</td>
+<td><span>@Charpy</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>2</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>Elyrial</td>
+<td><span>@Elyrial</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Hurdadd</td>
+<td><span>@Hurdadd</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>EfesX</td>
+<td><span>@EfesX</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>2</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>HiProfession</td>
+<td><span>@HiProfession</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>Franco Bonfiglio</td>
+<td><span>no account</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>nubikripto</td>
+<td><span>@nubikripto</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>GeorgeLS</td>
+<td><span>@GeorgeLS</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>pml68</td>
+<td><span>@pml68</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>LeandroPG19</td>
+<td><span>@LeandroPG19</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>orbisai0security</td>
+<td><span>@orbisai0security</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+</tr>
+<tr>
+<td>toboil-features</td>
+<td><span>@toboil-features</span></td>
+<td>v1.5.1</td>
+<td>1</td>
+<td>1</td>
+<td></td>
+<td></td>
 </tr>
 </tbody></table>
 

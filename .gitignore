@@ -19,3 +19,7 @@ tmp/
 # get `git add -A`'d with a personal repo list / notify command in them).
 watch.json
 reports/
+
+# Demo reruns rewrite the per-release --json reports; they carry upstream
+# commit-author e-mails and are deliberately not published (docs/demo/README.md).
+docs/demo/*/*.json
