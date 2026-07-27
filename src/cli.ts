@@ -15,6 +15,8 @@ import {
   calibrateModels,
   printModelRanking,
   rankCalibrations,
+  gateCalibration,
+  loadReference,
 } from "./calibrate.ts";
 import { commandExists } from "./util.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
@@ -324,7 +326,7 @@ async function main(): Promise<number> {
       });
       printModelRanking(cals);
       const best = rankCalibrations(cals)[0];
-      return best && best.passed === best.outcomes.length ? 0 : 1;
+      return best && gateCalibration(best).verdict === "sole-judge" ? 0 : 1;
     };
     const shortlist = (values.model ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     if (shortlist.length > 1) {
@@ -365,12 +367,12 @@ async function main(): Promise<number> {
       );
     }
     const cal = await runCalibration(engine, concurrency);
-    printCalibration(cal);
+    printCalibration(cal, await loadReference());
     if (values.json) {
       await writeFile(values.json, JSON.stringify(cal, null, 2));
       console.error(`JSON calibration written to ${values.json}`);
     }
-    return cal.passed === cal.outcomes.length ? 0 : 1;
+    return gateCalibration(cal).verdict === "sole-judge" ? 0 : 1;
   }
 
   if (!localPath && !(await commandExists("gh"))) {

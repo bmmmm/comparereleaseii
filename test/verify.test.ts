@@ -176,6 +176,17 @@ test("extractJsonObject repairs unterminated small-model output", () => {
   assert.throws(() => extractJsonObject("no json here"), /no JSON object/);
 });
 
+test("extractJsonObject reports whether the repair path ran", () => {
+  // Needing repair is a calibration signal even when the repair succeeds.
+  const repaired = { repaired: false };
+  extractJsonObject('{"verdict":"verified","confidence":0.9', repaired);
+  assert.equal(repaired.repaired, true);
+
+  const clean = { repaired: false };
+  extractJsonObject('{"verdict":"verified"}', clean);
+  assert.equal(clean.repaired, false);
+});
+
 test("selectEngine: openai needs an explicit model, then builds the engine", () => {
   assert.throws(() => selectEngine({ engine: "openai" }), /--model/);
   const engine = selectEngine({ engine: "openai", model: "qwen3:8b" });
@@ -190,6 +201,7 @@ test("rankCalibrations: accuracy first, rubber-stamp risk second, speed last", a
     outcomes: new Array(8).fill({}),
     passed,
     overVerified,
+    formatIssues: 0,
     avgMs,
   });
   const ranked = rankCalibrations([

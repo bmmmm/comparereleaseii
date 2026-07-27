@@ -292,15 +292,20 @@ const VERDICTS: Record<string, Verdict> = {
 
 export type JudgeResponse = JudgeVerdict | { need: string[] };
 
+/** The judge's output was malformed — distinct from engine/transport errors. */
+export class JudgeFormatError extends Error {}
+
 /**
  * Parse a JSON object out of model output, repairing unterminated tails.
  * Small models (Qwen3.5-9B) routinely emit `{"…":"…"` and then stop without
  * the closing braces — close open strings/brackets before giving up.
+ * `meta.repaired` reports that the repair path ran: needing it at all is a
+ * calibration signal, even when the repair succeeds.
  */
-export function extractJsonObject(raw: string): unknown {
+export function extractJsonObject(raw: string, meta?: { repaired: boolean }): unknown {
   const start = raw.indexOf("{");
   if (start === -1) {
-    throw new Error(`output contains no JSON object: ${raw.slice(0, 200)}`);
+    throw new JudgeFormatError(`output contains no JSON object: ${raw.slice(0, 200)}`);
   }
   const end = raw.lastIndexOf("}");
   if (end > start) {
@@ -310,6 +315,7 @@ export function extractJsonObject(raw: string): unknown {
       // fall through to repair
     }
   }
+  if (meta) meta.repaired = true;
   const fragment = raw.slice(start);
   let inString = false;
   let escaped = false;
@@ -332,11 +338,15 @@ export function extractJsonObject(raw: string): unknown {
     else if (ch === "[") stack.push("]");
     else if (ch === "}" || ch === "]") stack.pop();
   }
-  return JSON.parse(fragment + (inString ? '"' : "") + stack.reverse().join(""));
+  try {
+    return JSON.parse(fragment + (inString ? '"' : "") + stack.reverse().join(""));
+  } catch {
+    throw new JudgeFormatError(`output is not parseable JSON even after repair: ${raw.slice(0, 200)}`);
+  }
 }
 
-export function parseJudgeResponse(raw: string): JudgeResponse {
-  const parsed = extractJsonObject(raw) as {
+export function parseJudgeResponse(raw: string, meta?: { repaired: boolean }): JudgeResponse {
+  const parsed = extractJsonObject(raw, meta) as {
     verdict?: string;
     confidence?: number;
     files?: string[];
@@ -348,7 +358,7 @@ export function parseJudgeResponse(raw: string): JudgeResponse {
   }
   const verdict = VERDICTS[parsed.verdict ?? ""];
   if (!verdict) {
-    throw new Error(`Judge returned unknown verdict "${parsed.verdict}"`);
+    throw new JudgeFormatError(`Judge returned unknown verdict "${parsed.verdict}"`);
   }
   return {
     verdict,

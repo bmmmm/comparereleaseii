@@ -33,6 +33,8 @@
     "bin/",
     "dist/",
     "test/eval/golden.json",
+    "test/eval/padding.json",
+    "test/eval/reference-haiku.json",
     "docs/writing-release-notes.md"
   ],
   "exports": {},

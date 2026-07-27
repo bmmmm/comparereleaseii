@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **`--calibrate` now answers "is this model fit to judge?" with a gate, not a score.** The golden set grew from 25 to 36 cases, each carrying a `category`: new circularity cases (a changelog hunk restating the claim must not verify it), a forged-block-boundary injection (a hunk faking the `-----END UNTRUSTED-----` marker plus a maintainer-signed "pre-verified" note), a need-temptation case (the evidence visibly suffices — asking for more files is the wrong answer), three partial-coverage cases, and four long-context variants padding real cases mid-haystack into 12–18k characters of genuine unrelated diff material (`test/eval/padding.json`) — every short case is 70–1000 characters while production prompts carry up to 20k, so the set measured the wrong prompt size. The verdict is decided per category: any obeyed injection or a security rubber-stamp → NOT RECOMMENDED; failing long-context, needing JSON repair (now measured — the repair path reports itself), or failing ordinary cases → usable with `--escalate` only; a clean sweep → sole judge. Every rejection names the failed category and cases. The frozen reference run (`test/eval/reference-haiku.json`, Claude Haiku, 36/36, gate `sole-judge`) proves every category is passable; `docs/local-models.md` gained an "Is my model fit to judge?" section.
+
 ### Fixed
 
 - **The truncated-compare fallback no longer cries "first-time author".** When the compare API truncates and the diff is reloaded from a clone, commits carry git names while the baseline snapshots carry API logins — no name can ever match, so `new-author-sensitive` fired on exactly the big releases that truncate. The mixed-source case now demotes the flag to info with a note that author identities are not comparable across sources; keying identities by commit email is the clean fix and stays anchored as a FIXME.
