@@ -99,7 +99,9 @@ export async function runCalibration(engine: JudgeEngine, concurrency = 4): Prom
     }
   });
   // Sub-50ms responses came from the verdict cache — useless for timing.
-  const fresh = outcomes.filter((o) => o.ms >= 50);
+  // Errors are excluded too: a 30 s timeout is failure latency, not speed,
+  // and it feeds the ranking's s/call column.
+  const fresh = outcomes.filter((o) => o.ms >= 50 && o.got !== "error");
   return {
     engine: engine.name,
     outcomes,

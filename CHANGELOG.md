@@ -27,6 +27,9 @@ tool is checked with the tool itself before it ships.
 - **`--local .` names the repository after its directory, not ".".** Report
   headers read `Cost estimate — . v0.1.2 → v0.2.0`; the path is resolved
   before its basename becomes the label.
+- **Calibration speed excludes failed calls.** An engine erroring after a
+  long timeout polluted the ranking's s/call column with failure latency;
+  a calibration where every call failed now reports no timing at all.
 - **Watch's "N older releases skipped" hint counts only checkable
   releases.** With prereleases excluded (the default), they were still
   counted as "skipped", telling the operator to raise `maxPerRun` to
