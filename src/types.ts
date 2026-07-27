@@ -195,6 +195,8 @@ export interface Metrics {
     releases: number;
     medianChurn: number;
     medianAnchoredCoverage: number;
+    /** Oldest→newest, for trend rendering — medians alone hide the shape. */
+    snapshots: Array<{ tag: string; churn: number; coverage: number }>;
   } | null;
 }
 
@@ -213,4 +215,6 @@ export interface Report {
   engine: string;
   /** Web URL prefix for commit links, e.g. https://github.com/o/r — optional. */
   linkBase?: string;
+  /** URL path dialect: GitLab spells commit/compare routes with a `/-/`. */
+  linkStyle?: "github" | "gitlab";
 }

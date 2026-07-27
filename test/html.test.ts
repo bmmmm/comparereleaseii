@@ -176,3 +176,63 @@ test("scoreRing gives unverified its own color, not the same bucket a genuine 65
   const ringColor = (html: string) => html.match(/stroke="(#[0-9a-f]+)" stroke-width="10" stroke-linecap/)?.[1];
   assert.notEqual(ringColor(unverified), ringColor(genuine));
 });
+
+test("gitlab link style spells commit and compare routes with /-/", () => {
+  const flagged = report({
+    linkBase: "https://gitlab.example.com/group/app",
+    linkStyle: "gitlab",
+    metrics: {
+      ...report().metrics,
+      flags: [
+        { severity: "warn", kind: "x", message: "m", files: [], commitShas: ["abcdef1234567"] },
+      ],
+    },
+  });
+  const html = toHtml(flagged);
+  assert.ok(html.includes("https://gitlab.example.com/group/app/-/commit/abcdef1234567"));
+  assert.ok(html.includes("/-/compare/v0.9.0...v1.0.0"));
+  assert.ok(!html.includes("/app/commit/"), "github route leaked into a gitlab report");
+});
+
+test("forgejo reports link commits and compares like github, without sha256 anchors", () => {
+  const html = toHtml(report({ linkBase: "https://git.example.com/team/app", linkStyle: "github" }));
+  assert.ok(html.includes("https://git.example.com/team/app/compare/v0.9.0...v1.0.0"));
+  // The treemap tile still links to the compare view, but the file anchor is
+  // a GitHub compare-page feature and must not be fabricated elsewhere.
+  assert.ok(!/compare\/v0\.9\.0\.\.\.v1\.0\.0#diff-[0-9a-f]{64}/.test(html), "sha256 anchor on a non-GitHub forge");
+  const github = toHtml(report());
+  assert.ok(/compare\/v0\.9\.0\.\.\.v1\.0\.0#diff-[0-9a-f]{64}/.test(github), "GitHub reports keep the anchor");
+});
+
+test("baseline snapshots render as sparklines with per-release values", () => {
+  const html = toHtml(
+    report({
+      metrics: {
+        ...report().metrics,
+        baseline: {
+          releases: 3,
+          medianChurn: 200,
+          medianAnchoredCoverage: 0.4,
+          snapshots: [
+            { tag: "v0.7.0", churn: 100, coverage: 0.2 },
+            { tag: "v0.8.0", churn: 200, coverage: 0.4 },
+            { tag: "v0.9.0", churn: 400, coverage: 0.6 },
+          ],
+        },
+      },
+    }),
+  );
+  const sparks = html.match(/class="spark"/g) ?? [];
+  assert.equal(sparks.length, 2, "one sparkline for churn, one for coverage");
+  assert.ok(html.includes("v0.7.0: 100"), "per-release values live in the tooltip");
+  // No baseline, no sparkline.
+  assert.ok(!toHtml(report()).includes('class="spark"'));
+});
+
+test("the report adapts to both color schemes like the watch index", () => {
+  const html = toHtml(report());
+  assert.ok(html.includes("color-scheme:light dark"), "hard-coded to one scheme");
+  assert.ok(html.includes("@media (prefers-color-scheme:dark)"), "no dark override");
+  const style = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
+  assert.ok(!/body\{[^}]*#0d1117/.test(style), "body still hard-codes the dark background");
+});

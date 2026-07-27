@@ -17,19 +17,31 @@ function esc(s: string): string {
     .replaceAll("'", "&#39;");
 }
 
+type LinkStyle = "github" | "gitlab";
+
 /**
  * Refs are hostile: `git check-ref-format` accepts a tag called
  * `v1.0"><img/src=x/onerror=…>`, and that tag reaches us as `headRef`
  * straight from the release API. Percent-encode the ref, then escape the
  * whole URL for the attribute it is going into.
+ *
+ * GitHub and Forgejo/Gitea share their commit/compare route shape; GitLab
+ * prefixes both with `/-/`.
  */
-function commitUrl(linkBase: string, sha: string): string {
-  return esc(`${linkBase}/commit/${encodeURIComponent(sha)}`);
+function commitUrl(linkBase: string, sha: string, style: LinkStyle = "github"): string {
+  const route = style === "gitlab" ? "/-/commit/" : "/commit/";
+  return esc(`${linkBase}${route}${encodeURIComponent(sha)}`);
 }
 
-function compareUrlOf(linkBase: string, baseRef: string, headRef: string): string {
+function compareUrlOf(
+  linkBase: string,
+  baseRef: string,
+  headRef: string,
+  style: LinkStyle = "github",
+): string {
+  const route = style === "gitlab" ? "/-/compare/" : "/compare/";
   return esc(
-    `${linkBase}/compare/${encodeURIComponent(baseRef)}...${encodeURIComponent(headRef)}`,
+    `${linkBase}${route}${encodeURIComponent(baseRef)}...${encodeURIComponent(headRef)}`,
   );
 }
 
@@ -125,7 +137,28 @@ export function layoutTreemap(
   return out;
 }
 
-function treemapSvg(files: FileInsight[], compareUrl?: string): string {
+/**
+ * One inline sparkline for the baseline trend: single series, so no legend —
+ * the label next to it names it; values live in a native title tooltip.
+ */
+function sparkline(points: Array<{ label: string; value: number }>, title: string): string {
+  if (points.length < 2) return "";
+  const W = 84;
+  const H = 18;
+  const PAD = 3;
+  const values = points.map((p) => p.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const x = (i: number) => PAD + (i / (points.length - 1)) * (W - 2 * PAD);
+  const y = (v: number) => H - PAD - ((v - min) / span) * (H - 2 * PAD);
+  const path = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+  const last = points[points.length - 1];
+  const tip = `${title}\n${points.map((p) => `${p.label}: ${p.value}`).join("\n")}`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}"><title>${esc(tip)}</title><polyline points="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(points.length - 1).toFixed(1)}" cy="${y(last.value).toFixed(1)}" r="2.5" fill="var(--accent)"/></svg>`;
+}
+
+function treemapSvg(files: FileInsight[], compareUrl?: string, anchors = true): string {
   const MAX_TILES = 130;
   const sorted = [...files].sort((a, b) => b.churn - a.churn);
   const top = sorted.slice(0, MAX_TILES);
@@ -145,11 +178,9 @@ function treemapSvg(files: FileInsight[], compareUrl?: string): string {
   const parts = rects.map((r) => {
     const f = r.file;
     const fill = COVERAGE_COLOR[f.coverage];
-    const stroke = f.sensitive ? "#e3b341" : "#0d1117";
-    const strokeW = f.sensitive ? 2.5 : 1;
     const label =
       r.w > 70 && r.h > 16
-        ? `<text x="${(r.x + 4).toFixed(1)}" y="${(r.y + 13).toFixed(1)}" font-size="10" fill="#e6edf3" opacity="0.9">${esc(
+        ? `<text x="${(r.x + 4).toFixed(1)}" y="${(r.y + 13).toFixed(1)}" font-size="10" fill="#ffffff" opacity="0.92">${esc(
             (f.path.split("/").pop() ?? f.path).slice(0, Math.floor(r.w / 6)),
           )}</text>`
         : "";
@@ -157,11 +188,11 @@ function treemapSvg(files: FileInsight[], compareUrl?: string): string {
       `${f.path}\n±${f.churn} lines · ${f.coverage}` +
       `${f.sensitive ? ` · sensitive: ${f.sensitive}` : ""}` +
       `${f.functions?.length ? `\nfns: ${f.functions.join(", ")}` : ""}` +
-      (compareUrl ? "\n(click to open the diff on GitHub)" : "");
-    const tile = `<g><rect x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" fill="${fill}" fill-opacity="0.82" stroke="${stroke}" stroke-width="${strokeW}"><title>${esc(title)}</title></rect>${label}</g>`;
+      (compareUrl ? "\n(click to open the compare view)" : "");
+    const tile = `<g><rect class="tile${f.sensitive ? " tile-sens" : ""}" x="${r.x.toFixed(1)}" y="${r.y.toFixed(1)}" width="${r.w.toFixed(1)}" height="${r.h.toFixed(1)}" fill="${fill}" fill-opacity="0.82"><title>${esc(title)}</title></rect>${label}</g>`;
     const linkable = compareUrl && !f.path.startsWith("(");
     return linkable
-      ? `<a href="${compareUrl}#${diffAnchor(f.path)}" target="_blank" rel="noopener">${tile}</a>`
+      ? `<a href="${compareUrl}${anchors ? `#${diffAnchor(f.path)}` : ""}" target="_blank" rel="noopener">${tile}</a>`
       : tile;
   });
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Diff treemap">${parts.join("")}</svg>`;
@@ -183,7 +214,7 @@ function scoreRing(score: number, label: string): string {
           : score >= 45
             ? "#f0883e"
             : "#f85149";
-  return `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="${r}" fill="none" stroke="#21262d" stroke-width="10"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" fill="#e6edf3">${score}</text><text x="60" y="80" text-anchor="middle" font-size="12" fill="#8b949e">${esc(label)}</text></svg>`;
+  return `<svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="${r}" fill="none" style="stroke:var(--border)" stroke-width="10"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 60 60)"/><text x="60" y="58" text-anchor="middle" font-size="30" font-weight="700" style="fill:var(--fg)">${score}</text><text x="60" y="80" text-anchor="middle" font-size="12" style="fill:var(--muted)">${esc(label)}</text></svg>`;
 }
 
 function verdictBar(report: Report): string {
@@ -205,7 +236,7 @@ function verdictBar(report: Report): string {
   return `<div class="bar">${segs}</div><div class="legend">${legend}</div>`;
 }
 
-function flagsHtml(flags: RiskFlag[], linkBase?: string): string {
+function flagsHtml(flags: RiskFlag[], linkBase?: string, style?: LinkStyle): string {
   if (!flags.length) return `<p class="ok">No risk flags.</p>`;
   const sevColor = { critical: "#f85149", warn: "#d29922", info: "#58a6ff" };
   return flags
@@ -213,7 +244,7 @@ function flagsHtml(flags: RiskFlag[], linkBase?: string): string {
       const shas = f.commitShas
         .map((s) =>
           linkBase
-            ? `<a href="${commitUrl(linkBase, s)}">${esc(s.slice(0, 8))}</a>`
+            ? `<a href="${commitUrl(linkBase, s, style)}">${esc(s.slice(0, 8))}</a>`
             : esc(s.slice(0, 8)),
         )
         .join(", ");
@@ -224,7 +255,7 @@ function flagsHtml(flags: RiskFlag[], linkBase?: string): string {
     .join("");
 }
 
-function claimsHtml(report: Report, linkBase?: string): string {
+function claimsHtml(report: Report, linkBase?: string, style?: LinkStyle): string {
   const out: string[] = [];
   let section = "";
   for (const r of report.results) {
@@ -237,7 +268,9 @@ function claimsHtml(report: Report, linkBase?: string): string {
     const commits = r.evidence.commitShas
       .slice(0, 3)
       .map((s) =>
-        linkBase ? `<a href="${commitUrl(linkBase, s)}">${esc(s.slice(0, 8))}</a>` : esc(s.slice(0, 8)),
+        linkBase
+          ? `<a href="${commitUrl(linkBase, s, style)}">${esc(s.slice(0, 8))}</a>`
+          : esc(s.slice(0, 8)),
       )
       .join(", ");
     const body =
@@ -288,16 +321,20 @@ export function toHtml(report: Report): string {
         .map(([lang, bytes]) => `${lang} ${((bytes / (ctx.codeBytes || 1)) * 100).toFixed(0)}%`)
         .join(" · ")
     : "n/a";
+  const style = report.linkStyle;
   const compareUrl = report.linkBase
-    ? compareUrlOf(report.linkBase, report.baseRef, report.headRef)
+    ? compareUrlOf(report.linkBase, report.baseRef, report.headRef, style)
     : undefined;
+  // The sha256 file anchor is a GitHub compare-page feature — on other
+  // forges the tiles still link to the compare view, just without the jump.
+  const anchorsWork = report.linkBase?.startsWith("https://github.com/") ?? false;
   const hasSuggestions = report.uncovered.some((u) => u.suggestedNote);
   const uncoveredRows = report.uncovered
     .map(
       (u) =>
         `<tr><td>${
           report.linkBase
-            ? `<a href="${commitUrl(report.linkBase, u.commit.sha)}">${esc(u.commit.sha.slice(0, 8))}</a>`
+            ? `<a href="${commitUrl(report.linkBase, u.commit.sha, style)}">${esc(u.commit.sha.slice(0, 8))}</a>`
             : esc(u.commit.sha.slice(0, 8))
         }</td><td>${esc(u.commit.subject)}</td><td>+${u.additions}/−${u.deletions}</td><td>${u.fileCount}</td>${
           hasSuggestions ? `<td>${u.suggestedNote ? esc(u.suggestedNote) : "—"}</td>` : ""
@@ -310,40 +347,50 @@ export function toHtml(report: Report): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fact check: ${esc(report.repoLabel)} ${esc(report.headRef)}</title>
 <style>
-:root{color-scheme:dark}
-body{background:#0d1117;color:#e6edf3;font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
-a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
-h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid #21262d;padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:#8b949e}
-.sub{color:#8b949e;margin-bottom:20px}
-.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:#161b22;border:1px solid #21262d;border-radius:10px;padding:16px}
+:root{color-scheme:light dark;
+--bg:#ffffff;--card:#f6f8fa;--border:#d1d9e0;--btn-border:#d1d9e0;--btn-hover:#e7ebf0;
+--fg:#1f2328;--detail:#333b43;--muted:#59636e;--faint:#818b98;
+--link:#0969da;--accent:#0969da}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0d1117;--card:#161b22;--border:#21262d;--btn-border:#30363d;--btn-hover:#30363d;
+--fg:#e6edf3;--detail:#c9d1d9;--muted:#8b949e;--faint:#484f58;
+--link:#58a6ff;--accent:#1f6feb}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,'Segoe UI',sans-serif;margin:0;padding:24px;max-width:1200px;margin-inline:auto}
+a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}h3{font-size:14px;margin:16px 0 6px;color:var(--muted)}
+.sub{color:var(--muted);margin-bottom:20px}
+.cards{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
 .ring{width:120px;height:120px;flex-shrink:0}
 .comp{display:flex;gap:24px;flex-wrap:wrap}
-.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:#8b949e;font-size:12px}
-.ctx{margin-left:auto;text-align:right;color:#8b949e;font-size:12px}
+.comp div{text-align:center}.comp .n{font-size:22px;font-weight:700}.comp .t{color:var(--muted);font-size:12px}
+.ctx{margin-left:auto;text-align:right;color:var(--muted);font-size:12px}
 .bar{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:10px 0 6px}
 .seg{height:100%}
-.legend{color:#8b949e;font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.legend{color:var(--muted);font-size:12px}.lg{margin-right:14px}.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 svg{width:100%;height:auto;border-radius:8px}
-.flag{background:#161b22;border:1px solid #21262d;border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
-.files{color:#8b949e;font-size:12px;font-family:ui-monospace,monospace}
-details{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:6px 10px;margin:5px 0}
+.spark{width:84px;height:18px;vertical-align:-4px;border-radius:0}
+.tile{stroke:var(--bg);stroke-width:1}
+.tile-sens{stroke:#e3b341;stroke-width:2.5}
+.flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+details{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:5px 0}
 summary{cursor:pointer}
-.chip{color:#0d1117;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px}
-.gen{color:#8b949e;border:1px solid #30363d;font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
-.conf{color:#8b949e;font-size:12px}
+.chip{color:#ffffff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
+.gen{color:var(--muted);border:1px solid var(--btn-border);font-size:10px;padding:0 5px;border-radius:8px;margin-right:6px}
+.conf{color:var(--muted);font-size:12px}
 .surplus{color:#d29922;font-size:12px;margin-top:4px}
 .toolbar{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}
-.toolbar button{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
-.toolbar button:hover{background:#30363d}
-.toolbar button.active{background:#1f6feb;border-color:#1f6feb}
+.toolbar button{background:var(--card);color:var(--fg);border:1px solid var(--btn-border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:var(--btn-hover)}
+.toolbar button.active{background:var(--accent);border-color:var(--accent);color:#ffffff}
 body[data-filter="issues"] details[data-v="verified"],body[data-filter="issues"] details[data-v="skipped"]{display:none}
 body[data-filter="handwritten"] details:has(.gen){display:none}
-.detail{margin:8px 0 4px 4px;color:#c9d1d9}
-table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #21262d;padding:5px 8px;text-align:left;font-size:13px}th{color:#8b949e}
+.detail{margin:8px 0 4px 4px;color:var(--detail)}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--border);padding:5px 8px;text-align:left;font-size:13px}th{color:var(--muted)}
 .ok{color:#3fb950}
-.note{color:#8b949e;font-size:12px}
-.banner{background:#161b22;border:1px solid #1f6feb;border-left:4px solid #1f6feb;border-radius:6px;padding:10px 12px;margin:14px 0}
-footer{margin-top:32px;color:#484f58;font-size:12px}
+.note{color:var(--muted);font-size:12px}
+.banner{background:var(--card);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;margin:14px 0}
+footer{margin-top:32px;color:var(--faint);font-size:12px}
 </style></head><body>
 <h1>Release-note fact check — ${esc(report.repoLabel)}</h1>
 <div class="sub">${esc(report.baseRef)} → ${esc(report.headRef)} · ${report.stats.commits} commits · ${report.stats.files} files · +${report.stats.additions}/−${report.stats.deletions} · judge: ${esc(report.engine)}</div>
@@ -359,7 +406,13 @@ footer{margin-top:32px;color:#484f58;font-size:12px}
     ctx.releaseCadenceDays ? `<br>release cadence ~${ctx.releaseCadenceDays} d` : ""
   }${
     m.baseline
-      ? `<br>baseline (${m.baseline.releases} rel.): median churn ±${m.baseline.medianChurn} · coverage ${Math.round(m.baseline.medianAnchoredCoverage * 100)}%`
+      ? `<br>baseline (${m.baseline.releases} rel.): median churn ±${m.baseline.medianChurn} ${sparkline(
+          m.baseline.snapshots.map((s) => ({ label: s.tag, value: s.churn })),
+          "Churn per release (oldest → newest)",
+        )} · coverage ${Math.round(m.baseline.medianAnchoredCoverage * 100)}% ${sparkline(
+          m.baseline.snapshots.map((s) => ({ label: s.tag, value: Math.round(s.coverage * 100) })),
+          "Note coverage % per release (oldest → newest)",
+        )}`
       : ""
   }</div>
 </div>
@@ -374,10 +427,10 @@ ${
 ${verdictBar(report)}
 
 <h2>Risk flags</h2>
-${flagsHtml(m.flags, report.linkBase)}
+${flagsHtml(m.flags, report.linkBase, style)}
 
 <h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path${compareUrl ? ", click opens the diff" : ""}</span></h2>
-${treemapSvg(m.files, compareUrl)}
+${treemapSvg(m.files, compareUrl, anchorsWork)}
 <div class="legend">
   <span class="lg"><span class="dot" style="background:${COVERAGE_COLOR.evidence}"></span>cited as evidence</span>
   <span class="lg"><span class="dot" style="background:${COVERAGE_COLOR.covered}"></span>in documented commit</span>
@@ -394,7 +447,7 @@ ${treemapSvg(m.files, compareUrl)}
   <button id="expand">Expand all</button>
   <button id="collapse">Collapse all</button>
 </div>
-${claimsHtml(report, report.linkBase)}
+${claimsHtml(report, report.linkBase, style)}
 
 <h2>Undocumented commits</h2>
 ${

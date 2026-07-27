@@ -72,15 +72,22 @@ export async function loadGithubReleaseData(
   return { data, context };
 }
 
+export interface RepoLink {
+  /** Web URL prefix for commit/compare links, e.g. https://github.com/o/r. */
+  base: string;
+  /** GitLab spells commit/compare routes with a `/-/`; every other forge doesn't. */
+  style: "github" | "gitlab";
+}
+
 /**
  * The full analysis pipeline for loaded release data: claims, verification,
- * coverage, metrics, report. `repoSlug` (owner/repo) enables the release
- * baseline and web links; pass null for local sources.
+ * coverage, metrics, report. `link` enables web links in the report; pass
+ * null for sources without a known web origin (--local).
  */
 export async function analyzeRelease(
   data: ReleaseData,
   context: RepoContext,
-  repoSlug: string | null,
+  link: RepoLink | null,
   s: CheckSettings,
 ): Promise<Report> {
   const claims = parseClaims(data.notes);
@@ -161,6 +168,7 @@ export async function analyzeRelease(
     warnings: data.warnings,
     truncated: data.truncated ?? false,
     engine: s.engine ? s.engine.name : "off (deterministic only)",
-    linkBase: repoSlug ? `https://github.com/${repoSlug}` : undefined,
+    linkBase: link?.base,
+    linkStyle: link?.style,
   };
 }

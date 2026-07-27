@@ -565,7 +565,12 @@ export async function runWatch(
           tag: rel.tag,
           notesFile: rc.notesFile ? resolve(configDir, rc.notesFile) : undefined,
         });
-        const report = await analyzeRelease(data, context, rc.repo, settings);
+        const report = await analyzeRelease(
+          data,
+          context,
+          { base: `https://github.com/${rc.repo}`, style: "github" },
+          settings,
+        );
         // A labeled entry is not the repo's own release (e.g. a fabricated
         // negative control, or draft notes) — say so in the report header
         // instead of pinning the result on the innocent upstream repo.

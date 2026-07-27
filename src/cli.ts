@@ -31,7 +31,7 @@ import {
   type HistoryRelease,
   type HistorySource,
 } from "./history.ts";
-import { analyzeRelease, loadGithubReleaseData, type CheckSettings } from "./check.ts";
+import { analyzeRelease, loadGithubReleaseData, type CheckSettings, type RepoLink } from "./check.ts";
 import { runWatch } from "./watch.ts";
 import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
 import { loadGuidelines } from "./guidelines.ts";
@@ -235,6 +235,7 @@ async function main(): Promise<number> {
   let forgeBase: string | undefined;
   let forgeLabel: string | undefined;
   let forgeReleases: HistoryRelease[] | undefined;
+  let repoLink: RepoLink | null = null;
   if (values["repo-url"]) {
     const url = assertCloneUrl(values["repo-url"]);
     const dir = await cloneDirFor(url);
@@ -250,7 +251,21 @@ async function main(): Promise<number> {
 
     const target = parseRepoUrl(url);
     const forge = target && (await fetchForgeReleases(target));
-    if (target) forgeLabel = `${target.owner}/${target.repo}`;
+    if (target) {
+      forgeLabel = `${target.owner}/${target.repo}`;
+      // The web origin is known even when the host has no release API; the
+      // path dialect comes from the API detect, host name as the fallback.
+      repoLink = {
+        base: `${target.origin}/${target.owner}/${target.repo}`,
+        style: forge
+          ? forge.kind === "gitlab"
+            ? "gitlab"
+            : "github"
+          : /gitlab/i.test(target.origin)
+            ? "gitlab"
+            : "github",
+      };
+    }
     if (forge) {
       const wanted = values.tag ?? values.head;
       const release = wanted
@@ -485,7 +500,11 @@ async function main(): Promise<number> {
   const report: Report = await analyzeRelease(
     data,
     context,
-    localPath ? null : positionals[0],
+    localPath
+      ? repoLink
+      : positionals[0]
+        ? { base: `https://github.com/${positionals[0]}`, style: "github" }
+        : null,
     settings,
   );
 

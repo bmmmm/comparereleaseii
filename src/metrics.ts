@@ -842,6 +842,12 @@ export function computeMetrics(opts: {
       releases: opts.baseline.snapshots.length,
       medianChurn: opts.baseline.medianChurn,
       medianAnchoredCoverage: coverages[Math.floor(coverages.length / 2)],
+      // buildSnapshots returns newest first; a trend reads oldest→newest.
+      snapshots: [...opts.baseline.snapshots].reverse().map((s) => ({
+        tag: s.tag,
+        churn: s.additions + s.deletions,
+        coverage: s.anchoredCoverage,
+      })),
     };
   }
   return { scores, flags, files, churnCoveredRatio, context, baseline, unverifiable };
