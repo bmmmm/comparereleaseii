@@ -24,6 +24,9 @@ tool is checked with the tool itself before it ships.
   parsing treated an added `++i;` (which arrives as `+++i;`) as a file
   header: line counts came out low and those lines were invisible to
   lexical claim matching. GitHub-API counts were never affected.
+- **`--local .` names the repository after its directory, not ".".** Report
+  headers read `Cost estimate — . v0.1.2 → v0.2.0`; the path is resolved
+  before its basename becomes the label.
 - **Numeric flags reject garbage instead of silently disabling features.**
   `--concurrency abc` ran zero judge workers and "completed" with empty
   results; `--baseline`/`--suggest-limit`/`--history` with a non-number

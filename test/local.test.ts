@@ -284,3 +284,21 @@ index 111..222 100644
   assert.equal(file.additions, 3, "++i; and +--j; must count as additions");
   assert.equal(file.deletions, 1);
 });
+
+test("the repo label resolves the path before taking its basename", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "crii-label-"));
+  const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
+  await git("init", "-q");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(repo, "a.txt"), "one\n");
+  await writeFile(join(repo, "CHANGELOG.md"), "# Changelog\n\n## 1.0.0\n\n- First (#1)\n");
+  await git("add", ".");
+  await git("commit", "-q", "-m", "first");
+  await git("tag", "1.0.0");
+
+  // `--local .` used to report the repo as "." (basename of the raw path).
+  const dotted = await loadLocalRelease({ repo: `${repo}/.`, head: "1.0.0" });
+  assert.notEqual(dotted.repoLabel, ".");
+  assert.equal(dotted.repoLabel, repo.split("/").pop());
+});

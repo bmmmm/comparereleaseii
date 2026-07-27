@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { FENCE_LINE, run } from "../util.ts";
 import { extractPrNumbers } from "./github.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
@@ -384,7 +384,8 @@ export async function loadLocalRelease(opts: {
 
   const range = await loadLocalRange(opts.repo, base, head);
   return {
-    repoLabel: opts.repoLabel ?? basename(opts.repo),
+    // Resolve first: `--local .` would otherwise label the report ".".
+    repoLabel: opts.repoLabel ?? basename(resolve(opts.repo)),
     baseRef: base,
     headRef: head,
     notes,
