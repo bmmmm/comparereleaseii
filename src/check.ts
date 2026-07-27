@@ -96,7 +96,11 @@ export async function analyzeRelease(
   // without a warning the report reads exactly like "too few releases".
   const baselinePromise =
     s.history && s.baseline > 0
-      ? buildSnapshots(s.history, { count: s.baseline, before: data.headRef }).catch(
+      ? buildSnapshots(s.history, {
+          count: s.baseline,
+          before: data.headRef,
+          concurrency: s.concurrency,
+        }).catch(
           (err: Error) => {
             data.warnings.push(
               `Baseline unavailable (${err.message.split("\n")[0].slice(0, 120)}) — anomaly comparison against past releases skipped.`,

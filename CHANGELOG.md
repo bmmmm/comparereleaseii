@@ -8,6 +8,9 @@ tool is checked with the tool itself before it ships.
 
 ### Changed
 
+- **`--concurrency` also bounds baseline snapshot builds.** They were
+  hardcoded to 4 parallel builds regardless of the flag that already
+  governs every other pooled stage.
 - **The anchor phase warms per-commit and PR lookups in parallel.** They ran
   one claim at a time; on GitHub sources each is a `gh` process spawn
   (~0.35 s measured), so a 20-claim release paid ~7 s serially before

@@ -300,7 +300,7 @@ async function main(): Promise<number> {
         "--history needs a repository: pass owner/repo, --repo-url <url>, or --local <path>.",
       );
     }
-    const snapshots = await buildSnapshots(history, { count: historyCount });
+    const snapshots = await buildSnapshots(history, { count: historyCount, concurrency });
     printTimeline(snapshots);
     if (values.json) {
       await writeFile(values.json, JSON.stringify(snapshots, null, 2));

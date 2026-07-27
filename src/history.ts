@@ -188,7 +188,7 @@ async function snapshotFor(
  */
 export async function buildSnapshots(
   source: HistorySource,
-  opts: { count: number; before?: string },
+  opts: { count: number; before?: string; concurrency?: number },
 ): Promise<ReleaseSnapshot[]> {
   const releases = await source.listReleases();
   let start = 0;
@@ -200,7 +200,7 @@ export async function buildSnapshots(
   for (let i = start; i < releases.length - 1 && pairs.length < opts.count; i++) {
     pairs.push({ release: releases[i], base: releases[i + 1].tag });
   }
-  const built = await pooled(pairs, 4, (p) =>
+  const built = await pooled(pairs, opts.concurrency ?? 4, (p) =>
     // One release the source cannot answer for used to cost the whole
     // baseline: this threw all the way up into a `.catch(() => null)` at the
     // call site, and the run continued with no baseline and nothing said. A
