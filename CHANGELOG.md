@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.2.2 — 2026-07-27
+
 ### Changed
 
 - **`--concurrency` also bounds baseline snapshot builds.** They were hardcoded to 4 parallel builds regardless of the flag that already governs every other pooled stage.
