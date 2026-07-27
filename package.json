@@ -1,7 +1,7 @@
 {
   "name": "comparereleaseii",
-  "version": "0.2.0",
-  "description": "Fact-check release notes against the actual code diff between two versions",
+  "version": "0.2.1",
+  "description": "Fact-check release notes against the actual code diff — on GitHub, Forgejo, GitLab or any git clone",
   "type": "module",
   "license": "GPL-3.0-or-later",
   "repository": {
@@ -21,7 +21,10 @@
     "diff",
     "llm",
     "ci",
-    "cli"
+    "cli",
+    "forgejo",
+    "gitlab",
+    "gitea"
   ],
   "bin": {
     "comparerelease": "./bin/comparerelease.mjs"
@@ -45,6 +48,8 @@
     "prepack": "pnpm build",
     "prepublishOnly": "pnpm check && pnpm test",
     "dogfood": "node scripts/dogfood.ts",
+    "release:prepare": "node scripts/release-prepare.ts",
+    "release:publish": "node scripts/release-publish.ts",
     "eval": "node scripts/eval.ts",
     "start": "node src/cli.ts"
   },

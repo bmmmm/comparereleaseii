@@ -1,8 +1,9 @@
 name: comparerelease
 description: >-
-  Fact-check release notes against the actual code diff between two versions.
-  Writes the report to the step summary, uploads the HTML report as an
-  artifact, and fails the job when claims are unsupported or contradicted.
+  Fact-check release notes against the actual code diff — this repository, or
+  any forge reachable by clone (Forgejo, Gitea, GitLab). Writes the report to
+  the step summary, uploads the HTML report as an artifact, and fails the job
+  when claims are unsupported or contradicted.
 author: bmmmm
 branding:
   icon: check-circle
@@ -10,7 +11,13 @@ branding:
 
 inputs:
   repo:
-    description: "owner/repo to check (default: the current repository)"
+    description: "owner/repo to check on GitHub (default: the current repository)"
+    default: ""
+  repo-url:
+    description: >-
+      Clone URL of a repository on any other forge (Forgejo, Gitea, GitLab, a
+      plain git host). Mutually exclusive with `repo`. Notes come from the
+      forge's release API when it answers, else the CHANGELOG section.
     default: ""
   tag:
     description: >-
@@ -38,8 +45,17 @@ inputs:
   github-token:
     description: "Token for gh API calls (and the release comment)"
     default: ${{ github.token }}
+  forgejo-token:
+    description: "Token for the Forgejo/Gitea release API when `repo-url` points at a private repo"
+    default: ""
+  gitlab-token:
+    description: "Token for the GitLab release API when `repo-url` points at a private project"
+    default: ""
   comment:
-    description: "true: append/update the verdict summary in the release body (needs contents: write)"
+    description: >-
+      true: append/update the verdict summary in the body of this repository's
+      triggering release (needs contents: write). Ignored with `repo-url` — the
+      verdict is about a repository elsewhere.
     default: "false"
   artifact-name:
     description: "Name of the uploaded report artifact"
@@ -65,7 +81,10 @@ runs:
       env:
         ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         GH_TOKEN: ${{ inputs.github-token }}
+        FORGEJO_TOKEN: ${{ inputs.forgejo-token }}
+        GITLAB_TOKEN: ${{ inputs.gitlab-token }}
         IN_REPO: ${{ inputs.repo }}
+        IN_REPO_URL: ${{ inputs.repo-url }}
         IN_TAG: ${{ inputs.tag }}
         IN_BASE: ${{ inputs.base }}
         IN_ENGINE: ${{ inputs.engine }}
@@ -76,8 +95,21 @@ runs:
       run: |
         set +e
         out="$(mktemp -d "$RUNNER_TEMP/comparerelease.XXXXXX")"
-        args=( "${IN_REPO:-$GITHUB_REPOSITORY}" )
-        tag="${IN_TAG:-$EVENT_TAG}"
+        # `repo` defaults to this repository, so it is never empty and cannot
+        # be compared against `repo-url` after the fact — decide first.
+        if [ -n "$IN_REPO_URL" ]; then
+          if [ -n "$IN_REPO" ]; then
+            echo "::error::repo and repo-url both name the repository — set only one."
+            exit 2
+          fi
+          args=( --repo-url "$IN_REPO_URL" )
+          # EVENT_TAG belongs to a release of *this* repository; on another
+          # forge that tag usually does not exist, so it must not be a default.
+          tag="$IN_TAG"
+        else
+          args=( "${IN_REPO:-$GITHUB_REPOSITORY}" )
+          tag="${IN_TAG:-$EVENT_TAG}"
+        fi
         [ -n "$tag" ] && args+=( --tag "$tag" )
         [ -n "$IN_BASE" ] && args+=( --base "$IN_BASE" )
         [ -n "$IN_NOTES_FILE" ] && args+=( --notes-file "$IN_NOTES_FILE" )
@@ -99,7 +131,7 @@ runs:
         if-no-files-found: ignore
 
     - name: Update the release body with the verdict
-      if: ${{ inputs.comment == 'true' && github.event.release.id }}
+      if: ${{ inputs.comment == 'true' && github.event.release.id && inputs.repo-url == '' }}
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}

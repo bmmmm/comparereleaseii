@@ -43,7 +43,7 @@ Three ways to run it, the same CLI behind all of them:
   scripts, put the short name on your `PATH` from inside the checkout:
   `ln -s "$PWD/bin/comparerelease.mjs" ~/.local/bin/comparerelease`.
 - **CI** — the repo doubles as a [GitHub Action](#run-it-continuously):
-  `uses: bmmmm/comparereleaseii@v0.2.0`, nothing to clone.
+  `uses: bmmmm/comparereleaseii@v0.2.1`, nothing to clone.
 
 Requirements: Node ≥ 24, a judge, and whatever the source needs — see
 [Sources](#sources) below; GitHub wants an authenticated
@@ -222,12 +222,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: bmmmm/comparereleaseii@v0.2.0
+      - uses: bmmmm/comparereleaseii@v0.2.1
         with:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-Inputs mirror the CLI — full list in [action.yml](action.yml). `comment:
+Inputs mirror the CLI — full list in [action.yml](action.yml). `repo-url`
+points the job at a repository on another forge, so a GitHub runner can gate
+releases on a Forgejo, Gitea or GitLab server (with `forgejo-token` /
+`gitlab-token` for a private one). `comment:
 true` appends the verdict to the release body, `notes-file` gates a draft
 in a PR workflow *before* publishing, and `engine: "off"` runs keyless
 (deterministic stages only — exactly how this repo checks its own
