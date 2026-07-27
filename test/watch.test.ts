@@ -10,10 +10,14 @@ import {
   scoreBaseline,
   worstExit,
   toWatchIndexHtml,
+  carriedFromLedger,
+  capLedger,
+  MAX_PROMISE_LEDGER,
   type ReleaseInfo,
   type WatchState,
   type CheckedRelease,
 } from "../src/watch.ts";
+import type { PromiseCheck } from "../src/types.ts";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -292,6 +296,41 @@ test("toWatchIndexHtml: state entries dropped from the config are not rendered",
   ]);
   assert.ok(!html.includes("gone/repo"));
   assert.ok(html.includes("kept/repo"));
+});
+
+function ledgerEntry(status: PromiseCheck["status"], text: string, carriedFor?: number): PromiseCheck {
+  return { text, from: "v1.0.0", kind: "removal", status, carriedFor, files: [], note: "" };
+}
+
+test("only still-open promises ride to the next check, carry count intact", () => {
+  const ledger = [
+    ledgerEntry("kept", "shipped"),
+    ledgerEntry("still-open", "pending", 4),
+    ledgerEntry("broken", "lied"),
+    // stale IS the exit — re-carrying it would undo the aging.
+    ledgerEntry("stale", "ancient", 10),
+  ];
+  const carried = carriedFromLedger(ledger);
+  assert.deepEqual(carried, [
+    { text: "pending", from: "v1.0.0", kind: "removal", target: undefined, carriedFor: 4 },
+  ]);
+  assert.deepEqual(carriedFromLedger(undefined), []);
+});
+
+test("the ledger cap keeps still-open promises over this release's resolved ones", () => {
+  // Resolved entries are display-only and discarded next run; a plain
+  // head-slice would let them evict the carried promises the ledger exists
+  // for. Build a ledger where exactly that would happen.
+  const resolved = Array.from({ length: 30 }, (_, i) => ledgerEntry("kept", `kept-${i}`));
+  const open = Array.from({ length: 30 }, (_, i) => ledgerEntry("still-open", `open-${i}`, i));
+  const capped = capLedger([...resolved, ...open]);
+  assert.equal(capped.length, MAX_PROMISE_LEDGER);
+  // Every still-open entry survived; the tail resolved ones paid the cap.
+  assert.equal(capped.filter((p) => p.status === "still-open").length, 30);
+  assert.equal(capped.filter((p) => p.status === "kept").length, MAX_PROMISE_LEDGER - 30);
+  // Under the cap nothing is reordered or dropped.
+  const small = [ledgerEntry("kept", "a"), ledgerEntry("still-open", "b")];
+  assert.deepEqual(capLedger(small), small);
 });
 
 test("scoreBaseline needs three checks before it calls a level", () => {

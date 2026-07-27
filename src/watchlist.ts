@@ -5,7 +5,7 @@ import { readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { ghApi } from "./sources/github.ts";
-import { c } from "./util.ts";
+import { c, stripControl } from "./util.ts";
 import type { WatchConfig } from "./watch.ts";
 
 export type CandidateSource = "watched" | "starred" | "notifications";
@@ -209,11 +209,10 @@ function printCandidates(candidates: RepoCandidate[]): void {
   for (const [i, cand] of candidates.entries()) {
     const num = String(i + 1).padStart(numWidth);
     const pushed = cand.pushedAt ? cand.pushedAt.slice(0, 7) : "       ";
-    const desc = cand.description
-      ? cand.description.length > 48
-        ? cand.description.slice(0, 45) + "…"
-        : cand.description
-      : "";
+    // Repo descriptions are whoever-owns-the-repo's text landing in an
+    // interactive numbered picker — same sink class as the report terminal.
+    const clean = cand.description ? stripControl(cand.description).replace(/\n+/g, " ") : "";
+    const desc = clean.length > 48 ? clean.slice(0, 45) + "…" : clean;
     // stderr like the prompt — stdout stays clean for `watch list` piping.
     console.error(
       `  ${num}  ${cand.repo.padEnd(repoWidth)} ${c.dim(pushed)} ${c.dim(cand.source.padEnd(13))} ${c.dim(desc)}`,

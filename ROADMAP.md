@@ -198,11 +198,13 @@ the only record. Ordered by risk; none is release-blocking.
    caught. Fix shape: on API sources, "known email + unknown login" is not a
    pass — it is its own warn, because that combination is the spoofing
    signature.
-   - **Landed** (`4efc8f0`): API-built snapshots record forge logins;
-     `author-email-spoof` (warn) fires on a sensitive-path commit whose
-     email the baseline knows but whose account it does not — including "no
-     account at all", the shape a forged unregistered email produces. Clone
-     paths carry no attribution and stay silent instead of guessing.
+   - **Landed** (`4efc8f0`, sharpened after review): snapshots record the
+     email→account PAIRING, and `author-email-spoof` (warn) fires only when
+     a pairing the history always saw stops holding — a different account,
+     or none. The first cut kept a flat login list and warned on honest
+     maintainers whose email was simply never linked to an account
+     (reproduced by the reviewer); the pairing distinguishes exactly that.
+     Clone paths carry no attribution and stay silent instead of guessing.
 2. **The watch promise ledger is unbounded.** Target-less promises never
    resolve and ride forever; the dedupe key is normalized text, so trivial
    rewording multiplies entries. Cap the ledger and age still-open promises
@@ -244,9 +246,15 @@ the only record. Ordered by risk; none is release-blocking.
    - **All landed**: both color schemes verified in a browser against a
      live gitea.com report; a test cross-checks every golden claim's
      identifiers against every padding hunk; `printTerminal` strips
-     C0/DEL/C1 from foreign text (mutation-guarded); `mutate.yml` runs
+     C0/DEL/C1 plus Trojan-Source bidi/format characters from foreign text,
+     newlines collapse, and the same filter covers the `watch init` picker
+     and `--calibrate` reasoning (mutation-guarded); `mutate.yml` runs
      nightly keyless; `release:publish` pushes `HEAD:<default>` when HEAD
-     is not on the default branch. 27/27 mutants killed.
+     is not on the default branch. An Opus review of the whole series then
+     hardened the spoof warn (pairing, above), taught the ledger cap to
+     prefer still-open entries, extracted the watch promise wiring into
+     tested functions, and labeled the frozen Haiku reference as
+     round-1-graded in `--calibrate` output. 29/29 mutants killed.
 
 ### Demand-driven only (no schedule)
 - **F23 maxBuffer:** first decide whether kernel-scale releases are a target

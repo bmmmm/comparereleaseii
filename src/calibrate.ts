@@ -10,7 +10,7 @@ import {
   type JudgeEngine,
 } from "./judge.ts";
 import { withVerdictCache } from "./cache.ts";
-import { pooled, c } from "./util.ts";
+import { pooled, c, stripControl } from "./util.ts";
 
 export const GOLDEN_CATEGORIES = [
   "core",
@@ -392,7 +392,8 @@ export function printCalibration(cal: Calibration, reference?: Reference | null)
     const mark = o.pass ? c.green("PASS") : o.overVerified ? c.red("FAIL!") : c.yellow("FAIL");
     const format = o.formatIssue ? c.yellow(" [format]") : "";
     console.log(`${mark} ${o.name}: got ${o.got}, expected ${o.expected.join("|")}${format}`);
-    if (!o.pass) console.log(c.dim(`     ${o.reasoning}`));
+    // Model output is foreign text — same terminal rules as the report.
+    if (!o.pass) console.log(c.dim(`     ${stripControl(o.reasoning).replace(/\n+/g, " ")}`));
   }
 
   const gate = gateCalibration(cal);
@@ -415,9 +416,16 @@ export function printCalibration(cal: Calibration, reference?: Reference | null)
   console.log(`Gate: ${verdictLabel}`);
   console.log(recommendation(cal));
   if (reference) {
+    // A frozen run that still contains bare "need" outcomes predates the
+    // served-need round: its pass counts were graded on round 1 only. Say
+    // so rather than presenting it as if it covered today's grading.
+    const roundOne = reference.outcomes.some((o) => o.got === "need");
     console.log(
       c.dim(
-        `Reference: ${reference.model} passed ${reference.passed}/${reference.total} (${reference.date}, gate: ${reference.gate}) — every category above is passable.`,
+        `Reference: ${reference.model} passed ${reference.passed}/${reference.total} (${reference.date}, gate: ${reference.gate}) — every category above is passable.` +
+          (roundOne
+            ? " Note: graded before the served-need round existed — need cases reflect round 1 only."
+            : ""),
       ),
     );
   }

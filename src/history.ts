@@ -33,11 +33,13 @@ export interface ReleaseSnapshot {
   /** Identity keys (see authorKey) — emails where the source carries them. */
   authors: string[];
   /**
-   * Forge logins, when the range came from an API (a clone has none). What
-   * makes them worth a second list: the email above is attacker-chosen, the
-   * forge account is not.
+   * email → forge login, when the range came from an API (a clone has no
+   * attribution). The pairing is the point: an email that was NEVER linked
+   * to an account is an honest shape (plenty of authors commit with an
+   * unregistered address), while a known pairing that stops holding is the
+   * spoofing signature. A flat login list cannot tell those apart.
    */
-  logins?: string[];
+  emailAccounts?: Record<string, string>;
 }
 
 /**
@@ -57,8 +59,11 @@ export interface Baseline {
   /** Median of the snapshots' lexicalCoverage — the repo's normal shape. */
   medianLexicalCoverage: number;
   knownAuthors: string[];
-  /** Forge logins seen in API-built snapshots; empty when history came from a clone. */
-  knownLogins: string[];
+  /**
+   * email → forge login across API-built snapshots (newest snapshot wins on
+   * conflict); empty when history came from a clone.
+   */
+  emailAccounts: Record<string, string>;
   everBinary: boolean;
 }
 
@@ -190,13 +195,16 @@ async function snapshotFor(
     newDeps: [...new Set(cmp.files.flatMap((f) => newDependencies(f, source.slug)))],
     authors: [...new Set(cmp.commits.map((commit) => authorKey(commit)))],
   };
-  // Only when the source attributes commits at all — an empty list from an
-  // API range is a statement ("no known account touched this"), an absent
+  // Only when the source attributes commits at all — an empty map from an
+  // API range is a statement ("no linked account touched this"), an absent
   // one from a clone is not.
   if (cmp.commits.some((commit) => commit.login !== undefined)) {
-    snapshot.logins = [
-      ...new Set(cmp.commits.flatMap((commit) => (commit.login ? [commit.login] : []))),
-    ];
+    const pairs: Record<string, string> = {};
+    for (const commit of cmp.commits) {
+      const email = commit.email?.trim().toLowerCase();
+      if (email && commit.login) pairs[email] = commit.login;
+    }
+    snapshot.emailAccounts = pairs;
   }
   if (cacheFile) {
     try {
@@ -258,7 +266,12 @@ export function summarizeBaseline(snapshots: ReleaseSnapshot[]): Baseline {
     medianChurn: median(snapshots.map((s) => s.additions + s.deletions)),
     medianLexicalCoverage: median(snapshots.map((s) => s.lexicalCoverage)),
     knownAuthors: [...new Set(snapshots.flatMap((s) => s.authors))],
-    knownLogins: [...new Set(snapshots.flatMap((s) => s.logins ?? []))],
+    // Snapshots arrive newest first; Object.assign right-to-left below makes
+    // the newest snapshot's pairing win when an email changed accounts.
+    emailAccounts: Object.assign(
+      {},
+      ...snapshots.map((s) => s.emailAccounts ?? {}).reverse(),
+    ) as Record<string, string>,
     everBinary: snapshots.some((s) => s.binaries > 0),
   };
 }

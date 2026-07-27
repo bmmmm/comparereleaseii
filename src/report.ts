@@ -5,7 +5,10 @@ import type { ClaimResult, Report, UnverifiableKind, Verdict } from "./types.ts"
 // Everything printed to the terminal that originated outside this tool —
 // notes, commit subjects, judge reasoning, file paths — goes through this.
 // git forbids control characters in ref names, but not in messages or notes.
-const safe = stripControl;
+// Newlines collapse too: every foreign string here renders on one line, and
+// a kept newline would let judge output forge whole report lines (a fake
+// "Trust score: 100/100" among them).
+const safe = (s: string): string => stripControl(s).replace(/\n+/g, " ");
 
 const SYMBOL: Record<Verdict, string> = {
   verified: "✔",

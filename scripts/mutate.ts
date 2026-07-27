@@ -146,9 +146,9 @@ const MUTANTS: Mutant[] = [
     replace: "if (false) {",
   },
   {
-    guard: "a known email with no known forge account raises the spoof warn",
+    guard: "a broken email-to-account pairing raises the spoof warn",
     file: "src/metrics.ts",
-    find: "!(commit.login && knownLogins.has(commit.login)) &&",
+    find: "commit.login !== expected &&",
     replace: "false &&",
   },
   {
@@ -180,6 +180,18 @@ const MUTANTS: Mutant[] = [
     file: "src/promises.ts",
     find: 'if (res.status === "still-open" && (res.carriedFor ?? 0) >= STALE_AFTER) {',
     replace: "if (false) {",
+  },
+  {
+    guard: "stale promises are not re-carried (that would undo the aging)",
+    file: "src/watch.ts",
+    find: '.filter((p) => p.status === "still-open")\n    .map((p) => ({',
+    replace: '.filter((p) => p.status === "still-open" || p.status === "stale")\n    .map((p) => ({',
+  },
+  {
+    guard: "the ledger cap prefers still-open entries over resolved ones",
+    file: "src/watch.ts",
+    find: "return [...open, ...resolved].slice(0, MAX_PROMISE_LEDGER);",
+    replace: "return promises.slice(0, MAX_PROMISE_LEDGER);",
   },
 ];
 

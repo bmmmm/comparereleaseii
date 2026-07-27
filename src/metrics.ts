@@ -767,38 +767,42 @@ export function baselineFlags(
     }
 
     // The email above is attacker-chosen; the forge account is not. On API
-    // sources a known email must therefore not settle identity by itself:
-    // when the forge attributes the commit to no account the baseline has
-    // ever seen, that combination is the spoofing signature, not a pass.
-    // Needs an API-built baseline (a clone knows no logins) and API commits.
-    const knownLogins = new Set(baseline.knownLogins);
-    if (knownLogins.size) {
-      const spoofs = data.commits.filter(
-        (commit) =>
-          commit.login !== undefined &&
-          (known.has(authorKey(commit)) || known.has(commit.author)) &&
-          !(commit.login && knownLogins.has(commit.login)) &&
-          (coverage.commitFiles.get(commit.sha) ?? []).some((f) => sensitiveCategory(f.path)),
+    // sources a known email must therefore not settle identity by itself.
+    // The discriminating signal is the PAIRING: an email this repo's history
+    // always saw attributed to one account, now arriving attributed to a
+    // different account or to none. An email that was never linked to any
+    // account is an ordinary shape (authors commit with unregistered
+    // addresses all the time) and stays quiet — a flat "known logins" set
+    // could not tell those two apart and warned on honest maintainers.
+    const spoofs = data.commits.filter((commit) => {
+      if (commit.login === undefined) return false; // clone source — no attribution
+      const email = commit.email?.trim().toLowerCase();
+      const expected = email ? baseline.emailAccounts[email] : undefined;
+      return (
+        expected !== undefined &&
+        commit.login !== expected &&
+        (coverage.commitFiles.get(commit.sha) ?? []).some((f) => sensitiveCategory(f.path))
       );
-      if (spoofs.length) {
-        const who = [
-          ...new Set(
-            spoofs.map(
-              (commit) =>
-                `${authorKey(commit)} (${commit.login ? `@${commit.login}` : "no account"})`,
-            ),
+    });
+    if (spoofs.length) {
+      const who = [
+        ...new Set(
+          spoofs.map(
+            (commit) =>
+              `${authorKey(commit)} (expected @${baseline.emailAccounts[commit.email!.trim().toLowerCase()]}, got ${commit.login ? `@${commit.login}` : "no account"})`,
           ),
-        ].join(", ");
-        flags.push({
-          severity: "warn",
-          kind: "author-email-spoof",
-          message:
-            `Commit(s) on sensitive paths reuse a known author email, but the forge attributes them ` +
-            `to no account seen in the last ${n} releases — the git email is forgeable, the account is not: ${who}`,
-          files: [],
-          commitShas: spoofs.map((commit) => commit.sha).slice(0, 5),
-        });
-      }
+        ),
+      ].join(", ");
+      flags.push({
+        severity: "warn",
+        kind: "author-email-spoof",
+        message:
+          `Commit(s) on sensitive paths carry an author email this repo's last ${n} releases ` +
+          `always saw attributed to a different forge account — the git email is forgeable, ` +
+          `the account is not: ${who}`,
+        files: [],
+        commitShas: spoofs.map((commit) => commit.sha).slice(0, 5),
+      });
     }
   }
 

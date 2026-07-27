@@ -104,17 +104,17 @@ test("a baseline builds out of a clone, with no forge API in reach", async () =>
   // number the out-of-repo gate reads, and it has to survive the clone path.
   assert.equal(snapshots[0].lexicalCoverage, 1);
   // A clone attributes commits to no forge account — absent, not empty:
-  // an empty list would read as "no known account touched this".
-  assert.equal(snapshots[0].logins, undefined);
+  // an empty map would read as "no linked account touched this".
+  assert.equal(snapshots[0].emailAccounts, undefined);
 });
 
-test("API-built snapshots carry forge logins; clone-built ones stay silent", async () => {
-  const commit = (login: string | null) => ({
+test("API-built snapshots pair emails with accounts; clone-built ones stay silent", async () => {
+  const commit = (email: string, login: string | null) => ({
     sha: "a".repeat(40),
     subject: "change",
     body: "",
-    author: login ?? "Jane Doe",
-    email: "jane@example.invalid",
+    author: login ?? "Somebody",
+    email,
     login,
     prNumbers: [],
   });
@@ -125,15 +125,20 @@ test("API-built snapshots carry forge logins; clone-built ones stay silent", asy
       { tag: "v2", notes: "", date: null },
       { tag: "v1", notes: "", date: null },
     ],
-    // One attributed commit, one the forge maps to no account: the login
-    // list keeps the account and drops the null — presence of the field is
-    // what says "this range came from an API".
-    loadRange: async () => ({ commits: [commit("janedoe"), commit(null)], files: [] }),
+    // Jane's email is linked to her account; Bob commits with an address the
+    // forge maps to no account — only the LINKED pairing is recorded, so a
+    // never-linked email stays distinguishable from a broken pairing.
+    loadRange: async () => ({
+      commits: [commit("Jane@Example.invalid", "janedoe"), commit("bob@example.invalid", null)],
+      files: [],
+    }),
   };
   const snapshots = await buildSnapshots(source, { count: 5 });
-  assert.deepEqual(snapshots[0].logins, ["janedoe"]);
+  assert.deepEqual(snapshots[0].emailAccounts, { "jane@example.invalid": "janedoe" });
   const { summarizeBaseline } = await import("../src/history.ts");
-  assert.deepEqual(summarizeBaseline(snapshots).knownLogins, ["janedoe"]);
+  assert.deepEqual(summarizeBaseline(snapshots).emailAccounts, {
+    "jane@example.invalid": "janedoe",
+  });
 });
 
 test("`before` restricts the baseline to releases older than the one under test", async () => {

@@ -132,9 +132,16 @@ export function truncate(text: string, maxChars: number): string {
  * notes, commit subjects, judge output) before printing it. An escape
  * sequence smuggled into a note could otherwise rewrite the report line it
  * appears on: recolor a verdict, move the cursor, hide text. Keeps newline
- * and tab; strips the rest of C0, DEL, and C1 (U+009B is a one-byte CSI).
+ * and tab; strips the rest of C0, DEL, C1 (U+009B is a one-byte CSI), and
+ * the invisible bidi/format characters of the Trojan-Source class — a note
+ * that renders differently than it reads is this tool's own threat model.
+ * Directional marks in honest RTL text are safe to drop: terminals run
+ * their own bidi over the plain text.
  */
-const CONTROL_CHARS = new RegExp("[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f]", "g");
+const CONTROL_CHARS = new RegExp(
+  "[\\x00-\\x08\\x0b-\\x1f\\x7f-\\x9f\\u200b\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069\\u2028\\u2029\\ufeff]",
+  "g",
+);
 
 export function stripControl(s: string): string {
   return s.replace(CONTROL_CHARS, "");

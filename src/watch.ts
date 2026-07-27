@@ -12,6 +12,7 @@ import { toHtml } from "./html.ts";
 import { safeSegment } from "./paths.ts";
 
 import type { PromiseCheck, UnverifiableKind } from "./types.ts";
+import type { CarriedPromise } from "./promises.ts";
 
 type FailOn = "none" | "contradicted" | "no-evidence";
 
@@ -117,7 +118,9 @@ interface RepoState {
   history: CheckedRelease[];
   /**
    * Promise ledger from the last check: still-open entries are re-checked
-   * against every later release until they resolve to kept or broken.
+   * against every later release until they resolve to kept or broken — or
+   * age out as `stale` after STALE_AFTER carries, which is the third exit
+   * and the reason target-less promises cannot ride forever.
    */
   promises?: PromiseCheck[];
 }
@@ -176,6 +179,36 @@ const SCORE_DROP = 20;
  * cap is the backstop — and it is announced, never silent.
  */
 export const MAX_PROMISE_LEDGER = 50;
+
+/**
+ * Still-open entries ride to the next check with their carry count; kept,
+ * broken and stale entries stay behind — stale IS the exit, re-carrying it
+ * would undo the aging.
+ */
+export function carriedFromLedger(promises: PromiseCheck[] | undefined): CarriedPromise[] {
+  return (promises ?? [])
+    .filter((p) => p.status === "still-open")
+    .map((p) => ({
+      text: p.text,
+      from: p.from,
+      kind: p.kind,
+      target: p.target,
+      carriedFor: p.carriedFor,
+    }));
+}
+
+/**
+ * Bound the persisted ledger, still-open entries first: they are the only
+ * ones the ledger exists to carry. A plain head-slice would let this
+ * release's kept/broken entries (display-only, discarded next run anyway)
+ * evict the oldest carried promises.
+ */
+export function capLedger(promises: PromiseCheck[]): PromiseCheck[] {
+  if (promises.length <= MAX_PROMISE_LEDGER) return promises;
+  const open = promises.filter((p) => p.status === "still-open");
+  const resolved = promises.filter((p) => p.status !== "still-open");
+  return [...open, ...resolved].slice(0, MAX_PROMISE_LEDGER);
+}
 
 /**
  * The repo's own normal score — median of its past checks, or null while
@@ -581,15 +614,7 @@ export async function runWatch(
           // Promises older than the base release live only here: the state
           // carries every still-open one until a later diff resolves it — or
           // until it ages out as stale (checkPromises counts the carries).
-          carriedPromises: (repoState.promises ?? [])
-            .filter((p) => p.status === "still-open")
-            .map((p) => ({
-              text: p.text,
-              from: p.from,
-              kind: p.kind,
-              target: p.target,
-              carriedFor: p.carriedFor,
-            })),
+          carriedPromises: carriedFromLedger(repoState.promises),
         };
         const { data, context } = await loadGithubReleaseData(rc.repo, {
           tag: rel.tag,
@@ -682,7 +707,7 @@ export async function runWatch(
                 `(${ledger.length} tracked) — dropping the oldest carried promises.`,
             );
           }
-          repoState.promises = ledger.slice(0, MAX_PROMISE_LEDGER);
+          repoState.promises = capLedger(ledger);
         }
         state.repos[key] = repoState;
         codes.push(ec);
