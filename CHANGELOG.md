@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **On the dashboard, the repo name now opens that repo's history page; the forge moved to a small ↗ after the name.** The most valuable drilldown — the full score series, verdict composition, promise and author ledgers — hid behind a small gray "history" link at the row's end, while the most prominent click in the row left the site toward the forge. The name is the internal drilldown now (the common dashboard idiom), the forge sits one small arrow behind it exactly like the release column's, and the trailing "history" link is gone. Waiting rows — no checks, no history page yet — keep the forge link on the name.
+
 ### Added
 
 - **The dashboard and every history page state what the scores measure.** A watch instance served publicly shows red rows next to real project names, and the entry page never said what the number means — a visitor could read "45 · flagged" as a verdict on the project. Both pages now carry the framing the author section always had, as one line: scores measure how well the release notes match the shipped diff — not project quality, and never people; every number links to the full evidence behind it.

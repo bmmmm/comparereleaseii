@@ -226,7 +226,7 @@ test("toWatchIndexHtml marks flagged repos red and sorts them first", () => {
   assert.ok(html.includes('<div class="n">1</div><div class="t">flagged</div>'));
 });
 
-test("toWatchIndexHtml: whole rows link to the report, repos link to GitHub", () => {
+test("toWatchIndexHtml: rows link the report, repo names their history, the forge one ↗", () => {
   const state: WatchState = {
     version: 1,
     repos: {
@@ -242,7 +242,16 @@ test("toWatchIndexHtml: whole rows link to the report, repos link to GitHub", ()
     { key: "good/repo", repo: "good/repo" },
   ]);
   assert.ok(html.includes('data-href="x/v1.html"'), "row carries the report link");
-  assert.ok(html.includes('href="https://github.com/good/repo"'), "repo links to GitHub");
+  // The repo name is the internal drilldown; the forge is the small ↗ after
+  // it — the same pattern the release column uses.
+  assert.ok(
+    html.includes('<a class="repo" href="x/index.html"'),
+    "repo name opens the repo's history page",
+  );
+  assert.ok(
+    html.includes('<a class="ext" href="https://github.com/good/repo"'),
+    "the ↗ after the name opens the forge",
+  );
   assert.ok(
     html.includes('href="https://github.com/good/repo/releases/tag/v1"'),
     "tag links to the GitHub release",
@@ -288,6 +297,11 @@ test("toWatchIndexHtml: configured repos without a check yet get a pending row",
   ]);
   assert.ok(html.includes("waiting for the first release check"));
   assert.ok(html.includes("fresh/repo"));
+  // No history page exists yet — the waiting row's name keeps the forge link.
+  assert.ok(
+    html.includes('<a class="repo" href="https://github.com/fresh/repo"'),
+    "a waiting repo's name links to its forge",
+  );
   assert.ok(html.includes('<div class="n">1</div><div class="t">repos watched</div>'));
   assert.ok(html.includes('<div class="n">0</div><div class="t">flagged</div>'));
 });
@@ -453,14 +467,22 @@ test("toWatchIndexHtml links forge entries to their forge, never to GitHub", () 
   const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z", [
     { key: "https://gitea.com/gitea/tea", repo: "gitea/tea", url: "https://gitea.com/gitea/tea" },
   ]);
-  assert.ok(html.includes('href="https://gitea.com/gitea/tea"'), "repo cell links to the forge");
+  assert.ok(
+    html.includes('<a class="ext" href="https://gitea.com/gitea/tea"'),
+    "the ↗ after the name links to the forge",
+  );
   assert.ok(
     html.includes('href="https://gitea.com/gitea/tea/releases/tag/v0.14.2"'),
     "release links to the forge's release page",
   );
   assert.ok(!html.includes("github.com"), "nothing points at GitHub for a forge entry");
   // The cell SHOWS owner/repo — an unlabeled forge entry's key is its whole
-  // URL, which belongs in the title, not across the table.
+  // URL, which belongs in the title, not across the table. The name itself
+  // opens the history page, whose directory derives from the report path.
+  assert.ok(
+    html.includes('<a class="repo" href="x/index.html"'),
+    "the name opens the history page",
+  );
   assert.ok(html.includes(">gitea/tea</a>"), "cell text is the slug, not the URL");
   assert.ok(!html.includes(">https://gitea.com/gitea/tea</a>"), "the URL is not the link text");
 });
@@ -540,7 +562,8 @@ test("toWatchIndexHtml links each checked repo row to its history page", () => {
   const html = toWatchIndexHtml(state, "t", [{ key: "good/repo", repo: "good/repo" }]);
   // The history dir is derived from the report path, so old states keep
   // working whatever their directory naming was.
-  assert.ok(html.includes('href="x/index.html"'), "trend cell links the history page");
+  assert.ok(html.includes('href="x/index.html"'), "repo name links the history page");
+  assert.ok(!html.includes(">history</a>"), "the trailing history link is gone — the name is it");
 });
 
 test("the index aggregates the watchlist: tiles, distribution, broken promises", () => {

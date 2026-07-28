@@ -559,13 +559,28 @@ ${feedRows}
   // github.com just because it contains a slash. The cell shows owner/repo —
   // an unlabeled forge entry's key is its whole URL, which belongs in the
   // title, not across the table.
-  const repoCell = (key: string, repo: string, url?: string) => {
-    const shown = key.includes("://") ? repo : key;
-    const title = shown === repo ? (url ?? "") : (url ?? repo);
-    const href =
-      url ?? (repo.includes("/") && !repo.includes("://") ? `https://github.com/${repo}` : null);
-    return href
-      ? `<a class="repo" href="${esc(href)}" target="_blank" rel="noopener"${title ? ` title="${esc(title)}"` : ""}>${esc(shown)}</a>`
+  const forgeHref = (repo: string, url?: string) =>
+    url ?? (repo.includes("/") && !repo.includes("://") ? `https://github.com/${repo}` : null);
+  const shownName = (key: string, repo: string) => (key.includes("://") ? repo : key);
+  // The most prominent click in a row is the repo name, and the most valuable
+  // drilldown is the repo's own history page — so the name opens it (the
+  // common dashboard idiom: name = internal detail), and the forge moves to
+  // a small ↗ right behind it, the same pattern the release column uses.
+  const repoCell = (key: string, repo: string, url: string | undefined, rs: RepoState) => {
+    const fh = forgeHref(repo, url);
+    return (
+      `<a class="repo" href="${esc(reportDirOf(rs, key))}/index.html" title="this repo's full history: score series, verdicts, promise ledger">${esc(shownName(key, repo))}</a>` +
+      (fh
+        ? ` <a class="ext" href="${esc(fh)}" target="_blank" rel="noopener" title="${esc(fh)}">&#8599;</a>`
+        : "")
+    );
+  };
+  // A waiting row has no history page yet — its name keeps the forge link.
+  const pendingCell = (key: string, repo: string, url?: string) => {
+    const fh = forgeHref(repo, url);
+    const shown = shownName(key, repo);
+    return fh
+      ? `<a class="repo" href="${esc(fh)}" target="_blank" rel="noopener"${url ? ` title="${esc(url)}"` : ""}>${esc(shown)}</a>`
       : esc(shown);
   };
   const rows = withData
@@ -598,7 +613,7 @@ ${feedRows}
         : "";
       return `<tr class="${l.flagged ? "flagged" : ""}" data-href="${esc(l.report)}" data-repo="${esc(key.toLowerCase())}" data-released="${l.publishedAt ? esc(l.publishedAt) : ""}" data-score="${l.score}" data-flags="${l.criticalFlags * 1000 + l.flagCount}" data-checked="${esc(l.checkedAt)}">
 <td>${l.flagged ? "&#9888;" : "&#10003;"}</td>
-<td>${repoCell(key, repo, url)}</td>
+<td>${repoCell(key, repo, url, rs!)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
 <td><span class="score ${scoreClass(l)}" title="judge: ${esc(l.engine)}${
@@ -625,7 +640,7 @@ ${feedRows}
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
-<td>${trend}${trend ? " " : ""}<a class="hist" href="${esc(reportDirOf(rs!, key))}/index.html" title="this repo's full history: score series, verdicts, promise ledger">history</a></td>
+<td>${trend}</td>
 <td title="${esc(l.checkedAt)}">${esc(l.checkedAt.slice(0, 10))}</td>
 </tr>`;
     })
@@ -634,7 +649,7 @@ ${feedRows}
     .map(
       ({ key, repo, url }) => `<tr class="pending">
 <td>&#8943;</td>
-<td>${repoCell(key, repo, url)}</td>
+<td>${pendingCell(key, repo, url)}</td>
 <td colspan="8">waiting for the first release check</td>
 </tr>`,
     )
@@ -684,14 +699,13 @@ tr.pending td{color:#59636e}
 .dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}.dot.unverified{background:#8250df}
 a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
 a.repo{color:inherit}a.ext{font-size:.85em}
-a.hist{color:#59636e;font-size:.85em;white-space:nowrap}
 @media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}.incomplete{border-color:#d29922;color:#d29922}
 .cards{background:#161b22;border-color:#30363d}.cards .t,.sub,.note,.legend,.feed .when{color:#8d96a0}
 .dist .seg{border-color:#161b22}
 button{background:#161b22;color:#e6edf3;border-color:#30363d}button.active{background:#cf222e;border-color:#cf222e;color:#fff}
 th[data-sort]::after{color:#484f58}
 th[data-sort].sorted[data-dir="asc"]::after,th[data-sort].sorted[data-dir="desc"]::after{color:#e6edf3}
-.feed li{border-color:#30363d}a.hist{color:#8d96a0}}
+.feed li{border-color:#30363d}}
 </style></head><body>
 <h1>Release watch</h1>
 <p class="sub">generated ${esc(generatedAt)} by comparereleaseii · <a href="feed.xml">atom feed</a></p>
@@ -707,7 +721,7 @@ ${feedSection}
 <p class="sub">rows: &#10003; passed &middot; &#9888; flagged &middot; &#8943; waiting &mdash;
 verdicts: &#10004; verified &middot; &#9680; partial &middot; ? no evidence &middot; &#10008; contradicted &mdash;
 c &middot; c &middot; r = correctness &middot; completeness &middot; risk</p>
-<p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; history opens the repo&#39;s full record &middot; &#8599; opens the release on its forge</p>
+<p class="sub">repo names open that repo&#39;s full record &middot; click anywhere else in a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; &#8599; opens the repo or release on its forge</p>
 <p class="sub">scores measure how well the release notes match the shipped diff &mdash; not project quality, and never people; every number links to the full evidence behind it</p>
 <script>
 for (const tr of document.querySelectorAll("tr[data-href]")) {

@@ -24,22 +24,23 @@ watch: 4 repos · 1 new release(s) checked · 0 flagged · index reports/index.h
 Each checked release writes `reports/<repo>/<tag>.{html,md,json}` and
 regenerates `reports/index.html` — a one-page overview with red rows for
 flagged releases; every row links to its full report (click anywhere in the
-row), repo and release link out to their forge, and the score components
-(correctness · completeness · risk) sit next to the trust score. Repos that
-haven't had a release since being added are listed as waiting, so the index
-always mirrors the configured list. Above the table, tiles aggregate the
-watchlist (repos, flagged, broken promises, score distribution); columns
-sort on click and a toggle shows flagged rows only; below it, a release
-feed lists every checked release across repos, newest first. The same feed
-is written as static Atom to `reports/feed.xml` (relative links — serve the
-reports directory and any feed reader can subscribe), and each repo row
-links a `history` page (`reports/<repo>/index.html`) with the full score
-series, verdict composition per release, the promise ledger, and an author
-ledger — per-identity facts accumulated across checked releases (first
-seen, commits, sensitive-path and binary commits, forge-attribution
-history, bot tag) plus each release's identity count, first-appearances
-and top-identity commit share. Facts only, by design: no trust ratings on
-people in either direction.
+row), and the score components (correctness · completeness · risk) sit next
+to the trust score. The repo name opens that repo's own history page
+(`reports/<repo>/index.html`) — the full score series, verdict composition
+per release, the promise ledger, and an author ledger: per-identity facts
+accumulated across checked releases (first seen, commits, sensitive-path
+and binary commits, forge-attribution history, bot tag) plus each release's
+identity count, first-appearances and top-identity commit share. Facts
+only, by design: no trust ratings on people in either direction. The forge
+is the small ↗ right after the name (releases link out the same way);
+repos that haven't had a release since being added are listed as waiting —
+no history page yet, so their name still links to the forge — and the
+index always mirrors the configured list. Above the table, tiles aggregate
+the watchlist (repos, flagged, broken promises, score distribution);
+columns sort on click and a toggle shows flagged rows only; below it, a
+release feed lists every checked release across repos, newest first. The
+same feed is written as static Atom to `reports/feed.xml` (relative links —
+serve the reports directory and any feed reader can subscribe).
 
 ## How state works
 
