@@ -486,6 +486,9 @@ deliberately changes the documented "repo links out to its forge"
 behavior: update `docs/watchdog.md` and the index tests with it.
 **Done when:** clicking a repo name opens its history page, ↗ opens the
 forge, tests assert both.
+- **Landed 2026-07-28** (`c5014ab`), as planned. Waiting rows keep the
+  forge link on the name — they have no history page; the docs paragraph
+  and the index tests state the new idiom.
 
 ### Block B — `watch backfill`: solve the cold start honestly
 A fresh watcher needs 3 checks for a median and 6 for drift — with a
@@ -518,6 +521,24 @@ Settled design (do not re-litigate):
 **Done when:** a fresh repo entry backfilled with `--releases 10` shows a
 median, drift detection and a filled author ledger after one command, and
 a backfill interrupted halfway resumes without re-checking.
+- **Landed 2026-07-28** (`332bda4`). The watch loop's check body became one
+  shared `checkAndRecord`; state bookkeeping moved behind `recordChecked`
+  with the invariants a past-checking mode needs — chronological inserts,
+  `latest` and the poll cursor forward-only (a skip used to move the cursor
+  unconditionally, which for a backfilled old release would have re-alerted
+  everything since). Three calls the plan did not spell out: retries are
+  3 immediate attempts inside the run (the state's `failing` slot holds one
+  tag, so cross-run counting would self-reset under `continue`), with three
+  finally-failed releases in a row aborting as "looks systemic"; the
+  promise thread runs chronologically through the backfill and becomes the
+  state's ledger only when it reaches the present, so a pure-past run never
+  touches the live thread; and the deep listing rides into the forge
+  target/GitHub base pick, so notes, bases and baselines reach as far back
+  as the scope instead of the newest page. `DRIFT_WINDOW` (12) joined the
+  baseline window — an ancient level shift is the long view's story, not a
+  standing alert. Verified live against gitea.com: `--releases 5` then
+  `--releases 10` on `gitea/tea` checks 5+5 with no re-checks (median,
+  62-identity ledger), third run a no-op. Eight mutants; all killed.
 
 ### Block C — the long view: phases and exceptions, not more dots
 For a long history the unit of narrative is not the release, it is the
@@ -548,6 +569,18 @@ tests and, where they guard scoring-adjacent claims, mutants.
 **Done when:** a repo with 100+ backfilled checks renders phases, events,
 yearly strips and the heatmap from state alone, `--judge off`
 deterministic, with the framing line on the page.
+- **Landed 2026-07-28** (`65100b4`), as `src/watch-longview.ts`; a 118-check
+  synthetic record exercises all four sections in the tests. Three things
+  the plan left open, decided in the code: the state now records each
+  release's top identity by display name (`authors.top1Name`) — without it
+  the top-identity and first-appearance detections had nothing to read;
+  one threshold (12 checks) gates all four sections; the calendar is
+  monthly, not per-release (300 cells would drown the texture the view
+  exists for). One thing the plan could not know: the median look-ahead
+  that confirms a change point trips one check early — the boundary now
+  snaps to the first release that itself reads as the new regime, so a
+  phase starts exactly at the handover. Six mutants pin the detector
+  edges; 47/47 killed across the harness.
 
 Order: A → B → C (C needs B's data to be worth looking at). Immediate
 operational step available before any of this: a one-shot high-`maxPerRun`
