@@ -464,6 +464,104 @@ documentation.
 
 ---
 
+## Next — the long view (2026-07-28)
+
+Context: the watchdog is live (hourly launchd job at `~/release-watch`,
+running the SHA-pinned gh extension; v0.5.0/v0.5.1 shipped the history
+pages, dashboard, author ledger and the unwedge/skip mechanism). Three
+gaps surfaced on the first day of operations: the history page is hard to
+find, a fresh watcher is baseline-blind for months (cold start), and a
+*long* history has no adequate view — a 300-point score line is noise.
+Decisions below were settled in discussion on 2026-07-28.
+
+### Block A — make the history page findable (small)
+The most valuable drilldown hides behind a small gray "history" link at
+the row's end, while the most prominent click (the repo name) leaves the
+site toward the forge — backwards to the common idiom. Change: repo name
+links to the *internal* history page; the forge moves to a small ↗ right
+after the name (the release column already uses exactly that pattern);
+the trailing "history" link goes away, legend updated. Waiting rows (no
+checks yet) keep the forge link — they have no history page. This
+deliberately changes the documented "repo links out to its forge"
+behavior: update `docs/watchdog.md` and the index tests with it.
+**Done when:** clicking a repo name opens its history page, ↗ opens the
+forge, tests assert both.
+
+### Block B — `watch backfill`: solve the cold start honestly
+A fresh watcher needs 3 checks for a median and 6 for drift — with a
+monthly-release repo that is most of a year of blindness. Backfill fixes
+it by checking the *past* releases the state never saw.
+
+Settled design (do not re-litigate):
+- **No sampling.** "One release per month" breaks the method: each check
+  verifies notes against *its own* diff (prev→tag); skipped releases
+  leave commits no checked diff covers — promise resolution and the
+  author ledger get holes, and scores stop being comparable. Checks are
+  gap-free, oldest-first; *display* resolution is a rendering concern
+  (Block C).
+- **Own mode, not the catch-up.** `pickNewReleases`' `slice(-cap)`
+  prioritizes the *newest* releases when behind — right for alerting,
+  the exact opposite of backfill. A reset state + hourly runs would never
+  reach the old releases (found 2026-07-28).
+- CLI: `watch backfill [repo…] --releases N | --since <date>`, with a
+  cost statement before starting ("214 releases, est. ~4h judge time —
+  proceed?") and `--yes` for scripts. Release listing needs pagination
+  (today: newest 30).
+- Resumable by construction: state saves after every check; the
+  `recordCheckFailure` skip mechanism guards against wedging on broken
+  old releases. Backfilled checks never fire `--notify` (historical
+  alerts are noise); flagged stays in the record.
+- **Decouple the windows:** `historyLimit` becomes configurable (hard 20
+  today), and the baseline median deliberately stays on the last ~10
+  checks so old note culture cannot dilute what "normal" means now.
+
+**Done when:** a fresh repo entry backfilled with `--releases 10` shows a
+median, drift detection and a filled author ledger after one command, and
+a backfill interrupted halfway resumes without re-checking.
+
+### Block C — the long view: phases and exceptions, not more dots
+For a long history the unit of narrative is not the release, it is the
+phase and the exception ("is this still the project I trusted three years
+ago — if not, when did it change?"; the xz pattern is a *regime change*
+no score line shows). One page that scales with data depth — the existing
+history page grows sections once enough checks exist; no second page.
+All four views chosen by the user on 2026-07-28; everything derives
+deterministically from the state (no judge), so detections get unit
+tests and, where they guard scoring-adjacent claims, mutants.
+1. **Phase/regime bands** (the core): segment the history into stretches
+   of stable behavior — change points from a rolling-median level shift
+   over a threshold, top-identity change, concentration jump, cadence
+   change. Per phase: score band + median, author count + top share,
+   cadence, broken-promise count. The transitions carry the information.
+2. **Event log**: the 10–20 things that stood out across years — flagged
+   releases (with critical counts), score level shifts, top-identity
+   changes, broken promises, first appearances with immediate high
+   share. Each links its evidence (report / history row). Facts only,
+   the framing line applies — no insinuations.
+3. **Yearly distribution**: one strip per year, min/median/max + outliers
+   linking their reports. 300 releases become five readable rows.
+4. **Calendar heatmap**: one cell per release (or month), color = score
+   bucket — cadence, gaps and level shifts as texture. Color never
+   carries alone: symbols/tooltips per cell, palette rules as
+   established (status colors, validated).
+
+**Done when:** a repo with 100+ backfilled checks renders phases, events,
+yearly strips and the heatmap from state alone, `--judge off`
+deterministic, with the framing line on the page.
+
+Order: A → B → C (C needs B's data to be worth looking at). Immediate
+operational step available before any of this: a one-shot high-`maxPerRun`
+backfill of the live 11-repo watchlist (last ~5 releases each) via the
+existing catch-up — waits for an explicit user go (judge cost, live
+state).
+
+Noted, no commitment: a deep-backfill "adoption audit" moment (should I
+take this dependency at all?) is the same page fed by `--since <years
+ago>` — it needs no separate feature, only the willingness to pay for the
+checks.
+
+---
+
 ## Phase 1 — Distribution: from repo to `pnpm dlx` and a GitHub Action
 
 Goal: a stranger goes from zero to a verdict in under a minute, and a
