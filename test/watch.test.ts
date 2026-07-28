@@ -17,11 +17,14 @@ import {
   carriedFromLedger,
   capLedger,
   updateAuthorLedger,
+  recordCheckFailure,
   MAX_AUTHOR_LEDGER,
+  MAX_CHECK_ATTEMPTS,
   MAX_PROMISE_LEDGER,
   type ReleaseInfo,
   type WatchState,
   type CheckedRelease,
+  type RepoState,
 } from "../src/watch.ts";
 import type { PromiseCheck } from "../src/types.ts";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
@@ -710,4 +713,59 @@ test("a release wider than the cap keeps its whole active set — new stays hone
   const r3 = updateAuthorLedger(r2.ledger, [activity("fresh@x", 1)], "v3");
   assert.equal(r3.ledger.length, MAX_AUTHOR_LEDGER);
   assert.equal(r3.dropped, 51);
+});
+
+test("recordCheckFailure: retries first, keeps state put, counts attempts on the same tag", () => {
+  const rs: RepoState = { lastPublishedAt: "2026-01-01T00:00:00Z", lastTag: "v1", history: [] };
+  const rel = { tag: "v2", publishedAt: "2026-02-01T00:00:00Z" };
+
+  assert.equal(recordCheckFailure(rs, rel, "boom", "2026-02-02T00:00:00Z"), "retry");
+  assert.deepEqual(rs.failing, { tag: "v2", attempts: 1, lastError: "boom" });
+  assert.equal(rs.lastTag, "v1");
+  assert.equal(rs.lastPublishedAt, "2026-01-01T00:00:00Z");
+
+  assert.equal(recordCheckFailure(rs, rel, "boom again", "2026-02-03T00:00:00Z"), "retry");
+  assert.equal(rs.failing!.attempts, 2);
+  assert.equal(rs.failing!.lastError, "boom again");
+});
+
+test("recordCheckFailure: a different failing tag restarts the counter", () => {
+  const rs: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  recordCheckFailure(rs, { tag: "v2", publishedAt: "2026-02-01T00:00:00Z" }, "x", "t");
+  recordCheckFailure(rs, { tag: "v2", publishedAt: "2026-02-01T00:00:00Z" }, "x", "t");
+  assert.equal(rs.failing!.attempts, 2);
+  assert.equal(recordCheckFailure(rs, { tag: "v3", publishedAt: "2026-03-01T00:00:00Z" }, "y", "t"), "retry");
+  assert.deepEqual(rs.failing, { tag: "v3", attempts: 1, lastError: "y" });
+});
+
+test("recordCheckFailure: skips past the release after MAX_CHECK_ATTEMPTS, advancing the state", () => {
+  const rs: RepoState = { lastPublishedAt: "2026-01-01T00:00:00Z", lastTag: "v1", history: [] };
+  const rel = { tag: "v2", publishedAt: "2026-02-01T00:00:00Z" };
+  for (let i = 1; i < MAX_CHECK_ATTEMPTS; i++) {
+    assert.equal(recordCheckFailure(rs, rel, "no claims found", "t"), "retry");
+  }
+  assert.equal(recordCheckFailure(rs, rel, "no claims found", "2026-02-04T00:00:00Z"), "skip");
+  assert.equal(rs.failing, undefined);
+  assert.equal(rs.lastTag, "v2");
+  assert.equal(rs.lastPublishedAt, "2026-02-01T00:00:00Z");
+  assert.deepEqual(rs.skipped, [
+    {
+      tag: "v2",
+      publishedAt: "2026-02-01T00:00:00Z",
+      attempts: MAX_CHECK_ATTEMPTS,
+      lastError: "no claims found",
+      skippedAt: "2026-02-04T00:00:00Z",
+    },
+  ]);
+});
+
+test("recordCheckFailure: the skipped ledger is bounded, oldest entries drop", () => {
+  const rs: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  for (let n = 1; n <= 11; n++) {
+    const rel = { tag: `v${n}`, publishedAt: `2026-01-${String(n).padStart(2, "0")}T00:00:00Z` };
+    for (let i = 1; i <= MAX_CHECK_ATTEMPTS; i++) recordCheckFailure(rs, rel, "x", "t");
+  }
+  assert.equal(rs.skipped!.length, 10);
+  assert.equal(rs.skipped![0].tag, "v2");
+  assert.equal(rs.skipped![9].tag, "v11");
 });

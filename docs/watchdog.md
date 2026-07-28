@@ -54,6 +54,11 @@ A state file remembers the last checked release per repo (default:
 - A release is checked exactly once — re-runs cannot re-alert.
 - State is saved after every successful check, so a crash never loses or
   repeats work.
+- A failing check is retried on the next runs; after 3 runs failing on the
+  same release, watch moves past it so newer releases still get checked.
+  The skip is never silent: it is logged, and the release stays listed
+  under "Unchecked releases" on the repo's history page — a gap there
+  means "unchecked", not "fine".
 
 ## Building the repo list
 

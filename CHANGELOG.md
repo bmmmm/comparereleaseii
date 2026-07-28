@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **A permanently failing release no longer wedges its repo in watch mode.** A check failure used to stop the repo's batch and retry the same release on every later run — right for transient failures, fatal for permanent ones (a tag-only forge release whose empty notes parse to no claims, a diff the source cannot serve): the state never advanced, so newer releases were never checked again. Failures now carry an attempt counter in the state; after 3 runs failing on the same release, watch skips past it and keeps going. The skip is never silent — logged with the last error, and the release stays on the repo's history page under "Unchecked releases", so a gap in the score series reads as "unchecked", not "fine". A success wipes the counter; a different failing release restarts it.
+
 ## 0.5.0 — 2026-07-28
 
 ### Added

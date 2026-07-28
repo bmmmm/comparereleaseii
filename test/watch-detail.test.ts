@@ -265,3 +265,27 @@ test("an evicted-ledger page qualifies its first-appearance counts", () => {
   assert.ok(evicted.includes("identities have been evicted"));
   assert.ok(evicted.includes("an upper bound"));
 });
+
+test("history page lists skipped releases, with the error escaped", () => {
+  const rs = state([check("v1", 95)]);
+  rs.skipped = [
+    {
+      tag: "v2<script>",
+      publishedAt: "2026-07-10T00:00:00Z",
+      attempts: 3,
+      lastError: 'No claims found <img src=x onerror="alert(1)">',
+      skippedAt: "2026-07-12T00:00:00Z",
+    },
+  ];
+  const html = toRepoDetailHtml(ENTRY, rs, null, "2026-07-28T00:00:00Z");
+  assert.ok(html.includes("Unchecked releases"), "section renders");
+  assert.ok(html.includes("v2&lt;script&gt;"), "tag escaped");
+  assert.ok(html.includes("No claims found &lt;img"), "error escaped");
+  assert.ok(!html.includes("<img src=x"), "no raw payload");
+  assert.ok(html.includes("2026-07-10"), "published date shown");
+});
+
+test("history page omits the skipped section when nothing was skipped", () => {
+  const html = toRepoDetailHtml(ENTRY, state([check("v1", 95)]), null, "2026-07-28T00:00:00Z");
+  assert.ok(!html.includes("Unchecked releases"));
+});

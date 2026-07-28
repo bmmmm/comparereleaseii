@@ -181,6 +181,20 @@ export interface RepoState {
    * qualify first-appearance counts instead of stating them as fact.
    */
   authorsEvicted?: boolean;
+  /** The release the run loop is currently stuck on — retried next run. */
+  failing?: { tag: string; attempts: number; lastError: string };
+  /** Releases the loop gave up on after MAX_CHECK_ATTEMPTS failed runs. */
+  skipped?: SkippedRelease[];
+}
+
+/** A release that was seen but never checked: every attempt failed, and the
+ * state advanced past it so newer releases could get their turn. */
+export interface SkippedRelease {
+  tag: string;
+  publishedAt: string | null;
+  attempts: number;
+  lastError: string;
+  skippedAt: string;
 }
 
 /**
@@ -310,6 +324,43 @@ export function countSkipped(
       r.publishedAt! > lastPublishedAt,
   );
   return Math.max(0, eligible.length - (opts.cap ?? 3));
+}
+
+/** After this many failed runs on the same release, watch skips past it. */
+export const MAX_CHECK_ATTEMPTS = 3;
+/** Skipped releases kept on record — bounded like every other ledger. */
+const MAX_SKIPPED = 10;
+
+/**
+ * Record one failed check and decide the loop's move. Retrying next run is
+ * right for transient failures — network, rate limits — but a permanently
+ * failing release (a tag-only forge release whose empty notes parse to no
+ * claims, a diff the source cannot serve) would wedge the repo: the state
+ * never advances past it, so newer releases are never checked. The attempt
+ * count therefore rides in the state, and once MAX_CHECK_ATTEMPTS runs have
+ * failed on the same tag the state moves past it as seen-but-unchecked —
+ * announced in the log and listed on the history page, never silent. A
+ * success wipes the counter; a different failing tag restarts it.
+ */
+export function recordCheckFailure(
+  repoState: RepoState,
+  rel: { tag: string; publishedAt: string | null },
+  error: string,
+  now: string,
+): "retry" | "skip" {
+  const attempts = (repoState.failing?.tag === rel.tag ? repoState.failing.attempts : 0) + 1;
+  if (attempts < MAX_CHECK_ATTEMPTS) {
+    repoState.failing = { tag: rel.tag, attempts, lastError: error };
+    return "retry";
+  }
+  delete repoState.failing;
+  repoState.lastPublishedAt = rel.publishedAt;
+  repoState.lastTag = rel.tag;
+  repoState.skipped = [
+    ...(repoState.skipped ?? []),
+    { tag: rel.tag, publishedAt: rel.publishedAt, attempts, lastError: error, skippedAt: now },
+  ].slice(-MAX_SKIPPED);
+  return "skip";
 }
 
 /** Fewer than this many past checks is an accident, not a repo's normal level. */
@@ -1116,6 +1167,9 @@ export async function runWatch(
         repoState.lastTag = rel.tag;
         repoState.latest = checkedRelease;
         repoState.history = [...repoState.history, checkedRelease].slice(-20);
+        // A success proves the loop is not stuck — whatever tag the counter
+        // was tracking, it either just passed or is gone from the window.
+        delete repoState.failing;
         // The ledger is replaced wholesale: carried promises were all
         // re-checked this run, resolved ones keep their final status here and
         // only still-open entries ride along to the next release. The cap
@@ -1149,14 +1203,23 @@ export async function runWatch(
         await saveState(statePath, state);
         await writeIndex();
       } catch (err) {
-        // FIXME: `break` assumes the failure is transient. A permanently
-        // failing release (e.g. a tag-only forge release with an empty body
-        // -> "No claims found") wedges the repo: state never advances past
-        // it, so newer releases are never checked. Distinguish permanent
-        // shapes and skip them with a warning instead.
-        console.error(`${key}: checking ${rel.tag} failed — ${(err as Error).message}`);
+        const msg = (err as Error).message;
         codes.push(2);
-        break; // keep state before the failed release; retried next run
+        const move = recordCheckFailure(repoState, rel, msg, new Date().toISOString());
+        state.repos[key] = repoState;
+        if (move === "retry") {
+          console.error(
+            `${key}: checking ${rel.tag} failed (attempt ${repoState.failing!.attempts}/${MAX_CHECK_ATTEMPTS}) — ${msg}`,
+          );
+          break; // transient until proven otherwise; state stays put, retried next run
+        }
+        console.error(
+          `${key}: giving up on ${rel.tag} after ${MAX_CHECK_ATTEMPTS} failed runs — ${msg}. ` +
+            `Skipping past it so newer releases get checked; it stays listed as unchecked on the history page.`,
+        );
+        await saveState(statePath, state);
+        await writeIndex();
+        continue; // newer releases in this batch still get their check
       }
     }
   }
