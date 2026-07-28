@@ -1,6 +1,6 @@
 {
   "name": "comparereleaseii",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Fact-check release notes against the actual code diff — on GitHub, Forgejo, GitLab or any git clone",
   "type": "module",
   "license": "GPL-3.0-or-later",

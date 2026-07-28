@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.5.1 — 2026-07-28
+
 ### Fixed
 
 - **The `watch setup` launchd job announces itself by name, not as "sh".** macOS names a background job by its program — in `launchctl print`, in System Settings' Background Items, and in the notification that appears the moment the schedule is bootstrapped — and the plist used to run `/bin/sh -lc`, so the watchdog showed up as an anonymous shell. Setup now writes an executable runner script `comparereleaseii-watch` into the watch home and points the plist straight at it. The script also carries the PATH prefix itself (as the cron line always has), closing a real gap: the old `sh -l` route read `~/.profile` for PATH, which zsh users — the macOS default — typically do not have, so `gh` and a Homebrew `node` were never actually guaranteed to be found. The hand-wired launchd recipe in docs/watchdog.md follows the same shape.
