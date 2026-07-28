@@ -326,12 +326,13 @@ index — without opening the docs.
   and its printed first-run command produced state, reports and index for a
   gitea.com entry.
 
-Operational notes for the next session: a complete working setup (config
-with the 12 repos, state, reports) sits in the iteration-2 worktree under
-`tmp/release-watch/`; the canonical state from the first real run lives in
-`~/.local/state/comparereleaseii/watch-state.json`; creating
-`~/release-watch/` as a new top-level home directory is the user's call —
-ask before creating it.
+Operational note (updated 2026-07-28): the live setup runs from
+`~/release-watch/` (config, state, reports, named launchd runner — hourly
+since 2026-07-28); the interim copies this note used to point at
+(`tmp/release-watch/` in the iteration-2 worktree, the old state under
+`~/.local/state/comparereleaseii/`) are superseded — the tmp copy was
+removed in the 2026-07-28 cleanup, the old XDG state is a stale duplicate
+kept only until its deletion gets a user go.
 
 ### Next — presentation, analytics, and the author dimension (ideas 2026-07-27 — NOT settled, prioritize in a fresh session)
 
