@@ -37,7 +37,7 @@ import {
   type ForgeTarget,
   type RepoLink,
 } from "./check.ts";
-import { runWatch } from "./watch.ts";
+import { runWatch, runBackfill } from "./watch.ts";
 import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
 import { runWatchSetup } from "./setup.ts";
 import { loadGuidelines } from "./guidelines.ts";
@@ -53,6 +53,7 @@ Usage:
   ${PROG} --repo-url <url> [--tag <ref>] [--base <ref>] [--notes-file <file>]
   ${PROG} --local <path> [--head <ref>] [--base <ref>] [--notes-file <file>]
   ${PROG} watch --config <file> [--notify <cmd>]
+  ${PROG} watch backfill [repo…] --config <file> --releases <n> | --since <date>
   ${PROG} watch init|add|remove|list [--config <file>]
   ${PROG} watch setup
   ${PROG} guidelines [--full]
@@ -117,6 +118,17 @@ Watch mode (continuous release monitoring):
       --no-cache        Bypass the on-disk verdict cache
   A run only checks releases newer than the last run (state file) and
   regenerates <reports>/index.html; exit code is the worst of the batch.
+
+  Backfill (solve the cold start — check the past the state never saw):
+  ${PROG} watch backfill --config watch.json --releases 10
+  ${PROG} watch backfill owner/repo --config watch.json --since 2024-01-01
+      Checks past releases gap-free, oldest first: a fresh entry gets a
+      median, drift detection and a filled author ledger from one command.
+      States the cost and asks before checking (--yes for scripts); never
+      fires --notify (flagged stays in the record); resumes after an
+      interruption without re-checking. Positional repos restrict the run
+      (state key, owner/repo or URL). Raise "historyLimit" in the config
+      before a deep backfill — it decides how many checks the state keeps.
 
   Building the repo list (--config defaults to ./watch.json here):
   ${PROG} watch init [--from watched,starred,notifications]
@@ -496,6 +508,9 @@ async function runWatchCli(argv: string[]): Promise<number> {
     }
     return runWatchSetup();
   }
+  if (argv[0] === "backfill") {
+    return runWatchBackfillCli(argv.slice(1));
+  }
   if (["init", "add", "remove", "list"].includes(argv[0])) {
     return runWatchListCli(argv[0] as "init" | "add" | "remove" | "list", argv.slice(1));
   }
@@ -533,6 +548,50 @@ async function runWatchCli(argv: string[]): Promise<number> {
     stateFile: values.state,
     reportsDir: values.reports,
     cache: !values["no-cache"],
+  });
+}
+
+async function runWatchBackfillCli(argv: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      config: { type: "string" },
+      releases: { type: "string" },
+      since: { type: "string" },
+      yes: { type: "boolean", default: false },
+      state: { type: "string" },
+      reports: { type: "string" },
+      "no-cache": { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  if (values.help || !values.config) {
+    console.log(USAGE);
+    return values.help ? 0 : 2;
+  }
+  const releases =
+    values.releases === undefined ? undefined : intFlag("releases", values.releases, 1);
+  const raw = await readFile(values.config, "utf8").catch((err) => {
+    throw new Error(
+      `Cannot read watch config ${values.config} (${(err as Error).message}) — see docs/watchdog.md for the format.`,
+    );
+  });
+  let config;
+  try {
+    config = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Watch config ${values.config} is not valid JSON: ${(err as Error).message}`);
+  }
+  return runBackfill(config, {
+    configPath: values.config,
+    stateFile: values.state,
+    reportsDir: values.reports,
+    cache: !values["no-cache"],
+    releases,
+    since: values.since,
+    yes: values.yes,
+    only: positionals,
   });
 }
 

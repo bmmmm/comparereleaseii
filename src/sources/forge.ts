@@ -141,50 +141,63 @@ export async function fetchForgeReleases(
   opts: { limit?: number } = {},
 ): Promise<ForgeListing | null> {
   const limit = opts.limit ?? 100;
-  const path = `${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
 
-  const gitea = await getJson(
-    `${target.origin}/api/v1/repos/${path}/releases?limit=${limit}`,
-    authHeaders("forgejo"),
-  );
-  if (Array.isArray(gitea)) {
-    return {
-      kind: "forgejo",
-      releases: (gitea as GiteaRelease[])
-        .filter((r) => typeof r.tag_name === "string")
-        .map((r) => ({
-          tag_name: r.tag_name!,
-          name: r.name ?? r.tag_name!,
-          body: r.body ?? "",
-          draft: r.draft ?? false,
-          prerelease: r.prerelease ?? false,
-          published_at: r.published_at ?? null,
-        })),
-    };
+  const gitea = await fetchForgeReleasePage(target, "forgejo", { limit });
+  if (gitea) return { kind: "forgejo", releases: gitea };
+
+  const gitlab = await fetchForgeReleasePage(target, "gitlab", { limit });
+  if (gitlab) return { kind: "gitlab", releases: gitlab };
+
+  return null;
+}
+
+/**
+ * One page of a KNOWN dialect — the deep listing backfill needs. The
+ * detection (try Forgejo, then GitLab) happens once on page 1 via
+ * fetchForgeReleases; later pages go straight to the dialect it answered.
+ * Returns null when the endpoint stops answering mid-pagination.
+ */
+export async function fetchForgeReleasePage(
+  target: ForgeRepo,
+  kind: "forgejo" | "gitlab",
+  opts: { limit?: number; page?: number } = {},
+): Promise<GhRelease[] | null> {
+  const limit = opts.limit ?? 100;
+  const page = opts.page ?? 1;
+  if (kind === "forgejo") {
+    const path = `${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`;
+    const gitea = await getJson(
+      `${target.origin}/api/v1/repos/${path}/releases?limit=${limit}&page=${page}`,
+      authHeaders("forgejo"),
+    );
+    if (!Array.isArray(gitea)) return null;
+    return (gitea as GiteaRelease[])
+      .filter((r) => typeof r.tag_name === "string")
+      .map((r) => ({
+        tag_name: r.tag_name!,
+        name: r.name ?? r.tag_name!,
+        body: r.body ?? "",
+        draft: r.draft ?? false,
+        prerelease: r.prerelease ?? false,
+        published_at: r.published_at ?? null,
+      }));
   }
-
   // GitLab addresses a project by its URL-encoded full path, slash included.
   const project = encodeURIComponent(`${target.owner}/${target.repo}`);
   const gitlab = await getJson(
-    `${target.origin}/api/v4/projects/${project}/releases?per_page=${limit}`,
+    `${target.origin}/api/v4/projects/${project}/releases?per_page=${limit}&page=${page}`,
     authHeaders("gitlab"),
   );
-  if (Array.isArray(gitlab)) {
-    return {
-      kind: "gitlab",
-      releases: (gitlab as GitlabRelease[])
-        .filter((r) => typeof r.tag_name === "string")
-        .map((r) => ({
-          tag_name: r.tag_name!,
-          name: r.name ?? r.tag_name!,
-          body: r.description ?? "",
-          draft: false,
-          // GitLab's scheduled-but-unpublished release is its prerelease.
-          prerelease: r.upcoming_release ?? false,
-          published_at: r.released_at ?? null,
-        })),
-    };
-  }
-
-  return null;
+  if (!Array.isArray(gitlab)) return null;
+  return (gitlab as GitlabRelease[])
+    .filter((r) => typeof r.tag_name === "string")
+    .map((r) => ({
+      tag_name: r.tag_name!,
+      name: r.name ?? r.tag_name!,
+      body: r.description ?? "",
+      draft: false,
+      // GitLab's scheduled-but-unpublished release is its prerelease.
+      prerelease: r.upcoming_release ?? false,
+      published_at: r.released_at ?? null,
+    }));
 }

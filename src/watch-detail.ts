@@ -8,7 +8,7 @@ import { safeSegment } from "./paths.ts";
 import { STALE_AFTER } from "./promises.ts";
 import type { PromiseCheck } from "./types.ts";
 import type { AuthorRecord, CheckedRelease, RepoState, SkippedRelease, WatchedEntry } from "./watch.ts";
-import { MAX_CHECK_ATTEMPTS } from "./watch.ts";
+import { BASELINE_WINDOW, MAX_CHECK_ATTEMPTS } from "./watch.ts";
 
 /**
  * Where a repo's reports live, relative to the reports root — derived from
@@ -380,7 +380,7 @@ ${
   latest
     ? `<div class="cards">
   <div><div class="n">${scoreCell(latest)}</div><div class="t">latest: ${esc(latest.tag)}</div></div>
-  <div><div class="n">${level ?? "–"}</div><div class="t">median of recorded checks</div></div>
+  <div><div class="n">${level ?? "–"}</div><div class="t">median of the last ${BASELINE_WINDOW} checks</div></div>
   <div><div class="n">${flaggedCount}</div><div class="t">flagged of last ${history.length}</div></div>${
     stillOpen
       ? `\n  <div><div class="n">${stillOpen}</div><div class="t">promise${stillOpen === 1 ? "" : "s"} still open</div></div>`

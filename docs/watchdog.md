@@ -61,6 +61,47 @@ A state file remembers the last checked release per repo (default:
   under "Unchecked releases" on the repo's history page — a gap there
   means "unchecked", not "fine".
 
+## Backfill: solve the cold start
+
+A fresh watcher is baseline-blind: the relative alert needs 3 checks for a
+median and 6 for drift detection — with a monthly-release repo that is most
+of a year. `watch backfill` checks the *past* releases the state never saw:
+
+```console
+$ comparerelease watch backfill --config watch.json --releases 10
+$ comparerelease watch backfill gitea/tea --config watch.json --since 2024-01-01
+```
+
+- **Gap-free, oldest first — no sampling.** Each check verifies notes
+  against *its own* diff (previous release → tag); sampling would leave
+  commits no checked diff covers, holes in promise resolution and the
+  author ledger, and scores that stop being comparable. How a long series
+  is *displayed* is the history page's concern, not the record's.
+- **Its own mode, not the catch-up.** When behind, the ordinary run
+  prioritizes the *newest* releases (right for alerting) — the exact
+  opposite of backfill. Releases newer than the state's cursor stay the
+  ordinary run's job; backfill fills the gap behind it.
+- **The cost is stated first.** Backfill prints how many releases each repo
+  needs and a rough judge-time estimate, then asks; `--yes` skips the
+  question for scripts. The release listing paginates as deep as the scope
+  requires.
+- **Resumable by construction.** State saves after every check and checked
+  releases are never re-checked — an interrupted backfill continues where
+  it stopped. A release that fails all 3 immediate attempts is recorded as
+  unchecked (same skip mechanism as the watch loop) and the run moves on;
+  several such releases in a row abort the run as "looks systemic".
+- **Never alerts.** Historical alerts are noise: backfilled checks never
+  fire `--notify`; `flagged` stays in the record and on the pages.
+- Positional arguments restrict the run to some entries (state key,
+  `owner/repo`, or the config's `repoUrl`).
+
+Before a deep backfill, raise `historyLimit` in the config (default 20) —
+it decides how many checks the state keeps per repo, and the long-view
+sections can only render what the state keeps. The baseline median and
+drift detection deliberately do *not* widen with it: they read fixed
+windows of the newest checks (10 and 12), so years of old note culture
+cannot dilute what "normal" means now.
+
 ## Building the repo list
 
 Your GitHub account already knows which repos you care about — `watch init`
@@ -116,6 +157,7 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
 {
   "reportsDir": "reports",
   "maxPerRun": 3,
+  "historyLimit": 20,
   "notify": "ntfy publish releases",
   "defaults": {
     "engine": "openai",

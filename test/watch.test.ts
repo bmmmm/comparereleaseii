@@ -4,20 +4,27 @@ import assert from "node:assert/strict";
 import {
   countSkipped,
   pickNewReleases,
+  pickBackfillReleases,
   isFlagged,
   hasDrifted,
   releaseWebUrl,
   runNotify,
   runWatch,
+  runBackfill,
   sanitizeTag,
   scoreBaseline,
+  baselineLevel,
   worstExit,
   toWatchIndexHtml,
   toWatchAtomFeed,
   carriedFromLedger,
   capLedger,
   updateAuthorLedger,
+  recordChecked,
   recordCheckFailure,
+  recordSkip,
+  BASELINE_WINDOW,
+  DRIFT_WINDOW,
   MAX_AUTHOR_LEDGER,
   MAX_CHECK_ATTEMPTS,
   MAX_PROMISE_LEDGER,
@@ -791,6 +798,169 @@ test("recordCheckFailure: the skipped ledger is bounded, oldest entries drop", (
   assert.equal(rs.skipped!.length, 10);
   assert.equal(rs.skipped![0].tag, "v2");
   assert.equal(rs.skipped![9].tag, "v11");
+});
+
+function at(tag: string, score: number, publishedAt: string): CheckedRelease {
+  return { ...checked(tag, score, false), publishedAt };
+}
+
+test("pickBackfillReleases: the newest n eligible releases, oldest first, on a fresh repo", () => {
+  const releases = [
+    rel("v4", "2026-07-20T00:00:00Z"),
+    rel("v3-rc", "2026-07-15T00:00:00Z", { prerelease: true }),
+    rel("v3", "2026-07-10T00:00:00Z"),
+    rel("v2", "2026-06-01T00:00:00Z"),
+    rel("v1", "2026-05-01T00:00:00Z"),
+  ];
+  const fresh: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  assert.deepEqual(
+    pickBackfillReleases(releases, fresh, { releases: 3 }).map((r) => r.tag),
+    ["v2", "v3", "v4"],
+  );
+  assert.deepEqual(
+    pickBackfillReleases(releases, fresh, { releases: 2, includePrerelease: true }).map((r) => r.tag),
+    ["v3-rc", "v4"],
+  );
+  assert.deepEqual(
+    pickBackfillReleases(releases, fresh, { since: "2026-06-01" }).map((r) => r.tag),
+    ["v2", "v3", "v4"],
+  );
+});
+
+test("pickBackfillReleases: an interrupted backfill resumes without re-checking", () => {
+  const releases = [
+    rel("v3", "2026-07-10T00:00:00Z"),
+    rel("v2", "2026-06-01T00:00:00Z"),
+    rel("v1", "2026-05-01T00:00:00Z"),
+  ];
+  // The first half of the run landed in history; a broken release was given
+  // up on and sits on the skipped record. Neither is picked again.
+  const rs: RepoState = {
+    lastPublishedAt: "2026-07-10T00:00:00Z",
+    lastTag: "v3",
+    history: [at("v1", 80, "2026-05-01T00:00:00Z"), at("v3", 85, "2026-07-10T00:00:00Z")],
+    skipped: [
+      { tag: "v2", publishedAt: "2026-06-01T00:00:00Z", attempts: 3, lastError: "x", skippedAt: "t" },
+    ],
+  };
+  assert.deepEqual(pickBackfillReleases(releases, rs, { releases: 3 }), []);
+});
+
+test("pickBackfillReleases: releases newer than the poll cursor stay the watch run's job", () => {
+  const releases = [
+    rel("v5", "2026-07-25T00:00:00Z"),
+    rel("v4", "2026-07-20T00:00:00Z"),
+    rel("v3", "2026-07-10T00:00:00Z"),
+    rel("v2", "2026-06-01T00:00:00Z"),
+  ];
+  const rs: RepoState = {
+    lastPublishedAt: "2026-07-20T00:00:00Z",
+    lastTag: "v4",
+    history: [at("v4", 90, "2026-07-20T00:00:00Z")],
+  };
+  // v5 is new-and-unchecked — the catch-up's territory, with the state's
+  // promise thread; backfill takes only the gap behind the cursor.
+  assert.deepEqual(
+    pickBackfillReleases(releases, rs, { releases: 4 }).map((r) => r.tag),
+    ["v2", "v3"],
+  );
+});
+
+test("recordChecked: a backfilled past release lands chronologically and moves nothing forward", () => {
+  const newest = at("v3", 90, "2026-07-10T00:00:00Z");
+  const rs: RepoState = {
+    lastPublishedAt: "2026-07-10T00:00:00Z",
+    lastTag: "v3",
+    latest: newest,
+    history: [newest],
+  };
+  const old = at("v1", 70, "2026-05-01T00:00:00Z");
+  recordChecked(rs, old);
+  assert.deepEqual(rs.history.map((h) => h.tag), ["v1", "v3"], "insert is chronological");
+  assert.equal(rs.latest!.tag, "v3", "latest never moves backward");
+  assert.equal(rs.lastPublishedAt, "2026-07-10T00:00:00Z", "the poll cursor never moves backward");
+  assert.equal(rs.lastTag, "v3");
+});
+
+test("recordChecked: the watch path still advances cursor and latest", () => {
+  const rs: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  recordChecked(rs, at("v1", 80, "2026-05-01T00:00:00Z"));
+  recordChecked(rs, at("v2", 85, "2026-06-01T00:00:00Z"));
+  assert.equal(rs.lastTag, "v2");
+  assert.equal(rs.lastPublishedAt, "2026-06-01T00:00:00Z");
+  assert.equal(rs.latest!.tag, "v2");
+  assert.deepEqual(rs.history.map((h) => h.tag), ["v1", "v2"]);
+});
+
+test("recordChecked: the history cap keeps the newest releases", () => {
+  const rs: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  for (let i = 1; i <= 6; i++) {
+    recordChecked(rs, at(`v${i}`, 80, `2026-01-0${i}T00:00:00Z`), 4);
+  }
+  assert.deepEqual(rs.history.map((h) => h.tag), ["v3", "v4", "v5", "v6"]);
+  // A late-arriving OLD check cannot evict a newer one once the cap is hit.
+  recordChecked(rs, at("v0", 80, "2026-01-01T00:00:00Z"), 4);
+  assert.deepEqual(rs.history.map((h) => h.tag), ["v3", "v4", "v5", "v6"]);
+});
+
+test("recordSkip: giving up on a backfilled old release keeps the cursor where it is", () => {
+  const rs: RepoState = {
+    lastPublishedAt: "2026-07-10T00:00:00Z",
+    lastTag: "v3",
+    history: [],
+  };
+  recordSkip(rs, { tag: "v1", publishedAt: "2026-05-01T00:00:00Z" }, 3, "boom", "t");
+  assert.equal(rs.lastPublishedAt, "2026-07-10T00:00:00Z", "cursor did not move backward");
+  assert.equal(rs.lastTag, "v3");
+  assert.equal(rs.skipped![0].tag, "v1", "the release is on the unchecked record");
+  // The watch loop's skip (a NEWER release) still advances it.
+  recordSkip(rs, { tag: "v4", publishedAt: "2026-08-01T00:00:00Z" }, 3, "boom", "t");
+  assert.equal(rs.lastPublishedAt, "2026-08-01T00:00:00Z");
+  assert.equal(rs.lastTag, "v4");
+});
+
+test("baselineLevel reads the newest window — old note culture cannot dilute today's normal", () => {
+  // Twenty old checks at 90, then a regime at 40: the repo's CURRENT level
+  // is 40. A whole-history median would still say 90 and the relative alert
+  // would fire on every release of the new normal.
+  const history = [
+    ...Array.from({ length: 20 }, () => ({ score: 90 })),
+    ...Array.from({ length: BASELINE_WINDOW }, () => ({ score: 40 })),
+  ];
+  assert.equal(baselineLevel(history), 40);
+  assert.equal(baselineLevel([{ score: 90 }, { score: 92 }]), null, "too few checks stays null");
+});
+
+test("hasDrifted reads a fixed window — an ancient level shift is the long view's story, not an alert", () => {
+  // The shift from 90 to 70 happened long ago; inside the drift window the
+  // level is a steady 70. Alerting on it forever would be noise.
+  const ancient = [
+    ...Array.from({ length: 20 }, () => ({ score: 90 })),
+    ...Array.from({ length: DRIFT_WINDOW }, () => ({ score: 70 })),
+  ];
+  assert.equal(hasDrifted(ancient), false);
+  // A shift INSIDE the window still alerts.
+  const recent = [
+    ...Array.from({ length: 20 }, () => ({ score: 95 })),
+    ...Array.from({ length: DRIFT_WINDOW / 2 }, () => ({ score: 90 })),
+    ...Array.from({ length: DRIFT_WINDOW / 2 }, () => ({ score: 65 })),
+  ];
+  assert.equal(hasDrifted(recent), true);
+});
+
+test("backfill validation: exactly one scope, a real date, known selectors", async () => {
+  const cfg = { repos: [{ repo: "o/r" }] };
+  const base = { configPath: "watch.json", cache: false, yes: true, only: [] as string[] };
+  await assert.rejects(runBackfill(cfg, base), /exactly one scope/);
+  await assert.rejects(
+    runBackfill(cfg, { ...base, releases: 5, since: "2024-01-01" }),
+    /exactly one scope/,
+  );
+  await assert.rejects(runBackfill(cfg, { ...base, since: "letzten monat" }), /--since must be a date/);
+  await assert.rejects(
+    runBackfill(cfg, { ...base, releases: 5, only: ["nope/nope"] }),
+    /not in the watch config/,
+  );
 });
 
 test("the index states what scores measure — the entry page must not read as a project verdict", () => {

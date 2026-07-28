@@ -223,6 +223,48 @@ const MUTANTS: Mutant[] = [
     find: "    rec.name = act.name;\n    rec.lastSeen = tag;",
     replace: "    rec.name = act.name;\n    rec.firstSeen = tag;\n    rec.lastSeen = tag;",
   },
+  {
+    guard: "a backfilled check never becomes 'latest' over a newer one",
+    file: "src/watch.ts",
+    find: "if (!repoState.latest || at(checked) >= at(repoState.latest)) repoState.latest = checked;",
+    replace: "repoState.latest = checked;",
+  },
+  {
+    guard: "a successful check moves the poll cursor forward only",
+    file: "src/watch.ts",
+    find: "    checked.publishedAt &&\n    (repoState.lastPublishedAt === null || checked.publishedAt > repoState.lastPublishedAt)",
+    replace: "    Boolean(checked.publishedAt)",
+  },
+  {
+    guard: "giving up on a backfilled old release keeps the poll cursor in place",
+    file: "src/watch.ts",
+    find: "    rel.publishedAt &&\n    (repoState.lastPublishedAt === null || rel.publishedAt > repoState.lastPublishedAt)",
+    replace: "    Boolean(rel.publishedAt)",
+  },
+  {
+    guard: "the baseline median reads the newest window, not the whole history",
+    file: "src/watch.ts",
+    find: "return scoreBaseline(history.slice(-BASELINE_WINDOW));",
+    replace: "return scoreBaseline(history);",
+  },
+  {
+    guard: "drift compares recent halves, not this year against the whole record",
+    file: "src/watch.ts",
+    find: "const window = history.slice(-DRIFT_WINDOW);",
+    replace: "const window = history;",
+  },
+  {
+    guard: "backfill never re-checks a release already on record",
+    file: "src/watch.ts",
+    find: "      !done.has(r.tag) &&\n",
+    replace: "",
+  },
+  {
+    guard: "backfill leaves releases newer than the poll cursor to the watch run",
+    file: "src/watch.ts",
+    find: "(repoState.lastPublishedAt === null || r.publishedAt! <= repoState.lastPublishedAt),",
+    replace: "true,",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
