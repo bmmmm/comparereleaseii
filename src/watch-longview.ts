@@ -250,7 +250,11 @@ export function collectEvents(
       });
     }
     const top = h.authors?.top1Name;
+    // Never on the record's first check: there "first seen" is true of every
+    // identity by definition — the maintainer topping their own repo would
+    // read as an anomaly on every freshly backfilled history.
     if (
+      i > 0 &&
       top &&
       (h.authors?.top1Share ?? 0) >= NEW_TOP_SHARE &&
       ledger?.some((a) => a.name === top && a.firstSeen === h.tag)

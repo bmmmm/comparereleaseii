@@ -152,6 +152,21 @@ test("a first-seen identity immediately owning a release is an event — ledger-
     collectEvents(small, ledger, segmentPhases(small)).filter((e) => e.kind === "new-top-author").length,
     0,
   );
+  // Never on the record's first check: every identity is "first seen" there
+  // by definition — a maintainer topping their own freshly backfilled repo
+  // is not an anomaly (found live on junegunn/fzf).
+  const first = series(Array(LONGVIEW_MIN_CHECKS).fill(90));
+  first[0] = check(0, 90, { authors: { total: 2, new: 2, top1Share: 0.9, top1Name: "Maintainer" } });
+  const firstLedger = [
+    {
+      key: "m@x", name: "Maintainer", firstSeen: "v0", lastSeen: "v11",
+      releases: 12, commits: 90, sensitiveCommits: 0, binaryCommits: 0,
+    },
+  ];
+  assert.equal(
+    collectEvents(first, firstLedger, segmentPhases(first)).filter((e) => e.kind === "new-top-author").length,
+    0,
+  );
 });
 
 test("the event selection keeps regime information over routine flags, and says what it dropped", () => {
