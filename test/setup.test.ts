@@ -9,6 +9,7 @@ import {
   expandHome,
   judgeOptions,
   launchdPlist,
+  launchdRunner,
   scheduleSpec,
 } from "../src/setup.ts";
 import type { WatchRepoConfig } from "../src/watch.ts";
@@ -75,13 +76,11 @@ test("judgeOptions: what the machine offers, best first, off always last", () =>
   assert.deepEqual(bare.map((o) => o.engine), ["off"]);
 });
 
-test("launchd plist: label, sh -lc command, interval, log — hostile paths stay quoted", () => {
+test("launchd plist: label, interval, log — the program is the named runner, nothing else", () => {
   const plist = launchdPlist({
     label: "comparereleaseii.watch.release-watch",
-    node: "/usr/local/bin/node",
-    bin: "/Users/o'brien/comparereleaseii/bin/comparerelease.mjs",
-    config: "/Users/o'brien/release-watch/watch.json",
-    logPath: "/Users/o'brien/release-watch/watch.log",
+    program: "/Users/smith & jones/release-watch/comparereleaseii-watch",
+    logPath: "/Users/smith & jones/release-watch/watch.log",
     seconds: 21_600,
   });
   assert.ok(
@@ -89,10 +88,32 @@ test("launchd plist: label, sh -lc command, interval, log — hostile paths stay
     "label carries the home dir's name so two watch homes can coexist",
   );
   assert.ok(plist.includes("<integer>21600</integer>"), "interval carried");
-  assert.ok(plist.includes("<string>/bin/sh</string><string>-lc</string>"), "login shell for PATH");
+  // The program IS the job's user-visible name (launchctl print, Background
+  // Items) — a /bin/sh wrapper here would announce the watchdog as "sh".
+  assert.ok(
+    plist.includes(
+      "<string>/Users/smith &amp; jones/release-watch/comparereleaseii-watch</string>",
+    ),
+    "runner is the program, xml-escaped",
+  );
+  assert.ok(!plist.includes("/bin/sh"), "no shell wrapper");
+  assert.equal(plist.match(/<string>/g)!.length, 4, "label, program, two log paths — nothing else");
+});
+
+test("launchd runner: shebang, PATH prefix, exec line — hostile paths stay quoted", () => {
+  const runner = launchdRunner({
+    node: "/usr/local/bin/node",
+    bin: "/Users/o'brien/comparereleaseii/bin/comparerelease.mjs",
+    config: "/Users/o'brien/release-watch/watch.json",
+  });
+  assert.ok(runner.startsWith("#!/bin/sh\n"), "executable shell script");
+  // launchd's bare environment knows neither gh nor a package-manager node;
+  // the old `sh -l` route read ~/.profile, which zsh users don't have.
+  assert.ok(runner.includes('PATH="$HOME/.local/bin:'), "PATH prefix carried by the script itself");
+  assert.ok(runner.includes("exec '/usr/local/bin/node'"), "execs node directly");
   // The apostrophe must close-escape-reopen, or the path would end the quote.
-  assert.ok(plist.includes("o'\\''brien"), "single quotes escaped for sh");
-  assert.ok(plist.includes("watch --config"), "runs watch against the config");
+  assert.ok(runner.includes("o'\\''brien"), "single quotes escaped for sh");
+  assert.ok(runner.includes("watch --config"), "runs watch against the config");
 });
 
 test("cron line: schedule, PATH prefix, quoted paths, log redirect", () => {

@@ -227,8 +227,11 @@ home directory (config, state, reports and log in one place, default
 `~/release-watch/`), judge (detected from this machine, with the calibration
 gate one answer away for a local model), schedule, and an optional notify
 hook (test-fired once — a failing command is dropped unless kept
-deliberately) — then writes the config and the launchd plist or crontab line
-and **prints** the command that activates the schedule (on macOS: copy the
+deliberately) — then writes the config and the schedule: on macOS a runner
+script named `comparereleaseii-watch` plus a plist that executes it (macOS
+names a background job by its program, so the job shows up under that name
+instead of an anonymous "sh"), on other platforms a crontab line. It then
+**prints** the command that activates the schedule (on macOS: copy the
 plist into `~/Library/LaunchAgents` + `launchctl bootstrap`, so it survives
 reboots; on cron: an append guarded against double-pasting). It only ever
 writes files; nothing is installed. An existing config or state file is
@@ -246,7 +249,20 @@ cron's minimal PATH — hence the PATH prefix.
 
 ### launchd (macOS)
 
-`~/Library/LaunchAgents/comparereleaseii.watch.plist`, then
+An executable runner script `~/release-watch/comparereleaseii-watch` —
+macOS names a background job by its program (in `launchctl print`, System
+Settings' Background Items, the bootstrap notification), so a named script
+shows up as itself where a `/bin/sh -lc` wrapper would announce itself as
+an anonymous "sh":
+
+```sh
+#!/bin/sh
+PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH
+exec comparerelease watch --config "$HOME/release-watch/watch.json"
+```
+
+Then `~/Library/LaunchAgents/comparereleaseii.watch.plist`, and
 `launchctl load` it:
 
 ```xml
@@ -256,8 +272,7 @@ cron's minimal PATH — hence the PATH prefix.
 <plist version="1.0"><dict>
   <key>Label</key><string>comparereleaseii.watch</string>
   <key>ProgramArguments</key><array>
-    <string>/bin/sh</string><string>-lc</string>
-    <string>comparerelease watch --config $HOME/release-watch/watch.json</string>
+    <string>/Users/you/release-watch/comparereleaseii-watch</string><!-- absolute on purpose: launchd expands no $HOME (path-guard:allow) -->
   </array>
   <key>StartInterval</key><integer>3600</integer>
   <key>StandardOutPath</key><string>/tmp/comparereleaseii-watch.log</string>
@@ -265,9 +280,10 @@ cron's minimal PATH — hence the PATH prefix.
 </dict></plist>
 ```
 
-`sh -lc` pulls in your login PATH so `comparerelease`, `gh` and the judge
-engine are found. Point a static file server (or just your browser) at the
-reports directory — `index.html` is the dashboard.
+The PATH prefix in the script is what launchd's bare environment lacks —
+`comparerelease`, `gh` and the judge engine live there. Point a static file
+server (or just your browser) at the reports directory — `index.html` is
+the dashboard.
 
 ### GitHub Actions (scheduled)
 

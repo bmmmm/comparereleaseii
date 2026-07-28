@@ -113,28 +113,41 @@ function xmlEsc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** What launchd's and cron's bare environments lack — where gh, node and a
+ * package-manager git actually live. */
+const PATH_PREFIX = `PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"`;
+
 /**
- * The launchd job runs through `sh -lc` on purpose: launchd's PATH knows
- * neither gh nor claude nor a package-manager git, and the login shell's
- * profile is where the operator already solved that.
+ * The script the launchd job executes. macOS names a job by its program
+ * everywhere the user sees it — `launchctl print`, System Settings'
+ * Background Items, the "added as a background item" notification — and a
+ * plist running `/bin/sh -lc` announces the watchdog as an anonymous "sh".
+ * A script named comparereleaseii-watch is what shows up instead. It also
+ * carries the PATH prefix itself, as the cron line always has: the old
+ * `sh -l` route read `~/.profile` for PATH, which zsh users (the macOS
+ * default) typically do not have.
  */
+export function launchdRunner(opts: { node: string; bin: string; config: string }): string {
+  return `#!/bin/sh
+${PATH_PREFIX}
+export PATH
+exec ${shq(opts.node)} ${shq(opts.bin)} watch --config ${shq(opts.config)}
+`;
+}
+
 export function launchdPlist(opts: {
   label: string;
-  node: string;
-  bin: string;
-  config: string;
+  program: string;
   logPath: string;
   seconds: number;
 }): string {
-  const cmd = `exec ${shq(opts.node)} ${shq(opts.bin)} watch --config ${shq(opts.config)}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>${xmlEsc(opts.label)}</string>
   <key>ProgramArguments</key><array>
-    <string>/bin/sh</string><string>-lc</string>
-    <string>${xmlEsc(cmd)}</string>
+    <string>${xmlEsc(opts.program)}</string>
   </array>
   <key>StartInterval</key><integer>${opts.seconds}</integer>
   <key>StandardOutPath</key><string>${xmlEsc(opts.logPath)}</string>
@@ -152,7 +165,7 @@ export function cronLine(opts: {
   cron: string;
 }): string {
   return (
-    `${opts.cron} PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH" ` +
+    `${opts.cron} ${PATH_PREFIX} ` +
     `${shq(opts.node)} ${shq(opts.bin)} watch --config ${shq(opts.config)} >> ${shq(opts.logPath)} 2>&1`
   );
 }
@@ -341,6 +354,7 @@ export async function runWatchSetup(): Promise<number> {
     let schedulePath: string;
     let activate: string;
     let deactivate: string;
+    let runnerNote = "";
     if (process.platform === "darwin") {
       // The label carries the home dir's name so two watch homes can
       // coexist; the activation COPIES the plist into ~/Library/LaunchAgents
@@ -349,9 +363,16 @@ export async function runWatchSetup(): Promise<number> {
       const label = `comparereleaseii.watch.${safeSegment(basename(dir))}`;
       const name = `${label}.plist`;
       schedulePath = join(dir, name);
+      // A fixed literal name: it lives inside the watch home, so two homes
+      // cannot collide, and there is no user-controlled segment to sanitize.
+      const runnerPath = join(dir, "comparereleaseii-watch");
+      await writeFile(runnerPath, launchdRunner({ node, bin, config: configPath }), {
+        mode: 0o755,
+      });
+      runnerNote = `\n  runner    ${runnerPath} — what launchd runs, and names the job after`;
       await writeFile(
         schedulePath,
-        launchdPlist({ label, node, bin, config: configPath, logPath, seconds: spec.seconds }),
+        launchdPlist({ label, program: runnerPath, logPath, seconds: spec.seconds }),
       );
       const uid = process.getuid?.() ?? "$(id -u)";
       const installed = join(homedir(), "Library", "LaunchAgents", name);
@@ -373,7 +394,7 @@ export async function runWatchSetup(): Promise<number> {
         `  config    ${configPath} (${config.repos.length} repo(s))\n` +
         `  state     ${resolve(dir, config.stateFile!)}\n` +
         `  reports   ${join(dir, "reports")} — index.html after the first run\n` +
-        `  schedule  ${schedulePath}\n` +
+        `  schedule  ${schedulePath}${runnerNote}\n` +
         `\nFirst run — seeds the state and produces the index:\n` +
         `  ${shq(node)} ${shq(bin)} watch --config ${shq(configPath)}\n` +
         `\nActivate the schedule (this is the one thing setup does not do):\n` +
