@@ -708,6 +708,7 @@ ${feedSection}
 verdicts: &#10004; verified &middot; &#9680; partial &middot; ? no evidence &middot; &#10008; contradicted &mdash;
 c &middot; c &middot; r = correctness &middot; completeness &middot; risk</p>
 <p class="sub">click a row for the current report &middot; trend dots (last 6 checks) open past reports &middot; history opens the repo&#39;s full record &middot; &#8599; opens the release on its forge</p>
+<p class="sub">scores measure how well the release notes match the shipped diff &mdash; not project quality, and never people; every number links to the full evidence behind it</p>
 <script>
 for (const tr of document.querySelectorAll("tr[data-href]")) {
   tr.addEventListener("click", (e) => {

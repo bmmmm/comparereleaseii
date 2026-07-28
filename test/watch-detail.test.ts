@@ -289,3 +289,8 @@ test("history page omits the skipped section when nothing was skipped", () => {
   const html = toRepoDetailHtml(ENTRY, state([check("v1", 95)]), null, "2026-07-28T00:00:00Z");
   assert.ok(!html.includes("Unchecked releases"));
 });
+
+test("the history page footer states what scores measure", () => {
+  const html = toRepoDetailHtml(ENTRY, state([check("v1", 45)]), null, "2026-07-28T00:00:00Z");
+  assert.ok(html.includes("not project quality, and never people"));
+});

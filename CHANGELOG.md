@@ -4,6 +4,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **The dashboard and every history page state what the scores measure.** A watch instance served publicly shows red rows next to real project names, and the entry page never said what the number means — a visitor could read "45 · flagged" as a verdict on the project. Both pages now carry the framing the author section always had, as one line: scores measure how well the release notes match the shipped diff — not project quality, and never people; every number links to the full evidence behind it.
+
 ## 0.5.1 — 2026-07-28
 
 ### Fixed

@@ -769,3 +769,22 @@ test("recordCheckFailure: the skipped ledger is bounded, oldest entries drop", (
   assert.equal(rs.skipped![0].tag, "v2");
   assert.equal(rs.skipped![9].tag, "v11");
 });
+
+test("the index states what scores measure — the entry page must not read as a project verdict", () => {
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "o/r": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v1",
+        latest: checked("v1", 45, true),
+        history: [checked("v1", 45, true)],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-28T00:00:00Z");
+  assert.ok(
+    html.includes("not project quality, and never people"),
+    "framing line present on the dashboard",
+  );
+});
