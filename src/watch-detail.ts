@@ -6,6 +6,7 @@
 // plus the promise ledger with its carry countdowns.
 import { safeSegment } from "./paths.ts";
 import { STALE_AFTER } from "./promises.ts";
+import { longviewSections } from "./watch-longview.ts";
 import type { PromiseCheck } from "./types.ts";
 import type { AuthorRecord, CheckedRelease, RepoState, SkippedRelease, WatchedEntry } from "./watch.ts";
 import { BASELINE_WINDOW, MAX_CHECK_ATTEMPTS } from "./watch.ts";
@@ -365,6 +366,23 @@ th{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--mu
 tr.flagged{background:var(--flagged-bg)}
 .comp{color:var(--muted);white-space:nowrap}
 .flag{background:var(--card);border:1px solid var(--border);border-left:4px solid;border-radius:6px;padding:8px 12px;margin:6px 0}
+.opened{font-size:12px}
+.events{list-style:none;padding:0;margin:.4rem 0}
+.events li{padding:.26rem 0;border-bottom:1px solid var(--border);font-size:13px}
+.events .when{color:var(--muted);font-variant-numeric:tabular-nums;margin-right:.3rem}
+.evt{display:inline-block;border:1px solid var(--muted);color:var(--muted);border-radius:.6em;padding:0 .45em;font-size:.85em;white-space:nowrap}
+.strip{width:240px;height:18px;vertical-align:middle}
+.axisline{stroke:var(--border);stroke-width:1}
+.range{stroke:var(--muted);stroke-width:3;stroke-linecap:round}
+.medtick{stroke:var(--fg);stroke-width:1.5}
+.sd.good{fill:#1a7f37}.sd.mid{fill:#d4a72c}.sd.bad{fill:#cf222e}.sd.unverified{fill:#8250df}
+table.heat{width:auto}
+.heat th{font-size:.65rem}
+.heat td{text-align:center;font-size:11px;padding:.2rem .4rem;border:1px solid var(--border);min-width:1.7em}
+.heat td.y{font-weight:600;border:0}
+.heat td.empty{background:transparent}
+.heat td.m{color:#fff;font-weight:600;text-shadow:0 0 2px rgba(0,0,0,.4)}
+.heat td.m.good{background:#1a7f37}.heat td.m.mid{background:#9a6700}.heat td.m.bad{background:#cf222e}.heat td.m.unverified{background:#8250df}
 .chip{color:#fff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
 .files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
 .note{color:var(--muted);font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
@@ -393,6 +411,7 @@ ${
 ${scoreChart(history, level, root)}
 <h2>Verdicts per release <span class="note">— claim verdict composition of each check</span></h2>
 ${verdictChart(history, root)}
+${longviewSections(rs, root)}
 <h2>Checked releases</h2>
 ${releasesTable(history, root)}
 ${rs.skipped?.length ? skippedSection(rs.skipped) : ""}

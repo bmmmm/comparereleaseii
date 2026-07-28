@@ -138,8 +138,11 @@ export interface CheckedRelease {
    * Author facts of this release: identities total, identities the ledger
    * had never seen, and the top identity's share of commits (0–1) — a
    * single-maintainer release is a supply-chain fact worth showing.
+   * `top1Name` names the top identity (display name, not the key) so the
+   * long view can detect top-identity regime changes; absent in states
+   * written before it existed.
    */
-  authors?: { total: number; new: number; top1Share: number };
+  authors?: { total: number; new: number; top1Share: number; top1Name?: string };
   /** HTML report path relative to the reports directory. */
   report: string;
   /**
@@ -1293,6 +1296,7 @@ async function checkAndRecord(args: {
             new: authorUpdate.newAuthors,
             top1Share:
               Math.round(((report.authors[0]?.commits ?? 0) / (totalCommits || 1)) * 100) / 100,
+            ...(report.authors[0] ? { top1Name: report.authors[0].name } : {}),
           },
         }
       : {}),

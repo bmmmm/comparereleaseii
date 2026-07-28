@@ -102,6 +102,35 @@ drift detection deliberately do *not* widen with it: they read fixed
 windows of the newest checks (10 and 12), so years of old note culture
 cannot dilute what "normal" means now.
 
+## The long view
+
+Once a repo's record holds 12 checks or more, its history page grows four
+sections — same page, no second view, everything derived deterministically
+from the state (no judge, works with `judge: "off"`). For a long history
+the unit of narrative is not the release, it is the phase and the
+exception: "is this still the project I trusted three years ago — and if
+not, when did it change?" is a regime question no score line answers.
+
+- **Phases** segments the record into stretches of stable behavior. A new
+  phase opens on a confirmed change: a score-level shift of 20+ (the same
+  magnitude the relative alert calls a drop), a top-author handover that
+  holds, a commit-concentration jump, or a release-cadence change — each
+  confirmed by the following checks, so a single outlier release stays an
+  event instead of splitting the history. Per phase: period, releases,
+  score median with range, identities and top share, cadence, issues, and
+  what opened it — the transitions carry the information.
+- **Event log** lists what stood out across the record: critical flags,
+  level shifts, top-author changes, broken promises, and a first-seen
+  identity immediately authoring half a release or more. Facts only, each
+  entry links its evidence; when a long record has more than 20 events,
+  the regime information outranks routine flags and the cut is announced.
+- **Yearly distribution** compresses each year into one strip —
+  min/median/max with every check as a dot that opens its report. Three
+  hundred releases become a handful of readable rows.
+- **Release calendar** shows one cell per month (count of releases, color
+  by the month's median score bucket, tooltip naming each release) —
+  cadence, gaps and level shifts as texture. Color never carries alone.
+
 ## Building the repo list
 
 Your GitHub account already knows which repos you care about — `watch init`

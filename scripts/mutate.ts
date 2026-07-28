@@ -265,6 +265,42 @@ const MUTANTS: Mutant[] = [
     find: "(repoState.lastPublishedAt === null || r.publishedAt! <= repoState.lastPublishedAt),",
     replace: "true,",
   },
+  {
+    guard: "a phase opens only on a score shift past the threshold",
+    file: "src/watch-longview.ts",
+    find: "if (Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",
+    replace: "if (false) {",
+  },
+  {
+    guard: "a single outlier release never opens a phase (median look-ahead)",
+    file: "src/watch-longview.ts",
+    find: "const medAhead = median(ahead.map((h) => h.score))!;",
+    replace: "const medAhead = ahead[0].score;",
+  },
+  {
+    guard: "a top-author change needs the new identity to hold the window",
+    file: "src/watch-longview.ts",
+    find: "if (topCur && topAhead && topCur !== topAhead && aheadCount >= 2) {",
+    replace: "if (topCur && topAhead && topCur !== topAhead && aheadCount >= 1) {",
+  },
+  {
+    guard: "the long view stays off below the check threshold",
+    file: "src/watch-longview.ts",
+    find: "if (history.length < LONGVIEW_MIN_CHECKS) return \"\";",
+    replace: "",
+  },
+  {
+    guard: "a first appearance is an event only at a high commit share",
+    file: "src/watch-longview.ts",
+    find: "(h.authors?.top1Share ?? 0) >= NEW_TOP_SHARE &&",
+    replace: "",
+  },
+  {
+    guard: "the event cap keeps regime information over routine flags",
+    file: "src/watch-longview.ts",
+    find: ".sort((a, b) => EVENT_PRIORITY[a.kind] - EVENT_PRIORITY[b.kind] || a.idx - b.idx)",
+    replace: ".sort((a, b) => a.idx - b.idx)",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
