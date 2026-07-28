@@ -19,6 +19,14 @@ interface CacheEntry {
 
 let writeWarned = false;
 
+/** Judge calls this process paid for vs. answered from disk — the cost
+ * question every long run gets asked ("wie teuer war das jetzt?"). */
+const stats = { fresh: 0, cached: 0 };
+
+export function judgeCallStats(): { fresh: number; cached: number } {
+  return { ...stats };
+}
+
 /**
  * Same prompt + same engine + same tool version → same answer, from disk.
  * Makes re-runs deterministic and free; LLM nondeterminism only ever happens
@@ -40,12 +48,14 @@ export function withVerdictCache(engine: JudgeEngine): JudgeEngine {
             entry.engine === engine.name &&
             typeof entry.response === "string"
           ) {
+            stats.cached++;
             return entry.response;
           }
         } catch {
           // cache miss
         }
       }
+      stats.fresh++;
       const response = await engine.judge(prompt);
       if (file) {
         try {

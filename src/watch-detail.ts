@@ -209,7 +209,7 @@ function releasesTable(history: CheckedRelease[], root: string): string {
           }</span>`
         : "";
       return `<tr class="${h.flagged ? "flagged" : ""}">
-<td>${h.flagged ? "&#9888;" : "&#10003;"}</td>
+<td${h.backfilled ? ` title="backfilled — checked after the fact${h.flagged ? "; flagged on record, never alerted" : ""}"` : ""}>${h.flagged ? "&#9888;" : "&#10003;"}</td>
 <td><a href="${esc(reportHref(root, h))}">${esc(h.tag)}</a></td>
 <td>${h.publishedAt ? esc(h.publishedAt.slice(0, 10)) : ""}</td>
 <td>${scoreCell(h)}</td>

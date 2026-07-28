@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { withVerdictCache } from "../src/cache.ts";
+import { judgeCallStats, withVerdictCache } from "../src/cache.ts";
 import type { JudgeEngine } from "../src/judge.ts";
 
 // Own cache root: cache.ts resolves XDG_CACHE_HOME at call time.
@@ -25,9 +25,15 @@ function countingEngine(): JudgeEngine & { calls: number } {
 test("a second ask with the same prompt is served from disk", async () => {
   const engine = countingEngine();
   const cached = withVerdictCache(engine);
+  // The stats are process-global (the summary line's data source), so this
+  // test measures deltas — what these two calls added to the balance.
+  const before = judgeCallStats();
   assert.equal(await cached.judge("same prompt"), "answer for same prompt");
   assert.equal(await cached.judge("same prompt"), "answer for same prompt");
   assert.equal(engine.calls, 1);
+  const after = judgeCallStats();
+  assert.equal(after.fresh - before.fresh, 1, "one call was paid for");
+  assert.equal(after.cached - before.cached, 1, "one was answered from disk");
 });
 
 // Silently losing the cache silently loses determinism — the exact shape

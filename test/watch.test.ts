@@ -963,6 +963,38 @@ test("backfill validation: exactly one scope, a real date, known selectors", asy
   );
 });
 
+test("a backfilled flag says it never alerted — on the index row, the feed line and the atom feed", () => {
+  const live = { ...checked("v2", 40, true), checkedAt: "2026-07-28T01:00:00Z" };
+  const back = {
+    ...checked("v1", 45, true),
+    publishedAt: "2026-06-01T00:00:00Z",
+    checkedAt: "2026-07-28T02:00:00Z",
+    backfilled: true,
+  };
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "o/r": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v2",
+        latest: live,
+        history: [back, live],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t", [{ key: "o/r", repo: "o/r" }]);
+  assert.ok(
+    html.includes("flagged on record, never alerted"),
+    "the feed line qualifies the backfilled flag",
+  );
+  // The atom feed is the pull counterpart to --notify: a backfill dumping
+  // 40 "new" entries on a feed reader is exactly the historical alert
+  // noise notify refuses to make. Live checks stay.
+  const xml = toWatchAtomFeed(state, "t", [{ key: "o/r", repo: "o/r" }]);
+  assert.ok(xml.includes(">v2<") || xml.includes("v2 —"), "the live check is in the atom feed");
+  assert.ok(!xml.includes("v1"), "the backfilled check is not");
+});
+
 test("the index states what scores measure — the entry page must not read as a project verdict", () => {
   const state: WatchState = {
     version: 1,

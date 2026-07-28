@@ -301,6 +301,12 @@ const MUTANTS: Mutant[] = [
     find: ".sort((a, b) => EVENT_PRIORITY[a.kind] - EVENT_PRIORITY[b.kind] || a.idx - b.idx)",
     replace: ".sort((a, b) => a.idx - b.idx)",
   },
+  {
+    guard: "the atom feed never publishes backfilled checks as news",
+    file: "src/watch.ts",
+    find: "    .filter(({ h }) => !h.backfilled)\n",
+    replace: "",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

@@ -13,6 +13,7 @@ import {
 } from "./sources/forge.ts";
 import { assertCloneUrl } from "./sources/local.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
+import { judgeCallStats } from "./cache.ts";
 import {
   analyzeRelease,
   loadForgeRelease,
@@ -150,6 +151,13 @@ export interface CheckedRelease {
    * the index then derives the GitHub URL, which is all those states watched.
    */
   releaseUrl?: string;
+  /**
+   * Checked after the fact by `watch backfill`, not by the live loop. A
+   * flagged backfilled check never fired a notification and never will — the
+   * pages say so, and the Atom feed (the pull counterpart to --notify)
+   * skips these entries entirely: historical alerts are noise there too.
+   */
+  backfilled?: boolean;
 }
 
 /** One configured watch entry, for rendering the index: key = label ?? repo. */
@@ -664,9 +672,11 @@ export function toWatchIndexHtml(
     .slice(0, FEED_MAX)
     .map(
       ({ key, h }) =>
-        `<li><span class="when">${h.publishedAt ? esc(h.publishedAt.slice(0, 10)) : esc(h.checkedAt.slice(0, 10))}</span> ${
+        `<li><span class="when">${h.publishedAt ? esc(h.publishedAt.slice(0, 10)) : esc(h.checkedAt.slice(0, 10))}</span> <span${
+          h.backfilled ? ` title="backfilled — checked after the fact${h.flagged ? "; flagged on record, never alerted" : ""}"` : ""
+        }>${
           h.flagged ? "&#9888;" : "&#10003;"
-        } <b>${esc(key.includes("://") ? key.replace(/^\w+:\/\//, "") : key)}</b> <a href="${esc(h.report)}">${esc(h.tag)}</a> <span class="score ${scoreClass(h)}">${h.score}</span> ${esc(h.scoreLabel)}${
+        }</span> <b>${esc(key.includes("://") ? key.replace(/^\w+:\/\//, "") : key)}</b> <a href="${esc(h.report)}">${esc(h.tag)}</a> <span class="score ${scoreClass(h)}">${h.score}</span> ${esc(h.scoreLabel)}${
           h.brokenPromises ? ` <span class="incomplete">${h.brokenPromises} broken promise${h.brokenPromises > 1 ? "s" : ""}</span>` : ""
         }</li>`,
     )
@@ -737,7 +747,7 @@ ${feedRows}
         ? ` <a class="ext" href="${esc(releaseHref)}" target="_blank" rel="noopener" title="release on its forge">&#8599;</a>`
         : "";
       return `<tr class="${l.flagged ? "flagged" : ""}" data-href="${esc(l.report)}" data-repo="${esc(key.toLowerCase())}" data-released="${l.publishedAt ? esc(l.publishedAt) : ""}" data-score="${l.score}" data-flags="${l.criticalFlags * 1000 + l.flagCount}" data-checked="${esc(l.checkedAt)}">
-<td>${l.flagged ? "&#9888;" : "&#10003;"}</td>
+<td${l.backfilled ? ` title="backfilled — checked after the fact${l.flagged ? "; flagged on record, never alerted" : ""}"` : ""}>${l.flagged ? "&#9888;" : "&#10003;"}</td>
 <td>${repoCell(key, repo, url, rs!)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
@@ -908,6 +918,11 @@ export function toWatchAtomFeed(
   const checks = entries
     .filter((e) => e.rs)
     .flatMap(({ key, rs }) => rs!.history.map((h) => ({ key, h })))
+    // A feed reader treats every entry as news. Backfilled checks are the
+    // past — 40 of them arriving at once, several flagged, is exactly the
+    // historical alert noise --notify refuses to make; the pull channel
+    // refuses it too. They stay on the index's own feed section and pages.
+    .filter(({ h }) => !h.backfilled)
     .sort((a, b) => b.h.checkedAt.localeCompare(a.h.checkedAt))
     .slice(0, 50);
   const items = checks.map(({ key, h }) => {
@@ -1173,6 +1188,8 @@ async function checkAndRecord(args: {
   engines: EngineResolver;
   cache: boolean;
   historyLimit: number;
+  /** Marks the CheckedRelease as a backfill result (recorded, never alerted). */
+  backfilled?: boolean;
 }): Promise<CheckOutcome> {
   const { key, rc, rel, repoState, target } = args;
   const { engine, escalate } = await args.engines({
@@ -1304,6 +1321,7 @@ async function checkAndRecord(args: {
     scoreLevel,
     report: `${dirKey}/${base}.html`,
     ...(releaseUrl ? { releaseUrl } : {}),
+    ...(args.backfilled ? { backfilled: true } : {}),
   };
   recordChecked(repoState, checkedRelease, args.historyLimit);
   return { checked: checkedRelease, promises: report.promises, ec, flagged, drifted, jsonPath };
@@ -1466,9 +1484,16 @@ export async function runWatch(
   await saveState(statePath, state);
   const exit = worstExit(codes);
   console.error(
-    `watch: ${config.repos.length} repos · ${checked} new release(s) checked · ${flaggedTotal} flagged · index ${join(reportsDir, "index.html")} · exit ${exit}`,
+    `watch: ${config.repos.length} repos · ${checked} new release(s) checked · ${flaggedTotal} flagged · ${judgeBalance()}index ${join(reportsDir, "index.html")} · exit ${exit}`,
   );
   return exit;
+}
+
+/** The run's judge bill, for the summary line — the cost question every
+ * long run gets asked. Empty when no judge ran (deterministic-only). */
+function judgeBalance(): string {
+  const { fresh, cached } = judgeCallStats();
+  return fresh || cached ? `judge calls: ${fresh} fresh · ${cached} from cache · ` : "";
 }
 
 /** One listing page — GitHub and the forges both speak 100 per page. */
@@ -1750,6 +1775,7 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
               engines,
               cache: opts.cache,
               historyLimit,
+              backfilled: true,
             });
             break;
           } catch (err) {
@@ -1801,7 +1827,7 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
   await saveState(statePath, state);
   const exit = worstExit(codes);
   console.error(
-    `backfill: ${checked} release(s) checked · ${flaggedTotal} flagged (recorded, never notified) · ${gaveUp} given up · index ${join(reportsDir, "index.html")} · exit ${exit}`,
+    `backfill: ${checked} release(s) checked · ${flaggedTotal} flagged (recorded, never notified) · ${gaveUp} given up · ${judgeBalance()}index ${join(reportsDir, "index.html")} · exit ${exit}`,
   );
   return exit;
 }

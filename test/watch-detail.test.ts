@@ -290,6 +290,17 @@ test("history page omits the skipped section when nothing was skipped", () => {
   assert.ok(!html.includes("Unchecked releases"));
 });
 
+test("a backfilled check in the releases table says it never alerted", () => {
+  const history = [
+    check("v1", 45, { flagged: true, backfilled: true }),
+    check("v2", 90),
+  ];
+  const html = toRepoDetailHtml(ENTRY, state(history), null, "t");
+  assert.ok(html.includes("flagged on record, never alerted"));
+  const clean = toRepoDetailHtml(ENTRY, state([check("v2", 90)]), null, "t");
+  assert.ok(!clean.includes("backfilled"), "live-only histories carry no qualifier");
+});
+
 test("the history page footer states what scores measure", () => {
   const html = toRepoDetailHtml(ENTRY, state([check("v1", 45)]), null, "2026-07-28T00:00:00Z");
   assert.ok(html.includes("not project quality, and never people"));
