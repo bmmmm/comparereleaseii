@@ -13,13 +13,11 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 - **The first live backfill taught three lessons, applied the same hour.** A backfilled check is now marked as such in the state (`backfilled`), and everywhere its flag appears — index row, feed line, releases table — the tooltip says "flagged on record, never alerted", because an operator seeing a red historical row will otherwise ask why no notification ever came (traefik v3.7.7 did exactly that in the first run). The Atom feed skips backfilled checks entirely: a feed reader treats every entry as news, and forty historical entries arriving at once — several flagged — is precisely the noise `--notify` refuses to make; the pull channel now refuses it too (mutation-guarded). And both `watch` and `backfill` close their summary with the judge bill — "judge calls: N fresh · M from cache" — so "was hat das jetzt gekostet?" is answered by the run itself instead of by counting cache files.
 
+- **The dashboard and every history page state what the scores measure.** A watch instance served publicly shows red rows next to real project names, and the entry page never said what the number means — a visitor could read "45 · flagged" as a verdict on the project. Both pages now carry the framing the author section always had, as one line: scores measure how well the release notes match the shipped diff — not project quality, and never people; every number links to the full evidence behind it.
+
 ### Changed
 
 - **On the dashboard, the repo name now opens that repo's history page; the forge moved to a small ↗ after the name.** The most valuable drilldown — the full score series, verdict composition, promise and author ledgers — hid behind a small gray "history" link at the row's end, while the most prominent click in the row left the site toward the forge. The name is the internal drilldown now (the common dashboard idiom), the forge sits one small arrow behind it exactly like the release column's, and the trailing "history" link is gone. Waiting rows — no checks, no history page yet — keep the forge link on the name.
-
-### Added
-
-- **The dashboard and every history page state what the scores measure.** A watch instance served publicly shows red rows next to real project names, and the entry page never said what the number means — a visitor could read "45 · flagged" as a verdict on the project. Both pages now carry the framing the author section always had, as one line: scores measure how well the release notes match the shipped diff — not project quality, and never people; every number links to the full evidence behind it.
 
 ## 0.5.1 — 2026-07-28
 
