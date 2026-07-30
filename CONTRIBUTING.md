@@ -45,6 +45,7 @@ that way — a dependency needs a strong argument.
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
 | `src/watch.ts` | Watch mode: state file, per-repo runs, dashboard index, `--notify` |
 | `src/watch-state.ts` | What a check records and the rules that move the state — flagging, drift, ledgers. No I/O |
+| `src/watch-index.ts` | The dashboard across all watched repos and its Atom feed |
 | `src/watch-detail.ts` | Per-repo history page: score series, verdict composition, promise ledger |
 | `src/watch-longview.ts` | Long-view sections of the history page: phases, event log, yearly strips, calendar |
 | `src/watchlist.ts` | `watch init/add/remove/list` — build the repo list from your GitHub account |

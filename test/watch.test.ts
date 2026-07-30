@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runWatch, runBackfill, sanitizeTag, toWatchIndexHtml, toWatchAtomFeed } from "../src/watch.ts";
+import { runWatch, runBackfill, sanitizeTag } from "../src/watch.ts";
+import { toWatchIndexHtml, toWatchAtomFeed } from "../src/watch-index.ts";
 import { runNotify } from "../src/util.ts";
 import {
   countSkipped,

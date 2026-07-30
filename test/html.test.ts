@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { toHtml } from "../src/html.ts";
-import { toWatchIndexHtml } from "../src/watch.ts";
+import { toWatchIndexHtml } from "../src/watch-index.ts";
 import type { ClaimResult, Report } from "../src/types.ts";
 
 // `git check-ref-format refs/tags/<this>` returns 0, and the GitHub release
