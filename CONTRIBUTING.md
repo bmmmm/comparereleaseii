@@ -26,6 +26,7 @@ that way — a dependency needs a strong argument.
 | Path | Responsibility |
 |---|---|
 | `src/cli.ts` | Flags, orchestration, `--estimate` |
+| `src/estimate.ts` | `--estimate`: what a check would cost, measured by running the pipeline against a counting stub |
 | `src/check.ts` | One release end to end — shared by the CLI and watch mode |
 | `src/sources/github.ts` | Release data via `gh`, compare API, truncation fallback |
 | `src/sources/local.ts` | Local git ranges, CHANGELOG section extraction, unified-diff parsing |

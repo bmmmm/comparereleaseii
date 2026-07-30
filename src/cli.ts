@@ -5,8 +5,7 @@ import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { VERSION } from "./paths.ts";
-import { parseClaims } from "./claims.ts";
-import { resolveEngines, discoverLocalModels, type JudgeEngine } from "./judge.ts";
+import { resolveEngines, discoverLocalModels } from "./judge.ts";
 import {
   runCalibration,
   printCalibration,
@@ -17,8 +16,7 @@ import {
   loadReference,
 } from "./calibrate.ts";
 import { commandExists } from "./util.ts";
-import { verifyClaims, computeCoverage } from "./verify.ts";
-import { suggestNotes } from "./suggest.ts";
+import { printEstimate } from "./estimate.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
 import {
@@ -401,68 +399,15 @@ async function main(): Promise<number> {
   }
 
   if (values.estimate) {
-    const claims = parseClaims(data.notes);
-    if (!claims.length) {
-      throw new Error("No claims found in the release notes — nothing to check.");
-    }
-    const est = { calls: 0, chars: 0 };
-    const stub: JudgeEngine = {
-      name: "estimate",
-      judge: async (p: string) => {
-        est.calls++;
-        est.chars += p.length;
-        return '{"verdict":"partial","confidence":0.5,"files":[],"reasoning":"(estimate)"}';
-      },
-    };
-    const results = await verifyClaims(data, claims, {
+    return printEstimate(data, {
       judgeMode: judgeMode === "off" ? "auto" : judgeMode,
-      engine: stub,
-      concurrency: 8,
-      maxHunks: 6,
-      maxEvidenceChars: 20000,
+      concurrency,
+      baseline,
+      localPath: Boolean(localPath),
+      suggest: Boolean(values.suggest),
+      noReverse: Boolean(values["no-reverse"]),
+      suggestLimit,
     });
-    const change = results.filter((r) => r.claim.kind === "change");
-    const generated = results.filter((r) => r.generated).length;
-
-    let suggestTargets = 0;
-    if (values.suggest && !values["no-reverse"]) {
-      // Reuse the same stub engine so its draft calls land in est.calls/chars —
-      // the printed cost already covers --suggest, not just claim verification.
-      const coverage = await computeCoverage(data, claims, results);
-      suggestTargets = Math.min(coverage.uncovered.length, suggestLimit);
-      await suggestNotes(data, coverage.uncovered, {
-        engine: stub,
-        concurrency: 8,
-        limit: suggestLimit,
-        maxEvidenceChars: 20000,
-      });
-    }
-
-    const inTokens = Math.round(est.chars / 4);
-    const reserve = Math.ceil(est.calls * 0.5);
-    const timeMin = ((est.calls + reserve / 2) * 10) / concurrency / 60;
-    const apiCost = (inTokens / 1e6) * 1.0 + ((est.calls * 300) / 1e6) * 5.0;
-    console.log(`\nCost estimate — ${data.repoLabel} ${data.baseRef} → ${data.headRef}`);
-    console.log(`  Diff: ${data.commits.length} commits, ${data.files.length} files, ±${data.files.reduce((s, f) => s + f.additions + f.deletions, 0)} lines`);
-    console.log(`  Claims: ${results.length} total — ${change.length} checkable (${generated} generated), ${results.length - change.length} informational`);
-    if (values.suggest) {
-      console.log(
-        values["no-reverse"]
-          ? `  --suggest: no-op (--no-reverse disables the completeness check it drafts for)`
-          : `  --suggest: up to ${suggestTargets} undocumented commit(s) drafted (--suggest-limit ${values["suggest-limit"]}), included below`,
-      );
-    }
-    console.log(`  LLM judge calls (auto): ${est.calls}, plus up to ${reserve} for retrieval rounds / second opinions`);
-    console.log(`  Est. input ~${(inTokens / 1000).toFixed(0)}k tokens · wall clock ~${timeMin < 1 ? "<1" : timeMin.toFixed(0)} min via claude-cli · API cost ≈ $${apiCost.toFixed(2)} (haiku)`);
-    if (localPath) {
-      console.log(
-        `  Baseline: ${values.baseline} past release(s) diffed out of the clone — no API, but a blobless clone fetches their file contents on demand, so budget roughly one head-sized diff each.`,
-      );
-    } else {
-      console.log(`  GitHub API calls: ~${3 + data.commits.length + 2 * baseline} (compare, per-commit diffs, baseline)`);
-    }
-    console.log(`  Verdict cache: repeated runs on unchanged data are free and deterministic.`);
-    return 0;
   }
 
   const settings: CheckSettings = {
