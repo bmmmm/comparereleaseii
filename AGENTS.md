@@ -37,6 +37,7 @@ not add a dependency, a build step, or a framework.
 | `src/metrics.ts` | Score, risk flags, per-file coverage |
 | `src/report.ts` | Terminal/markdown output, exit codes |
 | `src/html.ts` | HTML report |
+| `src/theme.ts` | Score buckets and their colors — the boundaries every renderer and the terminal share |
 | `src/history.ts` | Timeline, baseline |
 | `src/promises.ts` | Forward-looking notes from earlier releases checked against this diff |
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |

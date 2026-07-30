@@ -5,9 +5,9 @@ import {
   isBotAuthor,
   reportDirOf,
   reportNavFor,
-  scoreClass,
   toRepoDetailHtml,
 } from "../src/watch-detail.ts";
+import { scoreClass } from "../src/theme.ts";
 import { STALE_AFTER } from "../src/promises.ts";
 import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch-state.ts";
 import type { PromiseCheck } from "../src/types.ts";

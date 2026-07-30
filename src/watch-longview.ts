@@ -6,7 +6,7 @@
 // Everything here derives deterministically from the watch state: no judge,
 // no network — which is what makes the detections unit-testable.
 import { esc } from "./util.ts";
-import { scoreClass } from "./watch-detail.ts";
+import { scoreClass } from "./theme.ts";
 import type { AuthorRecord, CheckedRelease, RepoState } from "./watch-state.ts";
 
 /** Below this many checks the score chart already tells the whole story. */

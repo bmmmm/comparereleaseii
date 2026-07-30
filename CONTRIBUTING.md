@@ -39,6 +39,7 @@ that way — a dependency needs a strong argument.
 | `src/metrics.ts` | Trust score, risk flags, per-file coverage |
 | `src/report.ts` | Terminal and markdown output, exit codes |
 | `src/html.ts` | Self-contained HTML report |
+| `src/theme.ts` | Score buckets and their colors — the boundaries every renderer and the terminal share |
 | `src/history.ts` | Release timeline and anomaly baseline |
 | `src/promises.ts` | Promise tracking — forward-looking notes checked against later releases |
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |

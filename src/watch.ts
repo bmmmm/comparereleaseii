@@ -14,6 +14,7 @@ import { assertCloneUrl } from "./sources/local.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
 import { judgeCallStats, resetJudgeStats } from "./cache.ts";
 import { esc, runNotify } from "./util.ts";
+import { SCORE_MINOR, SCORE_SOLID, scoreClass } from "./theme.ts";
 import {
   analyzeRelease,
   loadForgeRelease,
@@ -96,15 +97,19 @@ export function toWatchIndexHtml(
   const flaggedCount = withData.filter((e) => e.rs!.latest!.flagged).length;
   // Unverified gets its own bucket, not folded into "mid" — a capped 65 for
   // "could not be checked" must not look like a genuinely scored 65-84.
-  const scoreClass = (h: { score: number; scoreLabel: string }) =>
-    h.scoreLabel === "unverified" ? "unverified" : h.score >= 85 ? "good" : h.score >= 65 ? "mid" : "bad";
+  const bucketOf = (h: { score: number; scoreLabel: string }) => scoreClass(h.score, h.scoreLabel);
   const latest = withData.map((e) => e.rs!.latest!);
   const brokenTotal = latest.reduce((s, l) => s + (l.brokenPromises ?? 0), 0);
   // Score distribution across the CURRENT state of every repo — the shape of
   // the whole watchlist at a glance, in the same buckets the rows use.
   const dist = { good: 0, mid: 0, bad: 0, unverified: 0 };
-  for (const l of latest) dist[scoreClass(l) as keyof typeof dist]++;
-  const DIST_LABEL = { good: "85+", mid: "65–84", bad: "&lt;65", unverified: "unverified" };
+  for (const l of latest) dist[bucketOf(l) as keyof typeof dist]++;
+  const DIST_LABEL = {
+    good: `${SCORE_SOLID}+`,
+    mid: `${SCORE_MINOR}–${SCORE_SOLID - 1}`,
+    bad: `&lt;${SCORE_MINOR}`,
+    unverified: "unverified",
+  };
   const distBar = latest.length
     ? `<div class="dist" role="img" aria-label="score distribution">${(
         Object.keys(dist) as Array<keyof typeof dist>
@@ -140,7 +145,7 @@ export function toWatchIndexHtml(
           h.backfilled ? ` title="backfilled — checked after the fact${h.flagged ? "; flagged on record, never alerted" : ""}"` : ""
         }>${
           h.flagged ? "&#9888;" : "&#10003;"
-        }</span> <b>${esc(key.includes("://") ? key.replace(/^\w+:\/\//, "") : key)}</b> <a href="${esc(h.report)}">${esc(h.tag)}</a> <span class="score ${scoreClass(h)}">${h.score}</span> ${esc(h.scoreLabel)}${
+        }</span> <b>${esc(key.includes("://") ? key.replace(/^\w+:\/\//, "") : key)}</b> <a href="${esc(h.report)}">${esc(h.tag)}</a> <span class="score ${bucketOf(h)}">${h.score}</span> ${esc(h.scoreLabel)}${
           h.brokenPromises ? ` <span class="incomplete">${h.brokenPromises} broken promise${h.brokenPromises > 1 ? "s" : ""}</span>` : ""
         }</li>`,
     )
@@ -195,7 +200,7 @@ ${feedRows}
               .slice(-6)
               .map(
                 (h) =>
-                  `<a href="${esc(h.report)}" title="${esc(h.tag)}: ${h.score}"><span class="dot ${scoreClass(h)}"></span></a>`,
+                  `<a href="${esc(h.report)}" title="${esc(h.tag)}: ${h.score}"><span class="dot ${bucketOf(h)}"></span></a>`,
               )
               .join("")
           : "";
@@ -215,7 +220,7 @@ ${feedRows}
 <td>${repoCell(key, repo, url, rs!)}</td>
 <td><a href="${esc(l.report)}">${esc(l.tag)}</a>${releaseUrl}</td>
 <td>${l.publishedAt ? esc(l.publishedAt.slice(0, 10)) : ""}</td>
-<td><span class="score ${scoreClass(l)}" title="judge: ${esc(l.engine)}${
+<td><span class="score ${bucketOf(l)}" title="judge: ${esc(l.engine)}${
         typeof l.scoreLevel === "number" ? ` · this repo's median: ${l.scoreLevel}` : ""
       }">${l.score}</span> ${esc(l.scoreLabel)}${
         typeof l.scoreLevel === "number" && l.score < l.scoreLevel - 20

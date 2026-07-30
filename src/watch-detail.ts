@@ -7,6 +7,7 @@
 import { join, relative } from "node:path";
 import { safeSegment } from "./paths.ts";
 import { esc } from "./util.ts";
+import { CLASS_COLOR, scoreClass } from "./theme.ts";
 import { STALE_AFTER } from "./promises.ts";
 import { longviewSections } from "./watch-longview.ts";
 import type { ReportNav } from "./html.ts";
@@ -56,20 +57,6 @@ export function reportDirOf(rs: { latest?: { report: string } }, key: string): s
   }
   return safeSegment(key);
 }
-
-/** Same buckets the index uses — a capped "unverified" is never a mid score. */
-export function scoreClass(score: number, label: string): string {
-  return label === "unverified" ? "unverified" : score >= 85 ? "good" : score >= 65 ? "mid" : "bad";
-}
-
-// Status colors, shared with the index dots; identity is never color-alone —
-// every mark carries a tooltip and the table repeats the numbers as text.
-const CLASS_COLOR: Record<string, string> = {
-  good: "#1a7f37",
-  mid: "#d4a72c",
-  bad: "#cf222e",
-  unverified: "#8250df",
-};
 
 const VERDICT_SERIES = [
   { key: "verified", symbol: "✔", color: "#3fb950" },

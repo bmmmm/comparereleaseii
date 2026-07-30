@@ -15,6 +15,7 @@ import type {
   Unverifiable,
 } from "./types.ts";
 import type { Coverage } from "./verify.ts";
+import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
 import { authorKey, type Baseline } from "./history.ts";
 import { hunkFunctions, isChangelogPath } from "./match.ts";
 
@@ -720,7 +721,13 @@ export function computeScores(
     };
   }
   const label =
-    overall >= 85 ? "solid" : overall >= 65 ? "minor gaps" : overall >= 45 ? "questionable" : "suspicious";
+    overall >= SCORE_SOLID
+      ? "solid"
+      : overall >= SCORE_MINOR
+        ? "minor gaps"
+        : overall >= SCORE_QUESTIONABLE
+          ? "questionable"
+          : "suspicious";
   return { correctness, completeness, risk, overall, label };
 }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { createHash } from "node:crypto";
 import { esc } from "./util.ts";
+import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
 import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
 import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
@@ -196,11 +197,11 @@ function treemapSvg(files: FileInsight[], compareUrl?: string, anchors = true): 
 function scoreColor(score: number, label: string): string {
   return label === "unverified"
     ? "#a371f7"
-    : score >= 85
+    : score >= SCORE_SOLID
       ? "#3fb950"
-      : score >= 65
+      : score >= SCORE_MINOR
         ? "#d29922"
-        : score >= 45
+        : score >= SCORE_QUESTIONABLE
           ? "#f0883e"
           : "#f85149";
 }

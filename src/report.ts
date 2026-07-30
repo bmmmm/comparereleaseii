@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { c, stripControl } from "./util.ts";
+import { SCORE_MINOR, SCORE_SOLID } from "./theme.ts";
 import type { ClaimResult, Report, UnverifiableKind, Verdict } from "./types.ts";
 
 // Everything printed to the terminal that originated outside this tool —
@@ -152,7 +153,13 @@ export function printTerminal(report: Report): void {
   // 65-84 renders in — a capped "we don't know" must not read as "checked,
   // minor gaps" just because it landed on the same number.
   const scoreColor =
-    s.label === "unverified" ? c.cyan : s.overall >= 85 ? c.green : s.overall >= 65 ? c.yellow : c.red;
+    s.label === "unverified"
+      ? c.cyan
+      : s.overall >= SCORE_SOLID
+        ? c.green
+        : s.overall >= SCORE_MINOR
+          ? c.yellow
+          : c.red;
   console.log(
     `${c.bold("Trust score:")} ${scoreColor(`${s.overall}/100 (${s.label})`)} — ` +
       c.dim(
