@@ -18,7 +18,7 @@ $ comparerelease watch --config watch.json
 restic/restic: up to date (v0.19.1)
 juanfont/headscale: checking v0.30.0…
 juanfont/headscale: v0.30.0 → score 94 (solid)
-watch: 4 repos · 1 new release(s) checked · 0 flagged · index reports/index.html · exit 0
+watch: 4 repos · 1 new release(s) checked · 0 flagged · judge calls: 3 fresh · 0 from cache · index reports/index.html · exit 0
 ```
 
 Each checked release writes `reports/<repo>/<tag>.{html,md,json}` and
@@ -47,6 +47,8 @@ serve the reports directory and any feed reader can subscribe).
 A state file remembers the last checked release per repo (default:
 `$XDG_STATE_HOME/comparereleaseii/watch-state.json`, i.e.
 `~/.local/state/…` — override with `stateFile` in the config or `--state`).
+The reports directory works the same way: `reportsDir` in the config, or
+`--reports <dir>` on the command line.
 
 - First run per repo: only the latest release is checked (no backfill
   surprise).

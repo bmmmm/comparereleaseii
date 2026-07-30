@@ -137,7 +137,8 @@ because the release commit's message is the one thing worth writing by hand.
 The template asks for claims, real command output, a failing test, contract
 confirmations, risk, and scope. Fill it in and the review is mechanical.
 
-Two automated jobs run, and **neither can fail your build**:
+One automated job runs, in two steps, and **neither can fail your build**
+(GitHub reports the status per job, so you will see a single check):
 
 - **pr intake** — reads the description and posts a checklist of what is still
   open, so the reviewer sees the state at a glance.
