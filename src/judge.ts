@@ -2,7 +2,7 @@
 import { tmpdir } from "node:os";
 import { commandExists, run } from "./util.ts";
 import { withVerdictCache } from "./cache.ts";
-import type { SurplusItem, Verdict } from "./types.ts";
+import type { JudgedVerdict, SurplusItem } from "./types.ts";
 
 export interface JudgeEngine {
   name: string;
@@ -10,7 +10,7 @@ export interface JudgeEngine {
 }
 
 export interface JudgeVerdict {
-  verdict: Verdict;
+  verdict: JudgedVerdict;
   confidence: number;
   files: string[];
   reasoning: string;
@@ -282,7 +282,7 @@ export async function resolveEngines(
   return { engine: primary, escalate: second };
 }
 
-const VERDICTS: Record<string, Verdict> = {
+const VERDICTS: Record<string, JudgedVerdict> = {
   verified: "verified",
   partial: "partial",
   no_evidence: "no-evidence",

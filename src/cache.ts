@@ -28,6 +28,16 @@ export function judgeCallStats(): { fresh: number; cached: number } {
 }
 
 /**
+ * Starts a run's bill at zero. The counters are process-global, so a second
+ * run in the same process — two watch modes from one test, a backfill after a
+ * poll — would otherwise report the first run's calls as its own.
+ */
+export function resetJudgeStats(): void {
+  stats.fresh = 0;
+  stats.cached = 0;
+}
+
+/**
  * Same prompt + same engine + same tool version → same answer, from disk.
  * Makes re-runs deterministic and free; LLM nondeterminism only ever happens
  * once per distinct question. The version is part of the key so an upgrade

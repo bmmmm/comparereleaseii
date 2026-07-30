@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { judgeCallStats, withVerdictCache } from "../src/cache.ts";
+import { judgeCallStats, resetJudgeStats, withVerdictCache } from "../src/cache.ts";
 import type { JudgeEngine } from "../src/judge.ts";
 
 // Own cache root: cache.ts resolves XDG_CACHE_HOME at call time.
@@ -34,6 +34,20 @@ test("a second ask with the same prompt is served from disk", async () => {
   const after = judgeCallStats();
   assert.equal(after.fresh - before.fresh, 1, "one call was paid for");
   assert.equal(after.cached - before.cached, 1, "one was answered from disk");
+});
+
+test("a run's bill starts at zero — the counters do not carry over", async () => {
+  const cached = withVerdictCache(countingEngine());
+  await cached.judge("bill prompt one");
+  await cached.judge("bill prompt two");
+  assert.ok(judgeCallStats().fresh >= 2, "calls landed on the balance");
+
+  // What a second runWatch/runBackfill in the same process does before it
+  // starts counting — without this it reports the first run's calls as its own.
+  resetJudgeStats();
+  assert.deepEqual(judgeCallStats(), { fresh: 0, cached: 0 });
+  await cached.judge("bill prompt three");
+  assert.equal(judgeCallStats().fresh, 1, "the new run counts only its own");
 });
 
 // Silently losing the cache silently loses determinism — the exact shape

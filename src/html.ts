@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { createHash } from "node:crypto";
+import { esc } from "./util.ts";
 import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
 import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
@@ -7,15 +8,6 @@ import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
 function diffAnchor(path: string): string {
   return "diff-" + createHash("sha256").update(path).digest("hex");
-}
-
-function esc(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 type LinkStyle = "github" | "gitlab";

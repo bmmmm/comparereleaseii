@@ -6,6 +6,7 @@
 // plus the promise ledger with its carry countdowns.
 import { join, relative } from "node:path";
 import { safeSegment } from "./paths.ts";
+import { esc } from "./util.ts";
 import { STALE_AFTER } from "./promises.ts";
 import { longviewSections } from "./watch-longview.ts";
 import type { ReportNav } from "./html.ts";
@@ -13,14 +14,6 @@ import type { PromiseCheck } from "./types.ts";
 import type { AuthorRecord, CheckedRelease, RepoState, SkippedRelease, WatchedEntry } from "./watch.ts";
 import { BASELINE_WINDOW, MAX_CHECK_ATTEMPTS } from "./watch.ts";
 
-/**
- * Where a repo's reports live, relative to the reports root — derived from
- * the stored report path so states written before the sanitized layout keep
- * their nested directories (the history page must land where the index
- * links, and its relative links must climb the right number of levels).
- * Falls back to the sanitized key; a stored path whose segments could
- * escape the root is not trusted.
- */
 /**
  * A report's links back to its history page and to the dashboard. Computed
  * rather than assumed: under the legacy nested layout the history page keeps
@@ -39,6 +32,14 @@ export function reportNavFor(
   };
 }
 
+/**
+ * Where a repo's reports live, relative to the reports root — derived from
+ * the stored report path so states written before the sanitized layout keep
+ * their nested directories (the history page must land where the index
+ * links, and its relative links must climb the right number of levels).
+ * Falls back to the sanitized key; a stored path whose segments could
+ * escape the root is not trusted.
+ */
 export function reportDirOf(rs: { latest?: { report: string } }, key: string): string {
   const rel = rs.latest?.report ?? "";
   if (rel.includes("/")) {
@@ -47,15 +48,6 @@ export function reportDirOf(rs: { latest?: { report: string } }, key: string): s
     if (segments.every((s) => s && s !== "." && s !== ".." && !s.includes("\\"))) return dir;
   }
   return safeSegment(key);
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 /** Same buckets the index uses — a capped "unverified" is never a mid score. */

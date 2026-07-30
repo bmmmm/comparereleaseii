@@ -5,6 +5,7 @@
 // regime question no score line answers (the xz pattern IS a regime change).
 // Everything here derives deterministically from the watch state: no judge,
 // no network — which is what makes the detections unit-testable.
+import { esc } from "./util.ts";
 import { scoreClass } from "./watch-detail.ts";
 import type { AuthorRecord, CheckedRelease, RepoState } from "./watch.ts";
 
@@ -289,15 +290,6 @@ export function selectEvents(events: LongviewEvent[]): { shown: LongviewEvent[];
     .slice(0, EVENTS_MAX)
     .sort((a, b) => a.idx - b.idx || a.kind.localeCompare(b.kind));
   return { shown, dropped: events.length - EVENTS_MAX };
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 const EVENT_LABEL: Record<EventKind, string> = {

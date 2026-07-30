@@ -13,7 +13,8 @@ import {
 } from "./sources/forge.ts";
 import { assertCloneUrl } from "./sources/local.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
-import { judgeCallStats } from "./cache.ts";
+import { judgeCallStats, resetJudgeStats } from "./cache.ts";
+import { esc } from "./util.ts";
 import {
   analyzeRelease,
   loadForgeRelease,
@@ -597,15 +598,6 @@ export function hasDrifted(history: Array<{ score: number }>): boolean {
 /** Worst exit code of the batch: 2 (errors) > 1 (failed gate) > 0. */
 export function worstExit(codes: number[]): number {
   return codes.reduce((worst, c) => Math.max(worst, c), 0);
-}
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 /** Self-contained watch overview: one row per watched repo, red rows first,
@@ -1341,6 +1333,7 @@ export async function runWatch(
   },
 ): Promise<number> {
   validateWatchConfig(config);
+  resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
   const notifyCmd = opts.notify ?? config.notify;
   const historyLimit = config.historyLimit ?? DEFAULT_HISTORY_LIMIT;
@@ -1636,6 +1629,7 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
   if (opts.since !== undefined && !/^\d{4}-\d{2}-\d{2}/.test(opts.since)) {
     throw new Error(`--since must be a date like 2024-01-01 (got "${opts.since}").`);
   }
+  resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
   const historyLimit = config.historyLimit ?? DEFAULT_HISTORY_LIMIT;
   const state = await loadState(statePath);

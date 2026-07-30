@@ -163,3 +163,16 @@ export const c = {
   dim: ansi("2"),
   cyan: ansi("36"),
 };
+
+/**
+ * HTML text escaping for the generated pages. Ampersand first, or the
+ * entities the later rules introduce get escaped a second time.
+ */
+export function esc(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}

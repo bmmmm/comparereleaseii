@@ -4,6 +4,14 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **The judge bill counts one run, not the process.** The counters behind
+  `judge calls: N fresh · M from cache` are process-global and were never
+  reset, so a second run in the same process — a backfill after a poll, two
+  watch modes in one test — reported the first run's calls as its own. Both
+  entry points now start their bill at zero.
+
 ### Added
 
 - **A watch report is no longer a dead end.** The generated site reads

@@ -108,6 +108,14 @@ export type Verdict =
   | "contradicted"
   | "skipped";
 
+/**
+ * What a judge can actually answer. `skipped` is bookkeeping the pipeline
+ * assigns itself — meta claims, text carried over from an earlier release —
+ * and no judge ever produces it, so the vote-resolution code must not have
+ * to pretend it might.
+ */
+export type JudgedVerdict = Exclude<Verdict, "skipped">;
+
 export type MatchMethod =
   | "pr-anchor"
   | "sha-anchor"

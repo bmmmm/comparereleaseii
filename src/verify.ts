@@ -96,7 +96,6 @@ interface Pending {
 const SEVERITY: Record<JudgeVerdict["verdict"], number> = {
   verified: 0,
   partial: 1,
-  skipped: 1,
   "no-evidence": 2,
   contradicted: 3,
 };
