@@ -41,12 +41,13 @@ not add a dependency, a build step, or a framework.
 | `src/promises.ts` | Forward-looking notes from earlier releases checked against this diff |
 | `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
 | `src/watch.ts` | Watch mode: state, per-repo runs, dashboard index, `--notify` |
+| `src/watch-state.ts` | What a check records and the rules that move the state — flagging, drift, ledgers. No I/O |
 | `src/watch-detail.ts` | Per-repo history page: score series, verdict composition, promise ledger |
 | `src/watch-longview.ts` | Long-view sections of the history page: phases, event log, yearly strips, calendar |
 | `src/watchlist.ts` | `watch init/add/remove/list` — repo list from your GitHub account |
 | `src/setup.ts` | `watch setup` — interactive home dir, judge + calibration gate, schedule file, notify |
 | `src/guidelines.ts` | `guidelines` — agent checklist extracted from `docs/` |
-| `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction |
+| `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction, HTML escaping, the notify hook |
 | `src/types.ts` | Data model — read this first |
 
 ## Rules

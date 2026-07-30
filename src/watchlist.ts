@@ -8,7 +8,7 @@ import { ghApi } from "./sources/github.ts";
 import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
 import { assertCloneUrl } from "./sources/local.ts";
 import { c, stripControl } from "./util.ts";
-import type { WatchConfig } from "./watch.ts";
+import type { WatchConfig } from "./watch-state.ts";
 
 export type CandidateSource = "watched" | "starred" | "notifications";
 

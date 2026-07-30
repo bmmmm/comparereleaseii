@@ -11,8 +11,15 @@ import { STALE_AFTER } from "./promises.ts";
 import { longviewSections } from "./watch-longview.ts";
 import type { ReportNav } from "./html.ts";
 import type { PromiseCheck } from "./types.ts";
-import type { AuthorRecord, CheckedRelease, RepoState, SkippedRelease, WatchedEntry } from "./watch.ts";
-import { BASELINE_WINDOW, MAX_CHECK_ATTEMPTS } from "./watch.ts";
+import {
+  BASELINE_WINDOW,
+  MAX_CHECK_ATTEMPTS,
+  type AuthorRecord,
+  type CheckedRelease,
+  type RepoState,
+  type SkippedRelease,
+  type WatchedEntry,
+} from "./watch-state.ts";
 
 /**
  * A report's links back to its history page and to the dashboard. Computed

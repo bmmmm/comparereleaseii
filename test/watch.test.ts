@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { runWatch, runBackfill, sanitizeTag, toWatchIndexHtml, toWatchAtomFeed } from "../src/watch.ts";
+import { runNotify } from "../src/util.ts";
 import {
   countSkipped,
   pickNewReleases,
@@ -8,15 +10,9 @@ import {
   isFlagged,
   hasDrifted,
   releaseWebUrl,
-  runNotify,
-  runWatch,
-  runBackfill,
-  sanitizeTag,
   scoreBaseline,
   baselineLevel,
   worstExit,
-  toWatchIndexHtml,
-  toWatchAtomFeed,
   carriedFromLedger,
   capLedger,
   updateAuthorLedger,
@@ -32,7 +28,7 @@ import {
   type WatchState,
   type CheckedRelease,
   type RepoState,
-} from "../src/watch.ts";
+} from "../src/watch-state.ts";
 import type { PromiseCheck } from "../src/types.ts";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";

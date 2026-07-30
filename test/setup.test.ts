@@ -12,7 +12,7 @@ import {
   launchdRunner,
   scheduleSpec,
 } from "../src/setup.ts";
-import type { WatchRepoConfig } from "../src/watch.ts";
+import type { WatchRepoConfig } from "../src/watch-state.ts";
 
 test("scheduleSpec: hours, minutes and daily; nonsense and sub-5m refused", () => {
   assert.deepEqual(scheduleSpec("6h"), { seconds: 21_600, cron: "17 */6 * * *" });

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { access, constants } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 
@@ -175,4 +175,29 @@ export function esc(s: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+/**
+ * `cmd` is the operator's own shell string — running it is the feature. The
+ * report path is not: it carries a repo key and a tag, both from the config
+ * and the forge. It is therefore passed as a positional argument and read back
+ * as `"$1"`, never interpolated — the shell parses the operator's command and
+ * nothing else. Writing `${cmd} ${jsonPath}` here would hand a crafted tag a
+ * shell; the two sanitizers upstream (`safeSegment`, `sanitizeTag`) would then
+ * be the only thing left, and defence in depth is the point.
+ */
+export function runNotify(cmd: string, jsonPath: string): Promise<boolean> {
+  return new Promise((done) => {
+    const child = spawn("sh", ["-c", `${cmd} "$1"`, "sh", jsonPath], {
+      stdio: ["ignore", "inherit", "inherit"],
+    });
+    child.on("close", (code) => {
+      if (code !== 0) console.error(`warning: notify command exited with ${code}`);
+      done(code === 0);
+    });
+    child.on("error", (err) => {
+      console.error(`warning: notify command failed to start: ${err.message}`);
+      done(false);
+    });
+  });
 }

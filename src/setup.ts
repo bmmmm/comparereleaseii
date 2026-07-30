@@ -18,7 +18,8 @@ import { commandExists, c } from "./util.ts";
 import { ghApi } from "./sources/github.ts";
 import { discoverLocalModels } from "./judge.ts";
 import { calibrateModels, gateCalibration, printCalibration, loadReference } from "./calibrate.ts";
-import { runNotify, type WatchConfig, type WatchRepoConfig, type WatchState } from "./watch.ts";
+import { runNotify } from "./util.ts";
+import type { WatchConfig, WatchRepoConfig, WatchState } from "./watch-state.ts";
 import { addRepos, addRepoUrl, loadConfig, probeForgeUrl, saveConfig, REPO_RE } from "./watchlist.ts";
 
 /** One judge this machine offers, in recommendation order. */

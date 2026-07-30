@@ -14,7 +14,7 @@ import {
   saveConfig,
   type RepoCandidate,
 } from "../src/watchlist.ts";
-import type { WatchConfig } from "../src/watch.ts";
+import type { WatchConfig } from "../src/watch-state.ts";
 
 function cand(repo: string, extra: Partial<RepoCandidate> = {}): RepoCandidate {
   return {

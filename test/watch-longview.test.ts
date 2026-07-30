@@ -10,7 +10,7 @@ import {
   type LongviewEvent,
 } from "../src/watch-longview.ts";
 import { toRepoDetailHtml } from "../src/watch-detail.ts";
-import type { CheckedRelease, RepoState } from "../src/watch.ts";
+import type { CheckedRelease, RepoState } from "../src/watch-state.ts";
 
 /** Monthly cadence by default; index drives tag and date. */
 function check(i: number, score: number, over: Partial<CheckedRelease> = {}): CheckedRelease {

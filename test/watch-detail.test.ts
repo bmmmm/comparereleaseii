@@ -9,7 +9,7 @@ import {
   toRepoDetailHtml,
 } from "../src/watch-detail.ts";
 import { STALE_AFTER } from "../src/promises.ts";
-import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch.ts";
+import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch-state.ts";
 import type { PromiseCheck } from "../src/types.ts";
 
 const ENTRY: WatchedEntry = { key: "o/r", repo: "o/r" };
