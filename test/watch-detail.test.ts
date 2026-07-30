@@ -166,6 +166,22 @@ test("hostile tags, notes and paths stay text everywhere on the page", () => {
   assert.ok(!html.includes("<script>alert"), "promise text stays text");
 });
 
+test("the releases table links each release to its forge, like the dashboard does", () => {
+  const history = [
+    check("v1", 90, { releaseUrl: "https://forge.example/o/r/releases/tag/v1" }),
+    check("v2", 80),
+  ];
+  const html = toRepoDetailHtml(ENTRY, state(history), null, "t");
+  assert.ok(
+    html.includes('href="https://forge.example/o/r/releases/tag/v1"'),
+    "the stored release URL is rendered",
+  );
+  // A check recorded before the URL was stored simply has no arrow — the row
+  // still lists the release and links its report.
+  assert.equal(html.match(/class="ext"/g)?.length, 1);
+  assert.ok(html.includes("../o-r/v2.html"), "the report link is untouched");
+});
+
 test("the page links back to the index and out to the repo", () => {
   const html = toRepoDetailHtml(
     { key: "o/r", repo: "o/r" },

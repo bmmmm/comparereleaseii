@@ -14,6 +14,12 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **The history page links each release to its forge.** Every check stores the
+  release URL, but only the dashboard read it — the page that lists the same
+  releases, one per row, sent nobody to the source. The releases table now
+  carries the same small ↗ the dashboard's release column has; a check
+  recorded before the URL was stored simply renders without it.
+
 - **A watch report is no longer a dead end.** The generated site reads
   dashboard → history page → report, and the report was the one page with no
   way back: the history page has carried `← all watched repos` since 0.5.0,

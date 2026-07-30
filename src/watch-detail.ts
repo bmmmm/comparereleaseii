@@ -201,6 +201,16 @@ function scoreCell(h: CheckedRelease): string {
   return `<span class="score ${cls}">${h.score}</span> ${esc(h.scoreLabel)}${drop}${partial}${broken}`;
 }
 
+/**
+ * The small ↗ to the release on its forge, exactly as the dashboard's release
+ * column carries it. Every check stores the URL; only the index used to read
+ * it, so the page listing the same releases sent nobody to the source.
+ */
+function forgeLink(h: CheckedRelease): string {
+  if (!h.releaseUrl) return "";
+  return ` <a class="ext" href="${esc(h.releaseUrl)}" target="_blank" rel="noopener" title="release on its forge">&#8599;</a>`;
+}
+
 function releasesTable(history: CheckedRelease[], root: string): string {
   const rows = [...history]
     .reverse()
@@ -216,7 +226,7 @@ function releasesTable(history: CheckedRelease[], root: string): string {
         : "";
       return `<tr class="${h.flagged ? "flagged" : ""}">
 <td${h.backfilled ? ` title="backfilled — checked after the fact${h.flagged ? "; flagged on record, never alerted" : ""}"` : ""}>${h.flagged ? "&#9888;" : "&#10003;"}</td>
-<td><a href="${esc(reportHref(root, h))}">${esc(h.tag)}</a></td>
+<td><a href="${esc(reportHref(root, h))}">${esc(h.tag)}</a>${forgeLink(h)}</td>
 <td>${h.publishedAt ? esc(h.publishedAt.slice(0, 10)) : ""}</td>
 <td>${scoreCell(h)}</td>
 <td class="comp">${comp}</td>
@@ -391,6 +401,7 @@ table.heat{width:auto}
 .heat td.m.good{background:#1a7f37}.heat td.m.mid{background:#9a6700}.heat td.m.bad{background:#cf222e}.heat td.m.unverified{background:#8250df}
 .chip{color:#fff;font-weight:700;font-size:11px;padding:1px 7px;border-radius:9px;margin-right:6px;text-shadow:0 0 2px rgba(0,0,0,.35)}
 .files{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace}
+a.ext{font-size:.85em}
 .note{color:var(--muted);font-size:12px;font-weight:400;text-transform:none;letter-spacing:0}
 footer{margin-top:28px;color:var(--faint);font-size:12px}
 </style></head><body>
