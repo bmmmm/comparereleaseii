@@ -4,9 +4,11 @@
 // this repo been doing" — the full score series, verdict composition and
 // flag history the state already carries but the six trend dots cannot show,
 // plus the promise ledger with its carry countdowns.
+import { join, relative } from "node:path";
 import { safeSegment } from "./paths.ts";
 import { STALE_AFTER } from "./promises.ts";
 import { longviewSections } from "./watch-longview.ts";
+import type { ReportNav } from "./html.ts";
 import type { PromiseCheck } from "./types.ts";
 import type { AuthorRecord, CheckedRelease, RepoState, SkippedRelease, WatchedEntry } from "./watch.ts";
 import { BASELINE_WINDOW, MAX_CHECK_ATTEMPTS } from "./watch.ts";
@@ -19,6 +21,24 @@ import { BASELINE_WINDOW, MAX_CHECK_ATTEMPTS } from "./watch.ts";
  * Falls back to the sanitized key; a stored path whose segments could
  * escape the root is not trusted.
  */
+/**
+ * A report's links back to its history page and to the dashboard. Computed
+ * rather than assumed: under the legacy nested layout the history page keeps
+ * the stored directory while new reports land in the sanitized one, so the
+ * two are not always siblings.
+ */
+export function reportNavFor(
+  reportsDir: string,
+  reportDir: string,
+  rs: { latest?: { report: string } },
+  key: string,
+): ReportNav {
+  return {
+    historyHref: relative(reportDir, join(reportsDir, reportDirOf(rs, key), "index.html")),
+    indexHref: relative(reportDir, join(reportsDir, "index.html")),
+  };
+}
+
 export function reportDirOf(rs: { latest?: { report: string } }, key: string): string {
   const rel = rs.latest?.report ?? "";
   if (rel.includes("/")) {

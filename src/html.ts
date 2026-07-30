@@ -380,7 +380,20 @@ function fmtBytes(n: number): string {
   return `${n} B`;
 }
 
-export function toHtml(report: Report): string {
+/**
+ * A watch-written report's way back into the generated site. Both links
+ * depend only on where the file sits, which cannot change for a file that
+ * already exists — so a report stays navigable without ever being rewritten.
+ * A one-off CLI report has neither page to link to and omits the nav.
+ */
+export interface ReportNav {
+  /** This repo's history page, relative to the report's own directory. */
+  historyHref: string;
+  /** The watch dashboard, relative to the report's own directory. */
+  indexHref: string;
+}
+
+export function toHtml(report: Report, nav?: ReportNav): string {
   const m = report.metrics;
   const note = unverifiableNote(report);
   const carried = carriedOver(report);
@@ -474,7 +487,11 @@ table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--bo
 footer{margin-top:32px;color:var(--faint);font-size:12px}
 </style></head><body>
 <h1>Release-note fact check — ${esc(report.repoLabel)}</h1>
-<div class="sub">${esc(report.baseRef)} → ${esc(report.headRef)} · ${report.stats.commits} commits · ${report.stats.files} files · +${report.stats.additions}/−${report.stats.deletions} · judge: ${esc(report.engine)}</div>
+${
+  nav
+    ? `<p class="sub"><a href="${esc(nav.historyHref)}">&larr; this repo's history</a> · <a href="${esc(nav.indexHref)}">all watched repos</a></p>\n`
+    : ""
+}<div class="sub">${esc(report.baseRef)} → ${esc(report.headRef)} · ${report.stats.commits} commits · ${report.stats.files} files · +${report.stats.additions}/−${report.stats.deletions} · judge: ${esc(report.engine)}</div>
 
 <div class="cards">
   ${scoreRing(s.overall, s.label)}
@@ -510,7 +527,7 @@ ${waterfallSvg(scoreBreakdown(report), s.label)}
 <h2>Claims at a glance</h2>
 ${verdictBar(report)}
 
-<h2>Risk flags</h2>
+<h2 id="risk-flags">Risk flags</h2>
 ${flagsHtml(m.flags, report.linkBase, style)}
 
 <h2>Diff map <span class="note">— tile = file, size = changed lines, color = documentation status, amber border = sensitive path${compareUrl ? ", click opens the diff" : ""}</span></h2>

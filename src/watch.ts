@@ -26,7 +26,7 @@ import {
 import { githubHistory } from "./history.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
-import { reportDirOf, toRepoDetailHtml } from "./watch-detail.ts";
+import { reportDirOf, reportNavFor, toRepoDetailHtml } from "./watch-detail.ts";
 import { safeSegment } from "./paths.ts";
 
 import type { AuthorActivity, PromiseCheck, UnverifiableKind } from "./types.ts";
@@ -1248,7 +1248,10 @@ async function checkAndRecord(args: {
   const jsonPath = join(dir, `${base}.json`);
   await writeFile(jsonPath, JSON.stringify(report, null, 2));
   await writeFile(join(dir, `${base}.md`), toMarkdown(report));
-  await writeFile(join(dir, `${base}.html`), toHtml(report));
+  await writeFile(
+    join(dir, `${base}.html`),
+    toHtml(report, reportNavFor(args.reportsDir, dir, repoState, key)),
+  );
 
   // Watch default is lenient: honest releases often carry unprovable
   // claims (private advisories) — alerting on every one is fatigue.

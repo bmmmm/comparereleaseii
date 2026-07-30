@@ -4,6 +4,22 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **A watch report is no longer a dead end.** The generated site reads
+  dashboard → history page → report, and the report was the one page with no
+  way back: the history page has carried `← all watched repos` since 0.5.0,
+  but a report — the page most likely to be shared as a link — offered only
+  the browser's back button. Every watch-written report now opens with
+  `← this repo's history · all watched repos`, and the Risk flags section
+  gained an `id` so a specific finding can be linked directly. The links are
+  computed from where the file sits (the history page keeps the stored
+  directory under the legacy nested layout, so the two are not always
+  siblings) and depend on nothing else — a report that already exists can
+  never see them go stale, which is what keeps this out of the regeneration
+  pass that the index, feed and history pages need. A one-off `--html` report
+  has neither page to link to and carries no nav.
+
 ## 0.6.0 — 2026-07-29
 
 ### Added

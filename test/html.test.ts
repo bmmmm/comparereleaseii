@@ -282,3 +282,24 @@ test("a flag-free release never shows a phantom ±0.0 deduction", () => {
   );
   assert.ok(capped.includes(">−18<"), "0.45 × 40 renders as −18, not −18.0");
 });
+
+test("a watch report links back to its history page and the dashboard", () => {
+  const html = toHtml(report(), { historyHref: "index.html", indexHref: "../index.html" });
+  assert.ok(html.includes('<a href="index.html">&larr; this repo\'s history</a>'));
+  assert.ok(html.includes('<a href="../index.html">all watched repos</a>'));
+  assert.ok(html.includes('id="risk-flags"'), "the flags section is linkable on its own");
+});
+
+test("a one-off CLI report carries no nav — neither page exists for it", () => {
+  const html = toHtml(report());
+  assert.ok(!html.includes("all watched repos"));
+  assert.ok(!html.includes("this repo&#39;s history") && !html.includes("this repo's history"));
+});
+
+test("a hostile nav href cannot break out of its link", () => {
+  const html = toHtml(report(), {
+    historyHref: `"><img/src=x/onerror=alert(1)>`,
+    indexHref: "../index.html",
+  });
+  assertNoBreakout(html);
+});

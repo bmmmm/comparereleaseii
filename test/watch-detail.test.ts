@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isBotAuthor, reportDirOf, scoreClass, toRepoDetailHtml } from "../src/watch-detail.ts";
+import {
+  isBotAuthor,
+  reportDirOf,
+  reportNavFor,
+  scoreClass,
+  toRepoDetailHtml,
+} from "../src/watch-detail.ts";
 import { STALE_AFTER } from "../src/promises.ts";
 import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch.ts";
 import type { PromiseCheck } from "../src/types.ts";
@@ -187,6 +193,25 @@ test("reportDirOf keeps a legacy nested layout and rejects escape attempts", () 
   );
   assert.equal(reportDirOf({ latest: { report: "../evil/v1.html" } }, "o/r"), "o_r");
   assert.equal(reportDirOf({}, "o/r"), "o_r");
+});
+
+test("a report's nav points at its own history page and the dashboard", () => {
+  const nav = reportNavFor("/r", "/r/o_r", { latest: { report: "o_r/v1.html" } }, "o/r");
+  assert.equal(nav.historyHref, "index.html", "the history page is the report's sibling");
+  assert.equal(nav.indexHref, "../index.html");
+});
+
+test("a report's nav finds a history page the legacy layout left elsewhere", () => {
+  // The state was written nested, so the history page stays there while a new
+  // report lands in the sanitized directory — siblings they are not.
+  const nav = reportNavFor(
+    "/r",
+    "/r/zen-browser_desktop",
+    { latest: { report: "zen-browser/desktop/v1.html" } },
+    "zen-browser/desktop",
+  );
+  assert.equal(nav.historyHref, "../zen-browser/desktop/index.html");
+  assert.equal(nav.indexHref, "../index.html");
 });
 
 test("a legacy nested layout climbs the right number of levels", () => {
