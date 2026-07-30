@@ -62,6 +62,14 @@ All notable changes to comparereleaseii are documented here. The format follows 
   naming the file and the fix. Verified behaviour-neutral by measurement: the
   dashboard, the Atom feed and a history page rendered from a stored state come
   out byte-identical to what the code before the series produced.
+- **The mutation harness followed the code it guards.** Its 48 mutants pin a
+  code pattern to a file path, so moving code out of `watch.ts`, `html.ts` and
+  into the new modules left 15 of them pointing at text that was no longer
+  there. The harness says so and stops rather than reporting a kill it never
+  made — which is the behaviour that matters, since a mutant that cannot find
+  its pattern silently guards nothing. All 15 were repointed (none had lost its
+  target; every guard still has one) and the full run is back to 48/48 killed.
+
 - Documentation caught up with the code: `docs/watchdog.md`'s example transcript
   predated the judge bill 0.6.0 added to every summary line, never mentioned
   `--reports` beside the `reportsDir` config key it documents, and
