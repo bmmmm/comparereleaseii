@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Build and maintain the watch-config repo list from the user's own GitHub
 // account: watched repos, stars, recent release notifications.
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { ghApi } from "./sources/github.ts";
 import { fetchForgeReleases, parseRepoUrl } from "./sources/forge.ts";
 import { assertCloneUrl } from "./sources/local.ts";
-import { c, stripControl } from "./util.ts";
+import { c, stripControl, writeJsonAtomic } from "./util.ts";
 import type { WatchConfig } from "./watch-state.ts";
 
 export type CandidateSource = "watched" | "starred" | "notifications";
@@ -193,6 +193,22 @@ async function enrichCandidates(candidates: RepoCandidate[]): Promise<void> {
 
 const CONFIG_SHAPE_HINT = 'expected a JSON object with a "repos" array — see docs/watchdog.md';
 
+/**
+ * The run paths need a config that is actually there: `watch add` may create
+ * one, but a watch or backfill run has nothing to do without it. Shares
+ * loadConfig's parsing and shape check, which the two hand-rolled readers
+ * these replaced never had.
+ */
+export async function requireConfig(path: string): Promise<WatchConfig> {
+  const { config, existed } = await loadConfig(path);
+  if (!existed) {
+    throw new Error(
+      `Cannot read watch config ${path} (no such file) — see docs/watchdog.md for the format.`,
+    );
+  }
+  return config;
+}
+
 export async function loadConfig(
   path: string,
 ): Promise<{ config: WatchConfig; existed: boolean }> {
@@ -221,11 +237,8 @@ export async function loadConfig(
   return { config, existed: true };
 }
 
-export async function saveConfig(path: string, config: WatchConfig): Promise<void> {
-  const tmp = `${path}.tmp`;
-  await writeFile(tmp, JSON.stringify(config, null, 2) + "\n");
-  await rename(tmp, path);
-}
+export const saveConfig = (path: string, config: WatchConfig): Promise<void> =>
+  writeJsonAtomic(path, config, true);
 
 function printCandidates(candidates: RepoCandidate[]): void {
   const numWidth = String(candidates.length).length;

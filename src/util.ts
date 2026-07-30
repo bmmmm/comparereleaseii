@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { execFile, spawn } from "node:child_process";
-import { access, constants } from "node:fs/promises";
+import { access, constants, mkdir, rename, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { delimiter, join } from "node:path";
 
 /** PATH lookup without spawning — instant, no side effects. */
@@ -200,4 +201,20 @@ export function runNotify(cmd: string, jsonPath: string): Promise<boolean> {
       done(false);
     });
   });
+}
+
+/**
+ * Write JSON where a crash must not leave a half-written file behind: the
+ * whole document goes to a sibling first, then one rename, which is atomic
+ * within a filesystem. `trailingNewline` for files a human opens in an editor.
+ */
+export async function writeJsonAtomic(
+  path: string,
+  value: unknown,
+  trailingNewline = false,
+): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp`;
+  await writeFile(tmp, JSON.stringify(value, null, 2) + (trailingNewline ? "\n" : ""));
+  await rename(tmp, path);
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -13,7 +13,7 @@ import {
 import { assertCloneUrl } from "./sources/local.ts";
 import { resolveEngines, type EngineOptions } from "./judge.ts";
 import { judgeCallStats, resetJudgeStats } from "./cache.ts";
-import { esc, runNotify } from "./util.ts";
+import { esc, runNotify, writeJsonAtomic } from "./util.ts";
 import { SCORE_MINOR, SCORE_SOLID, scoreClass } from "./theme.ts";
 import {
   analyzeRelease,
@@ -446,12 +446,8 @@ async function loadState(path: string): Promise<WatchState> {
   }
 }
 
-async function saveState(path: string, state: WatchState): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp`;
-  await writeFile(tmp, JSON.stringify(state, null, 2));
-  await rename(tmp, path);
-}
+const saveState = (path: string, state: WatchState): Promise<void> =>
+  writeJsonAtomic(path, state);
 
 export function sanitizeTag(tag: string): string {
   const base = tag.replace(/[^\w.@-]+/g, "_");

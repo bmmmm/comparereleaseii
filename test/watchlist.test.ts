@@ -11,6 +11,7 @@ import {
   addRepoUrl,
   removeRepo,
   loadConfig,
+  requireConfig,
   saveConfig,
   type RepoCandidate,
 } from "../src/watchlist.ts";
@@ -154,6 +155,22 @@ test("loadConfig: rejects non-object configs and non-array repos instead of coer
     await writeFile(path, bad);
     await assert.rejects(loadConfig(path), /not a watch config/);
   }
+});
+
+test("requireConfig: a run needs a config that exists, and one shaped like a config", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+  // loadConfig tolerates a missing file — `watch add` creates one. A run does
+  // not: it has nothing to do, and the message has to say where to look.
+  await assert.rejects(
+    requireConfig(join(dir, "absent.json")),
+    /no such file.*docs\/watchdog\.md/,
+  );
+  const bad = join(dir, "bad.json");
+  await writeFile(bad, '["a/x"]');
+  await assert.rejects(requireConfig(bad), /not a watch config/);
+  const good = join(dir, "good.json");
+  await writeFile(good, '{"repos":[{"repo":"a/x"}]}');
+  assert.deepEqual((await requireConfig(good)).repos, [{ repo: "a/x" }]);
 });
 
 test("loadConfig: missing repos key becomes an empty array, keys survive", async () => {

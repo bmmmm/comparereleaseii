@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { parseArgs } from "node:util";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { VERSION } from "./paths.ts";
@@ -38,7 +38,13 @@ import {
   type RepoLink,
 } from "./check.ts";
 import { runWatch, runBackfill } from "./watch.ts";
-import { runWatchInit, runWatchAdd, runWatchRemove, runWatchList } from "./watchlist.ts";
+import {
+  requireConfig,
+  runWatchInit,
+  runWatchAdd,
+  runWatchRemove,
+  runWatchList,
+} from "./watchlist.ts";
 import { runWatchSetup } from "./setup.ts";
 import { loadGuidelines } from "./guidelines.ts";
 import type { Report } from "./types.ts";
@@ -529,19 +535,7 @@ async function runWatchCli(argv: string[]): Promise<number> {
     console.log(USAGE);
     return values.help ? 0 : 2;
   }
-  const raw = await readFile(values.config, "utf8").catch((err) => {
-    throw new Error(
-      `Cannot read watch config ${values.config} (${(err as Error).message}) — see docs/watchdog.md for the format.`,
-    );
-  });
-  let config;
-  try {
-    config = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(
-      `Watch config ${values.config} is not valid JSON: ${(err as Error).message}`,
-    );
-  }
+  const config = await requireConfig(values.config);
   return runWatch(config, {
     configPath: values.config,
     notify: values.notify,
@@ -572,17 +566,7 @@ async function runWatchBackfillCli(argv: string[]): Promise<number> {
   }
   const releases =
     values.releases === undefined ? undefined : intFlag("releases", values.releases, 1);
-  const raw = await readFile(values.config, "utf8").catch((err) => {
-    throw new Error(
-      `Cannot read watch config ${values.config} (${(err as Error).message}) — see docs/watchdog.md for the format.`,
-    );
-  });
-  let config;
-  try {
-    config = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(`Watch config ${values.config} is not valid JSON: ${(err as Error).message}`);
-  }
+  const config = await requireConfig(values.config);
   return runBackfill(config, {
     configPath: values.config,
     stateFile: values.state,
