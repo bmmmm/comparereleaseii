@@ -34,6 +34,44 @@ All notable changes to comparereleaseii are documented here. The format follows 
   pass that the index, feed and history pages need. A one-off `--html` report
   has neither page to link to and carries no nav.
 
+### Changed
+
+- **The watch module was three modules in one file, and two of them held a
+  cycle.** `watch.ts` had grown to 1836 lines carrying the rules that move the
+  watch state, a static site generator, and the orchestration that does the
+  I/O. The state algebra moved to `watch-state.ts` (566 lines, no I/O at all,
+  so every flagging and drift rule is directly testable) and the dashboard plus
+  its Atom feed to `watch-index.ts`; `watch.ts` is 918 lines and polls, checks,
+  records and writes. That dissolved a real cycle at value level, not merely
+  between types: `watch.ts` imported `reportDirOf` and `toRepoDetailHtml` from
+  `watch-detail.ts`, which imported `BASELINE_WINDOW` and `MAX_CHECK_ATTEMPTS`
+  back out of `watch.ts`, with `watch-longview.ts` closing a second edge — no
+  module under `src/` imports `watch.ts` any more. A second cycle between the
+  two renderers went with `theme.ts`, which now owns the score boundaries that
+  had been spelled out five times (the label in `metrics.ts`, the report's hex,
+  the terminal's ANSI, and `scoreClass` twice with incompatible signatures).
+  `deps.ts` takes the 265-line dependency-manifest parser out of `metrics.ts`,
+  which knows nothing about scoring, and `estimate.ts` takes `--estimate`'s
+  cost arithmetic out of the argument parser. `esc()` existed four times
+  byte-identically and now lives once in `util.ts`, alongside `runNotify` —
+  which `setup.ts` was pulling the entire watch import graph in to reach — and
+  `writeJsonAtomic`, the write-then-rename dance `saveState` and `saveConfig`
+  each spelled out. Both CLI run paths read their config through
+  `requireConfig` instead of two verbatim copies of a hand-rolled reader, so a
+  config that parses but is not shaped like one fails at the CLI boundary
+  naming the file and the fix. Verified behaviour-neutral by measurement: the
+  dashboard, the Atom feed and a history page rendered from a stored state come
+  out byte-identical to what the code before the series produced.
+- Documentation caught up with the code: `docs/watchdog.md`'s example transcript
+  predated the judge bill 0.6.0 added to every summary line, never mentioned
+  `--reports` beside the `reportsDir` config key it documents, and
+  CONTRIBUTING.md promised two automated PR checks where `pr-intake.yml` has one
+  job with two steps — which is what a contributor actually sees, since GitHub
+  reports status per job.
+- `@types/node` 26.1.1 → 26.1.2. `packageManager` deliberately stays on
+  pnpm 11.13.0: 11.18.0 is out, but the pin matches the pnpm installed here,
+  and moving one without the other is the drift the pin exists to prevent.
+
 ## 0.6.0 — 2026-07-29
 
 ### Added
