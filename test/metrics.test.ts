@@ -3,8 +3,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   sensitiveCategory,
-  newDependencies,
-  opacityIssue,
   computeScores,
   scoreBreakdown,
   authorActivity,
@@ -14,8 +12,8 @@ import {
   demoteUnsupportedFlag,
   buildFlags,
   baselineFlags,
-  lockfileSources,
 } from "../src/metrics.ts";
+import { lockfileSources, newDependencies, opacityIssue } from "../src/deps.ts";
 import { layoutTreemap } from "../src/html.ts";
 import type { ClaimResult, Commit, DiffFile, FileInsight, ReleaseData, Report, RiskFlag } from "../src/types.ts";
 import type { Baseline } from "../src/history.ts";
