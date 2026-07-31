@@ -77,8 +77,12 @@ All notable changes to comparereleaseii are documented here. The format follows 
   job with two steps — which is what a contributor actually sees, since GitHub
   reports status per job.
 - `@types/node` 26.1.1 → 26.1.2. `packageManager` deliberately stays on
-  pnpm 11.13.0: 11.18.0 is out, but the pin matches the pnpm installed here,
-  and moving one without the other is the drift the pin exists to prevent.
+  pnpm 11.13.0 — not because a bump would need anything installed alongside it
+  (pnpm here is a corepack shim, so the pin *is* the version, fetched on
+  demand), but because it is one of several repos pinning pnpm and they have
+  already drifted into two groups. Worth settling together, and worth settling
+  on the pinned-with-hash form the other group uses, since corepack verifies
+  that and a bare version string gives it nothing to check.
 
 ## 0.6.0 — 2026-07-29
 
