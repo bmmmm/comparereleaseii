@@ -76,13 +76,15 @@ All notable changes to comparereleaseii are documented here. The format follows 
   CONTRIBUTING.md promised two automated PR checks where `pr-intake.yml` has one
   job with two steps — which is what a contributor actually sees, since GitHub
   reports status per job.
-- `@types/node` 26.1.1 → 26.1.2. `packageManager` deliberately stays on
-  pnpm 11.13.0 — not because a bump would need anything installed alongside it
-  (pnpm here is a corepack shim, so the pin *is* the version, fetched on
-  demand), but because it is one of several repos pinning pnpm and they have
-  already drifted into two groups. Worth settling together, and worth settling
-  on the pinned-with-hash form the other group uses, since corepack verifies
-  that and a bare version string gives it nothing to check.
+- `@types/node` 26.1.1 → 26.1.2, and `packageManager` moves to
+  `pnpm@11.17.0` **with its `+sha512` hash** — the form corepack can actually
+  verify against the downloaded tarball, where the bare version string it
+  carried before gave corepack nothing to check. 11.17.0 rather than the newer
+  11.18.0 on purpose: a pnpm release serves the same three-day cooldown this
+  repo's `minimumReleaseAge` demands of every dependency, and 11.18.0 was two
+  days old. The version is no longer this repo's own choice — it is the norm
+  recorded once for every repo here, and drift against it is measurable rather
+  than a thing someone has to remember.
 
 ## 0.6.0 — 2026-07-29
 
