@@ -596,6 +596,115 @@ checks.
 
 ---
 
+## Next — the second axis: what actually shipped (2026-08-02)
+
+Context: the OpenCloud walkthrough exposed two structural limits at once.
+(1) **Product ≠ repo.** opencloud-eu/opencloud pins its entire frontend as
+one Makefile line — `WEB_ASSETS_VERSION = v7.2.0` in `services/web/Makefile`,
+downloaded as a release tarball, not a go.mod entry — so a whole frontend
+release enters the server's diff as a one-line bump and the check never sees
+its substance. `deps.ts` cannot see it twice over: it only parses dependency
+manifests, and it deliberately filters version bumps (`known` set,
+`sameSupplier`) because for third-party deps a bump is routine. For a
+first-party component the bump *is* the release. (2) **The completeness
+direction still stands on commit messages.** `subjectCovered` (verify.ts)
+marks a commit covered at ≥ 0.45 subject similarity, and the report
+describes uncovered commits by their subjects — claims describing claims;
+only `--suggest` reads the hunks. This is the founding thesis ("notes are
+claims") not yet applied to our own reverse direction.
+
+Decisions (settled with the user 2026-08-02):
+
+- **Second axis, not a pivot.** A diff-substance report ("what actually
+  shipped") becomes an equal deliverable next to the notes fact-check. The
+  trust score and the claims ladder stay; both axes share the pipeline and
+  the cache, and coverage eventually ends on diff findings instead of
+  subjects.
+- **Deterministic first, LLM later.** Mechanics are testable,
+  mutation-guardable and free; the LLM reads only what mechanics
+  prioritized. Every new stage lands score-neutral until measured — the 4.1
+  constraint stands (single-sample deltas under ~10 points are noise).
+- **The judge never sees commit messages while reading diff substance.**
+  Feeding it the message anchors it on the claim — the changelog-circularity
+  rule (iteration 2.2), generalized. Messages and notes join *late*, as a
+  reconciliation layer: confirmed (claimed + observed), undocumented
+  (observed, never claimed — the interesting signal), unsupported (claimed,
+  never observed).
+- **Audience is a property of the finding AND of the repo.** Findings carry
+  "who is affected" (deploy/config → admin, api → integrator, ui → end
+  user, security surface → everyone, with urgency). The default lens is per
+  repo, not global — a hosting service like OpenCloud has no real power-user
+  audience, vaultwarden reads security+selfhosting. Which profile fits which
+  watchlist repo is an explicit pre-block analysis (S4a), not a guess.
+- **Casual consumers are not an audience** — they do not decide updates.
+- **Third-party bumps are never expanded** (explosion). Optional later, as
+  its own decision: OSV advisory enrichment ("this bump closes CVE-…") —
+  keyless, local-first-compatible.
+
+### S1 — version-pin delta + first-party detection
+Every changed line that bumps a version pin becomes a structured object
+`(name, from, to, file)`: dependency manifests (reuse deps.ts parsing — the
+bump data is currently discarded on purpose) plus plain-text pins the
+OpenCloud shape needs — `NAME_VERSION = vX.Y.Z` Makefile variables,
+Dockerfile `FROM`/`ARG` tags, versioned download URLs in scripts. Classify
+first-party (pin target shares the checked repo's org/owner, or is listed in
+a per-repo `components` config) vs third-party. New report/JSON section,
+score-neutral. **Done when:** the OpenCloud server release that bumps
+`WEB_ASSETS_VERSION` reports "web v7.1.0 → v7.2.0, first-party, release
+link", and a routine third-party go.mod bump stays one quiet line.
+
+### S2 — mechanical substance layer
+Deterministic surface deltas from the release diff, no LLM: changed symbols
+from hunk headers (git's xfuncname gives function names for free), file-
+category rollup, config surface (new/removed config keys, env-var reads,
+CLI flags, helm/compose defaults), DB migrations, API-route files. The
+uncovered-commit output describes changes by observed surface, not by
+subject + churn alone. **Done when:** a `--judge off` run on any source
+yields a "what actually shipped" section listing surfaces touched, and the
+uncovered list carries observed-surface descriptions.
+
+### S3 — first-party expansion: the product graph
+A first-party pin bump triggers a sub-check of the referenced repo over
+`(from, to)` with the same algorithm, depth 1, through the existing
+clone/cache machinery — if the component repo is on the watchlist its
+analysis is already paid. The parent report links and folds in the child's
+summary: "server v3.x ships web v7.2.0 — its check: …". **Done when:** the
+OpenCloud server release renders the web release's substance inline, and an
+immediate re-run pays zero additional judge calls.
+
+### S4a — audience profiles, measured not guessed (pre-block)
+Before any lens rendering: walk the real watchlist and classify which
+audiences each project type actually has; define the 2–3 profiles that
+cover it (admin/operator, security+selfhosting, end-user-visible); decide
+per-repo `audience:` config with a heuristic proposal vs pure config. Paper
+exercise, lands as a ROADMAP addendum with the profile table.
+
+### S4b — LLM summarization + lenses
+Budget-driven summarization of the hunks S1/S2 prioritized (the tf-idf
+ranking exists) into typed findings — breaking / behavior / security /
+feature / internal, plus affected surface — blind to messages, hierarchical
+(hunk → subsystem → release), generate-to-fit against a hard token budget
+with the remainder declared ("N files not read in detail"), cached per
+(repo, base, head) like verdicts. Render the repo's default lens first,
+others as filters. **Done when:** two runs on a cached release are
+bit-identical, the budget line is printed, and an OpenCloud-shaped release
+reads differently under admin vs end-user lens from the same findings.
+
+### S5 — retire subjectCovered
+Coverage ends on substance: claims reconcile against findings, not against
+commit subjects; `subjectCovered`'s ≥ 0.45 similarity shortcut goes away.
+Score-relevant, so it moves last and under the measurement discipline: two
+arms, independent fresh caches, repeated runs. **Done when:** the A/B names
+what moved and why, and no honest repo in the corpus loses more than the
+noise floor.
+
+Order: S1 → S2 → S3 → S4a → S4b → S5. S1/S2 are additive and score-neutral
+(ship early, they make OpenCloud *visible*); S3 solves it; S4 makes the new
+axis readable; S5 is the only stage that touches scoring and inherits
+everything learned before it.
+
+---
+
 ## Phase 1 — Distribution: from repo to `pnpm dlx` and a GitHub Action
 
 Goal: a stranger goes from zero to a verdict in under a minute, and a
