@@ -138,6 +138,18 @@ informational, never a score component, since a promise is about a later
 release than the one being scored. `watch` carries still-open promises
 across releases until they resolve, or until they age out visibly as stale.
 
+The diff's **version pins** are read as their own signal: manifest bumps
+(go.mod, package.json, Cargo.toml, requirements.txt), `NAME_VERSION`-style
+Makefile variables, Dockerfile `FROM`/`ARG` tags and versioned download URLs
+become `(name, from → to)` entries in the report. A pin whose target shares
+the checked repo's owner — or is declared as a component, `--component
+WEB_ASSETS_VERSION=opencloud-eu/web` (in watch configs: a per-repo
+`components` map) — is **first-party**: that bump is not a routine
+dependency update but a release of the product itself entering as one
+changed line (OpenCloud ships its entire frontend this way), and the report
+links straight to the pinned release. Third-party bumps stay one quiet line
+each. Informational, never scored.
+
 Every run computes an explainable **trust score** (0–100) from correctness,
 completeness and risk. Contradicted claims or critical flags cap it — a fake
 release cannot average itself back to green. With `--baseline <n>` the repo's

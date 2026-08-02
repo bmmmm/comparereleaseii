@@ -38,6 +38,13 @@ export interface WatchRepoConfig {
   includePrerelease?: boolean;
   /** Trust score below which a release is flagged (default 65). */
   notifyBelow?: number;
+  /**
+   * First-party components behind version pins that cannot name their own
+   * repo: pin name → owner/repo (or repository URL), e.g.
+   * `{ "WEB_ASSETS_VERSION": "opencloud-eu/web" }`. Pins that name a repo
+   * themselves (go.mod paths, download URLs) are classified without this.
+   */
+  components?: Record<string, string>;
 }
 
 export interface WatchConfig {

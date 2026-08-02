@@ -4,7 +4,7 @@ import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
 import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
-import type { FileInsight, Report, RiskFlag, Verdict } from "./types.ts";
+import type { FileInsight, PinBump, Report, RiskFlag, Verdict } from "./types.ts";
 
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
 function diffAnchor(path: string): string {
@@ -301,6 +301,30 @@ function verdictBar(report: Report): string {
   return `<div class="bar">${segs}</div><div class="legend">${legend}</div>`;
 }
 
+/** Version pins the diff moves — first-party components as cards, the
+ * third-party routine as one quiet table. */
+function pinsHtml(pins: PinBump[]): string {
+  const firstParty = pins.filter((p) => p.firstParty);
+  const thirdParty = pins.filter((p) => !p.firstParty);
+  const cards = firstParty
+    .map((p) => {
+      const shown = p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
+      return `<div class="flag" style="border-left-color:#58a6ff"><span class="chip" style="background:#58a6ff">first-party</span> <b>${esc(`${shown} ${p.from} → ${p.to}`)}</b>${p.repo ? ` <span class="note">(${esc(p.repo)})</span>` : ""}${p.releaseUrl ? ` — <a href="${esc(p.releaseUrl)}">release</a>` : ""}<div class="files">${esc(p.file)}</div></div>`;
+    })
+    .join("");
+  const rows = thirdParty
+    .map(
+      (p) =>
+        `<tr><td>${esc(p.name)}</td><td>${esc(p.from)} → ${esc(p.to)}</td><td>${esc(p.file)}</td></tr>`,
+    )
+    .join("");
+  return `<h2>Version pins moved <span class="note">— pinned versions this diff bumps; a first-party bump is a release of the product itself; informational, never scored</span></h2>${cards}${
+    thirdParty.length
+      ? `<table><tr><th>pin</th><th>bump</th><th>file</th></tr>${rows}</table>`
+      : ""
+  }`;
+}
+
 function flagsHtml(flags: RiskFlag[], linkBase?: string, style?: LinkStyle): string {
   if (!flags.length) return `<p class="ok">No risk flags.</p>`;
   const sevColor = { critical: "#f85149", warn: "#d29922", info: "#58a6ff" };
@@ -560,6 +584,7 @@ ${
         .join("")}`
     : ""
 }
+${report.pins?.length ? pinsHtml(report.pins) : ""}
 <h2>Undocumented commits</h2>
 ${
   !report.reverseChecked

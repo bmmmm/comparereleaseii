@@ -217,6 +217,29 @@ export function printTerminal(report: Report): void {
     }
   }
 
+  if (report.pins?.length) {
+    const firstParty = report.pins.filter((p) => p.firstParty);
+    const thirdParty = report.pins.filter((p) => !p.firstParty);
+    console.log(
+      c.bold("\nVersion pins moved") +
+        c.dim(` — ${report.pins.length} pinned version(s) bumped in this diff:`),
+    );
+    for (const p of firstParty) {
+      const shown = p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
+      console.log(
+        `  ${c.cyan("↑")} ${safe(`${shown} ${p.from} → ${p.to}`)} ${c.cyan("first-party")}` +
+          (p.repo ? c.dim(` (${safe(p.repo)})`) : ""),
+      );
+      console.log(c.dim(`    ${safe(p.file)}${p.releaseUrl ? ` · ${safe(p.releaseUrl)}` : ""}`));
+    }
+    for (const p of thirdParty.slice(0, 8)) {
+      console.log(c.dim(`  · ${safe(`${p.name} ${p.from} → ${p.to}`)}`));
+    }
+    if (thirdParty.length > 8) {
+      console.log(c.dim(`  … and ${thirdParty.length - 8} more third-party bumps`));
+    }
+  }
+
   if (!report.reverseChecked) {
     console.log(c.dim("\nCompleteness check skipped (--no-reverse)."));
   } else if (report.uncovered.length) {
@@ -304,6 +327,18 @@ export function toMarkdown(report: Report): string {
     for (const p of report.promises) {
       lines.push(`- **${p.status}** (from \`${p.from}\`) ${p.text}`);
       lines.push(`  - ${p.note}${p.files.length ? ` (${p.files.slice(0, 3).join(", ")})` : ""}`);
+    }
+  }
+  if (report.pins?.length) {
+    lines.push("", "## Version pins moved", "");
+    for (const p of report.pins) {
+      const shown = p.firstParty && p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
+      const head = `${shown} ${p.from} → ${p.to}`;
+      lines.push(
+        p.firstParty
+          ? `- **${head} — first-party**${p.repo ? ` (\`${p.repo}\`)` : ""}${p.releaseUrl ? ` — [release](${p.releaseUrl})` : ""} · \`${p.file}\``
+          : `- ${head} (\`${p.file}\`)`,
+      );
     }
   }
   lines.push("", "## Undocumented changes", "");

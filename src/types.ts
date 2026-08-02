@@ -160,6 +160,32 @@ export interface ClaimResult {
   surplus?: SurplusItem[];
 }
 
+/**
+ * One version pin this release moves: a dependency-manifest entry, a
+ * Makefile variable, a Dockerfile tag, a versioned download URL. For a
+ * third-party dependency a bump is routine; for a first-party component the
+ * bump IS a release whose substance lives in the pinned repo, not in this
+ * diff. Informational, never scored.
+ */
+export interface PinBump {
+  /** The pin's own spelling: module path, image path, variable name, owner/repo. */
+  name: string;
+  from: string;
+  to: string;
+  file: string;
+  /** owner/repo the pin demonstrably points at — its own path/URL, or the
+   * components config. Absent when the pin names no repository (a crate, a
+   * pypi package, a bare variable without a config entry). */
+  repo?: string;
+  /** The pinned repo shares the checked repo's owner, or the components
+   * config lists this pin as part of the product. */
+  firstParty: boolean;
+  /** Web page of the bumped-to version. Built only when the repo is known
+   * and the host's URL shape is — github.com, or the checked repo's own
+   * forge. Never guessed for foreign hosts. */
+  releaseUrl?: string;
+}
+
 export interface UncoveredCommit {
   commit: Commit;
   additions: number;
@@ -289,4 +315,6 @@ export interface Report {
   promises?: PromiseCheck[];
   /** Per-identity activity in this release — informational, never scored. */
   authors?: AuthorActivity[];
+  /** Version pins this release moves, first-party components first — informational, never scored. */
+  pins?: PinBump[];
 }

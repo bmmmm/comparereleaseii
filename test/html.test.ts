@@ -303,3 +303,26 @@ test("a hostile nav href cannot break out of its link", () => {
   });
   assertNoBreakout(html);
 });
+
+test("the pins section renders first-party cards and keeps hostile pin names inert", () => {
+  const html = toHtml(
+    report({
+      pins: [
+        { name: HOSTILE, from: "1.0", to: "1.1", file: "Makefile", firstParty: true },
+        {
+          name: "github.com/rs/zerolog",
+          from: "v1.31.0",
+          to: "v1.32.0",
+          file: "go.mod",
+          firstParty: false,
+        },
+      ],
+    }),
+  );
+  assert.match(html, /Version pins moved/);
+  assert.match(html, /first-party/);
+  assert.match(html, /zerolog/);
+  assertNoBreakout(html);
+  // No pins, no section.
+  assert.ok(!toHtml(report()).includes("Version pins moved"));
+});

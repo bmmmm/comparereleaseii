@@ -37,6 +37,7 @@ not add a dependency, a build step, or a framework.
 | `src/paths.ts` | Build version, the private cache directory and its vetting, path-segment sanitizer |
 | `src/metrics.ts` | Score, risk flags, per-file coverage |
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
+| `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL bumps, first-party classification |
 | `src/report.ts` | Terminal/markdown output, exit codes |
 | `src/html.ts` | HTML report |
 | `src/theme.ts` | Score buckets and their colors — the boundaries every renderer and the terminal share |

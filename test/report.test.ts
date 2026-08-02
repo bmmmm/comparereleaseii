@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { exitCode, unverifiableNote, toMarkdown, printTerminal } from "../src/report.ts";
 import { toHtml } from "../src/html.ts";
 import { computeScores } from "../src/metrics.ts";
-import type { ClaimResult, Report, Unverifiable } from "../src/types.ts";
+import type { ClaimResult, PinBump, Report, Unverifiable } from "../src/types.ts";
 
 function claimResult(verdict: ClaimResult["verdict"]): ClaimResult {
   return {
@@ -188,4 +188,65 @@ test("terminal output strips control characters smuggled into foreign text", () 
   assert.match(out, /Fixed CVE, trust me/);
   assert.match(out, /innocent\]0;owned subject/);
   assert.match(out, /will remove \[31mlegacy/);
+});
+
+const PINS: PinBump[] = [
+  {
+    name: "WEB_ASSETS_VERSION",
+    from: "v7.1.0",
+    to: "v7.2.0",
+    file: "services/web/Makefile",
+    repo: "opencloud-eu/web",
+    firstParty: true,
+    releaseUrl: "https://github.com/opencloud-eu/web/releases/tag/v7.2.0",
+  },
+  {
+    name: "github.com/rs/zerolog",
+    from: "v1.31.0",
+    to: "v1.32.0",
+    file: "go.mod",
+    repo: "rs/zerolog",
+    firstParty: false,
+    releaseUrl: "https://github.com/rs/zerolog/releases/tag/v1.32.0",
+  },
+];
+
+test("a first-party pin bump reads as the component's release, link included", () => {
+  const md = toMarkdown({ ...report(null), pins: PINS });
+  assert.match(md, /## Version pins moved/);
+  // The OpenCloud shape: component name, versions, first-party, release link.
+  assert.match(
+    md,
+    /\*\*web v7\.1\.0 → v7\.2\.0 — first-party\*\* \(`opencloud-eu\/web`\) — \[release\]\(https:\/\/github\.com\/opencloud-eu\/web\/releases\/tag\/v7\.2\.0\)/,
+  );
+  // The routine third-party bump stays one quiet line under its full name.
+  assert.match(md, /^- github\.com\/rs\/zerolog v1\.31\.0 → v1\.32\.0 \(`go\.mod`\)$/m);
+  // No pins, no section.
+  assert.doesNotMatch(toMarkdown(report(null)), /Version pins/);
+});
+
+test("the terminal pins section keeps third-party quiet and declares its display cap", () => {
+  const many: PinBump[] = Array.from({ length: 10 }, (_, i) => ({
+    name: `example.com/dep-${i}`,
+    from: "1.0.0",
+    to: "1.0.1",
+    file: "go.mod",
+    firstParty: false,
+  }));
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(" "));
+  };
+  try {
+    printTerminal({ ...report(null), pins: [...PINS, ...many] });
+  } finally {
+    console.log = orig;
+  }
+  const out = lines.join("\n");
+  assert.match(out, /Version pins moved/);
+  assert.match(out, /web v7\.1\.0 → v7\.2\.0.*first-party/);
+  assert.match(out, /opencloud-eu\/web/);
+  // 11 third-party, 8 shown — the cap is declared, never silent.
+  assert.match(out, /and 3 more third-party bumps/);
 });

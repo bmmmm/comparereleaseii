@@ -103,6 +103,11 @@ Options:
                       detection (default: 5; 0 disables). Past releases come
                       from the forge API, or from the tags the CHANGELOG
                       documents when the host has none
+  --component <k=v>   Declare a first-party component behind a version pin
+                      that cannot name its own repo: pin name = owner/repo
+                      (or repo URL), e.g. WEB_ASSETS_VERSION=opencloud-eu/web.
+                      Repeatable. Pins that name a repo themselves (go.mod
+                      paths, download URLs) are classified without this
   --suggest           Draft a release-note line for the highest-churn
                       undocumented commits (needs a judge engine)
   --suggest-limit <n> Max commits to draft for, highest churn first
@@ -209,6 +214,7 @@ async function main(): Promise<number> {
       baseline: { type: "string", default: "5" },
       suggest: { type: "boolean", default: false },
       "suggest-limit": { type: "string", default: "15" },
+      component: { type: "string", multiple: true },
       history: { type: "string" },
       estimate: { type: "boolean", default: false },
       "no-cache": { type: "boolean", default: false },
@@ -255,6 +261,17 @@ async function main(): Promise<number> {
   const baseline = intFlag("baseline", values.baseline, 0);
   const suggestLimit = intFlag("suggest-limit", values["suggest-limit"], 0);
   const historyCount = values.history === undefined ? null : intFlag("history", values.history, 1);
+
+  const components: Record<string, string> = {};
+  for (const spec of values.component ?? []) {
+    const eq = spec.indexOf("=");
+    if (eq < 1 || eq === spec.length - 1) {
+      throw new Error(
+        `--component expects <pin name>=<owner/repo or URL> (got "${spec}") — e.g. WEB_ASSETS_VERSION=opencloud-eu/web.`,
+      );
+    }
+    components[spec.slice(0, eq)] = spec.slice(eq + 1);
+  }
 
   // Every forge speaks git, so a clone answers almost everything the check
   // asks: diff, commits, subjects, authors, tags. Only the published notes and
@@ -420,6 +437,7 @@ async function main(): Promise<number> {
     history,
     suggest: values.suggest,
     suggestLimit,
+    components: Object.keys(components).length ? components : undefined,
   };
   const report: Report = await analyzeRelease(
     data,

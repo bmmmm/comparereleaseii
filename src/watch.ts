@@ -293,6 +293,7 @@ async function checkAndRecord(args: {
     // carries every still-open one until a later diff resolves it — or
     // until it ages out as stale (checkPromises counts the carries).
     carriedPromises: args.carried,
+    components: rc.components,
   };
   const notesFile = rc.notesFile ? resolve(args.configDir, rc.notesFile) : undefined;
   let data;

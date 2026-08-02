@@ -26,8 +26,16 @@ function addedLines(patch: string): string[] {
     .map((l) => l.slice(1));
 }
 
-/** Dependency name in a manifest line, per file format — null if none. */
-function depName(line: string, path: string): string | null {
+/** One dependency named in a manifest, with its version when the line spells one. */
+export interface DepEntry {
+  name: string;
+  /** Version literal exactly as the manifest writes it — null when the line
+   * names the dependency without pinning it (range-only, table header). */
+  version: string | null;
+}
+
+/** Dependency entry in a manifest line, per file format — null if none. */
+export function depEntry(line: string, path: string): DepEntry | null {
   const trimmed = line.trim();
   if (/Cargo\.toml$/.test(path) || /package\.json$/.test(path)) {
     // Handled by cargoDeps / packageJsonDeps — both need block context, not a
@@ -37,10 +45,15 @@ function depName(line: string, path: string): string | null {
     return null;
   }
   if (/go\.mod$/.test(path)) {
-    return trimmed.match(/^(?:require\s+)?([\w./-]+\.[\w./-]+)\s+v\d/)?.[1] ?? null;
+    const m = trimmed.match(/^(?:require\s+)?([\w./-]+\.[\w./-]+)\s+(v\d[\w.+-]*)/);
+    return m ? { name: m[1], version: m[2] } : null;
   }
   if (/requirements[^/]*\.txt$/.test(path)) {
-    return trimmed.match(/^([\w.-]+)\s*[=<>~]/)?.[1] ?? null;
+    const m = trimmed.match(/^([\w.-]+)\s*[=<>~]/);
+    if (!m) return null;
+    // Only `==` pins a version; `>=`/`~=` name a range, not a release.
+    const pin = trimmed.match(/==\s*([\w.!+*-]+)/);
+    return { name: m[1], version: pin ? pin[1] : null };
   }
   return null;
 }
@@ -60,8 +73,12 @@ const CARGO_META_KEYS = new Set([
  * `[workspace.dependencies]`, `[target.'cfg(…)'.dependencies]`, and the
  * single-crate form `[dependencies.serde]`.
  */
-function cargoDeps(patch: string, sign: "+" | "-"): string[] {
-  const names: string[] = [];
+export function cargoDeps(
+  patch: string,
+  sign: "+" | "-",
+  opts: { tableVersions?: boolean } = {},
+): DepEntry[] {
+  const entries: DepEntry[] = [];
   let section: string | null = null;
   let tableDep: string | null = null;
   for (const raw of patch.split("\n")) {
@@ -78,10 +95,20 @@ function cargoDeps(patch: string, sign: "+" | "-"): string[] {
       // [dependencies.serde] names the dependency in the header itself.
       const table = section.match(/(?:^|\.)dependencies\.([\w-]+)$/);
       tableDep = table ? table[1] : null;
-      if (tableDep && raw.startsWith(sign)) names.push(tableDep);
+      if (tableDep && raw.startsWith(sign)) entries.push({ name: tableDep, version: null });
       continue;
     }
-    if (tableDep || !raw.startsWith(sign)) continue;
+    if (tableDep) {
+      // Bumping a [dependencies.x] table changes only its `version` line —
+      // the header stays a context line. Only the pin delta reads these;
+      // the new-dependency check keys on headers (opt-in keeps it fixed).
+      if (opts.tableVersions && raw.startsWith(sign)) {
+        const v = line.match(/^version\s*=\s*"([^"]+)"/);
+        if (v) entries.push({ name: tableDep, version: v[1] });
+      }
+      continue;
+    }
+    if (!raw.startsWith(sign)) continue;
     // `serde = "1.0"`, `serde = { version = … }`, `anyhow.workspace = true`.
     const m = line.match(/^([\w-]+)(\.[\w-]+)?\s*=\s*(.*)$/);
     if (!m) continue;
@@ -90,8 +117,10 @@ function cargoDeps(patch: string, sign: "+" | "-"): string[] {
     // supplier. A genuinely new one appears in the root Cargo.toml, which is
     // then its own file in the diff (zed: 4 criticals for existing crates).
     if (m[2] === ".workspace" || /^\{[^}]*\bworkspace\s*=\s*true/.test(m[3])) continue;
+    const version =
+      m[3].match(/^"([^"]+)"/)?.[1] ?? m[3].match(/\bversion\s*=\s*"([^"]+)"/)?.[1] ?? null;
     if (section !== null) {
-      if (/(^|\.)dependencies$/.test(section)) names.push(m[1]);
+      if (/(^|\.)dependencies$/.test(section)) entries.push({ name: m[1], version });
       continue;
     }
     // Section unknown (its header fell outside the hunk's context lines):
@@ -99,9 +128,9 @@ function cargoDeps(patch: string, sign: "+" | "-"): string[] {
     // with a version key — and drop the well-known [package] keys, whose
     // values look exactly the same.
     if (CARGO_META_KEYS.has(m[1])) continue;
-    if (/^"[\^~=]?\d|^\{.*version/.test(m[3])) names.push(m[1]);
+    if (/^"[\^~=]?\d|^\{.*version/.test(m[3])) entries.push({ name: m[1], version });
   }
-  return names;
+  return entries;
 }
 
 /** Well-known top-level package.json keys whose values can look like versions. */
@@ -118,8 +147,8 @@ const PKG_JSON_META_KEYS = new Set([
  * section is unknown; then any versioned `"name": "…"` line counts, minus the
  * well-known top-level keys.
  */
-function packageJsonDeps(patch: string, sign: "+" | "-"): string[] {
-  const names: string[] = [];
+export function packageJsonDeps(patch: string, sign: "+" | "-"): DepEntry[] {
+  const entries: DepEntry[] = [];
   let section: string | null = null;
   let sectionIndent = 0;
   for (const raw of patch.split("\n")) {
@@ -144,12 +173,12 @@ function packageJsonDeps(patch: string, sign: "+" | "-"): string[] {
     const inDeps = section !== null && /dependencies$/i.test(section);
     const unknownSection = section === null;
     if (!inDeps && !unknownSection) continue;
-    const m = line.trim().match(/^"((?:@[\w.-]+\/)?[\w.-]+)"\s*:\s*"[^"]*\d/);
+    const m = line.trim().match(/^"((?:@[\w.-]+\/)?[\w.-]+)"\s*:\s*"([^"]*\d[^"]*)"/);
     if (!m) continue;
     if (unknownSection && PKG_JSON_META_KEYS.has(m[1])) continue;
-    names.push(m[1]);
+    entries.push({ name: m[1], version: m[2] });
   }
-  return names;
+  return entries;
 }
 
 /** Module path without its Go major suffix: "example.com/x/v5" → "example.com/x". */
@@ -185,12 +214,16 @@ export function newDependencies(file: DiffFile, repoLabel?: string): string[] {
   if (!file.patch || !DEP_MANIFEST.test(file.path)) return [];
   if (/\.(lock|sum)$|-lock\.(json|yaml)$|Pipfile\.lock$/.test(file.path)) return [];
   if (/package\.json$/.test(file.path)) {
-    const removed = new Set(packageJsonDeps(file.patch, "-"));
-    return [...new Set(packageJsonDeps(file.patch, "+"))].filter((n) => !removed.has(n));
+    const removed = new Set(packageJsonDeps(file.patch, "-").map((e) => e.name));
+    return [...new Set(packageJsonDeps(file.patch, "+").map((e) => e.name))].filter(
+      (n) => !removed.has(n),
+    );
   }
   if (/Cargo\.toml$/.test(file.path)) {
-    const removed = new Set(cargoDeps(file.patch, "-"));
-    return [...new Set(cargoDeps(file.patch, "+"))].filter((n) => !removed.has(n));
+    const removed = new Set(cargoDeps(file.patch, "-").map((e) => e.name));
+    return [...new Set(cargoDeps(file.patch, "+").map((e) => e.name))].filter(
+      (n) => !removed.has(n),
+    );
   }
   // A version bump shows the same dependency name on a removed line — parse
   // both sides with the same format-aware extractor (a substring check misses
@@ -200,13 +233,13 @@ export function newDependencies(file: DiffFile, repoLabel?: string): string[] {
   const known = new Set<string>();
   for (const raw of file.patch.split("\n")) {
     if (!/^[- ]/.test(raw) || raw.startsWith("---")) continue;
-    const name = depName(raw.slice(1), file.path);
+    const name = depEntry(raw.slice(1), file.path)?.name;
     if (name) known.add(name);
   }
   const self = repoLabel ? `${repoLabel.split("/").slice(-2).join("/")}` : null;
   const deps: string[] = [];
   for (const line of addedLines(file.patch)) {
-    const name = depName(line, file.path);
+    const name = depEntry(line, file.path)?.name;
     if (!name || known.has(name)) continue;
     if (self && moduleRoot(name).includes(self)) continue;
     if (sameSupplier(name, known)) continue;

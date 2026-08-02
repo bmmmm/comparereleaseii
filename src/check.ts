@@ -16,6 +16,7 @@ import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { authorActivity, computeMetrics } from "./metrics.ts";
 import { checkPromises, type CarriedPromise } from "./promises.ts";
+import { pinBumps } from "./pins.ts";
 import {
   buildSnapshots,
   cloneHistory,
@@ -42,6 +43,9 @@ export interface CheckSettings {
   suggestLimit?: number;
   /** Still-open promises from earlier releases (watch state) to re-check. */
   carriedPromises?: CarriedPromise[];
+  /** Pin name → owner/repo (or URL): first-party components whose pins
+   * cannot identify their target themselves (a bare WEB_ASSETS_VERSION). */
+  components?: Record<string, string>;
 }
 
 /** Injection seam for tests — production always uses the real sources. */
@@ -308,6 +312,16 @@ export async function analyzeRelease(
     });
   }
 
+  // The version-pin delta is read straight off the diff — deterministic,
+  // score-neutral, and computed before any LLM stage so a --judge off run
+  // still carries it.
+  const pins = pinBumps(data.files, {
+    repoLabel: data.repoLabel,
+    components: s.components,
+    origin: link ? new URL(link.base).origin : undefined,
+    linkStyle: link?.style,
+  });
+
   let uncovered = coverage?.uncovered ?? [];
   if (s.suggest) {
     if (!s.engine) {
@@ -350,5 +364,6 @@ export async function analyzeRelease(
     authors: data.commits.length
       ? authorActivity(data.commits, coverage?.commitFiles ?? null)
       : undefined,
+    pins: pins.length ? pins : undefined,
   };
 }

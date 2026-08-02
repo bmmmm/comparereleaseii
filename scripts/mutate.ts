@@ -307,6 +307,18 @@ const MUTANTS: Mutant[] = [
     find: "    .filter(({ h }) => !h.backfilled)\n",
     replace: "",
   },
+  {
+    guard: "a pin that moves in the file without changing its version is not a bump",
+    file: "src/pins.ts",
+    find: "if (from === undefined || from === e.version) continue;",
+    replace: "if (from === undefined) continue;",
+  },
+  {
+    guard: "first-party needs the pin's owner to match the checked repo's",
+    file: "src/pins.ts",
+    find: "if (owner !== null && pin.coords.owner.toLowerCase() === owner) bump.firstParty = true;",
+    replace: "if (owner !== null) bump.firstParty = true;",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
