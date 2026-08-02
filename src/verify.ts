@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { pooled, truncate } from "./util.ts";
 import { anchorMatch, functionsOf, isChangelogPath, lexicalMatch, rankHunks, tokenize } from "./match.ts";
+import { commitSurface } from "./substance.ts";
 import { sensitiveCategory } from "./metrics.ts";
 import {
   buildJudgePrompt,
@@ -612,6 +613,9 @@ export async function computeCoverage(
       additions: files.reduce((s, f) => s + f.additions, 0),
       deletions: files.reduce((s, f) => s + f.deletions, 0),
       fileCount: files.length,
+      // What the commit's own diff touched — a silent change described by
+      // observation, not only by the subject line it chose for itself.
+      surface: commitSurface(files),
     });
   });
   uncovered.sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions));

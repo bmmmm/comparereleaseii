@@ -319,6 +319,18 @@ const MUTANTS: Mutant[] = [
     find: "if (owner !== null && pin.coords.owner.toLowerCase() === owner) bump.firstParty = true;",
     replace: "if (owner !== null) bump.firstParty = true;",
   },
+  {
+    guard: "a config read moved to another file cancels — refactoring is not new surface",
+    file: "src/substance.ts",
+    find: "added: [...plus].filter((k) => !minus.has(k)).sort(),",
+    replace: "added: [...plus].sort(),",
+  },
+  {
+    guard: "test symbols never enter the shipped-surface symbol list",
+    file: "src/substance.ts",
+    find: '.filter((f) => f.patch && fileCategory(f.path) === "source")',
+    replace: ".filter((f) => Boolean(f.patch))",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

@@ -326,3 +326,24 @@ test("the pins section renders first-party cards and keeps hostile pin names ine
   // No pins, no section.
   assert.ok(!toHtml(report()).includes("Version pins moved"));
 });
+
+test("the surface section renders and keeps hostile symbol names inert", () => {
+  const html = toHtml(
+    report({
+      surface: {
+        categories: [{ category: "source", files: 2, additions: 10, deletions: 3 }],
+        symbols: [HOSTILE, "Finalize"],
+        moreSymbols: 0,
+        envVars: { added: ["OC_ASYNC_UPLOADS"], removed: [] },
+        cliFlags: { added: [], removed: [] },
+        configKeys: { added: [], removed: [] },
+        migrations: [],
+        apiRoutes: [],
+      },
+    }),
+  );
+  assert.match(html, /What actually shipped/);
+  assert.match(html, /OC_ASYNC_UPLOADS/);
+  assertNoBreakout(html);
+  assert.ok(!toHtml(report()).includes("What actually shipped"));
+});

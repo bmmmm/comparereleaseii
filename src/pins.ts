@@ -54,8 +54,8 @@ const DOCKER_FILE = /(^|\/)(Dockerfile|Containerfile)(\.[\w.-]+)?$|\.dockerfile$
 
 const LOCKFILE = /\.(lock|sum)$|-lock\.(json|ya?ml)$|Pipfile\.lock$/;
 
-/** Content lines of one diff side, headers stripped. */
-function sideLines(patch: string, sign: "+" | "-"): string[] {
+/** Content lines of one diff side, headers stripped. Shared with substance.ts. */
+export function sideLines(patch: string, sign: "+" | "-"): string[] {
   const header = `${sign.repeat(3)} `;
   return patch
     .split("\n")

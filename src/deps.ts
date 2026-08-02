@@ -15,7 +15,7 @@ export const BENIGN_BINARY = /\.(png|jpe?g|gif|ico|webp|woff2?|ttf|eot|pdf)$/i;
 
 /** Binaries whose contents no reviewer can read — the ones worth a flag when
  * they change without a note. */
-const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz|tar|7z)$/i;
+export const OPAQUE_BINARY = /\.(bin|exe|so|dylib|dll|jar|wasm|class|pyc|o|a|zip|gz|tgz|tar|7z)$/i;
 
 function addedLines(patch: string): string[] {
   // "+++ " (with a space) is the file header; the space-less guard also

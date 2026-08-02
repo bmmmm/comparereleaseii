@@ -4,7 +4,7 @@ import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
 import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
-import type { FileInsight, PinBump, Report, RiskFlag, Verdict } from "./types.ts";
+import type { FileInsight, PinBump, ReleaseSurface, Report, RiskFlag, Verdict } from "./types.ts";
 
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
 function diffAnchor(path: string): string {
@@ -301,6 +301,37 @@ function verdictBar(report: Report): string {
   return `<div class="bar">${segs}</div><div class="legend">${legend}</div>`;
 }
 
+/** What actually shipped — deterministic surface deltas as one compact block. */
+function surfaceHtml(s: ReleaseSurface): string {
+  const rows = s.categories
+    .map(
+      (t) =>
+        `<tr><td>${esc(t.category)}</td><td>${t.files}</td><td>+${t.additions}/−${t.deletions}</td></tr>`,
+    )
+    .join("");
+  const cfg = [
+    ...s.envVars.added.map((v) => `+env ${v}`),
+    ...s.envVars.removed.map((v) => `−env ${v}`),
+    ...s.cliFlags.added.map((v) => `+flag ${v}`),
+    ...s.cliFlags.removed.map((v) => `−flag ${v}`),
+    ...s.configKeys.added.map((v) => `+key ${v}`),
+    ...s.configKeys.removed.map((v) => `−key ${v}`),
+  ];
+  const facts = [
+    s.symbols.length
+      ? `symbols: ${esc(s.symbols.join(", "))}${s.moreSymbols ? ` (+${s.moreSymbols} more)` : ""}`
+      : "",
+    cfg.length ? `config surface: ${esc(cfg.join(", "))}` : "",
+    s.migrations.length ? `migrations: ${esc(s.migrations.join(", "))}` : "",
+    s.apiRoutes.length ? `api surface: ${esc(s.apiRoutes.join(", "))}` : "",
+  ]
+    .filter(Boolean)
+    .map((f) => `<div class="files">${f}</div>`)
+    .join("");
+  return `<h2>What actually shipped <span class="note">— read deterministically off the diff; informational, never scored</span></h2>
+<table><tr><th>category</th><th>files</th><th>churn</th></tr>${rows}</table>${facts}`;
+}
+
 /** Version pins the diff moves — first-party components as cards, the
  * third-party routine as one quiet table. */
 function pinsHtml(pins: PinBump[]): string {
@@ -438,7 +469,9 @@ export function toHtml(report: Report, nav?: ReportNav): string {
           report.linkBase
             ? `<a href="${commitUrl(report.linkBase, u.commit.sha, style)}">${esc(u.commit.sha.slice(0, 8))}</a>`
             : esc(u.commit.sha.slice(0, 8))
-        }</td><td>${esc(u.commit.subject)}</td><td>+${u.additions}/−${u.deletions}</td><td>${u.fileCount}</td>${
+        }</td><td>${esc(u.commit.subject)}${
+          u.surface ? `<div class="note">touched: ${esc(u.surface)}</div>` : ""
+        }</td><td>+${u.additions}/−${u.deletions}</td><td>${u.fileCount}</td>${
           hasSuggestions ? `<td>${u.suggestedNote ? esc(u.suggestedNote) : "—"}</td>` : ""
         }</tr>`,
     )
@@ -584,6 +617,7 @@ ${
         .join("")}`
     : ""
 }
+${report.surface?.categories.length ? surfaceHtml(report.surface) : ""}
 ${report.pins?.length ? pinsHtml(report.pins) : ""}
 <h2>Undocumented commits</h2>
 ${

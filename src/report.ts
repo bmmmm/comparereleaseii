@@ -217,6 +217,52 @@ export function printTerminal(report: Report): void {
     }
   }
 
+  const surf = report.surface;
+  if (surf?.categories.length) {
+    console.log(
+      c.bold("\nWhat actually shipped") + c.dim(" — read deterministically off the diff:"),
+    );
+    console.log(
+      "  " +
+        surf.categories
+          .map((t) => `${t.files} ${t.category} ${c.dim(`(+${t.additions}/−${t.deletions})`)}`)
+          .join(" · "),
+    );
+    if (surf.symbols.length) {
+      console.log(
+        c.dim(
+          `  symbols: ${safe(surf.symbols.join(", "))}${surf.moreSymbols ? ` (+${surf.moreSymbols} more)` : ""}`,
+        ),
+      );
+    }
+    const cfg = [
+      ...surf.envVars.added.map((v) => `+env ${v}`),
+      ...surf.envVars.removed.map((v) => `−env ${v}`),
+      ...surf.cliFlags.added.map((v) => `+flag ${v}`),
+      ...surf.cliFlags.removed.map((v) => `−flag ${v}`),
+      ...surf.configKeys.added.map((v) => `+key ${v}`),
+      ...surf.configKeys.removed.map((v) => `−key ${v}`),
+    ];
+    if (cfg.length) {
+      const shown = cfg.slice(0, 10);
+      console.log(
+        c.dim(
+          `  config surface: ${safe(shown.join(", "))}${cfg.length > shown.length ? ` … +${cfg.length - shown.length} more` : ""}`,
+        ),
+      );
+    }
+    if (surf.migrations.length) {
+      console.log(
+        c.dim(
+          `  migrations: ${safe(surf.migrations.slice(0, 3).join(", "))}${surf.migrations.length > 3 ? ` +${surf.migrations.length - 3} more` : ""}`,
+        ),
+      );
+    }
+    if (surf.apiRoutes.length) {
+      console.log(c.dim(`  api surface: ${surf.apiRoutes.length} route/handler file(s)`));
+    }
+  }
+
   if (report.pins?.length) {
     const firstParty = report.pins.filter((p) => p.firstParty);
     const thirdParty = report.pins.filter((p) => !p.firstParty);
@@ -252,6 +298,9 @@ export function printTerminal(report: Report): void {
         `  ${c.yellow("!")} ${u.commit.sha.slice(0, 8)} ${safe(u.commit.subject)} ` +
           c.dim(`(+${u.additions}/−${u.deletions}, ${u.fileCount} files)`),
       );
+      if (u.surface) {
+        console.log(c.dim(`    touched: ${safe(u.surface)}`));
+      }
       if (u.suggestedNote) {
         console.log(c.dim(`    suggested note: "${safe(u.suggestedNote)}"`));
       }
@@ -329,6 +378,33 @@ export function toMarkdown(report: Report): string {
       lines.push(`  - ${p.note}${p.files.length ? ` (${p.files.slice(0, 3).join(", ")})` : ""}`);
     }
   }
+  const surf = report.surface;
+  if (surf?.categories.length) {
+    lines.push("", "## What actually shipped", "");
+    lines.push(
+      `- ${surf.categories.map((t) => `${t.files} ${t.category} (+${t.additions}/−${t.deletions})`).join(" · ")}`,
+    );
+    if (surf.symbols.length) {
+      lines.push(
+        `- symbols: ${surf.symbols.map((s) => `\`${s}\``).join(", ")}${surf.moreSymbols ? ` (+${surf.moreSymbols} more)` : ""}`,
+      );
+    }
+    const cfg = [
+      ...surf.envVars.added.map((v) => `+env \`${v}\``),
+      ...surf.envVars.removed.map((v) => `−env \`${v}\``),
+      ...surf.cliFlags.added.map((v) => `+flag \`${v}\``),
+      ...surf.cliFlags.removed.map((v) => `−flag \`${v}\``),
+      ...surf.configKeys.added.map((v) => `+key \`${v}\``),
+      ...surf.configKeys.removed.map((v) => `−key \`${v}\``),
+    ];
+    if (cfg.length) lines.push(`- config surface: ${cfg.join(", ")}`);
+    if (surf.migrations.length) {
+      lines.push(`- migrations: ${surf.migrations.map((m) => `\`${m}\``).join(", ")}`);
+    }
+    if (surf.apiRoutes.length) {
+      lines.push(`- api surface: ${surf.apiRoutes.map((m) => `\`${m}\``).join(", ")}`);
+    }
+  }
   if (report.pins?.length) {
     lines.push("", "## Version pins moved", "");
     for (const p of report.pins) {
@@ -351,6 +427,9 @@ export function toMarkdown(report: Report): string {
       lines.push(
         `- \`${u.commit.sha.slice(0, 8)}\` ${u.commit.subject} (+${u.additions}/−${u.deletions}, ${u.fileCount} files)`,
       );
+      if (u.surface) {
+        lines.push(`  - touched: ${u.surface}`);
+      }
       if (u.suggestedNote) {
         lines.push(`  - suggested note: "${u.suggestedNote}"`);
       }

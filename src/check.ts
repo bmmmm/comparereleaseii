@@ -17,6 +17,7 @@ import { suggestNotes } from "./suggest.ts";
 import { authorActivity, computeMetrics } from "./metrics.ts";
 import { checkPromises, type CarriedPromise } from "./promises.ts";
 import { pinBumps } from "./pins.ts";
+import { releaseSurface } from "./substance.ts";
 import {
   buildSnapshots,
   cloneHistory,
@@ -365,5 +366,6 @@ export async function analyzeRelease(
       ? authorActivity(data.commits, coverage?.commitFiles ?? null)
       : undefined,
     pins: pins.length ? pins : undefined,
+    surface: data.files.length ? releaseSurface(data.files) : undefined,
   };
 }

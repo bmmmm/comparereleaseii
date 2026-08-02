@@ -21,6 +21,7 @@ import { hunkFunctions, isChangelogPath } from "./match.ts";
 import {
   BENIGN_BINARY,
   DEP_MANIFEST,
+  OPAQUE_BINARY,
   lockfileSources,
   newDependencies,
   opacityIssue,
@@ -169,6 +170,35 @@ export function classifyUnverifiable(
       `These notes describe changes that are not in this repo's own diff — across the last ${baseline.snapshots.length} releases only ` +
       `${Math.round(baseline.medianLexicalCoverage * 100)}% of claims matched its code (fork, build or distribution repo).`,
   };
+}
+
+const MIGRATION_FILE =
+  /(^|\/)(migrations?|db\/migrate|alembic\/versions)\/|(^|\/)V\d+__[^/]+\.sql$/i;
+const CONFIG_FILE = /\.(ya?ml|toml|ini|conf|cfg|properties)$|(^|\/)\.env\.[\w.-]+$/i;
+
+/**
+ * Total classification for the substance rollup — every path lands in
+ * exactly one bucket. This answers "what kind of file", never "is it risky";
+ * sensitivity stays sensitiveCategory's job. Priority order carries the same
+ * hard-won exclusions: .github/CONTRIBUTING.md is docs before ci/build, a
+ * test fixture under tests/ is tests before config or migrations.
+ */
+export function fileCategory(path: string): string {
+  if (
+    DOC_FILE.test(path) ||
+    isChangelogPath(path) ||
+    PROJECT_META.test(path) ||
+    SITE_METADATA.test(path)
+  ) {
+    return "docs";
+  }
+  if (DEP_MANIFEST.test(path)) return "dependencies";
+  if (TEST_FILE.test(path)) return "tests";
+  if (CI_BUILD.test(path)) return "ci/build";
+  if (MIGRATION_FILE.test(path)) return "migrations";
+  if (BENIGN_BINARY.test(path) || OPAQUE_BINARY.test(path)) return "assets";
+  if (CONFIG_FILE.test(path)) return "config";
+  return "source";
 }
 
 /** Classify a path into a sensitivity category (checked in priority order). */

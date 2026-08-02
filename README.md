@@ -138,6 +138,16 @@ informational, never a score component, since a promise is about a later
 release than the one being scored. `watch` carries still-open promises
 across releases until they resolve, or until they age out visibly as stale.
 
+The report also states **what actually shipped**, read deterministically off
+the diff and independent of what the notes claim: a file-category rollup
+(source, tests, docs, ci/build, dependencies, config, migrations, assets),
+the changed symbols git's own hunk headers name, the config surface
+(environment-variable reads, `--flag` literals, config keys — moved lines
+cancel, so refactoring is not "new surface"), migrations and API-route
+files. Undocumented commits are described the same way — by what their diff
+touched, not only by the subject line they chose for themselves. All of it
+works with `--judge off`; none of it is scored.
+
 The diff's **version pins** are read as their own signal: manifest bumps
 (go.mod, package.json, Cargo.toml, requirements.txt), `NAME_VERSION`-style
 Makefile variables, Dockerfile `FROM`/`ARG` tags and versioned download URLs

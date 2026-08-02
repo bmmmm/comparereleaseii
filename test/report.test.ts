@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { exitCode, unverifiableNote, toMarkdown, printTerminal } from "../src/report.ts";
 import { toHtml } from "../src/html.ts";
 import { computeScores } from "../src/metrics.ts";
-import type { ClaimResult, PinBump, Report, Unverifiable } from "../src/types.ts";
+import type { ClaimResult, PinBump, ReleaseSurface, Report, Unverifiable } from "../src/types.ts";
 
 function claimResult(verdict: ClaimResult["verdict"]): ClaimResult {
   return {
@@ -249,4 +249,66 @@ test("the terminal pins section keeps third-party quiet and declares its display
   assert.match(out, /opencloud-eu\/web/);
   // 11 third-party, 8 shown — the cap is declared, never silent.
   assert.match(out, /and 3 more third-party bumps/);
+});
+
+const SURFACE: ReleaseSurface = {
+  categories: [
+    { category: "source", files: 3, additions: 120, deletions: 30 },
+    { category: "tests", files: 1, additions: 10, deletions: 0 },
+  ],
+  symbols: ["Finalize", "RegisterRoutes"],
+  moreSymbols: 2,
+  envVars: { added: ["OC_ASYNC_UPLOADS"], removed: [] },
+  cliFlags: { added: [], removed: ["--legacy-upload"] },
+  configKeys: { added: ["asyncUploads"], removed: [] },
+  migrations: ["db/migrations/0042_add_index.sql"],
+  apiRoutes: ["services/graph/routes/drives.go"],
+};
+
+test("the markdown surface section states categories, symbols and config deltas", () => {
+  const md = toMarkdown({ ...report(null), surface: SURFACE });
+  assert.match(md, /## What actually shipped/);
+  assert.match(md, /3 source \(\+120\/−30\) · 1 tests \(\+10\/−0\)/);
+  assert.match(md, /symbols: `Finalize`, `RegisterRoutes` \(\+2 more\)/);
+  assert.match(md, /\+env `OC_ASYNC_UPLOADS`, −flag `--legacy-upload`, \+key `asyncUploads`/);
+  assert.match(md, /migrations: `db\/migrations\/0042_add_index\.sql`/);
+  assert.match(md, /api surface: `services\/graph\/routes\/drives\.go`/);
+  // No surface, no section.
+  assert.doesNotMatch(toMarkdown(report(null)), /What actually shipped/);
+});
+
+test("uncovered commits carry their observed surface in markdown and terminal", () => {
+  const uncovered = [
+    {
+      commit: {
+        sha: "abcd1234abcd1234",
+        subject: "chore: things",
+        body: "",
+        author: "a",
+        prNumbers: [],
+      },
+      additions: 5,
+      deletions: 1,
+      fileCount: 2,
+      surface: "1 source · fns Finalize · +env OC_ASYNC_UPLOADS",
+    },
+  ];
+  const md = toMarkdown({ ...report(null), uncovered });
+  assert.match(md, /- touched: 1 source · fns Finalize · \+env OC_ASYNC_UPLOADS/);
+
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(" "));
+  };
+  try {
+    printTerminal({ ...report(null), uncovered, surface: SURFACE });
+  } finally {
+    console.log = orig;
+  }
+  const out = lines.join("\n");
+  assert.match(out, /What actually shipped/);
+  assert.match(out, /symbols: Finalize, RegisterRoutes \(\+2 more\)/);
+  assert.match(out, /config surface: \+env OC_ASYNC_UPLOADS, −flag --legacy-upload/);
+  assert.match(out, /touched: 1 source · fns Finalize/);
 });

@@ -193,6 +193,50 @@ export interface UncoveredCommit {
   fileCount: number;
   /** LLM-drafted release-note line for this commit (--suggest). */
   suggestedNote?: string;
+  /**
+   * Observed surface of the commit's own diff — symbols, config deltas,
+   * category counts — so a silent change is described by what it touched,
+   * not only by the subject line it chose for itself.
+   */
+  surface?: string;
+}
+
+/** Churn of one file category in the release diff. */
+export interface CategoryChurn {
+  category: string;
+  files: number;
+  additions: number;
+  deletions: number;
+}
+
+/** Names one side of the diff introduced or dropped; moved lines cancel. */
+export interface ConfigDelta {
+  added: string[];
+  removed: string[];
+}
+
+/**
+ * What actually shipped, read deterministically off the diff — no LLM, no
+ * scoring. The category rollup is total (every file lands in one bucket);
+ * the config surface is extracted from changed lines only, so an unchanged
+ * setting never appears here.
+ */
+export interface ReleaseSurface {
+  categories: CategoryChurn[];
+  /** Changed symbols from hunk headers, highest-churn files first. */
+  symbols: string[];
+  /** Distinct symbols beyond the cap — the cut is declared, never silent. */
+  moreSymbols: number;
+  /** Environment variables the code reads (os.Getenv/process.env/…). */
+  envVars: ConfigDelta;
+  /** `--flag` literals in source lines. */
+  cliFlags: ConfigDelta;
+  /** Keys in config-category files (yaml/toml/ini). */
+  configKeys: ConfigDelta;
+  /** Migration files touched. */
+  migrations: string[];
+  /** Route/handler/API-spec files touched. */
+  apiRoutes: string[];
 }
 
 export type FlagSeverity = "critical" | "warn" | "info";
@@ -317,4 +361,6 @@ export interface Report {
   authors?: AuthorActivity[];
   /** Version pins this release moves, first-party components first — informational, never scored. */
   pins?: PinBump[];
+  /** What actually shipped, read deterministically off the diff — informational, never scored. */
+  surface?: ReleaseSurface;
 }
