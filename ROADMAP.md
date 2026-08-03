@@ -16,42 +16,18 @@
 
 The complete list — anything not here is landed or settled below.
 
-- **Watcher parity + lens rollout** (Block 2): extension pin bump, S4a
-  `audience:` values in the live config.
-- **Backfill the live watchlist** (Block 3): user go at run time (judge
-  cost).
-- **Reconciliation layer** (Block 4): design proposal written, two
-  decisions marked open.
+- **Reconciliation layer** (Block 4): design settled, build in progress.
 - **Demand-driven only** (no schedule, deliberately not in the plan): the
   F23 maxBuffer decision; the Action PR-comment variant.
 
 ## Next — v0.7.0 and the axis in operation (2026-08-03)
 
-Context: v0.7.0 shipped 2026-08-03, but nobody consumes the axis yet —
-the live watcher runs v0.6.0 without lens config, and the reconciliation
-idea has ready inputs but no block. Blocks 2–3 are operations (deploy,
-use); Block 4 is the only build block. F23 and the Action PR-comment stay
-demand-driven — putting them here would schedule work no demand has asked
-for.
-
-### Block 2 — the watcher catches up: version parity + lens rollout
-Operations, not code — the config lives outside this repo:
-- Bump the watcher's pinned extension/checkout to `v0.7.0` (version-parity
-  sweep: every deployment place moves together, none is left behind).
-- Set the S4a `audience:` values in the live `watch.json` — the per-repo
-  assignment is operational data and lives in the config itself, not in
-  this file. Existing `components`/`expand` entries stay untouched.
-**Done when:** the next watch-written report renders a default lens and
-the version sweep reports one version everywhere.
-
-### Block 3 — backfill the live watchlist (user go at run time)
-The standing offer from the long-view work, now worth more: the reports
-it writes carry findings and lenses. `watch backfill --releases 5` across
-the watchlist — the command states the judge cost and asks before
-starting; backfilled checks never alert. Runs after Block 2 so the
-reports are written by the released version with lens config in place.
-**Done when:** every watchlist repo has a median, drift detection and a
-filled author ledger (≥ 5 checks each), or a documented skip.
+Context: v0.7.0 shipped 2026-08-03 and the axis is in operation — the
+watcher runs the released version with per-repo lenses configured, and
+the watchlist is backfilled to drift depth (≥ 6 checks everywhere).
+Block 4 is the remaining build block. F23 and the Action PR-comment stay
+demand-driven — putting them here would schedule work no demand has
+asked for.
 
 ### Block 4 — reconciliation: claims meet findings (design, then build)
 Settled with the axis (2026-08-02): messages and notes join *late*,
@@ -62,20 +38,15 @@ it. Proposal, deterministic first: match claims to findings with the S5
 machinery (identifier overlap against a finding's text + files), render
 as per-finding tags in the findings section plus one "unsupported claims"
 line; a judged matching pass only where the deterministic one stays
-empty — and only as a later, separate decision. Open before building:
-whether reconciliation renders inside the findings section or as its own;
-whether `undocumented` findings should order the uncovered list (display
-only — anything score-touching faces the A/B discipline).
+empty — and only as a later, separate decision. Settled at build start
+(2026-08-03, user): reconciliation renders inside the findings section
+(per-finding tags plus one unsupported-claims line), and `undocumented`
+findings order the uncovered list — display only, anything score-touching
+faces the A/B discipline.
 **Done when:** a cached OpenCloud report shows all three sets from
 existing data, `--judge off` degrades honestly (no findings → no
 reconciliation, deterministic output unchanged), re-runs stay
 bit-identical, and a score-neutrality test pins it.
-
-Order: 2 → 3 → 4. Parity + lenses first — the watcher must not keep
-writing reports with a version the repo has moved past; backfill second —
-its reports should be the final shape; reconciliation last, as the only
-block that changes code, inheriting an axis that is actually in operation
-by then.
 
 ## Demand-driven only (no schedule)
 
