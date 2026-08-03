@@ -33,6 +33,9 @@ export interface WatchRepoConfig {
   escalate?: "auto" | "off" | "claude-cli" | "api" | "openai";
   escalateModel?: string;
   failOn?: FailOn;
+  /** Flag the release (exit-code path) when the completeness score falls
+   * below this percentage — same semantics as the CLI's --min-coverage. */
+  minCoverage?: number;
   baseline?: number;
   concurrency?: number;
   includePrerelease?: boolean;

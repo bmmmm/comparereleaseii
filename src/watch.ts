@@ -341,7 +341,7 @@ async function checkAndRecord(args: {
   // Watch default is lenient: honest releases often carry unprovable
   // claims (private advisories) — alerting on every one is fatigue.
   // Critical flags and the score threshold still catch attack shapes.
-  const ec = exitCode(report, rc.failOn ?? "contradicted");
+  const ec = exitCode(report, rc.failOn ?? "contradicted", rc.minCoverage);
   const critical = report.metrics.flags.filter((f) => f.severity === "critical").length;
   // The repo's level comes from the checks BEFORE this release — in release
   // order, not check order: a backfilled past release must be measured

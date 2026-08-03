@@ -620,13 +620,31 @@ export function toMarkdown(report: Report): string {
   return lines.join("\n") + "\n";
 }
 
-export function exitCode(report: Report, failOn: "none" | "contradicted" | "no-evidence"): number {
-  if (failOn === "none") return 0;
-  const counts = countVerdicts(report.results);
-  if (counts.contradicted > 0) return 1;
-  // A diff with no source files could not have supported the claims in the
-  // first place — failing the build on that would punish the release shape,
-  // not the notes.
-  if (failOn === "no-evidence" && counts["no-evidence"] > 0 && !unverifiableNote(report)) return 1;
+export function exitCode(
+  report: Report,
+  failOn: "none" | "contradicted" | "no-evidence",
+  minCoverage?: number,
+): number {
+  if (failOn !== "none") {
+    const counts = countVerdicts(report.results);
+    if (counts.contradicted > 0) return 1;
+    // A diff with no source files could not have supported the claims in the
+    // first place — failing the build on that would punish the release shape,
+    // not the notes.
+    if (failOn === "no-evidence" && counts["no-evidence"] > 0 && !unverifiableNote(report)) return 1;
+  }
+  // The coverage gate is independent of the verdict gate: --fail-on none
+  // still honours an explicit --min-coverage. A null completeness (reverse
+  // check skipped) or an unverified release cannot fail it — there is no
+  // measurement to gate on.
+  const completeness = report.metrics.scores.completeness;
+  if (
+    minCoverage !== undefined &&
+    completeness !== null &&
+    completeness < minCoverage &&
+    !unverifiableNote(report)
+  ) {
+    return 1;
+  }
   return 0;
 }

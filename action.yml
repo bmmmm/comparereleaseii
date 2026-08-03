@@ -36,6 +36,11 @@ inputs:
   fail-on:
     description: "none | contradicted | no-evidence"
     default: "no-evidence"
+  min-coverage:
+    description: >-
+      Also fail when the completeness score (percentage of changed lines the
+      notes cover) is below this number. Empty disables the gate.
+    default: ""
   notes-file:
     description: "Check this notes file (workspace-relative) instead of the published notes"
     default: ""
@@ -90,6 +95,7 @@ runs:
         IN_ENGINE: ${{ inputs.engine }}
         IN_MODEL: ${{ inputs.model }}
         IN_FAIL_ON: ${{ inputs.fail-on }}
+        IN_MIN_COVERAGE: ${{ inputs.min-coverage }}
         IN_NOTES_FILE: ${{ inputs.notes-file }}
         EVENT_TAG: ${{ github.event.release.tag_name }}
       run: |
@@ -114,6 +120,7 @@ runs:
         [ -n "$IN_BASE" ] && args+=( --base "$IN_BASE" )
         [ -n "$IN_NOTES_FILE" ] && args+=( --notes-file "$IN_NOTES_FILE" )
         [ -n "$IN_MODEL" ] && args+=( --model "$IN_MODEL" )
+        [ -n "$IN_MIN_COVERAGE" ] && args+=( --min-coverage "$IN_MIN_COVERAGE" )
         args+=( --engine "$IN_ENGINE" --fail-on "$IN_FAIL_ON" )
         args+=( --md "$out/report.md" --json "$out/report.json" --html "$out/report.html" )
         node "$GITHUB_ACTION_PATH/bin/comparerelease.mjs" "${args[@]}"

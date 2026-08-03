@@ -43,6 +43,7 @@ test("numeric flags reject non-numbers with an actionable error", async () => {
     ["--baseline", "abc"],
     ["--suggest-limit", "x"],
     ["--history", "abc"],
+    ["--min-coverage", "abc"],
   ]) {
     const res = await exec(process.execPath, [CLI, "owner/repo", flag, value]).then(
       () => null,
@@ -52,4 +53,14 @@ test("numeric flags reject non-numbers with an actionable error", async () => {
     assert.equal(res.code, 2, `${flag}: exit ${res.code}`);
     assert.match(res.stderr ?? "", new RegExp(`${flag} must be`), `${flag}: ${res.stderr}`);
   }
+});
+
+test("--min-coverage rejects values above 100", async () => {
+  const res = await exec(process.execPath, [CLI, "owner/repo", "--min-coverage", "150"]).then(
+    () => null,
+    (err: { code?: number; stderr?: string }) => err,
+  );
+  assert.ok(res, "--min-coverage 150 exited 0");
+  assert.equal(res.code, 2, `exit ${res.code}`);
+  assert.match(res.stderr ?? "", /percentage 0–100/);
 });

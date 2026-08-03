@@ -120,6 +120,26 @@ test("--fail-on no-evidence does not fail on an unverifiable release", () => {
   assert.equal(exitCode(report(SOURCELESS), "none"), 0);
 });
 
+test("--min-coverage gates on the completeness score, independent of --fail-on", () => {
+  const low = report(null); // helper builds churnCoveredRatio 0 → completeness 0
+  assert.equal(exitCode(low, "none"), 0);
+  assert.equal(exitCode(low, "none", 50), 1);
+  assert.equal(exitCode(low, "contradicted", 50), 1);
+
+  const high = report(null);
+  high.metrics.scores.completeness = 80;
+  assert.equal(exitCode(high, "none", 50), 0);
+  assert.equal(exitCode(high, "none", 80), 0); // meeting the threshold passes
+  assert.equal(exitCode(high, "none", 90), 1);
+
+  // No measurement, no gate: a skipped reverse check and an unverifiable
+  // release must not fail on coverage.
+  const unmeasured = report(null);
+  unmeasured.metrics.scores.completeness = null;
+  assert.equal(exitCode(unmeasured, "none", 50), 0);
+  assert.equal(exitCode(report(SOURCELESS), "none", 50), 0);
+});
+
 test("markdown and html name the right category, per kind", () => {
   const sourceless = toMarkdown(report(SOURCELESS));
   assert.match(sourceless, /Not verifiable/);

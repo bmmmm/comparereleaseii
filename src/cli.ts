@@ -99,6 +99,11 @@ Options:
   --fail-on <what>    none | contradicted | no-evidence (default: no-evidence)
                       no-evidence never fails a release whose diff contains no
                       source-code changes — nothing could be checked there
+  --min-coverage <n>  Also fail (exit 1) when the completeness score — the
+                      percentage of changed lines the notes cover — is below
+                      n. Independent of --fail-on; a release whose coverage
+                      could not be measured (--no-reverse, unverified) never
+                      fails this gate
   --no-reverse        Skip the completeness check (undocumented commits)
   --baseline <n>      Compare against the n previous releases for anomaly
                       detection (default: 5; 0 disables). Past releases come
@@ -225,6 +230,7 @@ async function main(): Promise<number> {
       html: { type: "string" },
       concurrency: { type: "string", default: "4" },
       "fail-on": { type: "string", default: "no-evidence" },
+      "min-coverage": { type: "string" },
       "no-reverse": { type: "boolean", default: false },
       baseline: { type: "string", default: "5" },
       lens: { type: "string" },
@@ -271,6 +277,13 @@ async function main(): Promise<number> {
   const failOn = values["fail-on"] as "none" | "contradicted" | "no-evidence";
   if (!["none", "contradicted", "no-evidence"].includes(failOn)) {
     throw new Error(`--fail-on must be none, contradicted or no-evidence (got "${values["fail-on"]}")`);
+  }
+  const minCoverage =
+    values["min-coverage"] === undefined
+      ? undefined
+      : intFlag("min-coverage", values["min-coverage"], 0);
+  if (minCoverage !== undefined && minCoverage > 100) {
+    throw new Error(`--min-coverage is a percentage 0–100 (got "${values["min-coverage"]}")`);
   }
   const escalateOpt = values.escalate as "auto" | "off" | "claude-cli" | "api" | "openai";
   if (!["auto", "off", "claude-cli", "api", "openai"].includes(escalateOpt)) {
@@ -496,7 +509,7 @@ async function main(): Promise<number> {
     await writeFile(values.html, toHtml(report));
     console.error(`HTML report written to ${values.html}`);
   }
-  return exitCode(report, failOn);
+  return exitCode(report, failOn, minCoverage);
 }
 
 async function runWatchCli(argv: string[]): Promise<number> {
