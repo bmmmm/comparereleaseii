@@ -7,6 +7,7 @@
 // Run with `pnpm mutate`. The predecessor (tmp/rt/mutate.mjs, 28/28 killed)
 // lived in an ignored directory and was lost with it; this one is tracked.
 import { readFile, writeFile, readdir } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 interface Mutant {
@@ -429,6 +430,20 @@ if (!runSuite()) {
 
 let killed = 0;
 const survivors: Mutant[] = [];
+// `finally` only covers thrown errors — a SIGINT/SIGTERM mid-mutant would
+// leave the mutated source on disk, where the next `git add -u` commits it
+// (which happened once: isFlagged lost its baseline branch on main). The
+// restore must also run on the way out of a signal. SIGKILL still wins;
+// after any hard-killed run, `git diff src/` before staging.
+let active: { file: string; source: string } | null = null;
+const restoreSync = (signal: NodeJS.Signals) => {
+  if (active) writeFileSync(active.file, active.source);
+  process.stderr.write(`\n${signal}: mutated source restored.\n`);
+  process.exit(130);
+};
+process.on("SIGINT", restoreSync);
+process.on("SIGTERM", restoreSync);
+
 for (const [i, m] of selected.entries()) {
   const source = await readFile(m.file, "utf8");
   const occurrences = source.split(m.find).length - 1;
@@ -439,6 +454,7 @@ for (const [i, m] of selected.entries()) {
     process.exit(1);
   }
   process.stderr.write(`[${i + 1}/${selected.length}] ${m.guard} … `);
+  active = { file: m.file, source };
   await writeFile(m.file, source.replace(m.find, m.replace));
   try {
     const green = runSuite();
@@ -451,6 +467,7 @@ for (const [i, m] of selected.entries()) {
     }
   } finally {
     await writeFile(m.file, source);
+    active = null;
   }
 }
 
