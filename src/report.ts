@@ -3,8 +3,11 @@ import { c, stripControl } from "./util.ts";
 import { SCORE_MINOR, SCORE_SOLID } from "./theme.ts";
 import { surfaceLine } from "./substance.ts";
 import type {
+  Audience,
   ClaimResult,
   ComponentCheck,
+  Finding,
+  FindingKind,
   PinBump,
   Report,
   UnverifiableKind,
@@ -118,6 +121,61 @@ export function componentBits(m: ComponentCheck): string[] {
   }
   if (m.truncated) bits.push("diff truncated");
   return bits;
+}
+
+/** Severity order shared by every renderer — breaking first, internal last. */
+export const KIND_ORDER: FindingKind[] = [
+  "breaking",
+  "security",
+  "behavior",
+  "feature",
+  "internal",
+];
+
+const KIND_RANK = new Map(KIND_ORDER.map((k, i) => [k, i]));
+
+export interface LensView {
+  /** Findings this lens shows, severity order (stable within a kind). */
+  shown: Finding[];
+  /** Non-internal findings for other audiences the lens folded away. */
+  otherAudiences: number;
+  /** Internal findings — visible only without a lens. */
+  internalHidden: number;
+}
+
+/**
+ * The lens is a filter over finding audiences, never over content: a lens
+ * shows its own audience plus `everyone` (security pierces every lens —
+ * the S4a decision), folds other audiences behind a count, and hides
+ * `internal` findings (invisible outside the codebase by definition).
+ * Without a lens everything renders, internal last.
+ */
+export function lensFindings(findings: Finding[], lens: Audience | undefined): LensView {
+  const bySeverity = [...findings].sort(
+    (a, b) => (KIND_RANK.get(a.kind) ?? 9) - (KIND_RANK.get(b.kind) ?? 9),
+  );
+  if (!lens) {
+    return { shown: bySeverity, otherAudiences: 0, internalHidden: 0 };
+  }
+  const nonInternal = bySeverity.filter((f) => f.kind !== "internal");
+  const shown = nonInternal.filter((f) => f.audience === lens || f.audience === "everyone");
+  return {
+    shown,
+    otherAudiences: nonInternal.length - shown.length,
+    internalHidden: bySeverity.length - nonInternal.length,
+  };
+}
+
+/** The declared remainder of the findings pass, one line for every renderer. */
+export function budgetLine(report: Report): string | null {
+  const b = report.findings?.budget;
+  if (!b) return null;
+  const unread = b.filesTotal - b.filesRead;
+  return (
+    `read ${b.subsystemsRead}/${b.subsystemsTotal} subsystems, ${b.filesRead}/${b.filesTotal} files in detail ` +
+    `(${b.usedChars.toLocaleString("en-US")}/${b.maxChars.toLocaleString("en-US")} chars)` +
+    (unread > 0 ? ` — ${unread} file(s) not read in detail` : "")
+  );
 }
 
 export function countVerdicts(results: ClaimResult[]): Record<Verdict, number> {
@@ -300,6 +358,50 @@ export function printTerminal(report: Report): void {
     }
   }
 
+  const fin = report.findings;
+  if (fin) {
+    const kindColor: Record<FindingKind, (s: string) => string> = {
+      breaking: c.red,
+      security: c.red,
+      behavior: c.yellow,
+      feature: c.green,
+      internal: c.gray,
+    };
+    console.log(
+      c.bold("\nFindings") + c.dim(" — the diff as read by the judge, blind to commit messages:"),
+    );
+    const budget = budgetLine(report);
+    if (budget) console.log(c.dim(`  ${budget}`));
+    if (fin.summary) console.log(`  ${safe(fin.summary)}`);
+    const lens = report.audience;
+    const view = lensFindings(fin.findings, lens);
+    if (lens) {
+      console.log(c.dim(`  lens: ${lens} — security findings show under every lens`));
+    }
+    for (const f of view.shown) {
+      console.log(`  ${kindColor[f.kind](f.kind)} ${c.dim(`[${f.audience}]`)} ${safe(f.text)}`);
+      if (f.files.length) {
+        const files = f.files.slice(0, 3).join(", ");
+        const more = f.files.length - 3;
+        console.log(c.dim(`    ${safe(files)}${more > 0 ? ` +${more} more` : ""}`));
+      }
+    }
+    if (!view.shown.length && fin.findings.length) {
+      console.log(c.dim("  no findings for this lens."));
+    } else if (!fin.findings.length && !fin.errors?.length) {
+      console.log(c.dim("  nothing beyond noise in the read subsystems."));
+    }
+    const folded: string[] = [];
+    if (view.otherAudiences) folded.push(`${view.otherAudiences} finding(s) for other audiences`);
+    if (view.internalHidden) folded.push(`${view.internalHidden} internal`);
+    if (folded.length) {
+      console.log(c.dim(`  … ${folded.join(", ")} folded by this lens (--lens all shows everything)`));
+    }
+    for (const e of fin.errors ?? []) {
+      console.log(c.yellow(`  subsystem read failed: ${safe(e)}`));
+    }
+  }
+
   if (report.pins?.length) {
     const firstParty = report.pins.filter((p) => p.firstParty);
     const thirdParty = report.pins.filter((p) => !p.firstParty);
@@ -449,6 +551,28 @@ export function toMarkdown(report: Report): string {
     }
     if (surf.apiRoutes.length) {
       lines.push(`- api surface: ${surf.apiRoutes.map((m) => `\`${m}\``).join(", ")}`);
+    }
+  }
+  const fin = report.findings;
+  if (fin) {
+    // The file artifact is complete: every audience, no lens filtering —
+    // the lens is a view; a report on disk must not lose findings to it.
+    lines.push("", "## Findings", "");
+    const budget = budgetLine(report);
+    if (budget) lines.push(`_${budget}_`, "");
+    if (report.audience) lines.push(`Default lens: **${report.audience}**`, "");
+    if (fin.summary) lines.push(fin.summary, "");
+    for (const f of lensFindings(fin.findings, undefined).shown) {
+      const files = f.files.length
+        ? ` (${f.files.slice(0, 4).map((p) => `\`${p}\``).join(", ")})`
+        : "";
+      lines.push(`- **${f.kind}** [${f.audience}] ${f.text}${files}`);
+    }
+    if (!fin.findings.length && !fin.errors?.length) {
+      lines.push("Nothing beyond noise in the read subsystems.");
+    }
+    for (const e of fin.errors ?? []) {
+      lines.push(`- subsystem read failed: ${e}`);
     }
   }
   if (report.pins?.length) {

@@ -2,12 +2,21 @@
 import { createHash } from "node:crypto";
 import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
-import { carriedOver, componentBits, countVerdicts, unverifiableNote } from "./report.ts";
+import {
+  budgetLine,
+  carriedOver,
+  componentBits,
+  countVerdicts,
+  lensFindings,
+  unverifiableNote,
+} from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
 import { surfaceLine } from "./substance.ts";
 import type {
   ComponentCheck,
   FileInsight,
+  Finding,
+  FindingKind,
   PinBump,
   ReleaseSurface,
   Report,
@@ -341,6 +350,60 @@ function surfaceHtml(s: ReleaseSurface): string {
 <table><tr><th>category</th><th>files</th><th>churn</th></tr>${rows}</table>${facts}`;
 }
 
+const FINDING_COLOR: Record<FindingKind, string> = {
+  breaking: "#f85149",
+  security: "#f85149",
+  behavior: "#d29922",
+  feature: "#3fb950",
+  internal: "#6e7681",
+};
+
+function findingRow(f: Finding): string {
+  return `<div class="flag" style="border-left-color:${FINDING_COLOR[f.kind]}"><span class="chip" style="background:${FINDING_COLOR[f.kind]}">${f.kind}</span><span class="gen">${esc(f.audience)}</span> ${esc(f.text)}${
+    f.files.length ? `<div class="files">${esc(f.files.slice(0, 6).join(", "))}</div>` : ""
+  }</div>`;
+}
+
+/** Typed findings, the repo's default lens first — the rest stays in the
+ * document behind a fold, because the artifact must never lose findings. */
+function findingsHtml(report: Report): string {
+  const fin = report.findings!;
+  const lens = report.audience;
+  const view = lensFindings(fin.findings, lens);
+  const budget = budgetLine(report);
+  const parts: string[] = [
+    `<h2>Findings <span class="note">— the diff as read by the judge, blind to commit messages; informational, never scored</span></h2>`,
+  ];
+  if (budget) parts.push(`<p class="note">${esc(budget)}</p>`);
+  if (lens) {
+    parts.push(
+      `<p class="note">lens: ${esc(lens)} — security findings show under every lens</p>`,
+    );
+  }
+  if (fin.summary) parts.push(`<p>${esc(fin.summary)}</p>`);
+  parts.push(view.shown.map(findingRow).join(""));
+  if (lens) {
+    // Same objects — lensFindings sorts a copy of the array, so identity
+    // cleanly separates "shown under this lens" from the rest.
+    const shownSet = new Set(view.shown);
+    const rest = lensFindings(fin.findings, undefined).shown.filter((f) => !shownSet.has(f));
+    if (rest.length) {
+      parts.push(
+        `<details><summary>${rest.length} finding(s) outside the ${esc(lens)} lens</summary>${rest
+          .map(findingRow)
+          .join("")}</details>`,
+      );
+    }
+  }
+  if (!fin.findings.length && !fin.errors?.length) {
+    parts.push(`<p class="note">Nothing beyond noise in the read subsystems.</p>`);
+  }
+  for (const e of fin.errors ?? []) {
+    parts.push(`<div class="flag" style="border-left-color:#d29922">subsystem read failed: ${esc(e)}</div>`);
+  }
+  return parts.join("");
+}
+
 /** Version pins the diff moves — first-party components as cards (with the
  * depth-1 sub-check folded in), the third-party routine as one quiet table. */
 function pinsHtml(pins: PinBump[], components?: ComponentCheck[]): string {
@@ -637,6 +700,7 @@ ${
     : ""
 }
 ${report.surface?.categories.length ? surfaceHtml(report.surface) : ""}
+${report.findings ? findingsHtml(report) : ""}
 ${report.pins?.length ? pinsHtml(report.pins, report.components) : ""}
 <h2>Undocumented commits</h2>
 ${

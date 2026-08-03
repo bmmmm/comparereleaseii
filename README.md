@@ -170,6 +170,20 @@ and a component repo already checked pays no additional judge calls on a
 re-run. `--no-expand` (in watch configs: `"expand": false`) turns it off.
 Informational, never scored.
 
+With a judge engine active the diff also gets **read**: the highest-priority
+subsystems are summarized into typed findings — breaking / security /
+behavior / feature / internal, each tagged with who it affects (operator,
+integrator, user; a security finding addresses everyone). The judge reads
+within a hard evidence budget and the remainder is declared ("N files not
+read in detail") — and it never sees commit messages or release notes while
+reading: messages are claims, the findings are an independent observation
+of the code. `--lens operator|integrator|user` renders one audience's
+findings and folds the rest behind a count (in watch configs: a per-repo
+`audience`); security findings show under every lens, and the markdown/HTML
+artifacts always keep every finding. Findings are cached like verdicts, so
+an immediate re-run is bit-identical and free. `--no-findings` turns the
+pass off. Informational, never scored.
+
 Every run computes an explainable **trust score** (0–100) from correctness,
 completeness and risk. Contradicted claims or critical flags cap it — a fake
 release cannot average itself back to green. With `--baseline <n>` the repo's

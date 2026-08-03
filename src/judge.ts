@@ -2,7 +2,7 @@
 import { tmpdir } from "node:os";
 import { commandExists, run } from "./util.ts";
 import { withVerdictCache } from "./cache.ts";
-import type { JudgedVerdict, SurplusItem } from "./types.ts";
+import type { Finding, SurplusItem, JudgedVerdict } from "./types.ts";
 
 export interface JudgeEngine {
   name: string;
@@ -507,6 +507,109 @@ Respond with ONLY this JSON object, no markdown fences:
 export function parseSuggestOutput(raw: string): string {
   const parsed = extractJsonObject(raw) as { suggestion?: unknown };
   return String(parsed.suggestion ?? "").slice(0, 300).trim();
+}
+
+/**
+ * The findings prompt is deliberately blind: no commit subjects, no release
+ * notes, no author names — only the diff. Feeding the judge the message
+ * while it reads substance anchors it on the claim (the changelog-
+ * circularity rule, generalized); messages reconcile against findings in a
+ * later stage instead.
+ */
+export function buildFindingsPrompt(opts: {
+  repoLabel: string;
+  baseRef: string;
+  headRef: string;
+  subsystem: string;
+  filesShown: number;
+  filesTotal: number;
+  hunks: Array<{ path: string; hunk: string }>;
+}): string {
+  const hunkBlock = opts.hunks.map((h) => `--- ${h.path}\n${h.hunk}`).join("\n\n");
+  return `You are describing what actually shipped in a release of ${opts.repoLabel} (${opts.baseRef} -> ${opts.headRef}), from diff evidence alone.
+
+${TRUST_PREAMBLE}
+
+Subsystem under review: ${opts.subsystem} — showing ${opts.filesShown} of its ${opts.filesTotal} changed files (fixed evidence budget).
+
+Diff:
+${untrustedBlock("DIFF", hunkBlock)}
+
+List the changes in this diff as findings. Every finding is an observation of the shown code — never a guess about intent, never knowledge from outside the diff.
+- kind, exactly one of:
+  - breaking: removed/renamed config keys, env vars, CLI flags, endpoints or API signatures; changed defaults that alter behavior on upgrade
+  - security: auth, crypto, permissions, input validation, sandboxing, security-relevant dependency changes
+  - behavior: visible behavior changes that are not breaking
+  - feature: new capability, endpoint, setting or UI
+  - internal: refactoring, tests, CI, docs, formatting — invisible outside the codebase
+- audience, exactly one of (who is affected):
+  - operator: whoever deploys or hosts it — deploy, packaging, config, migrations, resource behavior
+  - integrator: whoever builds against it — API/SDK surface, wire formats, exports
+  - user: whoever uses the software itself — visible behavior, UI, UX
+  - everyone: security-relevant regardless of role (every security finding is audience "everyone")
+- text: one concrete sentence naming what changed, citing the observed change; no speculation, no praise.
+- files: the paths carrying the change.
+Merge related hunks into one finding. At most 8 findings, most important first. Use an empty array when the diff is pure noise (formatting, comments).
+${INJECTION_RULE}
+
+Respond with ONLY this JSON object, no markdown fences:
+{"findings":[{"kind":"breaking|security|behavior|feature|internal","audience":"operator|integrator|user|everyone","text":"…","files":["path"]}]}`;
+}
+
+/** Release-level rollup: synthesized from the findings alone, no new diff. */
+export function buildFindingsRollupPrompt(opts: {
+  repoLabel: string;
+  baseRef: string;
+  headRef: string;
+  findings: Finding[];
+}): string {
+  const list = opts.findings
+    .map((f) => `- [${f.kind}/${f.audience}] (${f.subsystem}) ${f.text}`)
+    .join("\n");
+  return `You are summarizing a release of ${opts.repoLabel} (${opts.baseRef} -> ${opts.headRef}).
+
+${TRUST_PREAMBLE}
+
+The findings below were extracted from the release diff, subsystem by subsystem:
+${untrustedBlock("FINDINGS", list)}
+
+Write 1-3 sentences stating what this release ships overall, weighted toward breaking and security findings. Observations only — no praise, no advice, no speculation beyond the findings.
+${INJECTION_RULE}
+
+Respond with ONLY this JSON object, no markdown fences:
+{"summary":"…"}`;
+}
+
+const FINDING_KINDS = new Set(["breaking", "security", "behavior", "feature", "internal"]);
+const FINDING_AUDIENCES = new Set(["operator", "integrator", "user", "everyone"]);
+
+export function parseFindingsOutput(raw: string): Array<Omit<Finding, "subsystem">> {
+  const parsed = extractJsonObject(raw) as { findings?: unknown };
+  if (!Array.isArray(parsed.findings)) return [];
+  return parsed.findings
+    .filter((f): f is Record<string, unknown> => typeof f === "object" && f !== null)
+    .slice(0, 8)
+    .map((f) => ({
+      kind: String(f.kind ?? ""),
+      audience: String(f.audience ?? ""),
+      text: String(f.text ?? "").slice(0, 300).trim(),
+      files: Array.isArray(f.files) ? f.files.slice(0, 10).map(String) : [],
+    }))
+    .filter(
+      (f): f is Omit<Finding, "subsystem"> =>
+        !!f.text && FINDING_KINDS.has(f.kind) && FINDING_AUDIENCES.has(f.audience),
+    )
+    .map((f) =>
+      // Security pierces every lens (the S4a decision): a security fix filed
+      // under one role would hide from the other lenses exactly the finding
+      // they most need to see.
+      f.kind === "security" ? { ...f, audience: "everyone" } : f,
+    );
+}
+
+export function parseFindingsSummary(raw: string): string {
+  const parsed = extractJsonObject(raw) as { summary?: unknown };
+  return String(parsed.summary ?? "").slice(0, 600).trim();
 }
 
 export function parseSurplusOutput(raw: string): SurplusItem[] {

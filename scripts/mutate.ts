@@ -343,6 +343,36 @@ const MUTANTS: Mutant[] = [
     find: "(p) => p.firstParty && p.repoUrl && p.repo !== repoLabel,",
     replace: "(p) => Boolean(p.repoUrl) && p.repo !== repoLabel,",
   },
+  {
+    guard: "a security finding addresses everyone — it cannot hide under one role's lens",
+    file: "src/judge.ts",
+    find: 'f.kind === "security" ? { ...f, audience: "everyone" } : f,',
+    replace: 'f.kind === "security" && false ? { ...f, audience: "everyone" } : f,',
+  },
+  {
+    guard: "the findings budget is a hard cap — subsystems beyond it are declared, not read",
+    file: "src/findings.ts",
+    find: "const alloc = remaining >= MIN_CALL_CHARS ? Math.min(PER_CALL_CHARS, remaining) : 0;",
+    replace: "const alloc = Math.min(PER_CALL_CHARS, Math.max(remaining, MIN_CALL_CHARS));",
+  },
+  {
+    guard: "a lens never hides a finding addressed to everyone",
+    file: "src/report.ts",
+    find: '(f) => f.audience === lens || f.audience === "everyone"',
+    replace: "(f) => f.audience === lens",
+  },
+  {
+    guard: "internal findings stay folded behind a lens — they are invisible outside the codebase",
+    file: "src/report.ts",
+    find: 'const nonInternal = bySeverity.filter((f) => f.kind !== "internal");',
+    replace: "const nonInternal = bySeverity;",
+  },
+  {
+    guard: "a component sub-check never runs its own findings pass",
+    file: "src/check.ts",
+    find: "findings: false,",
+    replace: "findings: s.findings,",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

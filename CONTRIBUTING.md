@@ -41,6 +41,7 @@ that way — a dependency needs a strong argument.
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
 | `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL bumps, first-party classification |
 | `src/substance.ts` | What actually shipped: category rollup, changed symbols, config surface, migrations, routes |
+| `src/findings.ts` | Typed findings: the diff read per subsystem within a hard budget, blind to commit messages |
 | `src/report.ts` | Terminal and markdown output, exit codes |
 | `src/html.ts` | Self-contained HTML report |
 | `src/theme.ts` | Score buckets and their colors — the boundaries every renderer and the terminal share |

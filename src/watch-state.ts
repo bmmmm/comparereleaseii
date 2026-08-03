@@ -6,7 +6,7 @@
 // this module without depending on each other.
 import type { RepoLink } from "./check.ts";
 import type { CarriedPromise } from "./promises.ts";
-import type { AuthorActivity, PromiseCheck, UnverifiableKind } from "./types.ts";
+import type { Audience, AuthorActivity, PromiseCheck, UnverifiableKind } from "./types.ts";
 
 type FailOn = "none" | "contradicted" | "no-evidence";
 
@@ -53,6 +53,18 @@ export interface WatchRepoConfig {
    * repo is watched too.
    */
   expand?: boolean;
+  /**
+   * The repo's default lens: who decides updates here — `operator` (hosts
+   * it), `integrator` (builds against it) or `user` (runs it themselves).
+   * Findings for other audiences fold behind a count; security findings
+   * render under every lens. Unset renders unfiltered. Pure config by
+   * design: a heuristic reading changed files misclassifies exactly the
+   * hybrid repos, and a silently wrong lens hides the findings its real
+   * audience needed (S4a).
+   */
+  audience?: Audience;
+  /** `false` disables the LLM findings pass for this repo. */
+  findings?: boolean;
 }
 
 export interface WatchConfig {

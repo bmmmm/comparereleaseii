@@ -296,6 +296,8 @@ async function checkAndRecord(args: {
     carriedPromises: args.carried,
     components: rc.components,
     expand: rc.expand === false ? undefined : componentLoader,
+    findings: rc.findings,
+    audience: rc.audience,
   };
   const notesFile = rc.notesFile ? resolve(args.configDir, rc.notesFile) : undefined;
   let data;

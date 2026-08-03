@@ -113,6 +113,16 @@ Options:
                       first-party bump whose repo is loadable gets a depth-1
                       check of its own (from, to) range — same pipeline,
                       same caches — folded into the report
+  --lens <who>        operator | integrator | user | all — which audience's
+                      findings the report shows; the rest folds behind a
+                      count (default: all; security findings show under
+                      every lens)
+  --no-findings       Skip the LLM findings pass — the typed, audience-
+                      tagged "what shipped" summary that runs whenever a
+                      judge engine is active
+  --findings-budget <chars>  Hard evidence budget for the findings pass;
+                      subsystems beyond it are declared unread
+                      (default: 120000)
   --suggest           Draft a release-note line for the highest-churn
                       undocumented commits (needs a judge engine)
   --suggest-limit <n> Max commits to draft for, highest churn first
@@ -217,6 +227,9 @@ async function main(): Promise<number> {
       "fail-on": { type: "string", default: "no-evidence" },
       "no-reverse": { type: "boolean", default: false },
       baseline: { type: "string", default: "5" },
+      lens: { type: "string" },
+      "no-findings": { type: "boolean", default: false },
+      "findings-budget": { type: "string" },
       suggest: { type: "boolean", default: false },
       "suggest-limit": { type: "string", default: "15" },
       component: { type: "string", multiple: true },
@@ -263,9 +276,17 @@ async function main(): Promise<number> {
   if (!["auto", "off", "claude-cli", "api", "openai"].includes(escalateOpt)) {
     throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
   }
+  const lensOpt = values.lens as "operator" | "integrator" | "user" | "all" | undefined;
+  if (lensOpt !== undefined && !["operator", "integrator", "user", "all"].includes(lensOpt)) {
+    throw new Error(`--lens must be operator, integrator, user or all (got "${values.lens}")`);
+  }
   const concurrency = intFlag("concurrency", values.concurrency, 1);
   const baseline = intFlag("baseline", values.baseline, 0);
   const suggestLimit = intFlag("suggest-limit", values["suggest-limit"], 0);
+  const findingsBudget =
+    values["findings-budget"] === undefined
+      ? undefined
+      : intFlag("findings-budget", values["findings-budget"], 1000);
   const historyCount = values.history === undefined ? null : intFlag("history", values.history, 1);
 
   const components: Record<string, string> = {};
@@ -445,6 +466,9 @@ async function main(): Promise<number> {
     suggestLimit,
     components: Object.keys(components).length ? components : undefined,
     expand: values["no-expand"] ? undefined : componentLoader,
+    findings: values["no-findings"] ? false : undefined,
+    findingsBudget,
+    audience: lensOpt === "all" ? undefined : lensOpt,
   };
   const report: Report = await analyzeRelease(
     data,

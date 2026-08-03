@@ -43,6 +43,22 @@ All notable changes to comparereleaseii are documented here. The format follows 
   and an immediate re-run pays zero additional judge calls. `--no-expand`
   (watch configs: `"expand": false`) turns it off.
 
+- **The judge reads the diff into typed, audience-tagged findings.** With an
+  engine active, the highest-priority subsystems are summarized into
+  findings — breaking / security / behavior / feature / internal, each
+  tagged with who it affects (operator, integrator, user; a security
+  finding addresses everyone) — plus a release-level summary synthesized
+  from the findings alone. The judge reads within a hard evidence budget
+  and the report declares the remainder ("N files not read in detail"); it
+  never sees commit messages or release notes while reading, because
+  messages are claims and the findings are the independent observation.
+  `--lens operator|integrator|user` (watch configs: a per-repo `audience`)
+  renders one audience's findings and folds the rest behind a count;
+  security findings show under every lens, and the markdown/HTML artifacts
+  always keep every finding. Cached like verdicts — an immediate re-run is
+  bit-identical and free. `--no-findings` turns the pass off. Informational,
+  never scored.
+
 - **The history page links each release to its forge.** Every check stores the
   release URL, but only the dashboard read it — the page that lists the same
   releases, one per row, sent nobody to the source. The releases table now

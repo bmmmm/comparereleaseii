@@ -26,8 +26,11 @@ import {
   type HistorySource,
 } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
+import { summarizeShipped } from "./findings.ts";
 import type {
+  Audience,
   ComponentCheck,
+  FindingsSection,
   PinBump,
   ReleaseData,
   Report,
@@ -58,6 +61,13 @@ export interface CheckSettings {
    * loader; absent disables expansion. Production passes componentLoader —
    * the indirection is the network seam tests stub. */
   expand?: ComponentLoader;
+  /** `false` skips the LLM findings pass (typed "what shipped" summary).
+   * On by default whenever a judge engine is active. */
+  findings?: boolean;
+  /** Hard evidence budget in chars for the findings pass. */
+  findingsBudget?: number;
+  /** The repo's default lens, stamped on the report for renderers. */
+  audience?: Audience;
 }
 
 /** Loads one component release range (tag, diffed against base). */
@@ -357,6 +367,18 @@ export async function analyzeRelease(
 
   const components = s.expand ? await expandComponents(pins, data.repoLabel, s) : undefined;
 
+  // The findings pass runs after computeMetrics has fixed the numbers —
+  // structurally score-neutral, like pins and promises.
+  let findings: FindingsSection | undefined;
+  if (s.engine && s.findings !== false && data.files.length) {
+    console.error(`Reading the diff into findings (what shipped)…`);
+    findings = await summarizeShipped(data, {
+      engine: s.engine,
+      concurrency: s.concurrency,
+      budgetChars: s.findingsBudget,
+    });
+  }
+
   let uncovered = coverage?.uncovered ?? [];
   if (s.suggest) {
     if (!s.engine) {
@@ -402,6 +424,8 @@ export async function analyzeRelease(
     pins: pins.length ? pins : undefined,
     surface: data.files.length ? releaseSurface(data.files) : undefined,
     components,
+    findings,
+    audience: s.audience,
   };
 }
 
@@ -475,6 +499,10 @@ async function checkComponent(pin: PinBump, s: CheckSettings): Promise<Component
     // too — its keys are the parent's pin names, and in the child's context
     // the same name could label a different repo entirely.
     expand: undefined,
+    // The child folds into one summary line; its deterministic surface is
+    // that summary. An LLM findings pass per component would multiply the
+    // parent's judge bill for detail the fold-in never shows.
+    findings: false,
   };
   try {
     const child = await analyzeRelease(data, context, null, childSettings);

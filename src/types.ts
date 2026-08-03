@@ -277,6 +277,54 @@ export interface ReleaseSurface {
   apiRoutes: string[];
 }
 
+export type FindingKind = "breaking" | "security" | "behavior" | "feature" | "internal";
+
+/** A repo's audience profile — who decides updates there (the S4a walk). */
+export type Audience = "operator" | "integrator" | "user";
+
+/**
+ * Who a finding affects. `everyone` is the security audience: a security
+ * finding renders under every lens — filing it under one role would hide
+ * from the other lenses exactly the finding they most need to see.
+ */
+export type FindingAudience = Audience | "everyone";
+
+/**
+ * One typed observation of what the release diff ships, produced by the
+ * judge engine reading the diff alone — blind to commit messages and notes
+ * by construction: feeding it the message anchors it on the claim
+ * (changelog circularity, generalized). Informational, never scored.
+ */
+export interface Finding {
+  kind: FindingKind;
+  audience: FindingAudience;
+  /** One concrete sentence — what changed, observed, never intent. */
+  text: string;
+  /** Paths carrying the change. */
+  files: string[];
+  /** Subsystem whose diff pass produced it. */
+  subsystem: string;
+}
+
+/** What the findings pass read vs. skipped — the declared remainder. */
+export interface FindingsBudget {
+  maxChars: number;
+  usedChars: number;
+  subsystemsRead: number;
+  subsystemsTotal: number;
+  filesRead: number;
+  filesTotal: number;
+}
+
+export interface FindingsSection {
+  findings: Finding[];
+  /** Release-level rollup, synthesized from the findings alone. */
+  summary?: string;
+  budget: FindingsBudget;
+  /** Subsystem passes that failed — their findings are missing, not empty. */
+  errors?: string[];
+}
+
 export type FlagSeverity = "critical" | "warn" | "info";
 
 export interface RiskFlag {
@@ -403,4 +451,12 @@ export interface Report {
   surface?: ReleaseSurface;
   /** Depth-1 sub-checks of first-party pin bumps — informational, never scored. */
   components?: ComponentCheck[];
+  /** Typed findings the judge engine read off the diff — informational, never scored. */
+  findings?: FindingsSection;
+  /**
+   * The repo's default lens (per-repo `audience:` config, or --lens): which
+   * audience's findings render first. A view property — the findings list
+   * itself always carries every audience.
+   */
+  audience?: Audience;
 }

@@ -211,8 +211,8 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
 report directory is the URL's path-safe form (`https_gitea.com_gitea_tea`). Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
 `escalate`, `escalateModel`, `failOn`, `baseline`, `concurrency`,
 `includePrerelease`, `notifyBelow`, `notesFile`, `label`, `components`,
-`expand`. Relative paths (`reportsDir`, `stateFile`, `notesFile`) resolve
-against the config file's directory.
+`expand`, `audience`, `findings`. Relative paths (`reportsDir`, `stateFile`,
+`notesFile`) resolve against the config file's directory.
 
 `components` declares first-party components behind version pins that cannot
 name their own repo — a bare Makefile variable, an `ARG`. Pin name →
@@ -235,6 +235,17 @@ The sub-check shares the clone and verdict caches, so a component that is
 itself on the watchlist costs nothing extra beyond its first check.
 `"expand": false` (per repo or in `defaults`) disables it; the CLI spelling
 is `--no-expand`.
+
+With a judge engine, each release's diff is also read into typed,
+audience-tagged **findings** ("what shipped") — blind to commit messages by
+construction. `audience` names the repo's default lens, i.e. who decides
+updates here: `"operator"` (hosts it), `"integrator"` (builds against it)
+or `"user"` (runs it themselves). Reports render that audience's findings
+first and fold the rest behind a count; security findings render under
+every lens, and unset renders unfiltered. It is deliberately pure config —
+no heuristic guesses it, because a silently wrong lens hides the findings
+the real audience needed. `"findings": false` disables the pass; the CLI
+spellings are `--lens` and `--no-findings`.
 
 The judge defaults shown above are the recommended watchdog setup: a local
 OpenAI-compatible model (Ollama/MLX/vLLM) does the bulk verification for
