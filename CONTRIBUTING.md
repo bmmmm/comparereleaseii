@@ -38,6 +38,7 @@ that way — a dependency needs a strong argument.
 | `src/calibrate.ts` | Golden set against the configured judge |
 | `src/cache.ts` | On-disk verdict cache |
 | `src/metrics.ts` | Trust score, risk flags, per-file coverage |
+| `src/bump.ts` | The version number as a claim: semver bump held against the commits' own BREAKING/feat markers |
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
 | `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL bumps, first-party classification |
 | `src/substance.ts` | What actually shipped: category rollup, changed symbols, config surface, migrations, routes |

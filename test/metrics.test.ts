@@ -865,3 +865,30 @@ test("authorActivity groups by email key across spellings and counts path facts"
   assert.equal(authorActivity(commits, null)[0].sensitiveCommits, 0);
   assert.equal(authorActivity(commits, null)[0].commits, 2);
 });
+
+test("buildFlags holds the version bump against the commits' markers", () => {
+  const data = releaseData(["src/app.js"]);
+  data.baseRef = "v1.2.3";
+  data.headRef = "v1.2.4";
+  data.commits = [
+    {
+      sha: "d3adb33f",
+      subject: "refactor!: new config format",
+      body: "",
+      author: "a",
+      prNumbers: [],
+    },
+  ];
+  const flags = buildFlags(data, [], null, [], null);
+  const bump = flags.find((f) => f.kind === "bump-mismatch");
+  assert.ok(bump, "expected the bump-mismatch warn");
+  assert.equal(bump.severity, "warn");
+
+  // The helper's default refs (1.0.0 → 1.1.0) with unmarked commits: quiet.
+  assert.equal(
+    buildFlags(releaseData(["src/app.js"]), [], null, [], null).some((f) =>
+      f.kind.startsWith("bump-mismatch"),
+    ),
+    false,
+  );
+});

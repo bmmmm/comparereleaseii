@@ -37,6 +37,24 @@ const MUTANTS: Mutant[] = [
     replace: "overall,",
   },
   {
+    guard: "a 1.x minor bump with BREAKING markers warns; dropping the major gate must be caught",
+    file: "src/bump.ts",
+    find: 'if (breaking.length && (bump === "patch" || base.major >= 1)) {',
+    replace: 'if (breaking.length && bump === "patch") {',
+  },
+  {
+    guard: "prerelease tags make no bump claim and stay out of bump-mismatch",
+    file: "src/bump.ts",
+    find: "if (!base || !head || base.prerelease || head.prerelease) return [];",
+    replace: "if (!base || !head) return [];",
+  },
+  {
+    guard: "feat-in-patch only fires in repos that actually speak conventional commits",
+    file: "src/bump.ts",
+    find: "conventional.length / subjects.length >= 0.25",
+    replace: "conventional.length / subjects.length >= 0",
+  },
+  {
     guard: "markdown files are never classified as ci/build or auth code",
     file: "src/metrics.ts",
     find: "if (DOC_FILE.test(path)) return null;",

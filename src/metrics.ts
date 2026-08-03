@@ -17,6 +17,7 @@ import type {
 import type { Coverage } from "./verify.ts";
 import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
 import { authorKey, type Baseline } from "./history.ts";
+import { bumpMismatchFlags } from "./bump.ts";
 import { hunkFunctions, isChangelogPath } from "./match.ts";
 import {
   BENIGN_BINARY,
@@ -268,6 +269,8 @@ export function buildFlags(
     }
     return [...shas].slice(0, 5);
   };
+
+  flags.push(...bumpMismatchFlags(data.baseRef, data.headRef, data.commits));
 
   const contradicted = results.filter((r) => r.verdict === "contradicted");
   if (contradicted.length) {
