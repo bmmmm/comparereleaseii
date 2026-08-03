@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runWatch, runBackfill, sanitizeTag } from "../src/watch.ts";
+import { runWatch, runBackfill, sanitizeTag, validateWatchConfig } from "../src/watch.ts";
 import { toWatchIndexHtml, toWatchAtomFeed } from "../src/watch-index.ts";
 import { runNotify } from "../src/util.ts";
 import {
@@ -80,6 +80,59 @@ test("pickNewReleases: drafts and prereleases are skipped unless opted in", () =
     ["v2-rc1"],
   );
   assert.deepEqual(pickNewReleases(releases, "2026-07-30T00:00:00Z"), []);
+});
+
+test("pickNewReleases: tagPattern keeps non-matching tags out entirely", () => {
+  const releases = [
+    rel("nightly-20260802", "2026-08-02T00:00:00Z"),
+    rel("v1.4.0", "2026-07-20T00:00:00Z"),
+    rel("nightly-20260710", "2026-07-10T00:00:00Z"),
+    rel("v1.3.0", "2026-06-01T00:00:00Z"),
+  ];
+  // First run: the newest MATCHING release, not the newest tag.
+  assert.deepEqual(
+    pickNewReleases(releases, null, { tagPattern: "^v\\d" }).map((r) => r.tag),
+    ["v1.4.0"],
+  );
+  // Cursor past the last matching release: a new nightly alone is no news.
+  assert.deepEqual(pickNewReleases(releases, "2026-07-25T00:00:00Z", { tagPattern: "^v\\d" }), []);
+  // countSkipped counts only what would have been checked.
+  assert.equal(countSkipped(releases, "2026-05-01T00:00:00Z", { tagPattern: "^v\\d", cap: 1 }), 1);
+  assert.equal(countSkipped(releases, "2026-05-01T00:00:00Z", { cap: 1 }), 3);
+});
+
+test("pickBackfillReleases: tagPattern scopes the backfill the same way", () => {
+  const releases = [
+    rel("nightly-20260802", "2026-08-02T00:00:00Z"),
+    rel("v1.4.0", "2026-07-20T00:00:00Z"),
+    rel("v1.3.0", "2026-06-01T00:00:00Z"),
+    rel("v1.2.0", "2026-05-01T00:00:00Z"),
+  ];
+  const fresh: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  assert.deepEqual(
+    pickBackfillReleases(releases, fresh, { releases: 2, tagPattern: "^v\\d" }).map((r) => r.tag),
+    ["v1.3.0", "v1.4.0"],
+  );
+});
+
+test("validateWatchConfig rejects an invalid tagPattern with the entry named", () => {
+  assert.throws(
+    () =>
+      validateWatchConfig({
+        repos: [{ repo: "owner/name", tagPattern: "([" }],
+      }),
+    /tagPattern.*owner\/name.*not a valid regular expression/s,
+  );
+  assert.throws(
+    () =>
+      validateWatchConfig({
+        repos: [{ repo: "owner/name" }],
+        defaults: { tagPattern: "(" },
+      }),
+    /tagPattern.*defaults/s,
+  );
+  // A valid pattern passes.
+  validateWatchConfig({ repos: [{ repo: "owner/name", tagPattern: "^v\\d" }] });
 });
 
 test("isFlagged: exit code, critical flags, or a score below threshold", () => {

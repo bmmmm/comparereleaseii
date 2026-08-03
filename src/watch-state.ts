@@ -39,6 +39,12 @@ export interface WatchRepoConfig {
   baseline?: number;
   concurrency?: number;
   includePrerelease?: boolean;
+  /**
+   * Only tags matching this regular expression are watched and backfilled —
+   * e.g. "^v\\d" keeps a repo's nightly-20260803 tags out of the watchlist.
+   * Invalid patterns are rejected when the config is loaded.
+   */
+  tagPattern?: string;
   /** Trust score below which a release is flagged (default 65). */
   notifyBelow?: number;
   /**
@@ -309,16 +315,31 @@ export interface WatchState {
   repos: Record<string, RepoState>;
 }
 
+/**
+ * The one release-eligibility rule every picker shares: drafts never,
+ * prereleases only when asked, and — when the entry pins a tagPattern —
+ * only matching tags. One function on purpose: the filters used to be
+ * copies, and copies drift.
+ */
+export function eligibleRelease(
+  r: ReleaseInfo,
+  opts: { includePrerelease?: boolean; tagPattern?: string },
+): boolean {
+  if (r.draft || !r.publishedAt) return false;
+  if (r.prerelease && !opts.includePrerelease) return false;
+  return opts.tagPattern === undefined || new RegExp(opts.tagPattern).test(r.tag);
+}
+
 /** Releases to check: newer than the last checked one, oldest first. On the
  * first run only the latest release is checked (no backfill surprise). */
 export function pickNewReleases(
   releases: ReleaseInfo[],
   lastPublishedAt: string | null,
-  opts: { includePrerelease?: boolean; cap?: number } = {},
+  opts: { includePrerelease?: boolean; tagPattern?: string; cap?: number } = {},
 ): ReleaseInfo[] {
   const cap = opts.cap ?? 3;
   const eligible = releases
-    .filter((r) => !r.draft && r.publishedAt && (opts.includePrerelease || !r.prerelease))
+    .filter((r) => eligibleRelease(r, opts))
     .sort((a, b) => a.publishedAt!.localeCompare(b.publishedAt!));
   if (!eligible.length) return [];
   if (!lastPublishedAt) return [eligible[eligible.length - 1]];
@@ -334,15 +355,11 @@ export function pickNewReleases(
 export function countSkipped(
   releases: ReleaseInfo[],
   lastPublishedAt: string | null,
-  opts: { includePrerelease?: boolean; cap?: number } = {},
+  opts: { includePrerelease?: boolean; tagPattern?: string; cap?: number } = {},
 ): number {
   if (lastPublishedAt === null) return 0;
   const eligible = releases.filter(
-    (r) =>
-      !r.draft &&
-      r.publishedAt &&
-      (opts.includePrerelease || !r.prerelease) &&
-      r.publishedAt! > lastPublishedAt,
+    (r) => eligibleRelease(r, opts) && r.publishedAt! > lastPublishedAt,
   );
   return Math.max(0, eligible.length - (opts.cap ?? 3));
 }
@@ -393,10 +410,10 @@ export function recordChecked(
 export function pickBackfillReleases(
   releases: ReleaseInfo[],
   repoState: RepoState,
-  scope: { releases?: number; since?: string; includePrerelease?: boolean },
+  scope: { releases?: number; since?: string; includePrerelease?: boolean; tagPattern?: string },
 ): ReleaseInfo[] {
   const eligible = releases
-    .filter((r) => !r.draft && r.publishedAt && (scope.includePrerelease || !r.prerelease))
+    .filter((r) => eligibleRelease(r, scope))
     .sort((a, b) => a.publishedAt!.localeCompare(b.publishedAt!));
   const inScope =
     scope.since !== undefined

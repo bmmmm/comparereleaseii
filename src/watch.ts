@@ -40,6 +40,7 @@ import {
   capLedger,
   carriedFromLedger,
   countSkipped,
+  eligibleRelease,
   entryKey,
   hasDrifted,
   isFlagged,
@@ -100,7 +101,7 @@ export function sanitizeTag(tag: string): string {
   return /^index$/i.test(base) ? `${base}_` : base;
 }
 
-function validateWatchConfig(config: WatchConfig): void {
+export function validateWatchConfig(config: WatchConfig): void {
   if (!Array.isArray(config.repos) || !config.repos.length) {
     throw new Error('Watch config needs a non-empty "repos" array — see docs/watchdog.md.');
   }
@@ -139,6 +140,24 @@ function validateWatchConfig(config: WatchConfig): void {
     } else if (!r.repo?.includes("/")) {
       throw new Error(
         `Watch config: every repos[] entry needs "repo": "owner/name" (GitHub) or "repoUrl": "https://forge.example.com/owner/repo" (got ${JSON.stringify(r.repo)}).`,
+      );
+    }
+  }
+  // Fail on a broken tagPattern here, once — the pickers compile it on
+  // every poll and would otherwise throw mid-run on every single release.
+  const patterns: Array<[string, string | undefined]> = [
+    ["defaults", config.defaults?.tagPattern],
+    ...config.repos.map(
+      (r): [string, string | undefined] => [r.repo ?? r.repoUrl ?? "?", r.tagPattern],
+    ),
+  ];
+  for (const [where, pattern] of patterns) {
+    if (pattern === undefined) continue;
+    try {
+      new RegExp(pattern);
+    } catch (err) {
+      throw new Error(
+        `Watch config: "tagPattern" ${JSON.stringify(pattern)} (${where}) is not a valid regular expression — ${(err as Error).message}`,
       );
     }
   }
@@ -487,6 +506,7 @@ export async function runWatch(
     const cap = config.maxPerRun ?? 3;
     const fresh = pickNewReleases(releases, repoState.lastPublishedAt, {
       includePrerelease: rc.includePrerelease,
+      tagPattern: rc.tagPattern,
       cap,
     });
     if (!fresh.length) {
@@ -496,6 +516,7 @@ export async function runWatch(
     }
     const skipped = countSkipped(releases, repoState.lastPublishedAt, {
       includePrerelease: rc.includePrerelease,
+      tagPattern: rc.tagPattern,
       cap,
     });
     if (skipped > 0) {
@@ -599,10 +620,12 @@ const MAX_LISTING_PAGES = 20;
  */
 async function listReleasesDeep(
   rc: WatchRepoConfig,
-  scope: { releases?: number; since?: string; includePrerelease?: boolean },
+  scope: { releases?: number; since?: string; includePrerelease?: boolean; tagPattern?: string },
 ): Promise<{ releases: ReleaseInfo[]; gh: GhRelease[] | null; forge: ForgeListing | null }> {
-  const eligibleCount = (rels: ReleaseInfo[]) =>
-    rels.filter((r) => !r.draft && r.publishedAt && (scope.includePrerelease || !r.prerelease));
+  // Pattern-filtered tags must not count toward "scope covered" — a repo
+  // whose newest page is all nightlies would otherwise stop paging before
+  // reaching the releases the pattern actually asks for.
+  const eligibleCount = (rels: ReleaseInfo[]) => rels.filter((r) => eligibleRelease(r, scope));
   // More pages are needed while the scope is not covered: for --releases N
   // until N+1 eligible ones are loaded, for --since until one eligible
   // release predates the date (then everything since it is on the list).
@@ -750,6 +773,7 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
     releases: opts.releases,
     since: opts.since,
     includePrerelease: rc.includePrerelease,
+    tagPattern: rc.tagPattern,
   });
 
   // Plan first — the cost statement must precede the first paid check.
