@@ -13,24 +13,20 @@
 ## Open (2026-08-03)
 
 The complete list — everything below this section is landed or explicitly
-settled.
+settled. The first four items are planned in detail in "Next — v0.7.0 and
+the axis in operation" at the bottom of the file (journal order: newest
+last).
 
-- **Cut a release.** The Unreleased CHANGELOG block carries the whole
-  second axis including one score-relevant change (S5); the local routine
-  applies (dogfood gate, `--calibrate` drift check, tag, both forges).
-- **Watchlist lens rollout** (config outside this repo): set the S4a
-  `audience:` values from the profile table in the live `watch.json`, so
-  daily watch runs render the lenses.
-- **Reconciliation layer** — noted, no commitment: claims joined against
-  findings as confirmed / undocumented / unsupported; S4b's blind findings
-  and S5's substance rule are its two ready inputs.
-- **Live-watchlist backfill** — waits for an explicit user go (judge cost,
-  live state): one-shot high-`maxPerRun` catch-up, last ~5 releases each.
-- **Stale XDG watch state** — the pre-2026-07-28 copy under
-  `~/.local/state/comparereleaseii/` is a duplicate awaiting a user go for
-  deletion.
-- **Demand-driven only** (no schedule): the F23 maxBuffer decision; the
-  Action PR-comment variant.
+- **Cut v0.7.0** (Block 1 there): the Unreleased CHANGELOG block, incl.
+  the score-relevant S5 change.
+- **Watcher parity + lens rollout** (Block 2): extension pin bump, S4a
+  `audience:` values in the live config, stale-XDG-state deletion.
+- **Backfill the live watchlist** (Block 3): user go at run time (judge
+  cost).
+- **Reconciliation layer** (Block 4): design proposal written, two
+  decisions marked open.
+- **Demand-driven only** (no schedule, deliberately not in the plan): the
+  F23 maxBuffer decision; the Action PR-comment variant.
 
 Settled decisions (badges rejected, `watch serve` unbuilt, public scans
 rejected, calibration frozen): see "Settled — do not reopen without new
@@ -1444,3 +1440,77 @@ fixture as the negative control.
 Tracking issues: [#7 Phase 1](https://github.com/bmmmm/comparereleaseii/issues/7) ·
 [#8 Phase 2](https://github.com/bmmmm/comparereleaseii/issues/8) ·
 [#9 Phase 3](https://github.com/bmmmm/comparereleaseii/issues/9)
+
+---
+
+## Next — v0.7.0 and the axis in operation (2026-08-03)
+
+Context: the second axis is code-complete on `main` but nobody consumes it
+yet — the CHANGELOG block is unreleased, the live watcher runs v0.6.0
+without lens config, and the reconciliation idea has ready inputs but no
+block. Blocks 1–3 are operations (ship, deploy, use); Block 4 is the only
+build block. F23 and the Action PR-comment stay demand-driven — putting
+them here would schedule work no demand has asked for.
+
+### Block 1 — release v0.7.0
+The Unreleased block carries the whole second axis: four additive features
+(pins, substance, first-party expansion, findings/lenses) and one
+score-relevant change (S5 substance coverage) — a minor bump; no public
+contract moves (exit codes, JSON additive-only, flag semantics). The local
+routine applies: full suite + `pnpm mutate` (every guard) green, `pnpm
+dogfood` gate on our own notes, `--calibrate` drift check,
+`release:prepare` / `release:publish`, tag on both forges + GitHub
+release — the moment the public mirror catches up. The README validation
+table already carries the 2026-08 numbers (re-measured under S5); only
+another scoring change would require a fresh run.
+**Done when:** `v0.7.0` exists on both forges with the GitHub release
+published and the dogfood gate scored our own notes ≥ 90.
+
+### Block 2 — the watcher catches up: version parity + lens rollout
+Operations, not code — the config lives outside this repo:
+- Bump the watcher's pinned extension/checkout to `v0.7.0` (version-parity
+  sweep: every deployment place moves together, none is left behind).
+- Set the S4a `audience:` values in the live `watch.json` — operator:
+  vaultwarden, traefik, omlx; integrator: sandbox-runtime, soundcloud/api;
+  user: the seven desktop apps. Existing `components`/`expand` entries
+  stay untouched.
+- Housekeeping, user go at run time: delete the stale pre-2026-07-28 XDG
+  state copy under `~/.local/state/comparereleaseii/`.
+**Done when:** the next watch-written report renders a default lens, the
+version sweep reports one version everywhere, and the stale state is gone
+or explicitly kept.
+
+### Block 3 — backfill the live watchlist (user go at run time)
+The standing offer from the long-view section, now worth more: the
+reports it writes carry findings and lenses. `watch backfill --releases 5`
+across the watchlist — the command states the judge cost and asks before
+starting; backfilled checks never alert. Runs after Block 2 so the
+reports are written by the released version with lens config in place.
+**Done when:** every watchlist repo has a median, drift detection and a
+filled author ledger (≥ 5 checks each), or a documented skip.
+
+### Block 4 — reconciliation: claims meet findings (design, then build)
+The axis's decisions block already settles the shape: messages and notes
+join *late*, against the findings — confirmed (claimed + observed),
+undocumented (observed, never claimed — the interesting signal),
+unsupported (claimed, never observed). Score-neutral until measured, like
+every stage before it. Proposal, deterministic first: match claims to
+findings with the S5 machinery (identifier overlap against a finding's
+text + files), render as per-finding tags in the findings section plus one
+"unsupported claims" line; a judged matching pass only where the
+deterministic one stays empty — and only as a later, separate decision.
+Open before building: whether reconciliation renders inside the findings
+section or as its own; whether `undocumented` findings should order the
+uncovered list (display only — anything score-touching faces the A/B
+discipline).
+**Done when:** a cached OpenCloud report shows all three sets from
+existing data, `--judge off` degrades honestly (no findings → no
+reconciliation, deterministic output unchanged), re-runs stay
+bit-identical, and a score-neutrality test pins it.
+
+Order: 1 → 2 → 3 → 4. Ship first — nothing downstream may pin an
+unreleased tree; parity + lenses second — the watcher must not keep
+writing reports with a version the repo has moved past; backfill third —
+its reports should be the final shape; reconciliation last, as the only
+block that changes code, inheriting an axis that is actually in operation
+by then.
