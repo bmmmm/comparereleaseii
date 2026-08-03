@@ -8,6 +8,7 @@
 // bit-identical and free. Informational: the score never reads this.
 import { pooled } from "./util.ts";
 import { capHunks } from "./verify.ts";
+import { isChangelogPath } from "./match.ts";
 import { fileCategory, sensitiveCategory } from "./metrics.ts";
 import {
   buildFindingsPrompt,
@@ -91,6 +92,11 @@ export function planFindings(files: DiffFile[], budgetChars: number): SubsystemP
   const groups = new Map<string, DiffFile[]>();
   for (const f of files) {
     if (!f.patch) continue;
+    // A changelog diff is the notes restating themselves — read as findings
+    // evidence it turns "what shipped" back into "what the publisher says
+    // shipped" (measured on OpenCloud: every finding cited CHANGELOG.md).
+    // Same boundary evidence matching draws via isChangelogPath.
+    if (isChangelogPath(f.path)) continue;
     const key = subsystemOf(f.path);
     const list = groups.get(key) ?? [];
     list.push(f);

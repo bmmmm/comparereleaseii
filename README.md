@@ -177,7 +177,9 @@ integrator, user; a security finding addresses everyone). The judge reads
 within a hard evidence budget and the remainder is declared ("N files not
 read in detail") — and it never sees commit messages or release notes while
 reading: messages are claims, the findings are an independent observation
-of the code. `--lens operator|integrator|user` renders one audience's
+of the code. Changelog diffs are excluded from the read for the same
+reason — notes cannot describe themselves.
+`--lens operator|integrator|user` renders one audience's
 findings and folds the rest behind a count (in watch configs: a per-repo
 `audience`); security findings show under every lens, and the markdown/HTML
 artifacts always keep every finding. Findings are cached like verdicts, so

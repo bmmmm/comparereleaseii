@@ -106,9 +106,12 @@ test("planFindings spends the budget top-priority-first and declares the rest", 
     file("docs/x.md", "@@ -1 +1 @@\n-a\n+b\n", 300, 300),
     file("src/core/a.go", "@@ -1 +1 @@\n-a\n+b\n", 200, 100),
     file("assets/logo.png", undefined, 0, 0),
+    file("CHANGELOG.md", "@@ -1 +1 @@\n-old claim\n+new claim per PR #1\n", 50, 50),
   ];
   const plan = planFindings(files, 21000);
-  // No patch, nothing to read: the asset never becomes a subsystem.
+  // No patch, nothing to read: the asset never becomes a subsystem. And the
+  // changelog diff is the notes restating themselves — never findings
+  // evidence, so it never becomes one either.
   assert.deepEqual(plan.map((p) => p.name), ["src/core", "docs"]);
   // Category weight beats raw churn: source outranks the bigger docs churn.
   assert.equal(plan[0].alloc, 20000);
@@ -377,6 +380,33 @@ test("analyzeRelease attaches findings with an engine — score-neutral, off wit
     settings({ judgeMode: "off" }),
   );
   assert.equal(judgeOff.findings, undefined);
+});
+
+test("--estimate counts the findings pass and its skip", async () => {
+  const { printEstimate } = await import("../src/estimate.ts");
+  const run = async (findings: boolean): Promise<string> => {
+    const lines: string[] = [];
+    const orig = console.log;
+    console.log = (...args: unknown[]) => lines.push(args.join(" "));
+    try {
+      await printEstimate(shippedData(), {
+        judgeMode: "auto",
+        concurrency: 4,
+        baseline: 0,
+        localPath: true,
+        suggest: false,
+        noReverse: false,
+        suggestLimit: 15,
+        findings,
+      });
+    } finally {
+      console.log = orig;
+    }
+    return lines.join("\n");
+  };
+  // Three subsystems + the release summary — the pass is in the bill.
+  assert.match(await run(true), /Findings pass: 4 call\(s\)/);
+  assert.doesNotMatch(await run(false), /Findings pass/);
 });
 
 test("first-party expansion never runs a findings pass for the child", async () => {

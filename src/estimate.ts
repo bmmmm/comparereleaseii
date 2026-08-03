@@ -6,6 +6,7 @@
 import { parseClaims } from "./claims.ts";
 import { computeCoverage, verifyClaims } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
+import { summarizeShipped } from "./findings.ts";
 import type { JudgeEngine } from "./judge.ts";
 import type { ReleaseData } from "./types.ts";
 
@@ -17,6 +18,8 @@ export interface EstimateOptions {
   suggest: boolean;
   noReverse: boolean;
   suggestLimit: number;
+  findings: boolean;
+  findingsBudget?: number;
 }
 
 export async function printEstimate(data: ReleaseData, opts: EstimateOptions): Promise<number> {
@@ -30,6 +33,15 @@ export async function printEstimate(data: ReleaseData, opts: EstimateOptions): P
     judge: async (p: string) => {
       est.calls++;
       est.chars += p.length;
+      // Shape-match the prompt so every downstream stage keeps running —
+      // a findings pass whose parse comes back empty would skip the release
+      // summary and undercount by one call.
+      if (p.startsWith("You are describing what actually shipped")) {
+        return '{"findings":[{"kind":"internal","audience":"user","text":"(estimate)","files":[]}]}';
+      }
+      if (p.startsWith("You are summarizing a release")) {
+        return '{"summary":"(estimate)"}';
+      }
       return '{"verdict":"partial","confidence":0.5,"files":[],"reasoning":"(estimate)"}';
     },
   };
@@ -42,6 +54,17 @@ export async function printEstimate(data: ReleaseData, opts: EstimateOptions): P
   });
   const change = results.filter((r) => r.claim.kind === "change");
   const generated = results.filter((r) => r.generated).length;
+
+  let findingsCalls = 0;
+  if (opts.findings) {
+    const before = est.calls;
+    await summarizeShipped(data, {
+      engine: stub,
+      concurrency: 8,
+      budgetChars: opts.findingsBudget,
+    });
+    findingsCalls = est.calls - before;
+  }
 
   let suggestTargets = 0;
   if (opts.suggest && !opts.noReverse) {
@@ -64,6 +87,11 @@ export async function printEstimate(data: ReleaseData, opts: EstimateOptions): P
   console.log(`\nCost estimate — ${data.repoLabel} ${data.baseRef} → ${data.headRef}`);
   console.log(`  Diff: ${data.commits.length} commits, ${data.files.length} files, ±${data.files.reduce((s, f) => s + f.additions + f.deletions, 0)} lines`);
   console.log(`  Claims: ${results.length} total — ${change.length} checkable (${generated} generated), ${results.length - change.length} informational`);
+  if (findingsCalls) {
+    console.log(
+      `  Findings pass: ${findingsCalls} call(s) — subsystem reads + release summary, included below (--no-findings skips)`,
+    );
+  }
   if (opts.suggest) {
     console.log(
       opts.noReverse

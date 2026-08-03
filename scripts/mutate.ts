@@ -373,6 +373,12 @@ const MUTANTS: Mutant[] = [
     find: "findings: false,",
     replace: "findings: s.findings,",
   },
+  {
+    guard: "changelog diffs are never findings evidence — the notes cannot describe themselves",
+    file: "src/findings.ts",
+    find: "if (isChangelogPath(f.path)) continue;",
+    replace: "",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

@@ -51,7 +51,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
   from the findings alone. The judge reads within a hard evidence budget
   and the report declares the remainder ("N files not read in detail"); it
   never sees commit messages or release notes while reading, because
-  messages are claims and the findings are the independent observation.
+  messages are claims and the findings are the independent observation —
+  changelog diffs are excluded from the read for the same reason.
   `--lens operator|integrator|user` (watch configs: a per-repo `audience`)
   renders one audience's findings and folds the rest behind a count;
   security findings show under every lens, and the markdown/HTML artifacts

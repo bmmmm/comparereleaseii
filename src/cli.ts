@@ -451,6 +451,8 @@ async function main(): Promise<number> {
       suggest: Boolean(values.suggest),
       noReverse: Boolean(values["no-reverse"]),
       suggestLimit,
+      findings: !values["no-findings"],
+      findingsBudget,
     });
   }
 
