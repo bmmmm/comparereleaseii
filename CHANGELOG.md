@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.7.0 — 2026-08-03
+
 ### Changed
 
 - **Coverage is earned by the commit's own diff, never by subject
