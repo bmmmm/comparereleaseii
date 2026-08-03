@@ -17,6 +17,7 @@ import { runNotify, writeJsonAtomic } from "./util.ts";
 import { toWatchAtomFeed, toWatchIndexHtml } from "./watch-index.ts";
 import {
   analyzeRelease,
+  componentLoader,
   loadForgeRelease,
   loadGithubReleaseData,
   prepareForgeTarget,
@@ -294,6 +295,7 @@ async function checkAndRecord(args: {
     // until it ages out as stale (checkPromises counts the carries).
     carriedPromises: args.carried,
     components: rc.components,
+    expand: rc.expand === false ? undefined : componentLoader,
   };
   const notesFile = rc.notesFile ? resolve(args.configDir, rc.notesFile) : undefined;
   let data;

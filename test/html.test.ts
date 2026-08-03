@@ -347,3 +347,38 @@ test("the surface section renders and keeps hostile symbol names inert", () => {
   assertNoBreakout(html);
   assert.ok(!toHtml(report()).includes("What actually shipped"));
 });
+
+test("component sub-check summaries render inside the pin card and keep hostile content inert", () => {
+  const pin = { name: "web", from: "1.0", to: "1.1", file: "Makefile", repo: "acme/web", firstParty: true };
+  const surface = {
+    categories: [{ category: "source", files: 1, additions: 1, deletions: 0 }],
+    symbols: [HOSTILE],
+    moreSymbols: 0,
+    envVars: { added: [HOSTILE], removed: [] },
+    cliFlags: { added: [], removed: [] },
+    configKeys: { added: [], removed: [] },
+    migrations: [],
+    apiRoutes: [],
+  };
+  const html = toHtml(
+    report({
+      pins: [pin],
+      components: [
+        { name: "web", repo: "acme/web", from: "1.0", to: "1.1", score: 92, scoreLabel: "solid", surface },
+      ],
+    }),
+  );
+  assert.match(html, /its check: score 92\/100 \(solid\)/);
+  assert.match(html, /shipped: 1 source/);
+  assertNoBreakout(html);
+
+  // A failed sub-check renders its (foreign-text) error inert too.
+  const failed = toHtml(
+    report({
+      pins: [pin],
+      components: [{ name: "web", repo: "acme/web", from: "1.0", to: "1.1", error: `load failed: ${HOSTILE}` }],
+    }),
+  );
+  assert.match(failed, /load failed:/);
+  assertNoBreakout(failed);
+});

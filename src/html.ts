@@ -2,9 +2,18 @@
 import { createHash } from "node:crypto";
 import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
-import { carriedOver, countVerdicts, unverifiableNote } from "./report.ts";
+import { carriedOver, componentBits, countVerdicts, unverifiableNote } from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
-import type { FileInsight, PinBump, ReleaseSurface, Report, RiskFlag, Verdict } from "./types.ts";
+import { surfaceLine } from "./substance.ts";
+import type {
+  ComponentCheck,
+  FileInsight,
+  PinBump,
+  ReleaseSurface,
+  Report,
+  RiskFlag,
+  Verdict,
+} from "./types.ts";
 
 /** GitHub's file anchor on compare pages: "diff-" + sha256(path). */
 function diffAnchor(path: string): string {
@@ -332,15 +341,25 @@ function surfaceHtml(s: ReleaseSurface): string {
 <table><tr><th>category</th><th>files</th><th>churn</th></tr>${rows}</table>${facts}`;
 }
 
-/** Version pins the diff moves — first-party components as cards, the
- * third-party routine as one quiet table. */
-function pinsHtml(pins: PinBump[]): string {
+/** Version pins the diff moves — first-party components as cards (with the
+ * depth-1 sub-check folded in), the third-party routine as one quiet table. */
+function pinsHtml(pins: PinBump[], components?: ComponentCheck[]): string {
   const firstParty = pins.filter((p) => p.firstParty);
   const thirdParty = pins.filter((p) => !p.firstParty);
   const cards = firstParty
     .map((p) => {
       const shown = p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
-      return `<div class="flag" style="border-left-color:#58a6ff"><span class="chip" style="background:#58a6ff">first-party</span> <b>${esc(`${shown} ${p.from} → ${p.to}`)}</b>${p.repo ? ` <span class="note">(${esc(p.repo)})</span>` : ""}${p.releaseUrl ? ` — <a href="${esc(p.releaseUrl)}">release</a>` : ""}<div class="files">${esc(p.file)}</div></div>`;
+      const comp = components?.find(
+        (m) => m.repo === p.repo && m.from === p.from && m.to === p.to,
+      );
+      const shipped = comp?.surface ? surfaceLine(comp.surface) : undefined;
+      const sub = !comp
+        ? ""
+        : comp.error
+          ? `<div class="files">${esc(comp.error)}</div>`
+          : `<div class="files">its check: ${esc(componentBits(comp).join(" · "))}</div>` +
+            (shipped ? `<div class="files">shipped: ${esc(shipped)}</div>` : "");
+      return `<div class="flag" style="border-left-color:#58a6ff"><span class="chip" style="background:#58a6ff">first-party</span> <b>${esc(`${shown} ${p.from} → ${p.to}`)}</b>${p.repo ? ` <span class="note">(${esc(p.repo)})</span>` : ""}${p.releaseUrl ? ` — <a href="${esc(p.releaseUrl)}">release</a>` : ""}<div class="files">${esc(p.file)}</div>${sub}</div>`;
     })
     .join("");
   const rows = thirdParty
@@ -618,7 +637,7 @@ ${
     : ""
 }
 ${report.surface?.categories.length ? surfaceHtml(report.surface) : ""}
-${report.pins?.length ? pinsHtml(report.pins) : ""}
+${report.pins?.length ? pinsHtml(report.pins, report.components) : ""}
 <h2>Undocumented commits</h2>
 ${
   !report.reverseChecked

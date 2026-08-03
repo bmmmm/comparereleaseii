@@ -4,7 +4,14 @@ import assert from "node:assert/strict";
 import { exitCode, unverifiableNote, toMarkdown, printTerminal } from "../src/report.ts";
 import { toHtml } from "../src/html.ts";
 import { computeScores } from "../src/metrics.ts";
-import type { ClaimResult, PinBump, ReleaseSurface, Report, Unverifiable } from "../src/types.ts";
+import type {
+  ClaimResult,
+  ComponentCheck,
+  PinBump,
+  ReleaseSurface,
+  Report,
+  Unverifiable,
+} from "../src/types.ts";
 
 function claimResult(verdict: ClaimResult["verdict"]): ClaimResult {
   return {
@@ -311,4 +318,66 @@ test("uncovered commits carry their observed surface in markdown and terminal", 
   assert.match(out, /symbols: Finalize, RegisterRoutes \(\+2 more\)/);
   assert.match(out, /config surface: \+env OC_ASYNC_UPLOADS, −flag --legacy-upload/);
   assert.match(out, /touched: 1 source · fns Finalize/);
+});
+
+const COMPONENT: ComponentCheck = {
+  name: "web",
+  repo: "opencloud-eu/web",
+  from: "v7.1.0",
+  to: "v7.2.0",
+  baseRef: "v7.1.0",
+  headRef: "v7.2.0",
+  stats: { commits: 5, files: 12, additions: 840, deletions: 120 },
+  score: 92,
+  scoreLabel: "solid",
+  claims: { verified: 4, partial: 1, "no-evidence": 0, contradicted: 0, skipped: 1 },
+  uncovered: 2,
+  surface: {
+    categories: [{ category: "source", files: 9, additions: 800, deletions: 100 }],
+    symbols: ["render"],
+    moreSymbols: 0,
+    envVars: { added: ["WEB_CACHE"], removed: [] },
+    cliFlags: { added: [], removed: [] },
+    configKeys: { added: [], removed: [] },
+    migrations: [],
+    apiRoutes: [],
+  },
+};
+
+test("a first-party pin folds in its component sub-check, third-party stays bare", () => {
+  const md = toMarkdown({ ...report(null), pins: PINS, components: [COMPONENT] });
+  assert.match(
+    md,
+    /- its check: score 92\/100 \(solid\) · 6 claims — 4 verified, 1 partial, 1 skipped · 2 undocumented · 5 commits, \+840\/−120/,
+  );
+  assert.match(md, /- shipped: 9 source · fns render · \+env WEB_CACHE/);
+  assert.doesNotMatch(md, /zerolog[\s\S]{0,120}its check/);
+
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(" "));
+  };
+  try {
+    printTerminal({ ...report(null), pins: PINS, components: [COMPONENT] });
+  } finally {
+    console.log = orig;
+  }
+  const out = lines.join("\n");
+  assert.match(out, /its check: score 92\/100 \(solid\)/);
+  assert.match(out, /shipped: 9 source · fns render · \+env WEB_CACHE/);
+});
+
+test("a failed component sub-check renders its actionable error under the pin", () => {
+  const failed: ComponentCheck = {
+    name: "web",
+    repo: "opencloud-eu/web",
+    from: "v7.1.0",
+    to: "v7.2.0",
+    error:
+      "component load failed: no such tag — tried v7.2.0 and 7.2.0 at https://github.com/opencloud-eu/web",
+  };
+  const md = toMarkdown({ ...report(null), pins: PINS, components: [failed] });
+  assert.match(md, /- sub-check: component load failed: no such tag — tried v7\.2\.0 and 7\.2\.0/);
+  assert.doesNotMatch(md, /its check:/);
 });

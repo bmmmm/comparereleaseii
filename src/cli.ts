@@ -28,6 +28,7 @@ import {
 } from "./history.ts";
 import {
   analyzeRelease,
+  componentLoader,
   loadForgeRelease,
   loadGithubReleaseData,
   prepareForgeTarget,
@@ -108,6 +109,10 @@ Options:
                       (or repo URL), e.g. WEB_ASSETS_VERSION=opencloud-eu/web.
                       Repeatable. Pins that name a repo themselves (go.mod
                       paths, download URLs) are classified without this
+  --no-expand         Do not sub-check first-party pin bumps. By default a
+                      first-party bump whose repo is loadable gets a depth-1
+                      check of its own (from, to) range — same pipeline,
+                      same caches — folded into the report
   --suggest           Draft a release-note line for the highest-churn
                       undocumented commits (needs a judge engine)
   --suggest-limit <n> Max commits to draft for, highest churn first
@@ -215,6 +220,7 @@ async function main(): Promise<number> {
       suggest: { type: "boolean", default: false },
       "suggest-limit": { type: "string", default: "15" },
       component: { type: "string", multiple: true },
+      "no-expand": { type: "boolean", default: false },
       history: { type: "string" },
       estimate: { type: "boolean", default: false },
       "no-cache": { type: "boolean", default: false },
@@ -438,6 +444,7 @@ async function main(): Promise<number> {
     suggest: values.suggest,
     suggestLimit,
     components: Object.keys(components).length ? components : undefined,
+    expand: values["no-expand"] ? undefined : componentLoader,
   };
   const report: Report = await analyzeRelease(
     data,

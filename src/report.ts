@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { c, stripControl } from "./util.ts";
 import { SCORE_MINOR, SCORE_SOLID } from "./theme.ts";
-import type { ClaimResult, Report, UnverifiableKind, Verdict } from "./types.ts";
+import { surfaceLine } from "./substance.ts";
+import type {
+  ClaimResult,
+  ComponentCheck,
+  PinBump,
+  Report,
+  UnverifiableKind,
+  Verdict,
+} from "./types.ts";
 
 // Everything printed to the terminal that originated outside this tool —
 // notes, commit subjects, judge reasoning, file paths — goes through this.
@@ -81,6 +89,35 @@ export function carriedOver(report: Report): { baseRef: string; count: number } 
   const carried = report.results.filter((r) => r.claim.carriedOverFrom);
   if (!carried.length) return null;
   return { baseRef: carried[0].claim.carriedOverFrom!, count: carried.length };
+}
+
+/** The sub-check summary of a first-party pin, when one ran for it. */
+export function componentFor(
+  report: Report,
+  pin: PinBump,
+): ComponentCheck | undefined {
+  return report.components?.find(
+    (m) => m.repo === pin.repo && m.from === pin.from && m.to === pin.to,
+  );
+}
+
+/** Summary bits of a component sub-check — one source for every renderer. */
+export function componentBits(m: ComponentCheck): string[] {
+  const bits: string[] = [];
+  if (m.score !== undefined) bits.push(`score ${m.score}/100 (${m.scoreLabel})`);
+  if (m.claims) {
+    const order: Verdict[] = ["verified", "partial", "no-evidence", "contradicted", "skipped"];
+    const total = order.reduce((sum, v) => sum + m.claims![v], 0);
+    const parts = order.filter((v) => m.claims![v] > 0).map((v) => `${m.claims![v]} ${v}`);
+    bits.push(`${total} claims — ${parts.join(", ")}`);
+  }
+  if (m.noNotes) bits.push("no release notes to check — surface only");
+  if (m.uncovered !== undefined) bits.push(`${m.uncovered} undocumented`);
+  if (m.stats) {
+    bits.push(`${m.stats.commits} commits, +${m.stats.additions}/−${m.stats.deletions}`);
+  }
+  if (m.truncated) bits.push("diff truncated");
+  return bits;
 }
 
 export function countVerdicts(results: ClaimResult[]): Record<Verdict, number> {
@@ -277,6 +314,15 @@ export function printTerminal(report: Report): void {
           (p.repo ? c.dim(` (${safe(p.repo)})`) : ""),
       );
       console.log(c.dim(`    ${safe(p.file)}${p.releaseUrl ? ` · ${safe(p.releaseUrl)}` : ""}`));
+      const comp = componentFor(report, p);
+      if (!comp) continue;
+      if (comp.error) {
+        console.log(c.yellow(`    ↳ ${safe(comp.error)}`));
+        continue;
+      }
+      console.log(`    ${c.cyan("↳")} its check: ${safe(componentBits(comp).join(" · "))}`);
+      const shipped = comp.surface ? surfaceLine(comp.surface) : undefined;
+      if (shipped) console.log(c.dim(`      shipped: ${safe(shipped)}`));
     }
     for (const p of thirdParty.slice(0, 8)) {
       console.log(c.dim(`  · ${safe(`${p.name} ${p.from} → ${p.to}`)}`));
@@ -415,6 +461,15 @@ export function toMarkdown(report: Report): string {
           ? `- **${head} — first-party**${p.repo ? ` (\`${p.repo}\`)` : ""}${p.releaseUrl ? ` — [release](${p.releaseUrl})` : ""} · \`${p.file}\``
           : `- ${head} (\`${p.file}\`)`,
       );
+      const comp = p.firstParty ? componentFor(report, p) : undefined;
+      if (!comp) continue;
+      if (comp.error) {
+        lines.push(`  - sub-check: ${comp.error}`);
+        continue;
+      }
+      lines.push(`  - its check: ${componentBits(comp).join(" · ")}`);
+      const shipped = comp.surface ? surfaceLine(comp.surface) : undefined;
+      if (shipped) lines.push(`  - shipped: ${shipped}`);
     }
   }
   lines.push("", "## Undocumented changes", "");

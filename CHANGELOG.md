@@ -14,6 +14,35 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **The version pins a diff moves are a signal of their own.** Manifest bumps
+  (go.mod, package.json, Cargo.toml, requirements.txt), `NAME_VERSION`-style
+  Makefile variables, Dockerfile `FROM`/`ARG` tags and versioned download
+  URLs become `(name, from → to)` entries in every report format. A pin whose
+  target shares the checked repo's owner — or is declared one with
+  `--component NAME=owner/repo` (watch configs: a per-repo `components` map)
+  — is first-party: a release of the product itself entering as one changed
+  line, linked straight to the pinned release. Third-party bumps stay one
+  quiet line each. Deterministic, works with `--judge off`, never scored.
+
+- **The report states what actually shipped, read off the diff.** A total
+  file-category rollup (source, tests, docs, ci/build, dependencies, config,
+  migrations, assets), the changed symbols git's own hunk headers name, the
+  config surface (environment-variable reads, `--flag` literals, config keys
+  — moved lines cancel, so refactoring is not "new surface"), migrations and
+  API-route files. Undocumented commits carry the same observation as a
+  `touched:` line — described by what their diff changed, not only by the
+  subject line they chose for themselves. Deterministic, never scored.
+
+- **A first-party pin bump expands into the component's own check.** When the
+  pinned repo is loadable (github.com, the checked repo's own forge, or the
+  URL the components config names), its `(from, to)` range runs through the
+  same pipeline — depth 1, only first-party pins, shared clone and verdict
+  caches — and the summary folds in under the pin: score, claim verdicts,
+  undocumented count, what shipped. The server release then shows the
+  frontend release's substance inline instead of one opaque version line,
+  and an immediate re-run pays zero additional judge calls. `--no-expand`
+  (watch configs: `"expand": false`) turns it off.
+
 - **The history page links each release to its forge.** Every check stores the
   release URL, but only the dashboard read it — the page that lists the same
   releases, one per row, sent nobody to the source. The releases table now

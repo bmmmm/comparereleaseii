@@ -26,7 +26,14 @@ import {
   type HistorySource,
 } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
-import type { ReleaseData, Report, RepoContext } from "./types.ts";
+import type {
+  ComponentCheck,
+  PinBump,
+  ReleaseData,
+  Report,
+  RepoContext,
+  Verdict,
+} from "./types.ts";
 
 export interface CheckSettings {
   judgeMode: "auto" | "all" | "off";
@@ -47,7 +54,32 @@ export interface CheckSettings {
   /** Pin name → owner/repo (or URL): first-party components whose pins
    * cannot identify their target themselves (a bare WEB_ASSETS_VERSION). */
   components?: Record<string, string>;
+  /** Expand first-party pin bumps into depth-1 sub-checks through this
+   * loader; absent disables expansion. Production passes componentLoader —
+   * the indirection is the network seam tests stub. */
+  expand?: ComponentLoader;
 }
+
+/** Loads one component release range (tag, diffed against base). */
+export type ComponentLoader = (
+  repoUrl: string,
+  opts: { tag: string; base: string },
+) => Promise<{ data: ReleaseData; context: RepoContext }>;
+
+/**
+ * The production component loader: a github.com URL goes through the
+ * gh-backed source (published notes, compare API, truncation fallback);
+ * every other host is a forge URL through the cached clone. Both routes are
+ * the same machinery a direct check of that repo would use, so the clone
+ * cache and the verdict cache are shared with it.
+ */
+export const componentLoader: ComponentLoader = (repoUrl, opts) => {
+  const gh = repoUrl.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)$/i);
+  if (gh) return loadGithubReleaseData(gh[1], { tag: opts.tag, base: opts.base });
+  return prepareForgeTarget(repoUrl).then((t) =>
+    loadForgeRelease(t, { head: opts.tag, base: opts.base }),
+  );
+};
 
 /** Injection seam for tests — production always uses the real sources. */
 export interface GithubLoadDeps {
@@ -323,6 +355,8 @@ export async function analyzeRelease(
     linkStyle: link?.style,
   });
 
+  const components = s.expand ? await expandComponents(pins, data.repoLabel, s) : undefined;
+
   let uncovered = coverage?.uncovered ?? [];
   if (s.suggest) {
     if (!s.engine) {
@@ -367,5 +401,114 @@ export async function analyzeRelease(
       : undefined,
     pins: pins.length ? pins : undefined,
     surface: data.files.length ? releaseSurface(data.files) : undefined,
+    components,
   };
+}
+
+/** `v7.1.2` and `7.1.2` name the same release in the wild — one retry. */
+const toggleV = (v: string): string => (v.startsWith("v") ? v.slice(1) : `v${v}`);
+
+/**
+ * Depth-1 sub-checks for the first-party pins that name a loadable repo:
+ * the component's own (from, to) range through the same pipeline. Only
+ * first-party pins expand — a third-party bump is routine background, not a
+ * release of this product. Sequential: components are few, and their judge
+ * calls already parallelize inside each check.
+ */
+async function expandComponents(
+  pins: PinBump[],
+  repoLabel: string,
+  s: CheckSettings,
+): Promise<ComponentCheck[] | undefined> {
+  const targets = pins.filter(
+    // A pin on the checked repo itself (own download URL in the docs) would
+    // re-check this very release as its own component.
+    (p) => p.firstParty && p.repoUrl && p.repo !== repoLabel,
+  );
+  if (!targets.length) return undefined;
+  const out: ComponentCheck[] = [];
+  for (const pin of targets) {
+    console.error(
+      `First-party pin ${pin.name} ${pin.from} → ${pin.to} — sub-checking ${pin.repoUrl}…`,
+    );
+    out.push(await checkComponent(pin, s));
+  }
+  return out;
+}
+
+async function checkComponent(pin: PinBump, s: CheckSettings): Promise<ComponentCheck> {
+  const summary: ComponentCheck = {
+    name: pin.repo!.split("/")[1] ?? pin.repo!,
+    repo: pin.repo!,
+    from: pin.from,
+    to: pin.to,
+  };
+  let loaded: { data: ReleaseData; context: RepoContext };
+  try {
+    try {
+      loaded = await s.expand!(pin.repoUrl!, { tag: pin.to, base: pin.from });
+    } catch (first) {
+      try {
+        loaded = await s.expand!(pin.repoUrl!, { tag: toggleV(pin.to), base: toggleV(pin.from) });
+      } catch {
+        // The pin's own spelling is the honest error to surface.
+        throw first;
+      }
+    }
+  } catch (err) {
+    summary.error = `component load failed: ${(err as Error).message.split("\n")[0].slice(0, 160)} — tried ${pin.to} and ${toggleV(pin.to)} at ${pin.repoUrl}`;
+    return summary;
+  }
+  const { data, context } = loaded;
+  summary.baseRef = data.baseRef;
+  summary.headRef = data.headRef;
+
+  const childSettings: CheckSettings = {
+    judgeMode: s.judgeMode,
+    engine: s.engine,
+    escalateEngine: s.escalateEngine,
+    concurrency: s.concurrency,
+    reverse: s.reverse,
+    baseline: 0,
+    // Depth stays 1: the component's own first-party pins are listed in its
+    // report but never expanded. The parent's components map stays behind
+    // too — its keys are the parent's pin names, and in the child's context
+    // the same name could label a different repo entirely.
+    expand: undefined,
+  };
+  try {
+    const child = await analyzeRelease(data, context, null, childSettings);
+    const claims: Record<Verdict, number> = {
+      verified: 0,
+      partial: 0,
+      "no-evidence": 0,
+      contradicted: 0,
+      skipped: 0,
+    };
+    for (const r of child.results) claims[r.verdict]++;
+    summary.stats = child.stats;
+    summary.score = child.metrics.scores.overall;
+    summary.scoreLabel = child.metrics.scores.label;
+    summary.claims = claims;
+    if (child.reverseChecked) summary.uncovered = child.uncovered.length;
+    summary.surface = child.surface;
+    if (child.truncated) summary.truncated = true;
+  } catch (err) {
+    // Notes-less child releases still have a diff — the deterministic
+    // surface is exactly what the expansion exists to show.
+    if (!/No claims found/.test((err as Error).message)) {
+      summary.error = `component check failed: ${(err as Error).message.split("\n")[0].slice(0, 160)}`;
+      return summary;
+    }
+    summary.noNotes = true;
+    summary.stats = {
+      commits: data.commits.length,
+      files: data.files.length,
+      additions: data.files.reduce((sum, f) => sum + f.additions, 0),
+      deletions: data.files.reduce((sum, f) => sum + f.deletions, 0),
+    };
+    summary.surface = data.files.length ? releaseSurface(data.files) : undefined;
+    if (data.truncated) summary.truncated = true;
+  }
+  return summary;
 }

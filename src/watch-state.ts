@@ -45,6 +45,14 @@ export interface WatchRepoConfig {
    * themselves (go.mod paths, download URLs) are classified without this.
    */
   components?: Record<string, string>;
+  /**
+   * `false` disables the depth-1 sub-check of first-party pin bumps. On by
+   * default: when a watched release bumps a first-party component, the
+   * component's own (from, to) range is checked and folded into the report
+   * — and the verdict cache makes the sub-check free when the component
+   * repo is watched too.
+   */
+  expand?: boolean;
 }
 
 export interface WatchConfig {

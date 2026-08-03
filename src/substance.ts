@@ -167,7 +167,12 @@ export function releaseSurface(files: DiffFile[]): ReleaseSurface {
  */
 export function commitSurface(files: DiffFile[]): string | undefined {
   if (!files.length) return undefined;
-  const s = releaseSurface(files);
+  return surfaceLine(releaseSurface(files));
+}
+
+/** The same observation, compacted from an already-computed surface —
+ * shared with the component-check summary renderers. */
+export function surfaceLine(s: ReleaseSurface): string | undefined {
   const parts: string[] = [];
   const tally = s.categories
     .slice(0, 3)

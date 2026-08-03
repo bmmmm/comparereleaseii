@@ -10,11 +10,13 @@ import {
   analyzeRelease,
   loadForgeRelease,
   loadGithubReleaseData,
+  type CheckSettings,
+  type ComponentLoader,
   type ForgeTarget,
 } from "../src/check.ts";
 import { cloneHistory } from "../src/history.ts";
 import type { ForgeListing } from "../src/sources/forge.ts";
-import type { ReleaseData, RepoContext } from "../src/types.ts";
+import type { DiffFile, ReleaseData, RepoContext } from "../src/types.ts";
 
 const exec = promisify(execFile);
 
@@ -227,4 +229,247 @@ test("loadForgeRelease: a tag the forge never published falls back to the CHANGE
   assert.equal(data.notes, "- Changelog wording of `beta`");
   // Media never mix: CHANGELOG head notes take CHANGELOG base notes.
   assert.equal(data.baseNotes, "- Changelog wording of `alpha`");
+});
+
+// ---------- first-party expansion: depth-1 component sub-checks ----------
+
+const GH_LINK = { base: "https://github.com/acme/app", style: "github" as const };
+
+function pinFile(name: string, from: string, to: string): DiffFile {
+  return {
+    path: "Makefile",
+    status: "modified",
+    additions: 1,
+    deletions: 1,
+    patch: `@@ -1,2 +1,2 @@\n-${name}=${from}\n+${name}=${to}\n unrelated line\n`,
+  };
+}
+
+function parentData(over: Partial<ReleaseData> = {}): ReleaseData {
+  return {
+    repoLabel: "acme/app",
+    baseRef: "v1.0.0",
+    headRef: "v1.1.0",
+    notes: "- Bump web to `v2.1.0`\n",
+    commits: [
+      { sha: "b".repeat(40), subject: "bump web", body: "", author: "dev", prNumbers: [] },
+    ],
+    files: [pinFile("WEB_VERSION", "v2.0.0", "v2.1.0")],
+    commitFiles: async () => [],
+    warnings: [],
+    ...over,
+  };
+}
+
+/** The component release the loader hands back — has its own claims, a
+ * source file with a symbol and an env read, and a first-party go.mod pin
+ * of its own (the depth-1 trap). */
+function childData(over: Partial<ReleaseData> = {}): ReleaseData {
+  return {
+    repoLabel: "acme/web",
+    baseRef: "v2.0.0",
+    headRef: "v2.1.0",
+    notes: "- Faster `render` pipeline\n",
+    commits: [
+      { sha: "c".repeat(40), subject: "speed up render", body: "", author: "dev", prNumbers: [] },
+      { sha: "d".repeat(40), subject: "chore", body: "", author: "dev", prNumbers: [] },
+    ],
+    files: [
+      {
+        path: "src/render.go",
+        status: "modified",
+        additions: 2,
+        deletions: 1,
+        patch: `@@ -1,4 +1,4 @@ func render()\n-old\n+new render path\n+\tcache := os.Getenv("WEB_CACHE")\n`,
+      },
+      {
+        path: "go.mod",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: `@@ -1,1 +1,1 @@\n-\tgithub.com/acme/lib v1.0.0\n+\tgithub.com/acme/lib v1.1.0\n`,
+      },
+    ],
+    commitFiles: async () => [],
+    warnings: [],
+    ...over,
+  };
+}
+
+function expandSettings(over: Partial<CheckSettings> = {}): CheckSettings {
+  return {
+    judgeMode: "off",
+    engine: null,
+    escalateEngine: null,
+    concurrency: 1,
+    reverse: true,
+    baseline: 0,
+    components: { WEB_VERSION: "acme/web" },
+    ...over,
+  };
+}
+
+function stubLoader(data: () => ReleaseData = childData): {
+  calls: Array<{ url: string; tag: string; base: string }>;
+  load: ComponentLoader;
+} {
+  const calls: Array<{ url: string; tag: string; base: string }> = [];
+  return {
+    calls,
+    load: async (url, opts) => {
+      calls.push({ url, tag: opts.tag, base: opts.base });
+      return { data: data(), context: CONTEXT };
+    },
+  };
+}
+
+test("a first-party pin expands into a component summary — and only one level deep", async () => {
+  const loader = stubLoader();
+  const report = await analyzeRelease(parentData(), CONTEXT, GH_LINK, expandSettings({ expand: loader.load }));
+  // The child's own first-party pin (github.com/acme/lib) must never load:
+  // depth stays 1, so exactly one call, and it is the configured component.
+  assert.deepEqual(loader.calls, [
+    { url: "https://github.com/acme/web", tag: "v2.1.0", base: "v2.0.0" },
+  ]);
+  assert.equal(report.components?.length, 1);
+  const comp = report.components![0];
+  assert.equal(comp.name, "web");
+  assert.equal(comp.repo, "acme/web");
+  assert.equal(comp.from, "v2.0.0");
+  assert.equal(comp.to, "v2.1.0");
+  assert.equal(comp.headRef, "v2.1.0");
+  assert.equal(comp.error, undefined);
+  assert.equal(typeof comp.score, "number");
+  assert.ok(comp.claims && comp.claims.verified + comp.claims.partial + comp.claims["no-evidence"] + comp.claims.contradicted + comp.claims.skipped > 0);
+  assert.equal(comp.stats?.commits, 2);
+  assert.ok(
+    comp.surface?.categories.some((t) => t.category === "source"),
+    "child surface missing",
+  );
+  assert.ok(comp.surface?.envVars.added.includes("WEB_CACHE"));
+  // The child's own pins are listed nowhere in the summary — and were not expanded.
+  assert.ok(!loader.calls.some((call) => call.url.includes("acme/lib")));
+});
+
+test("third-party pins never expand, even with a loadable github repo", async () => {
+  const loader = stubLoader();
+  const data = parentData({
+    notes: "- Bump zerolog\n",
+    files: [
+      {
+        path: "go.mod",
+        status: "modified",
+        additions: 1,
+        deletions: 1,
+        patch: `@@ -1,1 +1,1 @@\n-\tgithub.com/rs/zerolog v1.31.0\n+\tgithub.com/rs/zerolog v1.32.0\n`,
+      },
+    ],
+  });
+  const report = await analyzeRelease(data, CONTEXT, GH_LINK, expandSettings({ components: undefined, expand: loader.load }));
+  assert.ok(report.pins?.length, "the third-party bump itself is still listed");
+  assert.equal(loader.calls.length, 0);
+  assert.equal(report.components, undefined);
+});
+
+test("expansion is score-neutral: identical metrics and verdicts with and without it", async () => {
+  const base = await analyzeRelease(parentData(), CONTEXT, GH_LINK, expandSettings());
+  const expanded = await analyzeRelease(
+    parentData(),
+    CONTEXT,
+    GH_LINK,
+    expandSettings({ expand: stubLoader().load }),
+  );
+  assert.equal(base.components, undefined);
+  assert.ok(expanded.components);
+  assert.deepEqual(expanded.metrics, base.metrics);
+  assert.deepEqual(expanded.results, base.results);
+});
+
+test("a v-prefix mismatch between pin and tags retries once, toggled", async () => {
+  const tags: string[] = [];
+  const load: ComponentLoader = async (_url, opts) => {
+    tags.push(opts.tag);
+    if (opts.tag.startsWith("v")) throw new Error("no such tag");
+    return { data: childData({ baseRef: "2.0.0", headRef: "2.1.0" }), context: CONTEXT };
+  };
+  const report = await analyzeRelease(parentData(), CONTEXT, GH_LINK, expandSettings({ expand: load }));
+  assert.deepEqual(tags, ["v2.1.0", "2.1.0"]);
+  const comp = report.components![0];
+  assert.equal(comp.error, undefined);
+  assert.equal(comp.headRef, "2.1.0");
+});
+
+test("a component that fails to load becomes an actionable entry, not a crash", async () => {
+  const load: ComponentLoader = async () => {
+    throw new Error("clone exploded");
+  };
+  const report = await analyzeRelease(parentData(), CONTEXT, GH_LINK, expandSettings({ expand: load }));
+  const comp = report.components![0];
+  assert.ok(comp.error?.includes("clone exploded"), `cause missing from: ${comp.error}`);
+  assert.ok(comp.error?.includes("tried v2.1.0 and 2.1.0"), `retry not declared: ${comp.error}`);
+  assert.ok(comp.error?.includes("https://github.com/acme/web"), `source missing: ${comp.error}`);
+  assert.equal(comp.score, undefined);
+  // The parent check stands regardless.
+  assert.ok(report.results.length > 0);
+});
+
+test("a notes-less component still reports its deterministic surface", async () => {
+  const loader = stubLoader(() => childData({ notes: "" }));
+  const report = await analyzeRelease(parentData(), CONTEXT, GH_LINK, expandSettings({ expand: loader.load }));
+  const comp = report.components![0];
+  assert.equal(comp.noNotes, true);
+  assert.equal(comp.score, undefined);
+  assert.equal(comp.error, undefined);
+  assert.equal(comp.stats?.commits, 2);
+  assert.ok(comp.surface?.categories.some((t) => t.category === "source"));
+});
+
+// The done-when behind "an immediate re-run pays zero additional judge
+// calls": the verdict cache keys on the exact prompt, so a re-run is free
+// iff an expanded check asks byte-identical questions both times. Ordering
+// may vary under concurrency — the cache doesn't care — so the comparison
+// is over sorted prompt lists.
+test("an expanded check asks byte-identical judge questions on a re-run", async () => {
+  const runPrompts = async (): Promise<string[]> => {
+    const prompts: string[] = [];
+    await analyzeRelease(
+      parentData(),
+      CONTEXT,
+      GH_LINK,
+      expandSettings({
+        judgeMode: "all",
+        concurrency: 4,
+        engine: {
+          name: "recorder",
+          judge: async (p: string) => {
+            prompts.push(p);
+            return '{"verdict":"partial","confidence":0.5,"files":[],"reasoning":"stub"}';
+          },
+        },
+        expand: stubLoader().load,
+      }),
+    );
+    return prompts.sort();
+  };
+  const first = await runPrompts();
+  const second = await runPrompts();
+  assert.ok(first.length > 0, "the stub judge was never consulted");
+  assert.deepEqual(second, first);
+});
+
+test("a pin on the checked repo itself never self-expands", async () => {
+  const loader = stubLoader();
+  const data = parentData({
+    notes: "- Bump our own pinned installer version\n",
+    files: [pinFile("SELF_VERSION", "v1.0.0", "v1.1.0")],
+  });
+  const report = await analyzeRelease(
+    data,
+    CONTEXT,
+    GH_LINK,
+    expandSettings({ components: { SELF_VERSION: "acme/app" }, expand: loader.load }),
+  );
+  assert.equal(loader.calls.length, 0);
+  assert.equal(report.components, undefined);
+  assert.equal(report.pins?.[0].firstParty, true, "the pin itself still renders as first-party");
 });

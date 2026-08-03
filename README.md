@@ -160,6 +160,16 @@ changed line (OpenCloud ships its entire frontend this way), and the report
 links straight to the pinned release. Third-party bumps stay one quiet line
 each. Informational, never scored.
 
+A first-party bump whose repo is loadable goes one step further: the
+component's own `(from, to)` range gets a **depth-1 sub-check** — same
+pipeline, same clone and verdict caches — and its summary is folded in
+under the pin ("its check: score, claims, what shipped"). The server
+release then shows the frontend release's substance inline instead of one
+opaque version line. Only first-party pins expand, only one level deep,
+and a component repo already checked pays no additional judge calls on a
+re-run. `--no-expand` (in watch configs: `"expand": false`) turns it off.
+Informational, never scored.
+
 Every run computes an explainable **trust score** (0–100) from correctness,
 completeness and risk. Contradicted claims or critical flags cap it — a fake
 release cannot average itself back to green. With `--baseline <n>` the repo's

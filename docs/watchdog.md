@@ -210,9 +210,9 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
 `repoUrl` entry's state key is the URL unless `label` renames it, and its
 report directory is the URL's path-safe form (`https_gitea.com_gitea_tea`). Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
 `escalate`, `escalateModel`, `failOn`, `baseline`, `concurrency`,
-`includePrerelease`, `notifyBelow`, `notesFile`, `label`, `components`.
-Relative paths (`reportsDir`, `stateFile`, `notesFile`) resolve against the
-config file's directory.
+`includePrerelease`, `notifyBelow`, `notesFile`, `label`, `components`,
+`expand`. Relative paths (`reportsDir`, `stateFile`, `notesFile`) resolve
+against the config file's directory.
 
 `components` declares first-party components behind version pins that cannot
 name their own repo — a bare Makefile variable, an `ARG`. Pin name →
@@ -227,6 +227,14 @@ A pin that names its repo itself (a go.mod module path, a versioned download
 URL) is classified by owner without any config; the report's "Version pins
 moved" section then links the component's release directly. The CLI spelling
 for a one-off check is `--component WEB_ASSETS_VERSION=opencloud-eu/web`.
+
+A loadable first-party bump is also **sub-checked**: the component's own
+`(from, to)` range runs through the same pipeline — depth 1, never the
+component's own pins — and the summary lands under the pin in every report.
+The sub-check shares the clone and verdict caches, so a component that is
+itself on the watchlist costs nothing extra beyond its first check.
+`"expand": false` (per repo or in `defaults`) disables it; the CLI spelling
+is `--no-expand`.
 
 The judge defaults shown above are the recommended watchdog setup: a local
 OpenAI-compatible model (Ollama/MLX/vLLM) does the bulk verification for

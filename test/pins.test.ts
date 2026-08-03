@@ -295,3 +295,42 @@ test("a pin that merely moves in the file, version unchanged, is not a bump", ()
   );
   assert.deepEqual(pinBumps([mk]), []);
 });
+
+test("repoUrl marks the loadable sources — certain hosts only, never guessed", () => {
+  // Config slug: defer to the checked repo's own forge (github.com here).
+  const slug = pinBumps([OPENCLOUD_MAKEFILE], {
+    repoLabel: "opencloud-eu/opencloud",
+    components: { WEB_ASSETS_VERSION: "opencloud-eu/web" },
+    origin: "https://github.com",
+  });
+  assert.equal(slug[0].repoUrl, "https://github.com/opencloud-eu/web");
+
+  // Config URL: the declared source verbatim, `.git` stripped.
+  const url = pinBumps([OPENCLOUD_MAKEFILE], {
+    repoLabel: "opencloud-eu/opencloud",
+    components: { WEB_ASSETS_VERSION: "https://git.example.com/team/web.git" },
+  });
+  assert.equal(url[0].repoUrl, "https://git.example.com/team/web");
+
+  // Config slug without an origin (--local): no forge to defer to.
+  const local = pinBumps([OPENCLOUD_MAKEFILE], {
+    repoLabel: "opencloud-eu/opencloud",
+    components: { WEB_ASSETS_VERSION: "opencloud-eu/web" },
+  });
+  assert.equal(local[0].repoUrl, undefined);
+
+  // A go.mod path on github.com is loadable without any config.
+  const gomod = pinBumps(
+    [df("go.mod", "@@ -1,1 +1,1 @@\n-\tgithub.com/acme/lib v1.0.0\n+\tgithub.com/acme/lib v1.1.0\n")],
+    { repoLabel: "acme/app" },
+  );
+  assert.equal(gomod[0].repoUrl, "https://github.com/acme/lib");
+
+  // A foreign dotted host is never guessed at, owner match or not.
+  const foreign = pinBumps(
+    [df("go.mod", "@@ -1,1 +1,1 @@\n-\tgitlab.com/acme/lib v1.0.0\n+\tgitlab.com/acme/lib v1.1.0\n")],
+    { repoLabel: "acme/app", origin: "https://github.com" },
+  );
+  assert.equal(foreign[0].firstParty, true, "owner still matches");
+  assert.equal(foreign[0].repoUrl, undefined);
+});

@@ -184,6 +184,44 @@ export interface PinBump {
    * and the host's URL shape is — github.com, or the checked repo's own
    * forge. Never guessed for foreign hosts. */
   releaseUrl?: string;
+  /**
+   * Where the pinned repo's releases can be loaded from — set only when the
+   * host is certain: github.com, the checked repo's own forge, or the URL
+   * the components config spelled out. A registry path (docker hub, npm)
+   * names no forge, so it never gets one. This is what first-party
+   * expansion checks out.
+   */
+  repoUrl?: string;
+}
+
+/**
+ * Depth-1 sub-check of a first-party component whose pin this release
+ * bumps: the same pipeline over the component's own (from, to) range,
+ * summarized. The component's pins are listed in its own report but never
+ * expanded further. Informational — the parent score never reads it.
+ */
+export interface ComponentCheck {
+  /** Repo short name when known, else the pin's own spelling. */
+  name: string;
+  /** owner/repo slug of the component. */
+  repo: string;
+  from: string;
+  to: string;
+  /** Refs the child load actually resolved (tag-prefix retry may normalize). */
+  baseRef?: string;
+  headRef?: string;
+  stats?: { commits: number; files: number; additions: number; deletions: number };
+  score?: number;
+  scoreLabel?: string;
+  claims?: Record<Verdict, number>;
+  uncovered?: number;
+  surface?: ReleaseSurface;
+  /** The child diff was incomplete — its surface understates the release. */
+  truncated?: boolean;
+  /** The child release carried no checkable notes — surface only. */
+  noNotes?: boolean;
+  /** Load or check failure; the pin line stands, this explains the gap. */
+  error?: string;
 }
 
 export interface UncoveredCommit {
@@ -363,4 +401,6 @@ export interface Report {
   pins?: PinBump[];
   /** What actually shipped, read deterministically off the diff — informational, never scored. */
   surface?: ReleaseSurface;
+  /** Depth-1 sub-checks of first-party pin bumps — informational, never scored. */
+  components?: ComponentCheck[];
 }

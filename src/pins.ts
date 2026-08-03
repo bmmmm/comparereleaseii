@@ -234,6 +234,21 @@ function parseComponent(value: string): { host: string | null; repo: string } | 
   return null;
 }
 
+/**
+ * Where the component's releases can be loaded from — only when the host is
+ * certain: github.com, or the checked repo's own forge. A bare slug (host
+ * null, from the components config) lives on the same forge as the repo
+ * that pins it; anything else stays unloadable rather than guessed.
+ */
+function sourceUrl(host: string | null, repo: string, ctx: PinContext): string | undefined {
+  if (host === "github.com") return `https://github.com/${repo}`;
+  const origin = ctx.origin?.replace(/\/+$/, "");
+  if (!origin) return undefined;
+  const ownHost = origin.replace(/^https?:\/\//, "").toLowerCase();
+  if (host === null || host === ownHost) return `${origin}/${repo}`;
+  return undefined;
+}
+
 function classify(pin: RawPin, file: string, ctx: PinContext): PinBump {
   const bump: PinBump = { name: pin.name, from: pin.from, to: pin.to, file, firstParty: false };
   const configured = ctx.components?.[pin.name];
@@ -243,6 +258,11 @@ function classify(pin: RawPin, file: string, ctx: PinContext): PinBump {
       bump.firstParty = true;
       bump.repo = target.repo;
       bump.releaseUrl = releaseUrl(target.host, target.repo, pin.to, ctx);
+      // A config URL is the declared source verbatim; a slug defers to the
+      // checked repo's own forge.
+      bump.repoUrl = target.host
+        ? configured.replace(/\.git\/?$/, "").replace(/\/+$/, "")
+        : sourceUrl(null, target.repo, ctx);
       return bump;
     }
   }
@@ -252,6 +272,7 @@ function classify(pin: RawPin, file: string, ctx: PinContext): PinBump {
     if (pin.coords.linkable) {
       bump.repo = pin.coords.repo;
       bump.releaseUrl = releaseUrl(pin.coords.host, pin.coords.repo, pin.to, ctx);
+      bump.repoUrl = sourceUrl(pin.coords.host, pin.coords.repo, ctx);
     }
   }
   return bump;

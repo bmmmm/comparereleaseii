@@ -331,6 +331,18 @@ const MUTANTS: Mutant[] = [
     find: '.filter((f) => f.patch && fileCategory(f.path) === "source")',
     replace: ".filter((f) => Boolean(f.patch))",
   },
+  {
+    guard: "component expansion stays one level deep — a child never expands its own pins",
+    file: "src/check.ts",
+    find: "expand: undefined,",
+    replace: "expand: s.expand,",
+  },
+  {
+    guard: "only first-party pins expand — a third-party bump is never sub-checked",
+    file: "src/check.ts",
+    find: "(p) => p.firstParty && p.repoUrl && p.repo !== repoLabel,",
+    replace: "(p) => Boolean(p.repoUrl) && p.repo !== repoLabel,",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
