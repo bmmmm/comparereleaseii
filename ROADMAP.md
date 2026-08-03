@@ -38,10 +38,9 @@ for.
 Operations, not code — the config lives outside this repo:
 - Bump the watcher's pinned extension/checkout to `v0.7.0` (version-parity
   sweep: every deployment place moves together, none is left behind).
-- Set the S4a `audience:` values in the live `watch.json` — operator:
-  vaultwarden, traefik, omlx; integrator: sandbox-runtime, soundcloud/api;
-  user: the seven desktop apps. Existing `components`/`expand` entries
-  stay untouched.
+- Set the S4a `audience:` values in the live `watch.json` — the per-repo
+  assignment is operational data and lives in the config itself, not in
+  this file. Existing `components`/`expand` entries stay untouched.
 **Done when:** the next watch-written report renders a default lens and
 the version sweep reports one version everywhere.
 
