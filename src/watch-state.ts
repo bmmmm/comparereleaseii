@@ -598,7 +598,7 @@ export function isFlagged(
   // normally at 95 now alerts at 70 — which no absolute default would catch.
   // The comparison is inclusive: a drop of exactly SCORE_DROP is the case
   // the constant names, and `<` let it through.
-  
+  if (baseline !== null) return score <= baseline - SCORE_DROP;
   return score < notifyBelow;
 }
 
