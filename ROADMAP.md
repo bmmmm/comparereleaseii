@@ -652,6 +652,7 @@ a per-repo `components` config) vs third-party. New report/JSON section,
 score-neutral. **Done when:** the OpenCloud server release that bumps
 `WEB_ASSETS_VERSION` reports "web v7.1.0 → v7.2.0, first-party, release
 link", and a routine third-party go.mod bump stays one quiet line.
+- **Landed 2026-08-02** (`c5b5c24`), done-when held live on OpenCloud.
 
 ### S2 — mechanical substance layer
 Deterministic surface deltas from the release diff, no LLM: changed symbols
@@ -662,6 +663,7 @@ uncovered-commit output describes changes by observed surface, not by
 subject + churn alone. **Done when:** a `--judge off` run on any source
 yields a "what actually shipped" section listing surfaces touched, and the
 uncovered list carries observed-surface descriptions.
+- **Landed 2026-08-02** (`fe5c219`).
 
 ### S3 — first-party expansion: the product graph
 A first-party pin bump triggers a sub-check of the referenced repo over
@@ -671,6 +673,10 @@ analysis is already paid. The parent report links and folds in the child's
 summary: "server v3.x ships web v7.2.0 — its check: …". **Done when:** the
 OpenCloud server release renders the web release's substance inline, and an
 immediate re-run pays zero additional judge calls.
+- **Landed 2026-08-03** (`c4a0781`). The zero-cost proof needed a small
+  notes file — cache accounting does not need scale — and a permanent test
+  now pins the property it rests on: an expanded check asks byte-identical
+  judge questions across runs.
 
 ### S4a — audience profiles, measured not guessed (pre-block)
 Before any lens rendering: walk the real watchlist and classify which
@@ -678,6 +684,7 @@ audiences each project type actually has; define the 2–3 profiles that
 cover it (admin/operator, security+selfhosting, end-user-visible); decide
 per-repo `audience:` config with a heuristic proposal vs pure config. Paper
 exercise, lands as a ROADMAP addendum with the profile table.
+- **Landed 2026-08-03** (`dd28c9d`) — the addendum below is the deliverable.
 
 **Addendum (2026-08-03) — the measured table.** Walked the live watchlist
 (12 repos). Classification key: who *decides* the update — not who runs
@@ -744,6 +751,19 @@ with the remainder declared ("N files not read in detail"), cached per
 others as filters. **Done when:** two runs on a cached release are
 bit-identical, the budget line is printed, and an OpenCloud-shaped release
 reads differently under admin vs end-user lens from the same findings.
+- **Landed 2026-08-03** (`5a45d36`, changelog exclusion `9d0d530`). Live on
+  OpenCloud: two cached runs produced byte-identical JSON (`cmp`), the
+  budget line declares the remainder ("read 6/39 subsystems, 86/350 files
+  in detail — 264 not read in detail"), and the real v7.2.0 range reads
+  differently per lens from the same findings — the operator sees the LDAP
+  default-URI break and removed config fields, the end user sees Dutch
+  formal pronouns and new Polish translations, and the NATS-TLS security
+  finding pierces both. One thing the plan could not know, measured on the
+  first live run: with the changelog in the read set every finding cited
+  CHANGELOG.md — the notes describing themselves — so changelog paths are
+  excluded from the read, same boundary evidence matching draws
+  (mutant-pinned). Six mutants total; findings stay score-neutral by
+  structure and by test.
 
 ### S5 — retire subjectCovered
 Coverage ends on substance: claims reconcile against findings, not against
