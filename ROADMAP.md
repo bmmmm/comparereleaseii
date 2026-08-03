@@ -679,6 +679,61 @@ cover it (admin/operator, security+selfhosting, end-user-visible); decide
 per-repo `audience:` config with a heuristic proposal vs pure config. Paper
 exercise, lands as a ROADMAP addendum with the profile table.
 
+**Addendum (2026-08-03) — the measured table.** Walked the live watchlist
+(12 repos). Classification key: who *decides* the update — not who runs
+the binary. A single selfhoster is still an operator: the findings that
+matter to them are config and deploy, not UI. And the user profile is not
+the casual consumer the decisions block excludes — it is the person who
+installed the app and decides its updates.
+
+| repo | what it is | who decides updates | default lens |
+|---|---|---|---|
+| zen-browser/desktop | desktop browser (Firefox fork) | the person using it | user |
+| anthropic-experimental/sandbox-runtime | sandboxing runtime/library | developers embedding it | integrator |
+| dani-garcia/vaultwarden | self-hosted password server | the admin hosting it | operator |
+| traefik/traefik | reverse proxy | the admin hosting it | operator |
+| nextcloud/desktop | sync client | the person using it | user |
+| bitwarden/clients | password-manager clients | the person using it | user |
+| zed-industries/zed | code editor | the person using it | user |
+| jundot/omlx | local LLM server (OpenAI-compat API) | the operator running it | operator (integrator second) |
+| GyulyVGC/sniffnet | network monitor | the person using it | user |
+| cjpais/Handy | speech-to-text app | the person using it | user |
+| soundcloud/api | API tracker, no product code | developers building on the API | integrator |
+| p0deje/Maccy | clipboard manager | the person using it | user |
+
+Three profiles cover 12/12; no repo needed a fourth:
+
+- **operator** — hosts it as a service: deploy/packaging, config keys,
+  env vars, flags, migrations, exposed-API changes, resource behavior.
+  Breaking changes gate the upgrade.
+- **integrator** — builds against it: API/SDK surface, wire formats,
+  deprecations, exports, versioning policy.
+- **user** — runs it for themselves: visible behavior, features, fixes
+  they can feel, UX, performance. Internals are noise.
+
+Two corrections against the guessed trio. **Security+selfhosting is not
+a profile.** Selfhosting is the operator profile; security is a finding
+property (`audience: everyone`, with urgency) that pierces every lens —
+vaultwarden (operator) and bitwarden/clients (user) share the same
+security rule under different default lenses, which is exactly why it
+cannot be a lens itself. **Integrator was missing from the guess** and
+is real: soundcloud/api has no operator and no end-user reading at all.
+The three profiles map 1:1 onto the finding-level audience tags from the
+decisions block (deploy/config → operator, api → integrator, ui → user,
+security → everyone) — a lens is a plain filter over finding tags, and
+security passes every filter.
+
+Config decision: **pure config, no heuristic.** `audience:` per watch
+repo, one of `operator | integrator | user`. At check time the pipeline
+sees changed files, not the project's nature — a heuristic misclassifies
+exactly the hybrids (zed ships Dockerfiles but is a user app; omlx is a
+server consumed as an API), and a silently wrong lens hides the findings
+its real audience needed. Unconfigured repos and one-off checks render
+unfiltered — all findings grouped by audience tag — so nothing is lost,
+it just reads longer. Secondary audiences (omlx → integrator) need no
+config key: other lenses stay reachable as filters over the same
+findings.
+
 ### S4b — LLM summarization + lenses
 Budget-driven summarization of the hunks S1/S2 prioritized (the tf-idf
 ranking exists) into typed findings — breaking / behavior / security /
