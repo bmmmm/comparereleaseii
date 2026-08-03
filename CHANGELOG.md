@@ -4,6 +4,25 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **Coverage is earned by the commit's own diff, never by subject
+  resemblance.** The completeness check marked a commit covered when its
+  subject line resembled a claim at ≥ 0.45 token similarity — claims
+  describing claims, both written by the same publisher, so a fabricated
+  note could buy coverage by echoing an honest subject line. The
+  cherry-pick rescue that rule existed for now demands the bar the forward
+  direction calls strong evidence: a claim whose identifiers (code spans,
+  identifier-shaped terms) demonstrably appear in the commit's own diff
+  covers it, and changelog files never count as that evidence. Measured
+  A/B on the validation corpus (`--judge off`, deterministic): headscale,
+  git-cliff and vaultwarden are bit-identical, restic loses 1 point — two
+  cherry-picked commits whose notes carry no identifiers are now honestly
+  uncovered — and the fabricated negative control is unchanged. A first
+  replacement built on plain token overlap was rejected by the same
+  measurement after it handed the fabricated notes +20 completeness by
+  rewarding real component names.
+
 ### Fixed
 
 - **The judge bill counts one run, not the process.** The counters behind

@@ -578,12 +578,21 @@ export async function computeCoverage(
   data.commits.forEach((c, i) => commitFiles.set(c.sha, commitFileLists[i]));
 
   // Cherry-pick workflows (patch-release branches) lose PR references in the
-  // commit message — cover commits whose subject clearly restates a claim.
+  // commit message. The retired rescue compared claim text to the commit
+  // *subject* — claims describing claims, the founding thesis violated in
+  // the reverse direction. Its first replacement (token overlap with the
+  // commit's diff at the old 0.45 share) let fabricated notes buy coverage
+  // by naming real components — measured +20 on the negative control. So
+  // coverage is earned at the bar the forward direction calls strong
+  // evidence: the claim's identifiers demonstrably appear in this commit's
+  // own diff (lexicalMatch ≥ 5 — a code-span hit plus an identifier, or
+  // three identifiers). Changelog files never count inside lexicalMatch,
+  // so notes-only commits cannot cover themselves.
   const changeClaims = results
     .filter((r) => r.claim.kind === "change" && r.verdict !== "skipped")
-    .map((r) => r.claim.text.replace(/\bby @[\w-]+\b.*$/, ""));
-  const subjectCovered = (subject: string): boolean =>
-    changeClaims.some((text) => similarity(text, subject) >= 0.45);
+    .map((r) => r.claim);
+  const substanceCovered = (files: DiffFile[]): boolean =>
+    changeClaims.some((claim) => lexicalMatch(claim, files).score >= 5);
 
   // A merge commit bundles commits that are themselves in the range — counting
   // it (and its aggregate diff) again would double every miss and every line.
@@ -604,7 +613,7 @@ export async function computeCoverage(
         return;
       }
     }
-    if (subjectCovered(commit.subject)) {
+    if (files.length && substanceCovered(files)) {
       covered.add(commit.sha);
       return;
     }

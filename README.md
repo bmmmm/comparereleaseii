@@ -339,11 +339,11 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-07) |
+| Release | Notes style | Score (validation run, 2026-08) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
-| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 89 (solid) |
-| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 90 (solid) |
+| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 90 (solid) |
+| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 89 (solid) |
 | vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (flags a few unprovable claims) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 

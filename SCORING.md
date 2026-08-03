@@ -78,8 +78,8 @@ repeated line that cites a PR or sha shipped here is an assertion about this
 release and is checked and scored like any other — both sets of notes come
 from the same publisher, so "I said it last time too" cannot be what takes a
 claim out of the check. Text that really is standing also documents nothing:
-it earns no completeness credit, neither through its anchors nor by
-resembling a commit subject.
+it earns no completeness credit, neither through its anchors nor through
+its text.
 
 **Exception — releases that cannot be checked here.** When the release's own
 shape explains the misses (no source file in the diff at all, or a fork whose
@@ -99,6 +99,18 @@ Merge commits are excluded (their churn double-counts their parents). A
 hiding the refactor costs 3000 lines of coverage. Local runs without the
 reverse check (`--no-reverse`) have no completeness; the overall formula
 reweights (below).
+
+A commit counts as covered when a claim anchors to it (PR reference or
+sha), when a verified/partial claim cites mostly its files as evidence, or
+when a claim's identifiers — code spans, identifier-shaped terms —
+demonstrably appear in the commit's **own diff**, at the same lexical bar
+the forward direction calls strong evidence; changelog files never count
+as that evidence, so the notes restating themselves cover nothing. That
+last route is the cherry-pick rescue (patch-release branches lose PR
+references). An earlier version of it compared the claim to the commit's
+*subject line* instead — claims describing claims, both written by the
+same publisher, so a fabricated note could buy coverage by echoing an
+honest subject. Retired: identifiers in the diff are what earn coverage.
 
 ### risk — does anything smell?
 

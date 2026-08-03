@@ -772,11 +772,29 @@ Score-relevant, so it moves last and under the measurement discipline: two
 arms, independent fresh caches, repeated runs. **Done when:** the A/B names
 what moved and why, and no honest repo in the corpus loses more than the
 noise floor.
+- **Landed 2026-08-03.** The A/B (five-release corpus, `--judge off`, so
+  every delta is the coverage change and nothing else): headscale,
+  git-cliff and vaultwarden bit-identical, restic −1 overall — two
+  cherry-picked commits whose notes carry no identifiers are now honestly
+  uncovered — and the fabricated negative control unchanged. What the
+  measurement rejected: the first replacement, plain token overlap at the
+  old 0.45 share, handed the fabricated notes +20 completeness by
+  rewarding real component names; the shipped rule demands
+  `lexicalMatch ≥ 5`, the bar the forward direction calls strong evidence,
+  and changelog files never count as that evidence. Judge-on re-measure of
+  the README validation table with a fresh cache: 100 / 90 / 89 / 79 / 5 —
+  every row within ±1 of the 2026-07 run, table updated in the same
+  commit.
 
 Order: S1 → S2 → S3 → S4a → S4b → S5. S1/S2 are additive and score-neutral
 (ship early, they make OpenCloud *visible*); S3 solves it; S4 makes the new
 axis readable; S5 is the only stage that touches scoring and inherits
-everything learned before it.
+everything learned before it. All six blocks landed 2026-08-02/03.
+
+Noted, no commitment: the reconciliation layer from the decisions block —
+claims joined against findings as confirmed / undocumented / unsupported —
+has no block of its own yet. The blind findings (S4b) and the substance
+coverage rule (S5) are exactly its two inputs when it gets one.
 
 ---
 

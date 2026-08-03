@@ -583,10 +583,10 @@ test("a repeated line that points into this release is still a claim", async () 
 });
 
 test("standing text documents nothing, so it earns no coverage", async () => {
-  // The other coverage channel: a commit counts as documented when some claim
-  // restates its subject (cherry-pick workflows lose the PR reference). Text
-  // carried over from the base release was written before this commit existed,
-  // so it cannot be what documents it.
+  // The other coverage channel: a commit counts as documented when a claim's
+  // content tokens appear in its own diff (cherry-pick workflows lose the PR
+  // reference). Text carried over from the base release was written before
+  // this commit existed, so it cannot be what documents it.
   const linked: Commit = {
     sha: "beef5678cd",
     subject: "Refactor the plugin loader for lazy imports",
@@ -596,7 +596,7 @@ test("standing text documents nothing, so it earns no coverage", async () => {
   };
   const file = {
     path: "src/loader.js", status: "modified", additions: 40, deletions: 2,
-    patch: "@@ -1,2 +1,42 @@ function load()\n+  // forty new lines\n",
+    patch: "@@ -1,2 +1,42 @@\n+class PluginLoader {\n+  const lazy = () => import(modulePath);\n+}\n",
   };
   const data = {
     repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
@@ -604,18 +604,76 @@ test("standing text documents nothing, so it earns no coverage", async () => {
   };
   const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
 
-  const standing = claim("Refactor the plugin loader for lazy imports");
+  const spanned = (): Claim => {
+    const c = claim("Refactor the `PluginLoader` to lazy-load via `modulePath`");
+    c.codeSpans = ["PluginLoader", "modulePath"];
+    return c;
+  };
+  const standing = spanned();
   standing.carriedOverFrom = "v1";
   const skippedResults = await verifyClaims(data, [standing], opts);
   assert.equal(skippedResults[0].verdict, "skipped");
   const withStanding = await computeCoverage(data, [standing], skippedResults);
   assert.equal(withStanding.uncovered.length, 1, "the commit is still undocumented");
 
-  // The same sentence, written for this release, does document it.
-  const fresh = claim("Refactor the plugin loader for lazy imports");
+  // The same sentence, written for this release, does document it: its
+  // identifiers appear in the commit's own diff.
+  const fresh = spanned();
   const freshResults = await verifyClaims(data, [fresh], opts);
   const withFresh = await computeCoverage(data, [fresh], freshResults);
   assert.equal(withFresh.uncovered.length, 0);
+});
+
+test("subject resemblance alone no longer buys coverage — the diff must carry the claim", async () => {
+  // The retired shortcut marked a commit covered when its SUBJECT resembled
+  // a claim — claims describing claims. A fabricated note that echoes an
+  // honest subject line must not cover a commit whose diff shows none of it.
+  const linked: Commit = {
+    sha: "beef5678cd",
+    subject: "Refactor the plugin loader for lazy imports",
+    body: "",
+    author: "dev",
+    prNumbers: [],
+  };
+  const file = {
+    path: "src/telemetry.c", status: "modified", additions: 3, deletions: 0,
+    patch: "@@ -1,1 +1,4 @@ static void collect()\n+  send_beacon(endpoint);\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [linked], files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+  const echo = claim("Refactor the plugin loader for lazy imports");
+  const results = await verifyClaims(data, [echo], opts);
+  const coverage = await computeCoverage(data, [echo], results);
+  assert.equal(coverage.uncovered.length, 1, "the commit stays undocumented");
+});
+
+test("a changelog-only commit cannot cover itself through the notes' own text", async () => {
+  const linked: Commit = {
+    sha: "beef5678cd",
+    subject: "Update changelog",
+    body: "",
+    author: "dev",
+    prNumbers: [],
+  };
+  const file = {
+    path: "CHANGELOG.md", status: "modified", additions: 2, deletions: 0,
+    patch: "@@ -1,1 +1,3 @@\n+- Refactor the `PluginLoader` to lazy-load via `modulePath`\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [linked], files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+  // The claim's identifiers DO appear in the commit's diff — but only in a
+  // changelog file, and the notes restating themselves cover nothing.
+  const echo = claim("Refactor the `PluginLoader` to lazy-load via `modulePath`");
+  echo.codeSpans = ["PluginLoader", "modulePath"];
+  const results = await verifyClaims(data, [echo], opts);
+  const coverage = await computeCoverage(data, [echo], results);
+  assert.equal(coverage.uncovered.length, 1, "notes restating themselves cover nothing");
 });
 
 test("without an escalation engine a risky 'verified' still gets a second look", async () => {

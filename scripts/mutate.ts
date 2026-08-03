@@ -379,6 +379,12 @@ const MUTANTS: Mutant[] = [
     find: "if (isChangelogPath(f.path)) continue;",
     replace: "",
   },
+  {
+    guard: "coverage is earned by the commit's own diff, never by resemblance alone",
+    file: "src/verify.ts",
+    find: "changeClaims.some((claim) => lexicalMatch(claim, files).score >= 5);",
+    replace: "changeClaims.some(() => true);",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
