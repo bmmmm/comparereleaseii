@@ -24,19 +24,17 @@ The complete list — anything not here is landed or settled below.
 
 ## Demand-driven only (no schedule)
 
-- **F23 maxBuffer:** first decide whether kernel-scale releases are a target
-  at all. If not: a one-hour actionable error ("diff exceeds 64 MB — narrow
-  with --base"). If yes: streaming diff parse + per-file patch cap with
-  warning (the GitHub-API behavior downstream already handles).
-- **Action PR-comment variant:** GitHub-only nice-to-have, waits for a
-  concrete need.
 - **v-prefixed versions as identifier anchors:** `v7.1.4` in a claim text
   anchors nothing today — the identifier bar counts digit-led versions
   only, so a bump claim can sit unsupported next to the finding that
-  observes the same bump (seen live on OpenCloud v7.2.2). The bar is
-  shared with substance coverage: extending it moves the score and faces
-  the A/B discipline. Waits for a case where it hides more than a
-  version-bump line.
+  observes the same bump (seen live on OpenCloud v7.2.2; cosmetic — no
+  score or alert was wrong). Trigger: the first weeks of reconciliation
+  reports show bump claims dominating the unsupported line, or a score or
+  alert is demonstrably wrong because of it. Then score-neutral first — a
+  claims×pins join in the reconciliation (a bump claim whose pin the diff
+  demonstrably moves reads confirmed; deterministic, display-only, no A/B
+  debt). Widening the shared identifier bar itself is the second step and
+  faces the A/B discipline plus the README validation table.
 
 ## Settled — do not reopen without new facts
 
@@ -73,3 +71,13 @@ The complete list — anything not here is landed or settled below.
   Casual consumers are not an audience — they do not decide updates.
 - **Third-party pin bumps are never expanded** (2026-08-02) — explosion;
   OSV advisory enrichment stays a possible later, separate decision.
+- **Kernel-scale releases are not a target** (2026-08-04, closes the F23
+  maxBuffer question): the 64 MB in-memory cap is deliberate, and
+  overflowing it names the cap and the way out (`--base`) instead of
+  blaming git. The streaming diff parse stays unbuilt without a real
+  target — weeks of watcher operation and a full backfill never touched
+  the ceiling.
+- **Action PR-comment variant: rejected until real demand** (2026-08-04):
+  the tool checks release notes against a diff, and a PR has no release
+  notes — the claims-based PR intake already covers this repo's own PRs.
+  Reopens only via a user issue carrying a concrete use case.

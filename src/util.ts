@@ -23,22 +23,34 @@ export interface RunResult {
   stderr: string;
 }
 
-// FIXME(bughunt 2026-07-27): the 64 MB default maxBuffer is the real ceiling
-// for `git diff` on huge releases (Linux-kernel scale) — the failure is loud
-// but blames git, not the limit. Fixing it properly means streaming the diff
-// parse or diffing per file, which is a module-level change.
+// Kernel-scale releases are out of scope (settled 2026-08-04, closing the
+// 2026-07-27 bughunt FIXME): the 64 MB default maxBuffer is a deliberate
+// ceiling. Hitting it names the cap and the way out instead of blaming the
+// child process; the streaming diff parse stays unbuilt until a real
+// target needs it.
 export function run(
   cmd: string,
   args: string[],
   opts: { input?: string; cwd?: string; maxBuffer?: number } = {},
 ): Promise<RunResult> {
+  const maxBuffer = opts.maxBuffer ?? 64 * 1024 * 1024;
   return new Promise((resolve, reject) => {
     const child = execFile(
       cmd,
       args,
-      { cwd: opts.cwd, maxBuffer: opts.maxBuffer ?? 64 * 1024 * 1024 },
+      { cwd: opts.cwd, maxBuffer },
       (err, stdout, stderr) => {
         if (err) {
+          if (/maxBuffer/i.test(err.message)) {
+            const mb = Math.round(maxBuffer / (1024 * 1024));
+            reject(
+              new Error(
+                `${cmd} produced more output than the ${mb} MB this tool parses in memory — ` +
+                  `for a huge release diff, narrow the range with --base or check a smaller release.`,
+              ),
+            );
+            return;
+          }
           reject(
             new Error(
               `${cmd} ${args.slice(0, 3).join(" ")}… failed: ${stderr.trim() || err.message}`,

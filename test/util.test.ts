@@ -68,3 +68,15 @@ test("run() rejects instead of crashing when the child exits without reading a l
     /failed/,
   );
 });
+
+// The 64 MB ceiling is a decision, not an accident (kernel-scale releases
+// are out of scope) — so overflowing it must name the cap and the way out,
+// never blame the child process.
+test("run() names the parse cap and --base when output exceeds maxBuffer", async () => {
+  await assert.rejects(
+    run("node", ["-e", "process.stdout.write('x'.repeat(2 * 1024 * 1024))"], {
+      maxBuffer: 1024 * 1024,
+    }),
+    /1 MB.*--base/s,
+  );
+});

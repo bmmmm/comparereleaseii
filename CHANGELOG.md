@@ -45,6 +45,14 @@ All notable changes to comparereleaseii are documented here. The format follows 
   re-runs are bit-identical, `--judge off` output is unchanged — and never
   scored.
 
+### Fixed
+
+- **The 64 MB ceiling names itself.** Output past the in-memory parse cap
+  used to fail as `git … failed: stdout maxBuffer length exceeded` — loud,
+  but blaming git and naming no way out. The error now states the cap and
+  the escape (narrow the range with `--base`). Kernel-scale releases stay
+  out of scope by decision; the streaming parse stays unbuilt.
+
 ## 0.7.0 — 2026-08-03
 
 ### Changed
