@@ -1,22 +1,44 @@
 # Roadmap — the next level
 
-> **Status 2026-07-26:** all three phases are implemented on `main` — npm
-> packaging (the tarball ships compiled `dist/` because Node refuses to
-> strip types under `node_modules`; the roadmap's "ship src/" assumption was
-> wrong), the composite GitHub Action with a keyless smoke workflow, `watch`
-> mode with state/index/notify, the golden set, and SCORING.md.
-> One deliberate direction change against 1.1/3.2: this is a solo,
-> local-first project, so releasing is a local routine (`pnpm dogfood` gate
-> + `--calibrate` drift check + git tag + GitHub release) instead of a
-> secret-carrying CI pipeline — the repo needs no
-> ANTHROPIC_API_KEY/NPM_TOKEN secrets and stays judge-agnostic. Both former
-> open points landed in Iteration 2: v0.1.0 shipped as git tag + GitHub
-> release (no npm — see 2.5), and the full 11-model ranking closed
-> [#6](https://github.com/bmmmm/comparereleaseii/issues/6).
+> **Status 2026-08-03:** everything planned below is on `main` — the three
+> original phases (distribution, watchdog, judge trust; shipped without npm
+> and without repo secrets, both deliberate), iterations 2–4, the
+> 2026-07-27 block series (bughunt follow-up, hardening backlog, forge
+> watching, presentation + author ledger), the long view (backfill,
+> phases/events/heatmap), and the second axis (pins → substance →
+> first-party expansion → findings/lenses → substance coverage). This file
+> is a journal: each section keeps its plan and its landed notes, newest
+> section last.
+
+## Open (2026-08-03)
+
+The complete list — everything below this section is landed or explicitly
+settled.
+
+- **Cut a release.** The Unreleased CHANGELOG block carries the whole
+  second axis including one score-relevant change (S5); the local routine
+  applies (dogfood gate, `--calibrate` drift check, tag, both forges).
+- **Watchlist lens rollout** (config outside this repo): set the S4a
+  `audience:` values from the profile table in the live `watch.json`, so
+  daily watch runs render the lenses.
+- **Reconciliation layer** — noted, no commitment: claims joined against
+  findings as confirmed / undocumented / unsupported; S4b's blind findings
+  and S5's substance rule are its two ready inputs.
+- **Live-watchlist backfill** — waits for an explicit user go (judge cost,
+  live state): one-shot high-`maxPerRun` catch-up, last ~5 releases each.
+- **Stale XDG watch state** — the pre-2026-07-28 copy under
+  `~/.local/state/comparereleaseii/` is a duplicate awaiting a user go for
+  deletion.
+- **Demand-driven only** (no schedule): the F23 maxBuffer decision; the
+  Action PR-comment variant.
+
+Settled decisions (badges rejected, `watch serve` unbuilt, public scans
+rejected, calibration frozen): see "Settled — do not reopen without new
+facts" further down.
 
 ---
 
-## Next — post-bughunt plan (2026-07-27)
+## Landed — post-bughunt plan (2026-07-27)
 
 Context: a full-repo bug hunt at v0.2.0 read all 22 modules, confirmed and
 fixed 20 findings (see the Unreleased CHANGELOG section and the commit
@@ -183,7 +205,7 @@ authors correctly.
   before `%ae` joined the format. Both FIXMEs removed; F23 (maxBuffer)
   stays by design. 23/23 mutants killed.
 
-### Next — post-0.3.0 hardening backlog (2026-07-27)
+### Landed — post-0.3.0 hardening backlog (2026-07-27)
 
 Found while shipping blocks 1–8, anchored here so the session recap is not
 the only record. Ordered by risk; none is release-blocking.
@@ -258,7 +280,7 @@ the only record. Ordered by risk; none is release-blocking.
      tested functions, and labeled the frozen Haiku reference as
      round-1-graded in `--calibrate` output. 29/29 mutants killed.
 
-### Next — the watchdog leaves GitHub, and setup becomes a command (2026-07-27)
+### Landed — the watchdog leaves GitHub, and setup becomes a command (2026-07-27)
 
 Context: v0.4.0 shipped the full hardening backlog, and the same-day
 real-data check (a full `watch` pass over the 12-repo list plus a 4-repo
@@ -334,7 +356,7 @@ since 2026-07-28); the interim copies this note used to point at
 removed in the 2026-07-28 cleanup, the old XDG state is a stale duplicate
 kept only until its deletion gets a user go.
 
-### Next — presentation, analytics, and the author dimension (ideas 2026-07-27 — NOT settled, prioritize in a fresh session)
+### Landed — presentation, analytics, and the author dimension (2026-07-27/28)
 
 Context: the HTML layer is the least-built side. The report renders well but
 nobody is shown it (README carries zero screenshots, no demo); the watch
@@ -465,7 +487,7 @@ documentation.
 
 ---
 
-## Next — the long view (2026-07-28)
+## Landed — the long view (2026-07-28)
 
 Context: the watchdog is live (hourly launchd job at `~/release-watch`,
 running the SHA-pinned gh extension; v0.5.0/v0.5.1 shipped the history
@@ -596,7 +618,7 @@ checks.
 
 ---
 
-## Next — the second axis: what actually shipped (2026-08-02)
+## Landed — the second axis: what actually shipped (2026-08-02)
 
 Context: the OpenCloud walkthrough exposed two structural limits at once.
 (1) **Product ≠ repo.** opencloud-eu/opencloud pins its entire frontend as
@@ -800,6 +822,12 @@ coverage rule (S5) are exactly its two inputs when it gets one.
 
 ## Phase 1 — Distribution: from repo to `pnpm dlx` and a GitHub Action
 
+> **Landed 2026-07-26** — deliberately without npm (no account, no standing
+> supply-chain surface; see 2.5): git tag + GitHub release + the composite
+> Action, which only needs the tag. The packaging path stays exercised in
+> CI; the tarball ships compiled `dist/` because Node refuses to strip
+> types under `node_modules`.
+
 Goal: a stranger goes from zero to a verdict in under a minute, and a
 maintainer can gate releases without ever cloning us.
 
@@ -836,6 +864,10 @@ maintainer can gate releases without ever cloning us.
 
 ## Phase 2 — Watchdog: continuous release monitoring
 
+> **Landed 2026-07-26/27** — watch mode, alerting hook, launchd/cron recipe
+> (`docs/watchdog.md`); grown far past this plan by the later block series
+> (forge entries, backfill, history pages, long view).
+
 Goal: "watch these 10 repos; when any of them publishes a release, check it
 and tell me if something smells" — the supply-chain-watchdog use case that
 motivated the risk flags.
@@ -867,6 +899,12 @@ motivated the risk flags.
   the watchdog is the natural home for the local-first setup.
 
 ## Phase 3 — Judge trust over time
+
+> **Landed 2026-07-26/27** — golden set grew to 36 cases with the fitness
+> gate (Block 3) and a frozen Haiku reference; SCORING.md shipped. The
+> secret-carrying monthly CI eval (3.2) was deliberately not built (no repo
+> secrets): drift checks run locally via `--calibrate` in the release
+> routine, and the nightly keyless job covers mutants, not judges.
 
 Goal: keep the verdict quality measurable while models, prompts and providers
 change underneath us.
@@ -1388,7 +1426,7 @@ scoring behaviour underneath has just changed and has never been measured on
 real repos means any surprise afterwards has two possible causes instead of
 one.
 
-## Order and why
+## Order and why (the original three-phase plan)
 
 1 → 2 → 3. Distribution first because every later phase benefits from an
 installable artifact (the Action powers the watchdog examples; the eval
