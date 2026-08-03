@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.8.0 — 2026-08-04
+
 ### Added
 
 - **The version number is a claim too, and now it gets checked.** A patch
