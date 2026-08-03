@@ -27,6 +27,7 @@ import {
 } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
 import { summarizeShipped } from "./findings.ts";
+import { reconcile } from "./reconcile.ts";
 import type {
   Audience,
   ComponentCheck,
@@ -397,6 +398,14 @@ export async function analyzeRelease(
     }
   }
 
+  // The late join: claims meet findings only here, after both sides exist
+  // and the uncovered list is final — no findings (--judge off,
+  // --no-findings, empty diff) means no reconciliation, not an empty
+  // scaffold. Score-neutral by construction: the metrics above are fixed.
+  const reconciliation = findings?.findings.length
+    ? reconcile(results, findings.findings, uncovered, coverage?.commitFiles ?? null)
+    : undefined;
+
   return {
     repoLabel: data.repoLabel,
     baseRef: data.baseRef,
@@ -426,6 +435,7 @@ export async function analyzeRelease(
     components,
     findings,
     audience: s.audience,
+    reconciliation,
   };
 }
 

@@ -358,8 +358,8 @@ const FINDING_COLOR: Record<FindingKind, string> = {
   internal: "#6e7681",
 };
 
-function findingRow(f: Finding): string {
-  return `<div class="flag" style="border-left-color:${FINDING_COLOR[f.kind]}"><span class="chip" style="background:${FINDING_COLOR[f.kind]}">${f.kind}</span><span class="gen">${esc(f.audience)}</span> ${esc(f.text)}${
+function findingRow(f: Finding, tag = ""): string {
+  return `<div class="flag" style="border-left-color:${FINDING_COLOR[f.kind]}"><span class="chip" style="background:${FINDING_COLOR[f.kind]}">${f.kind}</span><span class="gen">${esc(f.audience)}</span> ${esc(f.text)}${tag}${
     f.files.length ? `<div class="files">${esc(f.files.slice(0, 6).join(", "))}</div>` : ""
   }</div>`;
 }
@@ -370,6 +370,15 @@ function findingsHtml(report: Report): string {
   const fin = report.findings!;
   const lens = report.audience;
   const view = lensFindings(fin.findings, lens);
+  const rec = report.reconciliation;
+  const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
+  const undocumentedIdx = new Set(rec?.undocumented ?? []);
+  const tagOf = (f: Finding): string => {
+    const fi = fin.findings.indexOf(f);
+    if (confirmedIdx.has(fi)) return ` <span class="gen">· claimed</span>`;
+    if (undocumentedIdx.has(fi)) return ` <span class="gen" style="color:#d29922">· never claimed</span>`;
+    return "";
+  };
   const budget = budgetLine(report);
   const parts: string[] = [
     `<h2>Findings <span class="note">— the diff as read by the judge, blind to commit messages; informational, never scored</span></h2>`,
@@ -381,7 +390,7 @@ function findingsHtml(report: Report): string {
     );
   }
   if (fin.summary) parts.push(`<p>${esc(fin.summary)}</p>`);
-  parts.push(view.shown.map(findingRow).join(""));
+  parts.push(view.shown.map((f) => findingRow(f, tagOf(f))).join(""));
   if (lens) {
     // Same objects — lensFindings sorts a copy of the array, so identity
     // cleanly separates "shown under this lens" from the rest.
@@ -390,7 +399,7 @@ function findingsHtml(report: Report): string {
     if (rest.length) {
       parts.push(
         `<details><summary>${rest.length} finding(s) outside the ${esc(lens)} lens</summary>${rest
-          .map(findingRow)
+          .map((f) => findingRow(f, tagOf(f)))
           .join("")}</details>`,
       );
     }
@@ -400,6 +409,14 @@ function findingsHtml(report: Report): string {
   }
   for (const e of fin.errors ?? []) {
     parts.push(`<div class="flag" style="border-left-color:#d29922">subsystem read failed: ${esc(e)}</div>`);
+  }
+  if (rec?.unsupported.length) {
+    const texts = rec.unsupported
+      .slice(0, 3)
+      .map((i) => `"${report.results[i].claim.text.slice(0, 80)}"`);
+    parts.push(
+      `<p class="note">claims no finding observes — ${rec.unsupported.length}: ${esc(texts.join(", "))}${rec.unsupported.length > 3 ? ", …" : ""}</p>`,
+    );
   }
   return parts.join("");
 }
@@ -544,7 +561,11 @@ export function toHtml(report: Report, nav?: ReportNav): string {
   // forges the tiles still link to the compare view, just without the jump.
   const anchorsWork = report.linkBase?.startsWith("https://github.com/") ?? false;
   const hasSuggestions = report.uncovered.some((u) => u.suggestedNote);
-  const uncoveredRows = report.uncovered
+  const uncoveredOrder = report.reconciliation?.uncoveredOrder;
+  const uncoveredListed = uncoveredOrder
+    ? uncoveredOrder.map((i) => report.uncovered[i])
+    : report.uncovered;
+  const uncoveredRows = uncoveredListed
     .map(
       (u) =>
         `<tr><td>${
@@ -707,7 +728,7 @@ ${
   !report.reverseChecked
     ? `<p class="note">Completeness check skipped (--no-reverse).</p>`
     : report.uncovered.length
-      ? `<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th>${hasSuggestions ? "<th>suggested note</th>" : ""}</tr>${uncoveredRows}</table>`
+      ? `${uncoveredOrder ? `<p class="note">ordered: commits sharing files with an undocumented finding first</p>` : ""}<table><tr><th>commit</th><th>subject</th><th>churn</th><th>files</th>${hasSuggestions ? "<th>suggested note</th>" : ""}</tr>${uncoveredRows}</table>`
       : `<p class="ok">All commits in the range are covered by the release notes.</p>`
 }
 

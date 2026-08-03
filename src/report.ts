@@ -378,8 +378,17 @@ export function printTerminal(report: Report): void {
     if (lens) {
       console.log(c.dim(`  lens: ${lens} — security findings show under every lens`));
     }
+    const rec = report.reconciliation;
+    const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
+    const undocumentedIdx = new Set(rec?.undocumented ?? []);
     for (const f of view.shown) {
-      console.log(`  ${kindColor[f.kind](f.kind)} ${c.dim(`[${f.audience}]`)} ${safe(f.text)}`);
+      const fi = fin.findings.indexOf(f);
+      const tag = confirmedIdx.has(fi)
+        ? c.dim(" · claimed")
+        : undocumentedIdx.has(fi)
+          ? c.yellow(" · never claimed")
+          : "";
+      console.log(`  ${kindColor[f.kind](f.kind)} ${c.dim(`[${f.audience}]`)} ${safe(f.text)}${tag}`);
       if (f.files.length) {
         const files = f.files.slice(0, 3).join(", ");
         const more = f.files.length - 3;
@@ -399,6 +408,16 @@ export function printTerminal(report: Report): void {
     }
     for (const e of fin.errors ?? []) {
       console.log(c.yellow(`  subsystem read failed: ${safe(e)}`));
+    }
+    if (rec?.unsupported.length) {
+      const texts = rec.unsupported
+        .slice(0, 2)
+        .map((i) => `"${report.results[i].claim.text.slice(0, 60)}"`);
+      console.log(
+        c.dim(
+          `  claims no finding observes — ${rec.unsupported.length}: ${safe(texts.join(", "))}${rec.unsupported.length > 2 ? ", …" : ""}`,
+        ),
+      );
     }
   }
 
@@ -441,7 +460,12 @@ export function printTerminal(report: Report): void {
       c.bold(`\nUndocumented changes`) +
         c.dim(` — ${report.uncovered.length} commit(s) not covered by any note:`),
     );
-    for (const u of report.uncovered.slice(0, 10)) {
+    const order = report.reconciliation?.uncoveredOrder;
+    const listed = order ? order.map((i) => report.uncovered[i]) : report.uncovered;
+    if (order) {
+      console.log(c.dim("  ordered: commits sharing files with an undocumented finding first"));
+    }
+    for (const u of listed.slice(0, 10)) {
       console.log(
         `  ${c.yellow("!")} ${u.commit.sha.slice(0, 8)} ${safe(u.commit.subject)} ` +
           c.dim(`(+${u.additions}/−${u.deletions}, ${u.fileCount} files)`),
@@ -562,17 +586,35 @@ export function toMarkdown(report: Report): string {
     if (budget) lines.push(`_${budget}_`, "");
     if (report.audience) lines.push(`Default lens: **${report.audience}**`, "");
     if (fin.summary) lines.push(fin.summary, "");
+    const rec = report.reconciliation;
+    const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
+    const undocumentedIdx = new Set(rec?.undocumented ?? []);
     for (const f of lensFindings(fin.findings, undefined).shown) {
+      const fi = fin.findings.indexOf(f);
+      const tag = confirmedIdx.has(fi)
+        ? " — *claimed*"
+        : undocumentedIdx.has(fi)
+          ? " — **never claimed**"
+          : "";
       const files = f.files.length
         ? ` (${f.files.slice(0, 4).map((p) => `\`${p}\``).join(", ")})`
         : "";
-      lines.push(`- **${f.kind}** [${f.audience}] ${f.text}${files}`);
+      lines.push(`- **${f.kind}** [${f.audience}] ${f.text}${files}${tag}`);
     }
     if (!fin.findings.length && !fin.errors?.length) {
       lines.push("Nothing beyond noise in the read subsystems.");
     }
     for (const e of fin.errors ?? []) {
       lines.push(`- subsystem read failed: ${e}`);
+    }
+    if (rec?.unsupported.length) {
+      const texts = rec.unsupported
+        .slice(0, 3)
+        .map((i) => `"${report.results[i].claim.text.slice(0, 80)}"`);
+      lines.push(
+        "",
+        `Claims no finding observes — ${rec.unsupported.length}: ${texts.join(", ")}${rec.unsupported.length > 3 ? ", …" : ""}`,
+      );
     }
   }
   if (report.pins?.length) {
@@ -602,7 +644,12 @@ export function toMarkdown(report: Report): string {
   } else if (!report.uncovered.length) {
     lines.push("None — all commits in the range are covered by the release notes.");
   } else {
-    for (const u of report.uncovered) {
+    const order = report.reconciliation?.uncoveredOrder;
+    const listed = order ? order.map((i) => report.uncovered[i]) : report.uncovered;
+    if (order) {
+      lines.push("_Ordered: commits sharing files with an undocumented finding first._", "");
+    }
+    for (const u of listed) {
       lines.push(
         `- \`${u.commit.sha.slice(0, 8)}\` ${u.commit.subject} (+${u.additions}/−${u.deletions}, ${u.fileCount} files)`,
       );

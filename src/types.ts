@@ -325,6 +325,36 @@ export interface FindingsSection {
   errors?: string[];
 }
 
+/** One finding and the claims whose identifiers demonstrably describe it. */
+export interface FindingClaimLink {
+  /** Index into report.findings.findings. */
+  finding: number;
+  /** Indices into report.results, ascending. */
+  claims: number[];
+}
+
+/**
+ * The late join of claims and findings: computed after both sides exist,
+ * so neither side's production ever read the other. `confirmed` findings
+ * are claimed and observed; `undocumented` findings were observed but
+ * never claimed — the interesting signal; `unsupported` claims are
+ * asserted but no finding observes them, which reads against the declared
+ * findings budget, not as a contradiction. Informational, never scored.
+ */
+export interface Reconciliation {
+  confirmed: FindingClaimLink[];
+  /** Indices into report.findings.findings no claim describes. */
+  undocumented: number[];
+  /** Indices into report.results (change-kind, not skipped) no finding observes. */
+  unsupported: number[];
+  /**
+   * Display order for report.uncovered: commits sharing a file with an
+   * undocumented finding first. Present only when it differs from the
+   * stored order — a view property, the list itself is untouched.
+   */
+  uncoveredOrder?: number[];
+}
+
 export type FlagSeverity = "critical" | "warn" | "info";
 
 export interface RiskFlag {
@@ -459,4 +489,6 @@ export interface Report {
    * itself always carries every audience.
    */
   audience?: Audience;
+  /** Claims joined against findings, late — informational, never scored. */
+  reconciliation?: Reconciliation;
 }

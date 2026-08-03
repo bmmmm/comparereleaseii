@@ -6,7 +6,9 @@
 > watching, presentation + author ledger), the long view (backfill,
 > phases/events/heatmap), and the second axis (pins → substance →
 > first-party expansion → findings/lenses → substance coverage; shipped
-> as v0.7.0 on 2026-08-03). This file carries only what is open. The landed
+> as v0.7.0 on 2026-08-03), and the reconciliation layer (claims meet
+> findings — landed 2026-08-03, rides the next release). This file
+> carries only what is open. The landed
 > plans and their dated landed notes live in this file's git history (up
 > to `039460a`); durable outcomes live where they belong — CHANGELOG
 > (what shipped), SCORING.md (score semantics), AGENTS.md (working
@@ -16,37 +18,9 @@
 
 The complete list — anything not here is landed or settled below.
 
-- **Reconciliation layer** (Block 4): design settled, build in progress.
 - **Demand-driven only** (no schedule, deliberately not in the plan): the
-  F23 maxBuffer decision; the Action PR-comment variant.
-
-## Next — v0.7.0 and the axis in operation (2026-08-03)
-
-Context: v0.7.0 shipped 2026-08-03 and the axis is in operation — the
-watcher runs the released version with per-repo lenses configured, and
-the watchlist is backfilled to drift depth (≥ 6 checks everywhere).
-Block 4 is the remaining build block. F23 and the Action PR-comment stay
-demand-driven — putting them here would schedule work no demand has
-asked for.
-
-### Block 4 — reconciliation: claims meet findings (design, then build)
-Settled with the axis (2026-08-02): messages and notes join *late*,
-against the findings — confirmed (claimed + observed), undocumented
-(observed, never claimed — the interesting signal), unsupported (claimed,
-never observed). Score-neutral until measured, like every stage before
-it. Proposal, deterministic first: match claims to findings with the S5
-machinery (identifier overlap against a finding's text + files), render
-as per-finding tags in the findings section plus one "unsupported claims"
-line; a judged matching pass only where the deterministic one stays
-empty — and only as a later, separate decision. Settled at build start
-(2026-08-03, user): reconciliation renders inside the findings section
-(per-finding tags plus one unsupported-claims line), and `undocumented`
-findings order the uncovered list — display only, anything score-touching
-faces the A/B discipline.
-**Done when:** a cached OpenCloud report shows all three sets from
-existing data, `--judge off` degrades honestly (no findings → no
-reconciliation, deterministic output unchanged), re-runs stay
-bit-identical, and a score-neutrality test pins it.
+  F23 maxBuffer decision; the Action PR-comment variant; v-prefixed
+  versions as identifier anchors.
 
 ## Demand-driven only (no schedule)
 
@@ -56,6 +30,13 @@ bit-identical, and a score-neutrality test pins it.
   warning (the GitHub-API behavior downstream already handles).
 - **Action PR-comment variant:** GitHub-only nice-to-have, waits for a
   concrete need.
+- **v-prefixed versions as identifier anchors:** `v7.1.4` in a claim text
+  anchors nothing today — the identifier bar counts digit-led versions
+  only, so a bump claim can sit unsupported next to the finding that
+  observes the same bump (seen live on OpenCloud v7.2.2). The bar is
+  shared with substance coverage: extending it moves the score and faces
+  the A/B discipline. Waits for a case where it hides more than a
+  version-bump line.
 
 ## Settled — do not reopen without new facts
 

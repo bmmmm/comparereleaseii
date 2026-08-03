@@ -31,6 +31,19 @@ All notable changes to comparereleaseii are documented here. The format follows 
   is one shared function now instead of four drifting copies — it also
   decides when the deep listing has covered its backfill scope, so a page
   of nightlies cannot end pagination early.
+- **Claims meet the findings, late.** With findings present, every checked
+  claim's identifiers (code spans, identifier-shaped terms) are matched
+  against each finding's text and files — the same identifier currency
+  substance coverage spends: one code span or two identifiers make a link,
+  a single stray token never does. Findings carry the result in place
+  (`claimed` / `never claimed` — the latter is the interesting signal),
+  one line names the claims no finding observes (read against the declared
+  findings budget, not as a contradiction), and commits sharing files with
+  a never-claimed finding lead the undocumented list, display-only. In the
+  JSON as one additive `reconciliation` block joining claims and findings
+  by index. Deterministic — meta and carried-over claims take no part,
+  re-runs are bit-identical, `--judge off` output is unchanged — and never
+  scored.
 
 ## 0.7.0 — 2026-08-03
 

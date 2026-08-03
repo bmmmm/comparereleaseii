@@ -404,6 +404,24 @@ const MUTANTS: Mutant[] = [
     find: "changeClaims.some((claim) => lexicalMatch(claim, files).score >= 5);",
     replace: "changeClaims.some(() => true);",
   },
+  {
+    guard: "a claim confirms a finding only past the identifier bar — one span or two identifiers",
+    file: "src/reconcile.ts",
+    find: "const MATCH_BAR = 3;",
+    replace: "const MATCH_BAR = 1;",
+  },
+  {
+    guard: "meta and skipped claims never join the reconciliation",
+    file: "src/reconcile.ts",
+    find: 'if (r.claim.kind === "change" && r.verdict !== "skipped") eligible.push(i);',
+    replace: "eligible.push(i);",
+  },
+  {
+    guard: "the uncovered order is emitted only when it actually reorders",
+    file: "src/reconcile.ts",
+    find: "if (order.some((v, i) => v !== i)) uncoveredOrder = order;",
+    replace: "uncoveredOrder = order;",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
