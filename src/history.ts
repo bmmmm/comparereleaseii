@@ -95,6 +95,10 @@ export interface HistorySource {
   cacheKey: string;
   /** owner/repo — the dependency heuristics use it to spot a repo's own packages. */
   slug: string;
+  // FIXME(tagPattern): the --baseline history lists releases by its own
+  // draft/prerelease rule — a watch entry's tagPattern does not reach it,
+  // so a pattern-scoped entry's baseline can include tags the config
+  // declared "not a release". Scope note: docs/watchdog.md.
   listReleases(): Promise<HistoryRelease[]>;
   loadRange(base: string, head: string): Promise<{ commits: Commit[]; files: DiffFile[] }>;
 }

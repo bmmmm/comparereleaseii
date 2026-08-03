@@ -218,7 +218,13 @@ config file's directory.
 `tagPattern` (a regular expression) decides which tags are releases at all:
 non-matching tags are never polled, counted as skipped or backfilled —
 `"^v\\d"` keeps a repo's `nightly-20260803` tags out of the watchlist. An
-invalid pattern is rejected when the config loads, with the entry named.
+invalid pattern is rejected when the config loads, with the entry named;
+`null` on an entry switches an inherited defaults pattern off. Scope note:
+the pattern decides which releases are *checked* — the base release a check
+diffs against and the `--baseline` history follow their own picking rules
+(tag prefix, prerelease exclusion) and do not consult it. Tag names are
+input the watched repo chooses, so prefer anchored, simple patterns
+(`^v\\d`) over nested quantifiers.
 `minCoverage` flags a release whose completeness score (the share of
 changed lines the notes cover) is below the number — the same gate as the
 CLI's `--min-coverage`.

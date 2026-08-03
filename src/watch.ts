@@ -145,19 +145,34 @@ export function validateWatchConfig(config: WatchConfig): void {
   }
   // Fail on a broken tagPattern here, once — the pickers compile it on
   // every poll and would otherwise throw mid-run on every single release.
-  const patterns: Array<[string, string | undefined]> = [
-    ["defaults", config.defaults?.tagPattern],
-    ...config.repos.map(
-      (r): [string, string | undefined] => [r.repo ?? r.repoUrl ?? "?", r.tagPattern],
-    ),
-  ];
-  for (const [where, pattern] of patterns) {
-    if (pattern === undefined) continue;
+  // Anything that is not a string (or the explicit null opt-out) would
+  // stringify into a regex that silently matches nothing, forever.
+  const perEntry = (field: "tagPattern" | "minCoverage") =>
+    [
+      ["defaults", config.defaults?.[field]] as const,
+      ...config.repos.map((r) => [r.repo ?? r.repoUrl ?? "?", r[field]] as const),
+    ].filter(([, v]) => v !== undefined);
+  for (const [where, pattern] of perEntry("tagPattern")) {
+    if (pattern === null) continue; // an entry switching a defaults pattern off
+    if (typeof pattern !== "string") {
+      throw new Error(
+        `Watch config: "tagPattern" (${where}) must be a string or null (got ${JSON.stringify(pattern)}).`,
+      );
+    }
     try {
       new RegExp(pattern);
     } catch (err) {
       throw new Error(
         `Watch config: "tagPattern" ${JSON.stringify(pattern)} (${where}) is not a valid regular expression — ${(err as Error).message}`,
+      );
+    }
+  }
+  // The CLI rejects --min-coverage outside 0–100; the config file must not
+  // be the back door that accepts it.
+  for (const [where, min] of perEntry("minCoverage")) {
+    if (typeof min !== "number" || !Number.isInteger(min) || min < 0 || min > 100) {
+      throw new Error(
+        `Watch config: "minCoverage" (${where}) must be an integer 0–100 (got ${JSON.stringify(min)}).`,
       );
     }
   }
@@ -510,7 +525,19 @@ export async function runWatch(
       cap,
     });
     if (!fresh.length) {
-      console.error(`${key}: up to date (${repoState.lastTag ?? "no releases"})`);
+      // "Up to date" must not paper over a pattern that matches nothing —
+      // a typo'd tagPattern looks exactly like a quiet repo otherwise.
+      const patternMatchesNothing =
+        rc.tagPattern != null &&
+        releases.length > 0 &&
+        !releases.some((r) =>
+          eligibleRelease(r, { includePrerelease: rc.includePrerelease, tagPattern: rc.tagPattern }),
+        );
+      console.error(
+        patternMatchesNothing
+          ? `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`
+          : `${key}: up to date (${repoState.lastTag ?? "no releases"})`,
+      );
       state.repos[key] = repoState;
       continue;
     }
@@ -620,7 +647,12 @@ const MAX_LISTING_PAGES = 20;
  */
 async function listReleasesDeep(
   rc: WatchRepoConfig,
-  scope: { releases?: number; since?: string; includePrerelease?: boolean; tagPattern?: string },
+  scope: {
+    releases?: number;
+    since?: string;
+    includePrerelease?: boolean;
+    tagPattern?: string | null;
+  },
 ): Promise<{ releases: ReleaseInfo[]; gh: GhRelease[] | null; forge: ForgeListing | null }> {
   // Pattern-filtered tags must not count toward "scope covered" — a repo
   // whose newest page is all nightlies would otherwise stop paging before
@@ -790,6 +822,16 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
       const listing = await listReleasesDeep(rc, scope(rc));
       const repoState = state.repos[key] ?? { lastPublishedAt: null, lastTag: null, history: [] };
       const plan = pickBackfillReleases(listing.releases, repoState, scope(rc));
+      if (
+        !plan.length &&
+        rc.tagPattern != null &&
+        listing.releases.length > 0 &&
+        !listing.releases.some((r) => eligibleRelease(r, scope(rc)))
+      ) {
+        console.error(
+          `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`,
+        );
+      }
       plans.push({ rc, key, plan, gh: listing.gh, forge: listing.forge });
     } catch (err) {
       console.error(`${key}: listing releases failed — ${(err as Error).message}`);

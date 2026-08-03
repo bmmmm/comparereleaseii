@@ -86,6 +86,26 @@ test("feat commits in a patch bump: info, and only in a conventional repo", () =
   assert.equal(bumpMismatchFlags("v1.2.3", "v1.2.4", freeform).length, 0);
 });
 
+test("review hardening: four-part tags, merge bodies, prose subjects", () => {
+  // A four-part tag is a build-number scheme, not a semver claim.
+  assert.equal(parseSemverTag("1.2.3.4"), null);
+  assert.equal(parseSemverTag("v1.2.3.4"), null);
+
+  // A merge commit quoting the PR's BREAKING footer is not its own marker.
+  const merge = commit("Merge pull request #7 from x/y", "BREAKING CHANGE: quoted from the PR");
+  assert.equal(bumpMismatchFlags("v1.2.3", "v1.2.4", [merge]).length, 0);
+
+  // Prose "Word:" subjects must not vote the repo over the conventional bar.
+  const prose = [
+    commit("feat: sparkline"),
+    commit("Note: see the wiki"),
+    commit("Fixed: the flaky test"),
+    commit("Update: readme"),
+    commit("Cleanup: old code"),
+  ];
+  assert.equal(bumpMismatchFlags("v1.2.3", "v1.2.4", prose).length, 0);
+});
+
 test("out of scope: prereleases, major bumps, non-semver tags", () => {
   const breaking = [commit("feat!: anything")];
   assert.equal(bumpMismatchFlags("v1.2.3", "v1.2.4-rc.1", breaking).length, 0);

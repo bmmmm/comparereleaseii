@@ -22,6 +22,9 @@ export interface SemverTag {
 export function parseSemverTag(tag: string): SemverTag | null {
   const m = /^(.*?)(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(tag);
   if (!m) return null;
+  // A four-part tag (1.2.3.4) would backtrack its first number into the
+  // prefix and read as "2.3.4" — a build-number scheme, not a semver claim.
+  if (/\d\.$/.test(m[1])) return null;
   return {
     prefix: m[1],
     major: Number(m[2]),
@@ -47,7 +50,11 @@ export function bumpKind(base: SemverTag, head: SemverTag): BumpKind {
   return null;
 }
 
-const CONVENTIONAL_RE = /^[A-Za-z]+(\([^)]*\))?!?:\s/;
+// The standard type vocabulary only — a generic word-colon match would let
+// prose subjects ("Note: …", "Fixed: …") vote a free-form repo over the
+// conventional-commits bar that gates the feat-in-patch info.
+const CONVENTIONAL_RE =
+  /^(feat|fix|chore|docs|refactor|perf|test|build|ci|style|revert)(\([^)]*\))?!?:\s/;
 const BREAKING_SUBJECT_RE = /^[A-Za-z]+(\([^)]*\))?!:\s/;
 const FEAT_RE = /^feat(\([^)]*\))?!?:\s/;
 const BREAKING_FOOTER_RE = /^BREAKING[ -]CHANGE:/m;
@@ -81,7 +88,11 @@ export function bumpMismatchFlags(
   if (bump === null || bump === "major") return [];
 
   const flags: RiskFlag[] = [];
-  const breaking = commits.filter(isBreaking);
+  // Merge commits quote the PR body — including any BREAKING CHANGE footer
+  // the real commit already carries. Scanning them would double-count, and
+  // the churn accounting in metrics.ts excludes merges for the same reason.
+  const own = commits.filter((c) => !c.subject.startsWith("Merge "));
+  const breaking = own.filter(isBreaking);
   if (breaking.length && (bump === "patch" || base.major >= 1)) {
     flags.push({
       severity: "warn",
@@ -95,10 +106,9 @@ export function bumpMismatchFlags(
   }
 
   if (bump === "patch") {
-    const subjects = commits.filter((c) => !c.subject.startsWith("Merge "));
-    const conventional = subjects.filter((c) => CONVENTIONAL_RE.test(c.subject));
-    const feats = subjects.filter((c) => FEAT_RE.test(c.subject) && !isBreaking(c));
-    if (feats.length && subjects.length > 0 && conventional.length / subjects.length >= 0.25) {
+    const conventional = own.filter((c) => CONVENTIONAL_RE.test(c.subject));
+    const feats = own.filter((c) => FEAT_RE.test(c.subject) && !isBreaking(c));
+    if (feats.length && own.length > 0 && conventional.length / own.length >= 0.25) {
       flags.push({
         severity: "info",
         kind: "bump-mismatch-feat",

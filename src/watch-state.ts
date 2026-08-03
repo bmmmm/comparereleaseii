@@ -42,9 +42,13 @@ export interface WatchRepoConfig {
   /**
    * Only tags matching this regular expression are watched and backfilled —
    * e.g. "^v\\d" keeps a repo's nightly-20260803 tags out of the watchlist.
-   * Invalid patterns are rejected when the config is loaded.
+   * Invalid patterns are rejected when the config is loaded; `null` switches
+   * an inherited defaults pattern off for this entry. The pattern decides
+   * which releases are CHECKED — the base release a check diffs against and
+   * the --baseline history follow their own picking rules and do not
+   * consult it (yet — see the scope note in docs/watchdog.md).
    */
-  tagPattern?: string;
+  tagPattern?: string | null;
   /** Trust score below which a release is flagged (default 65). */
   notifyBelow?: number;
   /**
@@ -321,13 +325,25 @@ export interface WatchState {
  * only matching tags. One function on purpose: the filters used to be
  * copies, and copies drift.
  */
+// One-slot memo: a backfill filters thousands of releases against the same
+// pattern — compiling per release would be pure waste.
+let compiledSource: string | null = null;
+let compiledRe: RegExp | null = null;
+function tagRe(pattern: string): RegExp {
+  if (pattern !== compiledSource) {
+    compiledSource = pattern;
+    compiledRe = new RegExp(pattern);
+  }
+  return compiledRe!;
+}
+
 export function eligibleRelease(
   r: ReleaseInfo,
-  opts: { includePrerelease?: boolean; tagPattern?: string },
+  opts: { includePrerelease?: boolean; tagPattern?: string | null },
 ): boolean {
   if (r.draft || !r.publishedAt) return false;
   if (r.prerelease && !opts.includePrerelease) return false;
-  return opts.tagPattern === undefined || new RegExp(opts.tagPattern).test(r.tag);
+  return opts.tagPattern == null || tagRe(opts.tagPattern).test(r.tag);
 }
 
 /** Releases to check: newer than the last checked one, oldest first. On the
@@ -335,7 +351,7 @@ export function eligibleRelease(
 export function pickNewReleases(
   releases: ReleaseInfo[],
   lastPublishedAt: string | null,
-  opts: { includePrerelease?: boolean; tagPattern?: string; cap?: number } = {},
+  opts: { includePrerelease?: boolean; tagPattern?: string | null; cap?: number } = {},
 ): ReleaseInfo[] {
   const cap = opts.cap ?? 3;
   const eligible = releases
@@ -355,7 +371,7 @@ export function pickNewReleases(
 export function countSkipped(
   releases: ReleaseInfo[],
   lastPublishedAt: string | null,
-  opts: { includePrerelease?: boolean; tagPattern?: string; cap?: number } = {},
+  opts: { includePrerelease?: boolean; tagPattern?: string | null; cap?: number } = {},
 ): number {
   if (lastPublishedAt === null) return 0;
   const eligible = releases.filter(
@@ -410,7 +426,12 @@ export function recordChecked(
 export function pickBackfillReleases(
   releases: ReleaseInfo[],
   repoState: RepoState,
-  scope: { releases?: number; since?: string; includePrerelease?: boolean; tagPattern?: string },
+  scope: {
+    releases?: number;
+    since?: string;
+    includePrerelease?: boolean;
+    tagPattern?: string | null;
+  },
 ): ReleaseInfo[] {
   const eligible = releases
     .filter((r) => eligibleRelease(r, scope))
@@ -577,7 +598,7 @@ export function isFlagged(
   // normally at 95 now alerts at 70 — which no absolute default would catch.
   // The comparison is inclusive: a drop of exactly SCORE_DROP is the case
   // the constant names, and `<` let it through.
-  if (baseline !== null) return score <= baseline - SCORE_DROP;
+  
   return score < notifyBelow;
 }
 

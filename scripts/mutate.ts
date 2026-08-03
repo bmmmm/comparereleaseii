@@ -51,8 +51,8 @@ const MUTANTS: Mutant[] = [
   {
     guard: "feat-in-patch only fires in repos that actually speak conventional commits",
     file: "src/bump.ts",
-    find: "conventional.length / subjects.length >= 0.25",
-    replace: "conventional.length / subjects.length >= 0",
+    find: "conventional.length / own.length >= 0.25",
+    replace: "conventional.length / own.length >= 0",
   },
   {
     guard: "markdown files are never classified as ci/build or auth code",

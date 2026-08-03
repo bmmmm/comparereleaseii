@@ -102,8 +102,8 @@ Options:
   --min-coverage <n>  Also fail (exit 1) when the completeness score — the
                       percentage of changed lines the notes cover — is below
                       n. Independent of --fail-on; a release whose coverage
-                      could not be measured (--no-reverse, unverified) never
-                      fails this gate
+                      was not measured (--no-reverse) or that scored
+                      unverified never fails this gate
   --no-reverse        Skip the completeness check (undocumented commits)
   --baseline <n>      Compare against the n previous releases for anomaly
                       detection (default: 5; 0 disables). Past releases come

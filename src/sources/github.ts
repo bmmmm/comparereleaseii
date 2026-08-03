@@ -142,6 +142,9 @@ function tagMajor(tag: string): string | null {
   return tag.match(/\d+/)?.[0] ?? null;
 }
 
+// FIXME(tagPattern): a watch entry's tagPattern does not reach this base
+// pick — a same-prefix tag the config declared "not a release" can still
+// become the base a check diffs against. Scope note: docs/watchdog.md.
 export function pickBaseRelease(releases: GhRelease[], tag: string): string | null {
   const idx = releases.findIndex((r) => r.tag_name === tag);
   if (idx === -1) {

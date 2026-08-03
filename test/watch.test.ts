@@ -96,6 +96,11 @@ test("pickNewReleases: tagPattern keeps non-matching tags out entirely", () => {
   );
   // Cursor past the last matching release: a new nightly alone is no news.
   assert.deepEqual(pickNewReleases(releases, "2026-07-25T00:00:00Z", { tagPattern: "^v\\d" }), []);
+  // null (the defaults opt-out) behaves like no pattern at all.
+  assert.deepEqual(
+    pickNewReleases(releases, null, { tagPattern: null }).map((r) => r.tag),
+    ["nightly-20260802"],
+  );
   // countSkipped counts only what would have been checked.
   assert.equal(countSkipped(releases, "2026-05-01T00:00:00Z", { tagPattern: "^v\\d", cap: 1 }), 1);
   assert.equal(countSkipped(releases, "2026-05-01T00:00:00Z", { cap: 1 }), 3);
@@ -131,8 +136,28 @@ test("validateWatchConfig rejects an invalid tagPattern with the entry named", (
       }),
     /tagPattern.*defaults/s,
   );
-  // A valid pattern passes.
+  // A valid pattern passes; null is the explicit per-entry opt-out.
   validateWatchConfig({ repos: [{ repo: "owner/name", tagPattern: "^v\\d" }] });
+  validateWatchConfig({
+    repos: [{ repo: "owner/name", tagPattern: null }],
+    defaults: { tagPattern: "^v" },
+  });
+  // Any other non-string would stringify into a regex that matches nothing.
+  assert.throws(
+    () => validateWatchConfig({ repos: [{ repo: "owner/name", tagPattern: 5 as never }] }),
+    /tagPattern.*must be a string or null/s,
+  );
+});
+
+test("validateWatchConfig holds minCoverage to the CLI's 0–100 rule", () => {
+  validateWatchConfig({ repos: [{ repo: "owner/name", minCoverage: 60 }] });
+  for (const bad of [150, -1, 6.5, "60" as never]) {
+    assert.throws(
+      () => validateWatchConfig({ repos: [{ repo: "owner/name", minCoverage: bad }] }),
+      /minCoverage.*0–100/s,
+      `accepted ${JSON.stringify(bad)}`,
+    );
+  }
 });
 
 test("isFlagged: exit code, critical flags, or a score below threshold", () => {
