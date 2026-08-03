@@ -198,7 +198,7 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
   "repos": [
     { "repo": "restic/restic" },
     { "repo": "juanfont/headscale" },
-    { "repo": "orhun/git-cliff" },
+    { "repo": "orhun/git-cliff", "tagPattern": "^v\\d" },
     { "repo": "dani-garcia/vaultwarden", "baseline": 8 },
     { "repoUrl": "https://gitea.com/gitea/tea" }
   ]
@@ -209,10 +209,19 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
 `repo` (GitHub) and `repoUrl` (any Forgejo/Gitea/GitLab URL) per entry; a
 `repoUrl` entry's state key is the URL unless `label` renames it, and its
 report directory is the URL's path-safe form (`https_gitea.com_gitea_tea`). Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
-`escalate`, `escalateModel`, `failOn`, `baseline`, `concurrency`,
-`includePrerelease`, `notifyBelow`, `notesFile`, `label`, `components`,
-`expand`, `audience`, `findings`. Relative paths (`reportsDir`, `stateFile`,
-`notesFile`) resolve against the config file's directory.
+`escalate`, `escalateModel`, `failOn`, `minCoverage`, `baseline`,
+`concurrency`, `includePrerelease`, `tagPattern`, `notifyBelow`,
+`notesFile`, `label`, `components`, `expand`, `audience`, `findings`.
+Relative paths (`reportsDir`, `stateFile`, `notesFile`) resolve against the
+config file's directory.
+
+`tagPattern` (a regular expression) decides which tags are releases at all:
+non-matching tags are never polled, counted as skipped or backfilled —
+`"^v\\d"` keeps a repo's `nightly-20260803` tags out of the watchlist. An
+invalid pattern is rejected when the config loads, with the entry named.
+`minCoverage` flags a release whose completeness score (the share of
+changed lines the notes cover) is below the number — the same gate as the
+CLI's `--min-coverage`.
 
 `components` declares first-party components behind version pins that cannot
 name their own repo — a bare Makefile variable, an `ARG`. Pin name →

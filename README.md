@@ -234,7 +234,9 @@ one big red amber-bordered tile.
 
 `--fail-on contradicted` is the lenient gate: it tolerates claims the diff
 cannot prove (a private advisory, say) and fails only on ones the diff
-contradicts.
+contradicts. `--min-coverage 60` gates the other direction, independently:
+fail when less than 60 % of the changed lines are covered by the notes,
+whatever the verdicts say — the cheap deterministic gate to adopt first.
 
 ### Releases that cannot be checked
 

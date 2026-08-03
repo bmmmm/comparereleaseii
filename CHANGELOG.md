@@ -4,6 +4,34 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **The version number is a claim too, and now it gets checked.** A patch
+  bump (or a minor from 1.0.0 on) whose commits carry an explicit
+  BREAKING CHANGE marker — a conventional `!` subject or footer — earns a
+  `bump-mismatch` warn: the tag understates its own commits. `feat:`
+  commits inside a patch bump earn a score-neutral info, and only in repos
+  that speak conventional commits (≥ 25 % of subjects). Marker-based only —
+  no diff is ever guessed to be breaking; 0.x minors, prerelease tags,
+  CalVer wearing semver syntax and cross-prefix monorepo tag lines stay
+  out of scope. Spot-checked deterministically against restic v0.19.1 and
+  git-cliff v2.13.1: no false fires.
+- **`--min-coverage <n>` gates on documentation coverage alone.** Exit 1
+  when the completeness score — the share of changed lines the notes
+  cover — is below the threshold, independent of `--fail-on`: a team can
+  gate on "are the changes documented at all?" before it trusts the
+  correctness scoring. A release whose coverage cannot be measured
+  (`--no-reverse`, unverified) never fails the gate. Watch entries carry
+  the same knob as `minCoverage`, the Action as its `min-coverage` input.
+- **A watch entry can pin which tags are releases at all.** Per-entry (or
+  defaults) `tagPattern` regex: only matching tags are polled, counted as
+  skipped and backfilled — a repo tagging nightlies next to releases stops
+  drowning the watchlist. Invalid patterns are rejected at config load
+  with the entry named, and the draft/prerelease/pattern eligibility rule
+  is one shared function now instead of four drifting copies — it also
+  decides when the deep listing has covered its backfill scope, so a page
+  of nightlies cannot end pagination early.
+
 ## 0.7.0 — 2026-08-03
 
 ### Changed
