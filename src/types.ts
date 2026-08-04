@@ -340,6 +340,34 @@ export interface FindingsSection {
   errors?: string[];
 }
 
+/**
+ * How the diff's own pin delta answers a bump claim.
+ *
+ * `confirmed` — the diff moves that pin and lands on the claimed version.
+ * `overtaken` — the diff moves that pin PAST the claimed version. The note
+ * correctly describes its own pull request while the release aggregates
+ * several bumps of the same pin, so claim and evidence are cut at different
+ * granularities. Nobody wrote anything false, and this must never read as a
+ * contradiction.
+ * `contradicted` — the pin moves the other way, or lands short of the
+ * version the claim names.
+ * `unmatched` — no pin of that name moved, or the two versions cannot be
+ * ordered against each other; the claim stands as it was judged.
+ */
+export type BumpJoin = "confirmed" | "overtaken" | "contradicted" | "unmatched";
+
+/** One bump claim held against the pin delta of the same diff. */
+export interface BumpResolution {
+  /** Index into report.results. */
+  claim: number;
+  status: BumpJoin;
+  /** What the note said — the claim's own trait, repeated so a reader of
+   * this list alone sees both numbers. */
+  claimed: ClaimBump;
+  /** Index into report.pins — the pin that decided it. Absent when unmatched. */
+  pin?: number;
+}
+
 /** One finding and the claims whose identifiers demonstrably describe it. */
 export interface FindingClaimLink {
   /** Index into report.findings.findings. */
@@ -362,6 +390,13 @@ export interface Reconciliation {
   undocumented: number[];
   /** Indices into report.results (change-kind, not skipped) no finding observes. */
   unsupported: number[];
+  /**
+   * Bump claims held against the diff's own pin delta. Deterministic and
+   * score-neutral like the rest of this layer, but computed early enough
+   * that the verification ladder can read it — a claim the pins settle
+   * needs no judge.
+   */
+  bumps?: BumpResolution[];
   /**
    * Display order for report.uncovered: commits sharing a file with an
    * undocumented finding first. Present only when it differs from the

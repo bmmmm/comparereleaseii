@@ -6,15 +6,17 @@
 // findings means no reconciliation at all.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reconcile } from "../src/reconcile.ts";
+import { compareVersions, reconcile, resolveBumpClaims } from "../src/reconcile.ts";
 import { analyzeRelease, type CheckSettings } from "../src/check.ts";
 import type { JudgeEngine } from "../src/judge.ts";
 import type {
   Claim,
+  ClaimBump,
   ClaimResult,
   Commit,
   DiffFile,
   Finding,
+  PinBump,
   ReleaseData,
   RepoContext,
   UncoveredCommit,
@@ -248,4 +250,179 @@ test("analyzeRelease joins late: reconciliation with findings, absent without �
   const judgeOff = await analyzeRelease(data(), CONTEXT, null, settings({ judgeMode: "off" }));
   assert.equal(judgeOff.findings, undefined);
   assert.equal(judgeOff.reconciliation, undefined);
+});
+
+// ---------- the pin join ----------
+//
+// The claim side and the diff side of the same fact, held against each
+// other. Both are deterministic reads of what the release published, so
+// the join is too — no judge takes part in any of this.
+
+function pin(over: Partial<PinBump> = {}): PinBump {
+  return {
+    name: "actions/cache",
+    from: "5.0.3",
+    to: "5.0.4",
+    file: ".github/workflows/build.yml",
+    firstParty: false,
+    ...over,
+  };
+}
+
+function bumpClaim(text: string, bump: ClaimBump, over: Partial<Claim> = {}): Claim {
+  return claim({ text, bump, ...over });
+}
+
+test("a bump claim the diff lands on is confirmed", () => {
+  const c = bumpClaim("chore(deps): bump actions/cache from 5.0.3 to 5.0.4", {
+    name: "actions/cache",
+    from: "5.0.3",
+    to: "5.0.4",
+  });
+  assert.deepEqual(resolveBumpClaims([c], [pin()]), [
+    { claim: 0, status: "confirmed", claimed: c.bump, pin: 0 },
+  ]);
+});
+
+test("a release aggregating several bumps overtakes its own note — never a contradiction", () => {
+  // The corpus case, verbatim: the note quotes its own pull request while
+  // the release aggregates several bumps of the same action, so the diff
+  // reads 4.3.0 → 5.0.5. Nobody wrote anything false.
+  const c = bumpClaim("chore(deps): bump actions/cache from 5.0.3 to 5.0.4 by @dependabot[bot] in #9668", {
+    name: "actions/cache",
+    from: "5.0.3",
+    to: "5.0.4",
+  });
+  const resolved = resolveBumpClaims([c], [pin({ from: "4.3.0", to: "5.0.5" })]);
+  assert.equal(resolved[0].status, "overtaken");
+  assert.equal(resolved[0].pin, 0);
+});
+
+test("a pin landing short of the claimed version contradicts it", () => {
+  // traefik's real one, in the direction that is genuinely wrong: the note
+  // names a version the release never reached.
+  const c = bumpClaim("Bump github.com/DataDog/dd-trace-go/v2 to 2.8.1", {
+    name: "github.com/DataDog/dd-trace-go/v2",
+    to: "2.8.1",
+  });
+  const short = resolveBumpClaims([c], [
+    pin({ name: "github.com/DataDog/dd-trace-go/v2", from: "v2.7.0", to: "v2.8.0", file: "go.mod" }),
+  ]);
+  assert.equal(short[0].status, "contradicted");
+
+  // And a pin moving backwards while the note claims a bump.
+  const backwards = resolveBumpClaims([c], [
+    pin({ name: "github.com/DataDog/dd-trace-go/v2", from: "v2.9.0", to: "v2.7.9", file: "go.mod" }),
+  ]);
+  assert.equal(backwards[0].status, "contradicted");
+});
+
+test("a note's path tail names the manifest's module", () => {
+  const c = bumpClaim("Bump DataDog/dd-trace-go/v2 to 2.8.2", {
+    name: "DataDog/dd-trace-go/v2",
+    to: "2.8.2",
+  });
+  const resolved = resolveBumpClaims([c], [
+    pin({ name: "github.com/DataDog/dd-trace-go/v2", from: "v2.8.1", to: "v2.8.2", file: "go.mod" }),
+  ]);
+  assert.equal(resolved[0].status, "confirmed");
+});
+
+test("no pin of that name, or versions that cannot be ordered — the claim stands as judged", () => {
+  const c = bumpClaim("Update `serde` to 1.0.200", { name: "serde", to: "1.0.200" });
+  const none = resolveBumpClaims([c], [pin()]);
+  assert.deepEqual(none, [{ claim: 0, status: "unmatched", claimed: c.bump }]);
+  assert.equal("pin" in none[0], false, "an unmatched claim points at no pin");
+
+  // `rc1` against `rc2` has no arithmetic, and guessing would be the
+  // difference between "went further" and "is wrong".
+  const rc = bumpClaim("Update `serde` to 1.0.0-rc2", { name: "serde", to: "1.0.0-rc2" });
+  const unordered = resolveBumpClaims([rc], [
+    pin({ name: "serde", from: "0.9.0", to: "1.0.0-rc1", file: "Cargo.toml" }),
+  ]);
+  assert.equal(unordered[0].status, "unmatched");
+});
+
+test("a bare last segment never matches — `cache` is not `actions/cache`", () => {
+  const c = bumpClaim("Update `cache` to 5.0.4", { name: "cache", to: "5.0.4" });
+  assert.equal(resolveBumpClaims([c], [pin()])[0].status, "unmatched");
+});
+
+test("meta and carried-over bump claims take no part", () => {
+  const c = bumpClaim("bump actions/cache from 5.0.3 to 5.0.4", {
+    name: "actions/cache",
+    from: "5.0.3",
+    to: "5.0.4",
+  });
+  assert.deepEqual(resolveBumpClaims([{ ...c, kind: "meta" }], [pin()]), []);
+  assert.deepEqual(resolveBumpClaims([{ ...c, carriedOverFrom: "v1.0.0" }], [pin()]), []);
+});
+
+test("the file that lands on the claimed version answers the claim", () => {
+  // Two workflows move the same action to different versions; the one the
+  // note is about is the one that decides it.
+  const c = bumpClaim("bump actions/cache from 5.0.3 to 5.0.4", {
+    name: "actions/cache",
+    from: "5.0.3",
+    to: "5.0.4",
+  });
+  const resolved = resolveBumpClaims([c], [
+    pin({ to: "5.0.6", file: ".github/workflows/a.yml" }),
+    pin({ to: "5.0.4", file: ".github/workflows/b.yml" }),
+  ]);
+  assert.equal(resolved[0].status, "confirmed");
+  assert.equal(resolved[0].pin, 1);
+});
+
+test("version ordering: the spelling of a version is not its content", () => {
+  assert.equal(compareVersions("v5.0.4", "5.0.4"), 0);
+  assert.equal(compareVersions("1.2", "1.2.0"), 0);
+  assert.equal(compareVersions("5.0.5", "5.0.4"), 1);
+  assert.equal(compareVersions("2.8.0", "2.8.1"), -1);
+  assert.equal(compareVersions("0.2.0-main.849", "0.2.0-main.843"), 1);
+  // A prerelease sorts before the release it leads to.
+  assert.equal(compareVersions("1.0.0-rc1", "1.0.0"), -1);
+  assert.equal(compareVersions("1.0.0", "1.0.0-rc1"), 1);
+  assert.equal(compareVersions("1.0.0-rc1", "1.0.0-rc2"), null);
+  // Numeric segments compare as numbers, not as text.
+  assert.equal(compareVersions("1.10.0", "1.9.0"), 1);
+});
+
+test("the pin join is a pure view — inputs untouched, re-runs identical", () => {
+  const claims = [
+    bumpClaim("bump actions/cache from 5.0.3 to 5.0.4", {
+      name: "actions/cache",
+      from: "5.0.3",
+      to: "5.0.4",
+    }),
+  ];
+  const pins = [pin({ to: "5.0.5" })];
+  const before = structuredClone({ claims, pins });
+  const one = resolveBumpClaims(claims, pins);
+  const two = resolveBumpClaims(claims, pins);
+  assert.deepEqual({ claims, pins }, before);
+  assert.deepEqual(one, two);
+});
+
+test("reconcile carries the join and drops the claims it skipped", () => {
+  const kept = bumpClaim("bump actions/cache from 5.0.3 to 5.0.4", {
+    name: "actions/cache",
+    from: "5.0.3",
+    to: "5.0.4",
+  });
+  const dropped = bumpClaim("bump actions/stale from 1.0.0 to 1.1.0", {
+    name: "actions/stale",
+    from: "1.0.0",
+    to: "1.1.0",
+  }, { id: 2 });
+  const resolved = resolveBumpClaims([kept, dropped], [pin(), pin({ name: "actions/stale", to: "1.1.0" })]);
+  const rec = reconcile(
+    [result(kept), result(dropped, "skipped")],
+    [finding({ text: "unrelated" })],
+    [],
+    null,
+    resolved,
+  );
+  assert.equal(rec.bumps?.length, 1);
+  assert.equal(rec.bumps![0].claim, 0);
 });

@@ -27,7 +27,7 @@ import {
 } from "./history.ts";
 import type { JudgeEngine } from "./judge.ts";
 import { summarizeShipped } from "./findings.ts";
-import { reconcile } from "./reconcile.ts";
+import { reconcile, resolveBumpClaims } from "./reconcile.ts";
 import type {
   Audience,
   ComponentCheck,
@@ -326,6 +326,18 @@ export async function analyzeRelease(
           },
         )
       : Promise.resolve(null);
+  // The version-pin delta is read straight off the diff — deterministic,
+  // score-neutral, and computed before any LLM stage so a --judge off run
+  // still carries it. It runs ahead of verification because the pin join
+  // below settles bump claims the ladder would otherwise pay a judge for.
+  const pins = pinBumps(data.files, {
+    repoLabel: data.repoLabel,
+    components: s.components,
+    origin: link ? new URL(link.base).origin : undefined,
+    linkStyle: link?.style,
+  });
+  const bumps = resolveBumpClaims(claims, pins);
+
   const [results, baselineSnapshots] = await Promise.all([
     verifyClaims(data, claims, {
       judgeMode: s.judgeMode,
@@ -355,16 +367,6 @@ export async function analyzeRelease(
       commitShas: [],
     });
   }
-
-  // The version-pin delta is read straight off the diff — deterministic,
-  // score-neutral, and computed before any LLM stage so a --judge off run
-  // still carries it.
-  const pins = pinBumps(data.files, {
-    repoLabel: data.repoLabel,
-    components: s.components,
-    origin: link ? new URL(link.base).origin : undefined,
-    linkStyle: link?.style,
-  });
 
   const components = s.expand ? await expandComponents(pins, data.repoLabel, s) : undefined;
 
@@ -403,7 +405,7 @@ export async function analyzeRelease(
   // --no-findings, empty diff) means no reconciliation, not an empty
   // scaffold. Score-neutral by construction: the metrics above are fixed.
   const reconciliation = findings?.findings.length
-    ? reconcile(results, findings.findings, uncovered, coverage?.commitFiles ?? null)
+    ? reconcile(results, findings.findings, uncovered, coverage?.commitFiles ?? null, bumps)
     : undefined;
 
   return {

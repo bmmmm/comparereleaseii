@@ -7,9 +7,12 @@
 // no I/O, same inputs, same join. Informational, never scored.
 import { extractIdentifiers } from "./match.ts";
 import type {
+  BumpResolution,
+  Claim,
   ClaimResult,
   DiffFile,
   Finding,
+  PinBump,
   Reconciliation,
   UncoveredCommit,
 } from "./types.ts";
@@ -33,6 +36,100 @@ function matchScore(identifiers: string[], codeSpans: string[], finding: Finding
   return score;
 }
 
+/** Segments of a version literal — the v-prefix is spelling, not content. */
+function segments(v: string): string[] {
+  return v.replace(/^v/i, "").split(/[.+-]/).filter(Boolean);
+}
+
+/**
+ * Order two version literals, or `null` when they cannot be ordered — two
+ * different non-numeric segments (`rc1` against `rc2`) have no arithmetic,
+ * and guessing one would be the difference between "the release went
+ * further than the note says" and "the note is wrong". A trailing run of
+ * zeros adds nothing (`1.2` is `1.2.0`); anything else trailing is a
+ * prerelease, which sorts before its release.
+ */
+export function compareVersions(a: string, b: string): number | null {
+  const sa = segments(a);
+  const sb = segments(b);
+  for (let i = 0; i < Math.max(sa.length, sb.length); i++) {
+    const x = sa[i];
+    const y = sb[i];
+    if (x === y) continue;
+    if (x === undefined || y === undefined) {
+      const rest = (x === undefined ? sb : sa).slice(i);
+      if (rest.every((s) => /^0+$/.test(s))) continue;
+      const shorterWins = !/^\d+$/.test(rest[0]);
+      return (x === undefined) === shorterWins ? 1 : -1;
+    }
+    if (!/^\d+$/.test(x) || !/^\d+$/.test(y)) return null;
+    const d = Number(x) - Number(y);
+    if (d !== 0) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+/**
+ * The two spellings name the same pin: identical, or one is the other's
+ * path tail — a note writes `DataDog/dd-trace-go/v2` for the module the
+ * manifest spells `github.com/DataDog/dd-trace-go/v2`. The tail has to
+ * start at a path boundary, so `cache` never matches `actions/cache`: a
+ * bare last segment is ambiguous across ecosystems.
+ */
+function sameName(claim: string, pin: string): boolean {
+  const a = claim.toLowerCase();
+  const b = pin.toLowerCase();
+  if (a === b) return true;
+  if (a.includes("/") && b.endsWith(`/${a}`)) return true;
+  return b.includes("/") && a.endsWith(`/${b}`);
+}
+
+/**
+ * Hold every bump claim against the pin delta of the same diff. Both sides
+ * are deterministic reads of material the release published, so this join
+ * is too: same input, same answer, no LLM and no I/O.
+ *
+ * Claims are indexed by position, which is the order `verifyClaims` returns
+ * its results in. Carried-over text takes no part — it describes the
+ * product, not this release, and gets skipped before any verdict.
+ */
+export function resolveBumpClaims(claims: Claim[], pins: PinBump[]): BumpResolution[] {
+  const out: BumpResolution[] = [];
+  claims.forEach((claim, index) => {
+    const claimed = claim.bump;
+    if (!claimed || claim.kind !== "change" || claim.carriedOverFrom) return;
+    const candidates = pins
+      .map((pin, i) => ({ pin, i }))
+      .filter(({ pin }) => sameName(claimed.name, pin.name));
+    if (!candidates.length) {
+      out.push({ claim: index, status: "unmatched", claimed });
+      return;
+    }
+    // Several files can move the same pin to different versions. The one
+    // that lands on the claimed version answers the claim; failing that,
+    // the furthest the release went does.
+    const best =
+      candidates.find(({ pin }) => compareVersions(pin.to, claimed.to) === 0) ??
+      candidates.reduce((a, b) => ((compareVersions(b.pin.to, a.pin.to) ?? 0) > 0 ? b : a));
+    const order = compareVersions(best.pin.to, claimed.to);
+    const status =
+      order === null
+        ? "unmatched"
+        : order === 0
+          ? "confirmed"
+          : order > 0
+            ? "overtaken"
+            : "contradicted";
+    out.push({
+      claim: index,
+      status,
+      claimed,
+      ...(status === "unmatched" ? {} : { pin: best.i }),
+    });
+  });
+  return out;
+}
+
 /**
  * Join claims and findings. Only claims that assert something about THIS
  * release take part — change-kind and not skipped, the same population
@@ -46,6 +143,7 @@ export function reconcile(
   findings: Finding[],
   uncovered: UncoveredCommit[],
   commitFiles: Map<string, DiffFile[]> | null,
+  bumps: BumpResolution[] = [],
 ): Reconciliation {
   const eligible: number[] = [];
   results.forEach((r, i) => {
@@ -89,5 +187,15 @@ export function reconcile(
     if (order.some((v, i) => v !== i)) uncoveredOrder = order;
   }
 
-  return { confirmed, undocumented, unsupported, uncoveredOrder };
+  // A skipped claim asserts nothing about this release, so its pin join is
+  // bookkeeping nobody should read.
+  const bumpsShown = bumps.filter((b) => results[b.claim]?.verdict !== "skipped");
+
+  return {
+    confirmed,
+    undocumented,
+    unsupported,
+    uncoveredOrder,
+    bumps: bumpsShown.length ? bumpsShown : undefined,
+  };
 }

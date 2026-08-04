@@ -453,6 +453,24 @@ const MUTANTS: Mutant[] = [
     replace: "(?:dependencies|dependency|crate|module|package|action|image|plugin|gem|library)\\s*)?",
   },
   {
+    guard: "a release overtaking its own bump note is never read as a contradiction",
+    file: "src/reconcile.ts",
+    find: '? "overtaken"',
+    replace: '? "contradicted"',
+  },
+  {
+    guard: "versions that cannot be ordered leave the bump claim unresolved",
+    file: "src/reconcile.ts",
+    find: "if (!/^\\d+$/.test(x) || !/^\\d+$/.test(y)) return null;",
+    replace: "",
+  },
+  {
+    guard: "a bare last segment never names a pin (`cache` is not `actions/cache`)",
+    file: "src/reconcile.ts",
+    find: 'if (a.includes("/") && b.endsWith(`/${a}`)) return true;\n  return b.includes("/") && a.endsWith(`/${b}`);',
+    replace: "return a.endsWith(`/${b}`) || b.endsWith(`/${a}`);",
+  },
+  {
     guard: "a release stored under both path layouts is one release, not two",
     file: "scripts/corpus-aggregate.ts",
     find: "if (!byRelease.has(key)) byRelease.set(key, r);",
