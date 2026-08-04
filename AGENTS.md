@@ -39,7 +39,7 @@ not add a dependency, a build step, or a framework.
 | `src/metrics.ts` | Score, risk flags, per-file coverage |
 | `src/bump.ts` | Semver bump vs the commits' own BREAKING/feat markers |
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
-| `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL bumps, first-party classification |
+| `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL/workflow-`uses:` bumps, first-party classification — and the claim side, `detectBumpClaim` |
 | `src/substance.ts` | What actually shipped: category rollup, changed symbols, config surface, migrations, routes |
 | `src/findings.ts` | Typed findings: the diff read per subsystem within a hard budget, blind to commit messages |
 | `src/reconcile.ts` | The late join of claims and findings: confirmed, undocumented, unsupported — deterministic, never scored |

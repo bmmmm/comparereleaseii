@@ -423,6 +423,24 @@ const MUTANTS: Mutant[] = [
     replace: "uncoveredOrder = order;",
   },
   {
+    guard: "a moving workflow ref pins nothing — @main is not a version",
+    file: "src/pins.ts",
+    find: "return VERSION_SHAPE.test(version) ? [{ name: m[1], version }] : [];",
+    replace: "return [{ name: m[1], version }];",
+  },
+  {
+    guard: "a sha-pinned action bumps by the version in its comment, not by the sha",
+    file: "src/pins.ts",
+    find: "const version = m[3] && VERSION_SHAPE.test(m[3]) ? m[3] : m[2];",
+    replace: "const version = m[2];",
+  },
+  {
+    guard: "one pin moving one way is one bump, however many files repeat it",
+    file: "src/pins.ts",
+    find: "      if (seen.has(key)) return false;\n",
+    replace: "",
+  },
+  {
     guard: "a bump claim needs a pin-shaped name — prose with a version in it is not one",
     file: "src/pins.ts",
     find: "if (!noun && !tick && !PIN_NAME_SHAPE.test(name)) return undefined;",

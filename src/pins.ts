@@ -52,6 +52,18 @@ const PLAIN_PIN_FILE =
 
 const DOCKER_FILE = /(^|\/)(Dockerfile|Containerfile)(\.[\w.-]+)?$|\.dockerfile$/;
 
+/** Workflow definitions, and the composite actions that are built the same way. */
+const WORKFLOW_FILE = /(^|\/)\.(github|gitea|forgejo)\/workflows\/[^/]+\.ya?ml$|(^|\/)action\.ya?ml$/;
+
+/**
+ * `uses: owner/action@ref` — the CI pin. A moving tag (`@main`) pins
+ * nothing; a sha-pinned ref carries its human version in the trailing
+ * comment the bumping bot maintains, and that comment is the number the
+ * release note quotes, so it wins over the sha.
+ */
+const USES_LINE =
+  /^\s*-?\s*uses:\s*["']?([\w.-]+\/[\w.-]+(?:\/[\w.-]+)*)@([\w.+-]+)["']?\s*(?:#\s*(?:pin\s+)?(v?\d[\w.+-]*))?/;
+
 const LOCKFILE = /\.(lock|sum)$|-lock\.(json|ya?ml)$|Pipfile\.lock$/;
 
 /** Content lines of one diff side, headers stripped. Shared with substance.ts. */
@@ -205,6 +217,38 @@ function plainBumps(file: DiffFile): RawPin[] {
   return bumps;
 }
 
+function usesEntries(line: string): DepEntry[] {
+  const m = line.match(USES_LINE);
+  if (!m) return [];
+  const version = m[3] && VERSION_SHAPE.test(m[3]) ? m[3] : m[2];
+  return VERSION_SHAPE.test(version) ? [{ name: m[1], version }] : [];
+}
+
+/**
+ * Action pins a workflow moves. `uses: owner/repo@ref` names a repository
+ * by construction — but only under `.github/` is the forge it lives on
+ * certain, so a Gitea or Forgejo workflow classifies its pins and links
+ * none of them.
+ */
+function workflowBumps(file: DiffFile): RawPin[] {
+  const github = /(^|\/)\.github\//.test(file.path);
+  return pairEntries(
+    sideLines(file.patch!, "-").flatMap(usesEntries),
+    sideLines(file.patch!, "+").flatMap(usesEntries),
+  ).map((b): RawPin => {
+    const segs = b.name.split("/");
+    return {
+      ...b,
+      coords: {
+        host: github ? "github.com" : null,
+        owner: segs[0],
+        repo: `${segs[0]}/${segs[1]}`,
+        linkable: github,
+      },
+    };
+  });
+}
+
 /** A `to` that can be a git tag: no build metadata, no Go pseudo-version. */
 const TAG_SHAPE = /^v?\d[\w.-]*$/;
 const PSEUDO_VERSION = /\d{14}-[0-9a-f]{7,}$/;
@@ -288,12 +332,27 @@ export function pinBumps(files: DiffFile[], ctx: PinContext = {}): PinBump[] {
     if (!file.patch || LOCKFILE.test(file.path)) continue;
     const raw = DEP_MANIFEST.test(file.path)
       ? manifestBumps(file)
-      : PLAIN_PIN_FILE.test(file.path)
-        ? plainBumps(file)
-        : [];
+      : WORKFLOW_FILE.test(file.path)
+        ? workflowBumps(file)
+        : PLAIN_PIN_FILE.test(file.path)
+          ? plainBumps(file)
+          : [];
     for (const pin of raw) bumps.push(classify(pin, file.path, ctx));
   }
-  return bumps.sort(
+  // One action bumped across nine workflow files is one bump, listed nine
+  // times — the same pin moving the same way is one fact whatever number of
+  // files repeat it. The first file stands for it; a pin moving to
+  // *different* versions in different files keeps both entries, because
+  // then the files genuinely disagree.
+  const seen = new Set<string>();
+  return bumps
+    .filter((b) => {
+      const key = `${b.name}\0${b.from}\0${b.to}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort(
     (a, b) =>
       Number(b.firstParty) - Number(a.firstParty) ||
       a.file.localeCompare(b.file) ||

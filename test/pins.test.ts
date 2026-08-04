@@ -388,3 +388,98 @@ test("prose with a version in it is not a bump claim", () => {
   // A count is not a version — one dotted number is the bar.
   assert.equal(detectBumpClaim("Update `foo` to 3"), undefined);
 });
+
+// ---------- workflow action pins ----------
+//
+// `uses:` refs are where the corpus's largest bump group lives: six of the
+// eight contradicted bump claims in it are dependabot lines about actions.
+
+const CI_WORKFLOW = df(
+  ".github/workflows/build.yml",
+  `@@ -20,7 +20,7 @@ jobs:
+     steps:
+-      - uses: actions/cache@v5.0.3
++      - uses: actions/cache@v5.0.5
+       - uses: actions/checkout@v6.0.3
+`,
+);
+
+test("a workflow's uses: ref is a pin, linked to the action's own release", () => {
+  const pins = pinBumps([CI_WORKFLOW], { repoLabel: "nextcloud/desktop" });
+  assert.deepEqual(pins, [
+    {
+      name: "actions/cache",
+      from: "v5.0.3",
+      to: "v5.0.5",
+      file: ".github/workflows/build.yml",
+      firstParty: false,
+      repo: "actions/cache",
+      releaseUrl: "https://github.com/actions/cache/releases/tag/v5.0.5",
+      repoUrl: "https://github.com/actions/cache",
+    },
+  ]);
+});
+
+test("a sha-pinned ref bumps by the version in its comment, not by the sha", () => {
+  // The hardened form: the sha is the pin, the comment is the version the
+  // bumping bot and the release note both quote.
+  const pins = pinBumps(
+    [
+      df(
+        ".github/workflows/release.yml",
+        `@@ -1,3 +1,3 @@
+-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.1.2
++      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v4.2.0
+`,
+      ),
+    ],
+    { repoLabel: "acme/app" },
+  );
+  assert.equal(pins.length, 1);
+  assert.equal(pins[0].from, "v4.1.2");
+  assert.equal(pins[0].to, "v4.2.0");
+});
+
+test("a moving ref pins nothing — @main is not a version", () => {
+  const pins = pinBumps(
+    [
+      df(
+        ".github/workflows/build.yml",
+        `@@ -1,2 +1,2 @@
+-      - uses: acme/deploy@main
++      - uses: acme/deploy@next
+`,
+      ),
+    ],
+    { repoLabel: "acme/app" },
+  );
+  assert.deepEqual(pins, []);
+});
+
+test("the same action bumped across several workflows is one bump", () => {
+  const second = df(".github/workflows/test.yml", CI_WORKFLOW.patch!);
+  const pins = pinBumps([CI_WORKFLOW, second], { repoLabel: "nextcloud/desktop" });
+  assert.equal(pins.length, 1, "one pin moving one way is one fact, not one per file");
+  assert.equal(pins[0].file, ".github/workflows/build.yml");
+});
+
+test("a forge workflow classifies its pins and links none of them", () => {
+  // Which forge `uses: owner/repo` resolves to is instance configuration
+  // outside .github/ — first-party still follows from the owner.
+  const pins = pinBumps(
+    [
+      df(
+        ".forgejo/workflows/ci.yml",
+        `@@ -1,2 +1,2 @@
+-      - uses: acme/setup-tool@v1.2.0
++      - uses: acme/setup-tool@v1.3.0
+`,
+      ),
+    ],
+    { repoLabel: "acme/app", origin: "https://forge.example.com" },
+  );
+  assert.equal(pins[0].firstParty, true);
+  assert.equal(pins[0].repo, undefined);
+  assert.equal(pins[0].releaseUrl, undefined);
+  assert.equal(pins[0].repoUrl, undefined);
+});
