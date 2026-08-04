@@ -51,6 +51,7 @@
     "prepublishOnly": "pnpm check && pnpm test",
     "dogfood": "node scripts/dogfood.ts",
     "mutate": "node scripts/mutate.ts",
+    "mutate-notes": "node scripts/mutate-notes.ts",
     "release:prepare": "node scripts/release-prepare.ts",
     "release:publish": "node scripts/release-publish.ts",
     "eval": "node scripts/eval.ts",

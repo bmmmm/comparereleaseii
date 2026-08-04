@@ -380,9 +380,45 @@ $ pnpm install
 $ pnpm check   # tsc --noEmit
 $ pnpm test    # node:test unit tests
 $ pnpm eval    # judge eval against the golden set (needs an engine)
+$ pnpm mutate  # do the tests actually guard the rules? (mutates src/)
+$ pnpm mutate-notes ~/release-watch/reports   # does the detector catch a lie?
 ```
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
+
+### Does it catch a release that lies?
+
+`pnpm mutate` mutates this tool's own source and asks whether the suite
+notices — that measures the tests. `pnpm mutate-notes` mutates the *notes* of
+real releases from a watch home and asks whether the detector notices, which
+is the question the product is actually about. It runs with the judge off
+against the clone cache, so it needs no key and no network: every expectation
+below is settled deterministically, and a miss here is a miss no model was
+involved in.
+
+Measured on 51 releases (`test/eval/reference-detection.json`, 2026-08-05):
+
+| Mutation | What it does | Detected |
+|---|---|---:|
+| `omission` | drops the notes covering a documented high-churn commit | 29/33 |
+| `bump-overshoot` | restates a settled bump as a version the release did not reach | 21/21 |
+| `bump-undershoot` | restates it as a version the pin never held | **1/21** |
+| `foreign-claim` | plants a claim from a different release of the same repo | 43/46 |
+| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | **2/51** |
+
+The last row is the finding: two backticked words that occur anywhere in the
+changed lines score 3 each, 6 clears the `>= 5` lexical bar, and clearing that
+bar settles a claim as `verified` without a judge — *and* counts every commit
+it matches as documented. `bump-undershoot` is the same shape one layer down:
+a pin that moved past the claimed version reads as `overtaken`, which is right
+for the case it was built for — a per-PR note describing one slice of an
+aggregated bump — but the rule never checks that the claimed version lies
+inside the interval the pin actually traversed, so "bumped to 0.0.1" verifies
+against a release that moved 10.54.0 → 10.65.0.
+
+Both are open. The reference records them as measured, not as a target: a run
+that scores worse than the frozen file fails, and re-freezing is a decision
+someone makes, not a side effect.
 
 ### Releasing
 
