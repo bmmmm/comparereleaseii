@@ -1,6 +1,8 @@
 # Roadmap
 
-> **Status 2026-08-03:** everything planned so far is on `main` — the three
+> **Status 2026-08-04:** the corpus (80 releases, `docs/corpus.md`) supplied
+> the facts the bump question was waiting for, and it is now the one planned
+> block below. Everything else is on `main` — the three
 > original phases (distribution, watchdog, judge trust), iterations 2–4,
 > the 2026-07-27 block series (bughunt follow-up, hardening backlog, forge
 > watching, presentation + author ledger), the long view (backfill,
@@ -14,27 +16,98 @@
 > (what shipped), SCORING.md (score semantics), AGENTS.md (working
 > rules), docs/ (operations).
 
-## Open (2026-08-03)
+## Open (2026-08-04): the bump block
 
 The complete list — anything not here is landed or settled below.
 
-- **Demand-driven only** (no schedule, deliberately not in the plan): the
-  F23 maxBuffer decision; the Action PR-comment variant; v-prefixed
-  versions as identifier anchors.
+**The trigger fired.** The demand-driven condition on the identifier-anchor
+question was "bump claims dominate the unsupported line, or a score is
+demonstrably wrong because of it". The corpus answers both, harder than
+expected:
 
-## Demand-driven only (no schedule)
+| | Bump claims | Every other claim |
+|---|---:|---:|
+| Claims | 32 (1.1 %) | 2,879 |
+| `contradicted` | 8 | 4 |
+| Contradicted rate | **25 %** | **0.14 %** |
 
-- **v-prefixed versions as identifier anchors:** `v7.1.4` in a claim text
-  anchors nothing today — the identifier bar counts digit-led versions
-  only, so a bump claim can sit unsupported next to the finding that
-  observes the same bump (seen live on OpenCloud v7.2.2; cosmetic — no
-  score or alert was wrong). Trigger: the first weeks of reconciliation
-  reports show bump claims dominating the unsupported line, or a score or
-  alert is demonstrably wrong because of it. Then score-neutral first — a
-  claims×pins join in the reconciliation (a bump claim whose pin the diff
-  demonstrably moves reads confirmed; deterministic, display-only, no A/B
-  debt). Widening the shared identifier bar itself is the second step and
-  faces the A/B discipline plus the README validation table.
+A bump claim is ~180× more likely to be called contradicted than any other
+kind, and only 10 of the 32 come through as plain `verified`. Two releases
+in the corpus sit at 35/100 ("suspicious") on the strength of one patch
+digit in a dependency note. Hand-classifying all twelve contradictions:
+six are not disagreements at all — the note correctly quotes its own PR
+("bump `actions/cache` from 5.0.3 to 5.0.4") while the release aggregates
+several bumps of the same pin, so the diff reads 4.3.0 → 5.0.5. Claim and
+evidence are cut at different granularities. Nobody wrote anything false.
+
+**The seam already exists on both sides.** `pinBumps()` in `src/pins.ts`
+extracts `{name, from, to, file, repo}` from the diff and `src/check.ts`
+already calls it; the claims carry the same versions as text. Nothing here
+needs a new subsystem — the two halves have never been joined.
+
+Order matters below: measure, then resolve deterministically, then remove
+the source of the bad verdicts, then show it. Scoring is last and only if
+still needed.
+
+### 1. Name the class and count it — nothing changes yet
+
+A deterministic bump-claim classifier (a pin name plus a version, one side
+or two), surfaced as a claim trait and counted separately by
+`pnpm corpus-stats`. No routing, no verdict and no score moves in this
+block. It exists so every later claim of "fixed" is measurable against a
+number that predates the fix. DoD: test + a `scripts/mutate.ts` entry.
+
+### 2. Join claims against pins in the reconciliation — display-only
+
+`src/reconcile.ts` is already the late, deterministic, never-scored meeting
+of claims and observations; the pin join belongs there. Per bump claim:
+
+- **confirmed** — the diff moves that pin and lands on the claimed version.
+- **overtaken** — the diff moves that pin past the claimed version. This is
+  the six-case group above, and naming it is the whole point: the note
+  describes a slice of a bump the release aggregated. It is not a
+  contradiction and must never read as one.
+- **contradicted** — the pin moves the other way, or to a version the claim
+  excludes.
+- **unmatched** — no pin in the diff carries that name; the claim stands as
+  it was judged.
+
+Deterministic, re-runs bit-identical, `--judge off` output unchanged. DoD:
+test + mutant + golden cases for confirmed/overtaken/contradicted.
+
+### 3. Take resolved bump claims off the judge route
+
+A new anchor stage in `src/verify.ts`, ahead of LLM escalation: a bump claim
+the pin join resolves is never sent to a judge. That removes the source of
+the false contradictions rather than post-processing them, and it saves the
+25 judge calls this corpus spent on the class. This block *moves rulings* —
+it needs `test/eval/golden.json` cases and `pnpm eval` before and after, and
+the README validation table re-measured in the same commit if any of the
+five listed releases shifts.
+
+### 4. Make it visible
+
+Bump claims read as one class instead of scattered through the verdict
+stream — terminal, Markdown, HTML and an additive `reconciliation` field in
+the JSON: *"12 dependency bumps — 9 confirmed, 2 overtaken by the release,
+1 unmatched"*. An overtaken line shows both numbers, the note's and the
+diff's, because that difference is the finding a reader wants. Additive
+only: the `--json` contract does not break.
+
+### 5. Scoring — conditional, and only after 1–4
+
+Re-run the corpus and ask whether any bump case still lands in the
+contradicted bucket. If the answer is no, the hard-cap problem dissolved
+without touching the score and this question closes with zero A/B debt —
+the intended outcome of doing it score-neutral first. Only if bump cases
+survive there does the cap semantics itself come up for debate, and then
+under the full discipline: A/B against the golden set, the README table
+re-measured, the calibration drift checked.
+
+Widening the shared identifier bar to v-prefixed versions (`v7.1.4`, the
+original OpenCloud observation) stays a separate, later question. Blocks 1–4
+address bump claims through their own channel, which is the narrower fix; the
+bar governs every claim type and faces the same A/B discipline on its own.
 
 ## Settled — do not reopen without new facts
 
