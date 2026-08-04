@@ -155,9 +155,16 @@ version. The commit the note names moves it v2.2.3 → v2.8.2, and that
 commit is in the release. The judge had been reading the commit diff it was
 handed; the pin join had been reading the range. Both were right about what
 they were shown. A bump claim the range cannot answer now falls back on its
-own commit, which reads that case as overtaken. Re-checked with the same
-judge and the same base, that release moves from 35 ("suspicious", one
-contradicted claim, one critical flag) to 88 ("solid", neither).
+own commit, which reads that case as overtaken.
+
+Re-checked through the watcher, traefik v2.11.54 moves from 35
+("suspicious", one contradicted claim, one critical flag) to 88 ("solid",
+neither). v3.6.25 loses its bump contradiction just as deterministically and
+still does not settle on a number: it carries a second contradiction — an
+advisory claim whose own test comment names a different GHSA id — whose
+verdict differs between runs. Worth stating because it marks the boundary
+this work moved. The pin join is deterministic and its part of the answer
+does not vary; everything around it is still one judge reading a diff.
 
 The 106 bump claims across the corpus are now counted apart by
 `pnpm corpus-stats`, so the same number can be re-derived on any watch home:

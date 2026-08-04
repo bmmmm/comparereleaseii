@@ -36,9 +36,14 @@ All notable changes to comparereleaseii are documented here. The format follows 
   say nothing false. Re-checked against the same diffs, **all eight are
   gone** — nextcloud/desktop v34.0.0's six become verified (twelve of its
   thirteen bump claims are settled off the pins), traefik v2.11.54's reads
-  as overtaken, and v3.6.25's is answered by its own commit — that release
-  re-checks from 35 ("suspicious") to 88 ("solid") with the same judge and
-  the same base, its critical flag gone with the contradiction.
+  as overtaken, and v3.6.25's is answered by its own commit. Re-checked
+  through the watcher, v2.11.54 moves from 35 ("suspicious", one contradicted
+  claim, one critical flag) to 88 ("solid", neither). v3.6.25 loses its bump
+  contradiction just as deterministically, but keeps a separate one — an
+  advisory claim whose own test comment names a different GHSA id — and that
+  claim's verdict varies between runs, so that release's score does not
+  settle on one number. The pin join is deterministic; what is left around it
+  is still a judge.
 
   The golden set carries the three shapes, and one of them is a finding of
   its own: `bump-release-overtakes-its-own-note` came back `contradicted`
