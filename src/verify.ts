@@ -18,16 +18,9 @@ import type {
   Commit,
   DiffFile,
   Evidence,
-  PinBump,
   ReleaseData,
   UncoveredCommit,
 } from "./types.ts";
-
-/** A bump claim the pin join settled, with the pin that settled it. */
-export interface BumpAnchor {
-  resolution: BumpResolution;
-  pin: PinBump;
-}
 
 export interface VerifyOptions {
   judgeMode: "auto" | "all" | "off";
@@ -41,7 +34,7 @@ export interface VerifyOptions {
    * Bump claims the diff's own pin delta already answers, by claim id.
    * These never reach a judge — see the anchor stage in verifyClaims.
    */
-  bumps?: Map<number, BumpAnchor>;
+  bumps?: Map<number, BumpResolution>;
 }
 
 /** Claims where a wrong "verified" is most damaging (rubber-stamp risk). */
@@ -190,7 +183,7 @@ export async function verifyClaims(
   const anchorShas = new Set<string>();
   const prefetchPrs = new Set<number>();
   for (const claim of claims) {
-    if (claim.kind === "meta" || opts.bumps?.has(claim.id)) continue;
+    if (claim.kind === "meta") continue;
     const anchors = anchorMatch(claim, data.commits);
     if (anchors.commits.length) {
       for (const commit of anchors.commits) anchorShas.add(commit.sha);
@@ -247,52 +240,6 @@ export async function verifyClaims(
 
     const anchors = anchorMatch(claim, data.commits);
 
-    // The pin anchor. A bump claim states a pin and a version, and the diff
-    // carries the same pin and its own version — that is the whole question,
-    // answered off the material both sides published, before any escalation
-    // ladder runs. Sending it to a judge was strictly worse: it costs a call,
-    // it varies between runs, and on this class it was measurably wrong.
-    // Eight of the twelve contradicted claims in the corpus are bump claims,
-    // and six of those are a note correctly describing one slice of a bump
-    // the release aggregated.
-    const bump = opts.bumps?.get(claim.id);
-    if (bump) {
-      const { resolution, pin } = bump;
-      const moved = `the diff moves ${pin.name} ${pin.from} → ${pin.to} (${pin.file})`;
-      const settled =
-        resolution.status === "confirmed"
-          ? { verdict: "verified" as const, confidence: 0.95, reasoning: `${moved}, the version this note names.` }
-          : resolution.status === "overtaken"
-            ? {
-                verdict: "verified" as const,
-                confidence: 0.85,
-                reasoning:
-                  `The note names ${resolution.claimed.to} and ${moved} — past it. ` +
-                  "The release aggregates several bumps of this pin and the note describes one of them; " +
-                  "the bump it states is in this diff.",
-              }
-            : {
-                verdict: "contradicted" as const,
-                confidence: 0.9,
-                reasoning: `The note names ${resolution.claimed.to}, but ${moved}.`,
-              };
-      results.set(claim.id, {
-        claim,
-        ...settled,
-        evidence: {
-          commitShas: anchors.commits.map((c) => c.sha),
-          files: [pin.file],
-          matchedTerms: [resolution.claimed.name],
-          methods: anchors.commits.length
-            ? [anchors.viaPr.length ? "pr-anchor" : "sha-anchor", "pin-anchor"]
-            : ["pin-anchor"],
-        },
-        judged: false,
-        generated: isGeneratedEntry(claim, anchors.commits),
-      });
-      continue;
-    }
-
     if (!anchors.commits.length && claim.prNumbers.length && data.resolvePr) {
       // Squash-without-suffix repos: ask the forge which commit merged the PR.
       for (const pr of claim.prNumbers.slice(0, 5)) {
@@ -318,6 +265,54 @@ export async function verifyClaims(
         reasoning: `Carried over verbatim from ${claim.carriedOverFrom} — describes the product, not this release.`,
         judged: false,
         generated: false,
+      });
+      continue;
+    }
+
+    // The pin anchor. A bump claim states a pin and a version, and the diff
+    // carries the same pin and its own version — that is the whole question,
+    // answered off the material both sides published, before any escalation
+    // ladder runs. Sending it to a judge was strictly worse: it costs a call,
+    // it varies between runs, and on this class it was measurably wrong.
+    // Eight of the twelve contradicted claims in the corpus are bump claims,
+    // and six of those are a note correctly describing one slice of a bump
+    // the release aggregated.
+    const bump = opts.bumps?.get(claim.id);
+    if (bump?.observed) {
+      const { claimed, observed } = bump;
+      const where = observed.viaCommit
+        ? `the commit this note names moves ${claimed.name} ${observed.from} → ${observed.to} (${observed.file})`
+        : `the diff moves ${claimed.name} ${observed.from} → ${observed.to} (${observed.file})`;
+      const settled =
+        bump.status === "confirmed"
+          ? { verdict: "verified" as const, confidence: 0.95, reasoning: `${where}, the version this note names.` }
+          : bump.status === "overtaken"
+            ? {
+                verdict: "verified" as const,
+                confidence: 0.85,
+                reasoning:
+                  `The note names ${claimed.to} and ${where} — past it. ` +
+                  "The release aggregates several bumps of this pin and the note describes one of them; " +
+                  "the bump it states is in this diff.",
+              }
+            : {
+                verdict: "contradicted" as const,
+                confidence: 0.9,
+                reasoning: `The note names ${claimed.to}, but ${where}.`,
+              };
+      results.set(claim.id, {
+        claim,
+        ...settled,
+        evidence: {
+          commitShas: anchors.commits.map((c) => c.sha),
+          files: [observed.file],
+          matchedTerms: [claimed.name],
+          methods: anchors.commits.length
+            ? [anchors.viaPr.length ? "pr-anchor" : "sha-anchor", "pin-anchor"]
+            : ["pin-anchor"],
+        },
+        judged: false,
+        generated: isGeneratedEntry(claim, anchors.commits),
       });
       continue;
     }

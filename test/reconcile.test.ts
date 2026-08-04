@@ -280,7 +280,12 @@ test("a bump claim the diff lands on is confirmed", () => {
     to: "5.0.4",
   });
   assert.deepEqual(resolveBumpClaims([c], [pin()]), [
-    { claim: 0, status: "confirmed", claimed: c.bump, pin: 0 },
+    {
+      claim: 0,
+      status: "confirmed",
+      claimed: c.bump,
+      observed: { from: "5.0.3", to: "5.0.4", file: ".github/workflows/build.yml" },
+    },
   ]);
 });
 
@@ -295,7 +300,11 @@ test("a release aggregating several bumps overtakes its own note — never a con
   });
   const resolved = resolveBumpClaims([c], [pin({ from: "4.3.0", to: "5.0.5" })]);
   assert.equal(resolved[0].status, "overtaken");
-  assert.equal(resolved[0].pin, 0);
+  assert.deepEqual(resolved[0].observed, {
+    from: "4.3.0",
+    to: "5.0.5",
+    file: ".github/workflows/build.yml",
+  });
 });
 
 test("a pin landing short of the claimed version contradicts it", () => {
@@ -332,7 +341,7 @@ test("no pin of that name, or versions that cannot be ordered — the claim stan
   const c = bumpClaim("Update `serde` to 1.0.200", { name: "serde", to: "1.0.200" });
   const none = resolveBumpClaims([c], [pin()]);
   assert.deepEqual(none, [{ claim: 0, status: "unmatched", claimed: c.bump }]);
-  assert.equal("pin" in none[0], false, "an unmatched claim points at no pin");
+  assert.equal(none[0].observed, undefined, "an unmatched claim shows no observation");
 
   // `rc1` against `rc2` has no arithmetic, and guessing would be the
   // difference between "went further" and "is wrong".
@@ -371,7 +380,7 @@ test("the file that lands on the claimed version answers the claim", () => {
     pin({ to: "5.0.4", file: ".github/workflows/b.yml" }),
   ]);
   assert.equal(resolved[0].status, "confirmed");
-  assert.equal(resolved[0].pin, 1);
+  assert.equal(resolved[0].observed?.file, ".github/workflows/b.yml");
 });
 
 test("version ordering: the spelling of a version is not its content", () => {
@@ -425,4 +434,102 @@ test("reconcile carries the join and drops the claims it skipped", () => {
   );
   assert.equal(rec.bumps?.length, 1);
   assert.equal(rec.bumps![0].claim, 0);
+});
+
+test("a bump the release diff cancels out is still answered by the commit that made it", async () => {
+  // traefik v3.6.25's shape: the base already carried the destination
+  // version, so go.mod reads unchanged across the range while the commit
+  // inside the range moves it. Reading only the range left the release
+  // capped at 35 for a note describing exactly what happened.
+  const bumpCommit: Commit = {
+    sha: "e".repeat(40),
+    subject: "Bump github.com/acme/lib to 2.8.1",
+    body: "",
+    author: "dev",
+    prNumbers: [13530],
+  };
+  const d = data({
+    notes: "- **[tracing]** Bump github.com/acme/lib to 2.8.1 (#13530)\n",
+    commits: [bumpCommit],
+    files: [file("src/app.go", "@@ -1,2 +1,2 @@ func Serve()\n-old\n+new\n")],
+    commitFiles: async () => [
+      file(
+        "go.mod",
+        "@@ -3,3 +3,3 @@ require (\n \tgithub.com/other/dep v1.0.0\n-\tgithub.com/acme/lib v2.2.3\n+\tgithub.com/acme/lib v2.8.2\n",
+      ),
+    ],
+  });
+
+  const report = await analyzeRelease(d, CONTEXT, null, settings({ judgeMode: "off" }));
+  const bump = report.results[0];
+  assert.equal(bump.verdict, "verified", "overtaken, not contradicted");
+  assert.ok(bump.evidence.methods.includes("pin-anchor"));
+  assert.match(bump.reasoning, /the commit this note names moves/);
+  // The release diff itself moved no pin, so the pins section stays honest.
+  assert.equal(report.pins, undefined);
+
+  // And the join says where it looked, so a reader is not left wondering
+  // why the pin section is empty.
+  const withFindings = await analyzeRelease(
+    data({
+      notes: d.notes,
+      commits: [bumpCommit],
+      files: d.files,
+      commitFiles: d.commitFiles,
+    }),
+    CONTEXT,
+    null,
+    settings({ engine: stubEngine }),
+  );
+  assert.deepEqual(withFindings.reconciliation?.bumps?.[0].observed, {
+    from: "v2.2.3",
+    to: "v2.8.2",
+    file: "go.mod",
+    viaCommit: true,
+  });
+});
+
+test("the commit retry never overrides what the release diff already settled", async () => {
+  // The release ends at 2.5.0; a commit inside it passed through 2.8.2 and
+  // something later pulled it back. What the release ships is what the note
+  // is measured against — a commit mid-range must not buy back a claim the
+  // release contradicts.
+  const bumpCommit: Commit = {
+    sha: "f".repeat(40),
+    subject: "dependency work",
+    body: "",
+    author: "dev",
+    prNumbers: [77],
+  };
+  const d = data({
+    notes: [
+      "- Bump github.com/acme/lib to 2.8.1",
+      "- Bump github.com/other/dep to 3.0.0 (#77)",
+      "",
+    ].join("\n"),
+    commits: [bumpCommit],
+    files: [
+      file(
+        "go.mod",
+        "@@ -3,3 +3,3 @@ require (\n-\tgithub.com/acme/lib v2.2.3\n+\tgithub.com/acme/lib v2.5.0\n",
+      ),
+    ],
+    commitFiles: async () => [
+      file(
+        "go.mod",
+        "@@ -3,4 +3,4 @@ require (\n-\tgithub.com/acme/lib v2.2.3\n+\tgithub.com/acme/lib v2.8.2\n-\tgithub.com/other/dep v2.0.0\n+\tgithub.com/other/dep v3.0.0\n",
+      ),
+    ],
+  });
+
+  const report = await analyzeRelease(d, CONTEXT, null, settings({ engine: stubEngine }));
+  const bumps = report.reconciliation!.bumps!;
+  const lib = bumps.find((b) => b.claimed.name === "github.com/acme/lib")!;
+  const dep = bumps.find((b) => b.claimed.name === "github.com/other/dep")!;
+  assert.equal(lib.status, "contradicted", "the release diff decides, and it says 2.5.0");
+  assert.equal(lib.observed?.to, "v2.5.0");
+  assert.equal(lib.observed?.viaCommit, undefined);
+  // The claim the release diff says nothing about is the one the retry answers.
+  assert.equal(dep.status, "confirmed");
+  assert.equal(dep.observed?.viaCommit, true);
 });

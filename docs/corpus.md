@@ -81,7 +81,7 @@ claim is a hard cap on the trust score. Two of the five releases carrying a
 `critical/contradicted-claim` flag are pushed to 35/100 ("suspicious") by a
 single dependency version digit. That is what the table above measured; what
 came of it is [below](#the-question-this-corpus-opened-and-what-came-of-it) —
-seven of the eight bump contradictions no longer exist.
+none of the eight bump contradictions exists any more.
 
 ## The silent direction is where the risk sits
 
@@ -139,7 +139,7 @@ are joined deterministically before any judge runs (see `SCORING.md`), and a
 release that moves a pin *past* the version its note names reads as
 **overtaken** — not as a contradiction.
 
-Re-checked against the same diffs, seven of the eight are gone.
+Re-checked against the same diffs, all eight are gone.
 nextcloud/desktop v34.0.0 settles twelve of its thirteen bump claims off the
 pins alone, all six former contradictions among them; traefik v2.11.54's
 reads as overtaken (the release moved `dd-trace-go` v2.2.3 → v2.8.2, past
@@ -147,14 +147,17 @@ the 2.8.1 the note names). Nothing about the scoring formula, the hard cap
 or the golden set's scoring semantics changed to achieve that — the class
 simply stopped being a guess.
 
-The eighth is worth stating plainly, because it is a different failure. In
-traefik v3.6.25 the diff moves that pin nowhere: `dd-trace-go` appears in
-that release's diff only inside `CHANGELOG.md`. Nothing joins, the claim
-takes the ordinary route, and the judge answers `contradicted` — reasoning
-about `go.mod` and `go.sum` lines that are not in the diff it was shown.
-Whatever that is, it is not a bump claim cut at the wrong granularity, and
-no cap semantics would fix it. It is tracked as its own question in
-`ROADMAP.md`.
+The eighth took a second mechanism and is worth stating, because it looked
+for a while like a judge hallucinating. traefik v3.6.25's release diff moves
+`dd-trace-go` nowhere — the module's `go.mod` line is identical at both
+ends of the range, because the base branch already carried the destination
+version. The commit the note names moves it v2.2.3 → v2.8.2, and that
+commit is in the release. The judge had been reading the commit diff it was
+handed; the pin join had been reading the range. Both were right about what
+they were shown. A bump claim the range cannot answer now falls back on its
+own commit, which reads that case as overtaken. Re-checked with the same
+judge and the same base, that release moves from 35 ("suspicious", one
+contradicted claim, one critical flag) to 88 ("solid", neither).
 
 The 106 bump claims across the corpus are now counted apart by
 `pnpm corpus-stats`, so the same number can be re-derived on any watch home:

@@ -453,21 +453,33 @@ const MUTANTS: Mutant[] = [
     replace: "(?:dependencies|dependency|crate|module|package|action|image|plugin|gem|library)\\s*)?",
   },
   {
+    guard: "a bump the release diff cancels out is looked for in the commit that made it",
+    file: "src/check.ts",
+    find: "  const second = resolveBumpClaims(claims, commitPins, { viaCommit: true });",
+    replace: "  const second: BumpResolution[] = [];",
+  },
+  {
+    guard: "the commit retry never overrides a bump the release diff already settled",
+    file: "src/check.ts",
+    find: '    if (b.status !== "unmatched") return b;',
+    replace: "",
+  },
+  {
     guard: "an overtaken bump line shows both numbers — the note's and the diff's",
     file: "src/report.ts",
-    find: "observed: pin ? `${pin.from} → ${pin.to}` : undefined,",
+    find: "observed: b.observed ? `${b.observed.from} → ${b.observed.to}` : undefined,",
     replace: "observed: undefined,",
   },
   {
     guard: "a bump claim the pins settle never reaches a judge",
     file: "src/verify.ts",
-    find: "    const bump = opts.bumps?.get(claim.id);\n    if (bump) {",
-    replace: "    const bump = opts.bumps?.get(claim.id);\n    if (false && bump) {",
+    find: "    const bump = opts.bumps?.get(claim.id);\n    if (bump?.observed) {",
+    replace: "    const bump = opts.bumps?.get(claim.id);\n    if (false && bump?.observed) {",
   },
   {
     guard: "an overtaken bump claim is verified, not contradicted",
     file: "src/verify.ts",
-    find: 'resolution.status === "overtaken"',
+    find: 'bump.status === "overtaken"',
     replace: 'resolution.status === "unmatched"',
   },
   {

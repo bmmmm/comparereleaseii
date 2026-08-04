@@ -12,6 +12,8 @@ import {
 } from "./sources/local.ts";
 import { fetchForgeReleases, parseRepoUrl, type ForgeListing } from "./sources/forge.ts";
 import { parseClaims, markCarriedOver } from "./claims.ts";
+import { anchorMatch } from "./match.ts";
+import { pooled } from "./util.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
 import { authorActivity, computeMetrics } from "./metrics.ts";
@@ -30,7 +32,10 @@ import { summarizeShipped } from "./findings.ts";
 import { reconcile, resolveBumpClaims } from "./reconcile.ts";
 import type {
   Audience,
+  BumpResolution,
+  Claim,
   ComponentCheck,
+  DiffFile,
   FindingsSection,
   PinBump,
   ReleaseData,
@@ -336,11 +341,9 @@ export async function analyzeRelease(
     origin: link ? new URL(link.base).origin : undefined,
     linkStyle: link?.style,
   });
-  const bumps = resolveBumpClaims(claims, pins);
+  const bumps = await resolveBumps(data, claims, pins, s.concurrency);
   const bumpAnchors = new Map(
-    bumps
-      .filter((b) => b.pin !== undefined)
-      .map((b) => [claims[b.claim].id, { resolution: b, pin: pins[b.pin!] }]),
+    bumps.filter((b) => b.observed).map((b) => [claims[b.claim].id, b]),
   );
 
   const [results, baselineSnapshots] = await Promise.all([
@@ -445,6 +448,69 @@ export async function analyzeRelease(
     audience: s.audience,
     reconciliation,
   };
+}
+
+/**
+ * Bump claims against the pin delta, release diff first.
+ *
+ * A claim the release diff leaves unmatched gets a second look at the diff
+ * of the commit it names: a bump landing on the version the base branch
+ * already carried cancels out over the range and leaves no pin there, while
+ * the commit that made it is right in the release. traefik v3.6.25 is the
+ * case — `dd-trace-go` moves v2.2.3 → v2.8.2 inside commit ef514e15, its
+ * go.mod line is unchanged across the range, and reading only the range
+ * left the release capped at 35 for a note that describes what happened.
+ * Only claims that named their own commit take this route, and only after
+ * the release diff had nothing to say.
+ */
+async function resolveBumps(
+  data: ReleaseData,
+  claims: Claim[],
+  pins: PinBump[],
+  concurrency: number,
+): Promise<BumpResolution[]> {
+  const resolved = resolveBumpClaims(claims, pins);
+  const unmatched = resolved.filter((b) => b.status === "unmatched");
+  if (!unmatched.length) return resolved;
+
+  const shas = new Set<string>();
+  const prs = new Set<number>();
+  for (const b of unmatched) {
+    const claim = claims[b.claim];
+    const anchors = anchorMatch(claim, data.commits);
+    if (anchors.commits.length) {
+      for (const commit of anchors.commits) shas.add(commit.sha);
+    } else if (claim.prNumbers.length && data.resolvePr) {
+      // Squash-without-suffix repos: the note's "(#13530)" appears in no
+      // commit message, and the forge is the only one who knows which
+      // commit merged it. The verification ladder asks the same question
+      // for the same claims a moment later, off the source's own cache.
+      for (const pr of claim.prNumbers.slice(0, 5)) prs.add(pr);
+    }
+  }
+  if (prs.size && data.resolvePr) {
+    const resolvePr = data.resolvePr;
+    const found = await pooled([...prs], concurrency, (n) => resolvePr(n).catch(() => null));
+    for (const sha of found) {
+      const commit =
+        sha && data.commits.find((c) => sha.startsWith(c.sha) || c.sha.startsWith(sha));
+      if (commit) shas.add(commit.sha);
+    }
+  }
+  if (!shas.size) return resolved;
+
+  const lists = await pooled([...shas], concurrency, (sha) =>
+    data.commitFiles(sha).catch(() => [] as DiffFile[]),
+  );
+  const commitPins = pinBumps(lists.flat(), { repoLabel: data.repoLabel });
+  if (!commitPins.length) return resolved;
+
+  const second = resolveBumpClaims(claims, commitPins, { viaCommit: true });
+  return resolved.map((b) => {
+    if (b.status !== "unmatched") return b;
+    const retry = second.find((r) => r.claim === b.claim);
+    return retry?.observed ? retry : b;
+  });
 }
 
 /** `v7.1.2` and `7.1.2` name the same release in the wild — one retry. */

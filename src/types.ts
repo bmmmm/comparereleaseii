@@ -366,8 +366,19 @@ export interface BumpResolution {
   /** What the note said — the claim's own trait, repeated so a reader of
    * this list alone sees both numbers. */
   claimed: ClaimBump;
-  /** Index into report.pins — the pin that decided it. Absent when unmatched. */
-  pin?: number;
+  /** What the diff moved. Absent when unmatched. */
+  observed?: {
+    from: string;
+    to: string;
+    file: string;
+    /**
+     * The move is visible in the diff of the commit the note anchors to,
+     * not in the release diff — which happens when the base already
+     * carried the destination version, so the range cancels the move out.
+     * The release still contains the commit that made it.
+     */
+    viaCommit?: boolean;
+  };
 }
 
 /** One finding and the claims whose identifiers demonstrably describe it. */

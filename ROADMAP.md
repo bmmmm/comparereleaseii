@@ -16,53 +16,11 @@
 > (what shipped), SCORING.md (score semantics), AGENTS.md (working
 > rules), docs/ (operations).
 
-## Open (2026-08-04): a judge that cites lines it was never shown
+## Open (2026-08-04): nothing planned
 
-The complete list — anything not here is landed or settled below.
-
-**One finding survived the bump block, and it is not about bumps.**
-traefik v3.6.25's notes carry "Bump `github.com/DataDog/dd-trace-go/v2` to
-2.8.1". That release's diff moves the module nowhere: it appears in the
-diff only inside `CHANGELOG.md`, so the pin join has nothing to join and the
-claim takes the ordinary route. The judge answers `contradicted`, reasoning
-that "the go.mod and go.sum diffs show it was bumped from v2.2.3 to v2.8.2"
-— neither file's diff in that release contains the module at all. Two
-independent passes agreed (the second-voter rule for `contradicted` was
-satisfied), so the release is capped at 35, "suspicious", on evidence that
-does not exist.
-
-`no-evidence` is the honest verdict for a claim whose subject the diff never
-touches. The judge reached past what it was shown and reported the reach as
-a finding — and the vote rule cannot catch it, because two passes reading
-the same prompt invent the same plausible thing.
-
-What is NOT yet known, and has to come before any fix:
-
-1. **How often.** One case is an anecdote. The corpus has 12 contradicted
-   claims total; re-reading each one's cited files against the diff it was
-   shown is a bounded, deterministic check — a claim citing a path that
-   carries no hunk in that release is the shape to count.
-2. **Whether it is one prompt's problem.** The judge is handed ranked hunks
-   plus the release's full path list (`allPaths`, so it can ask for a file
-   it needs). A model can name a path from that list and then describe
-   content it never saw. Whether the list is load-bearing here is testable:
-   a golden case whose claim names a file present in `allPaths` but absent
-   from the hunks, with `contradicted` as the wrong answer and
-   `no-evidence` as the right one.
-
-Only with those two numbers does a fix become a decision rather than a
-guess. The obvious candidates — requiring a `contradicted` verdict's cited
-files to carry a hunk the judge actually received, or grading the citation
-in calibration rather than only the verdict — both move rulings and would
-face the full discipline: golden cases, `pnpm eval` before and after, the
-README validation table re-measured.
-
-**Settled in the same breath, so it does not get re-litigated:** the
-identifier-anchor question that opened this whole line closed with the bump
-block. Widening the shared identifier bar to v-prefixed versions (`v7.1.4`,
-the original OpenCloud observation) is no longer demand-driven by anything
-in the corpus — the class that motivated it is answered through its own
-deterministic channel. It reopens only on new evidence of its own.
+The bump block closed the last planned question. What is left is the list
+below — settled decisions, kept so they do not get re-litigated. New work
+starts from a fact: an issue, a corpus number, a release that reads wrong.
 
 ## Settled — do not reopen without new facts
 
@@ -108,13 +66,21 @@ deterministic channel. It reopens only on new evidence of its own.
 - **The `contradicted` hard cap stays as it is** (2026-08-04, closes the
   bump question's block 5): the cap was suspected of punishing releases for
   a patch digit in a dependency note, and the fix turned out not to be in
-  the cap. Settling bump claims off the diff's own pin delta removed seven
-  of the corpus's eight bump contradictions without touching a scoring
-  number, which is what "score-neutral first" was for — there is now no
-  A/B debt, no re-measured README table, no calibration drift to chase. The
-  eighth survivor is a judge citing files it was not shown (open, above),
-  and no cap semantics repairs that. Reopening the cap needs a case where
-  the verdict is right and the cap is still wrong.
+  the cap. Settling bump claims off the diff's own pin delta removed all
+  eight of the corpus's bump contradictions without touching a scoring
+  number, which is what "score-neutral first" was for — no A/B debt, no
+  re-measured README table, no calibration drift to chase. Reopening the cap
+  needs a case where the verdict is right and the cap is still wrong.
+- **A bump claim is checked against the release diff first, the named
+  commit second** (2026-08-04): the two are not the same evidence, and
+  assuming they were cost a full round of wrong diagnosis. traefik v3.6.25
+  moves `dd-trace-go` v2.2.3 → v2.8.2 inside the commit its note names,
+  while the same module's go.mod line is unchanged across the release range
+  — the base branch already carried the destination. The judge read the
+  commit diff it was handed and answered `contradicted`; the pin join read
+  the range and found nothing. Neither was inventing anything. The order
+  matters and stays fixed: what the release ships decides, and only a claim
+  the range cannot answer at all gets to fall back on its own commit.
 - **Action PR-comment variant: rejected until real demand** (2026-08-04):
   the tool checks release notes against a diff, and a PR has no release
   notes — the claims-based PR intake already covers this repo's own PRs.

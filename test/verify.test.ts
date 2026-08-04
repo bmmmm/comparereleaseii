@@ -11,7 +11,6 @@ import {
   medianVerdict,
   resolveVotes,
   verifyClaims,
-  type BumpAnchor,
 } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
 import {
@@ -25,7 +24,7 @@ import {
   type JudgeVerdict,
 } from "../src/judge.ts";
 import { withVerdictCache } from "../src/cache.ts";
-import type { BumpJoin, Claim, ClaimBump, Commit, PinBump } from "../src/types.ts";
+import type { BumpJoin, BumpResolution, Claim, ClaimBump, Commit } from "../src/types.ts";
 
 function claim(text: string, prNumbers: number[] = []): Claim {
   return {
@@ -892,19 +891,23 @@ function forbiddenEngine(): JudgeEngine {
   };
 }
 
-function bumpAnchor(status: BumpJoin, claimed: ClaimBump, pin: Partial<PinBump>): Map<number, BumpAnchor> {
+function bumpAnchor(
+  status: BumpJoin,
+  claimed: ClaimBump,
+  observed: Partial<BumpResolution["observed"]>,
+): Map<number, BumpResolution> {
   return new Map([
     [
       0,
       {
-        resolution: { claim: 0, status, claimed, pin: 0 },
-        pin: {
-          name: "actions/cache",
+        claim: 0,
+        status,
+        claimed,
+        observed: {
           from: "4.3.0",
           to: "5.0.5",
           file: ".github/workflows/build.yml",
-          firstParty: false,
-          ...pin,
+          ...observed,
         },
       },
     ],

@@ -139,6 +139,8 @@ export interface BumpLine {
   /** What the diff moved this pin through. Absent when nothing matched. */
   observed?: string;
   file?: string;
+  /** The move is in the named commit's diff, not in the release diff. */
+  viaCommit?: boolean;
 }
 
 const BUMP_LABEL: Record<BumpJoin, string> = {
@@ -164,16 +166,14 @@ export function bumpSummary(
   // them. Everything else is a difference between the note and the diff.
   const lines = bumps
     .filter((b) => b.status !== "confirmed")
-    .map((b): BumpLine => {
-      const pin = b.pin === undefined ? undefined : report.pins?.[b.pin];
-      return {
-        status: b.status,
-        name: b.claimed.name,
-        claimed: b.claimed.from ? `${b.claimed.from} → ${b.claimed.to}` : b.claimed.to,
-        observed: pin ? `${pin.from} → ${pin.to}` : undefined,
-        file: pin?.file,
-      };
-    });
+    .map((b): BumpLine => ({
+      status: b.status,
+      name: b.claimed.name,
+      claimed: b.claimed.from ? `${b.claimed.from} → ${b.claimed.to}` : b.claimed.to,
+      observed: b.observed ? `${b.observed.from} → ${b.observed.to}` : undefined,
+      file: b.observed?.file,
+      viaCommit: b.observed?.viaCommit,
+    }));
   return { total: bumps.length, counts, lines };
 }
 

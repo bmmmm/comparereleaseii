@@ -93,14 +93,16 @@ function sameName(claim: string, pin: string): boolean {
  * its results in. Carried-over text takes no part — it describes the
  * product, not this release, and gets skipped before any verdict.
  */
-export function resolveBumpClaims(claims: Claim[], pins: PinBump[]): BumpResolution[] {
+export function resolveBumpClaims(
+  claims: Claim[],
+  pins: PinBump[],
+  opts: { viaCommit?: boolean } = {},
+): BumpResolution[] {
   const out: BumpResolution[] = [];
   claims.forEach((claim, index) => {
     const claimed = claim.bump;
     if (!claimed || claim.kind !== "change" || claim.carriedOverFrom) return;
-    const candidates = pins
-      .map((pin, i) => ({ pin, i }))
-      .filter(({ pin }) => sameName(claimed.name, pin.name));
+    const candidates = pins.filter((pin) => sameName(claimed.name, pin.name));
     if (!candidates.length) {
       out.push({ claim: index, status: "unmatched", claimed });
       return;
@@ -109,22 +111,23 @@ export function resolveBumpClaims(claims: Claim[], pins: PinBump[]): BumpResolut
     // that lands on the claimed version answers the claim; failing that,
     // the furthest the release went does.
     const best =
-      candidates.find(({ pin }) => compareVersions(pin.to, claimed.to) === 0) ??
-      candidates.reduce((a, b) => ((compareVersions(b.pin.to, a.pin.to) ?? 0) > 0 ? b : a));
-    const order = compareVersions(best.pin.to, claimed.to);
-    const status =
-      order === null
-        ? "unmatched"
-        : order === 0
-          ? "confirmed"
-          : order > 0
-            ? "overtaken"
-            : "contradicted";
+      candidates.find((pin) => compareVersions(pin.to, claimed.to) === 0) ??
+      candidates.reduce((a, b) => ((compareVersions(b.to, a.to) ?? 0) > 0 ? b : a));
+    const order = compareVersions(best.to, claimed.to);
+    if (order === null) {
+      out.push({ claim: index, status: "unmatched", claimed });
+      return;
+    }
     out.push({
       claim: index,
-      status,
+      status: order === 0 ? "confirmed" : order > 0 ? "overtaken" : "contradicted",
       claimed,
-      ...(status === "unmatched" ? {} : { pin: best.i }),
+      observed: {
+        from: best.from,
+        to: best.to,
+        file: best.file,
+        ...(opts.viaCommit ? { viaCommit: true } : {}),
+      },
     });
   });
   return out;

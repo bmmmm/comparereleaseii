@@ -47,8 +47,8 @@ test("the --judge off ladder answers are pinned over the golden set", async () =
     const pins = pinBumps(data.files, { repoLabel: data.repoLabel });
     const bumps = new Map(
       resolveBumpClaims(claims, pins)
-        .filter((b) => b.pin !== undefined)
-        .map((b) => [claims[b.claim].id, { resolution: b, pin: pins[b.pin!] }]),
+        .filter((b) => b.observed)
+        .map((b) => [claims[b.claim].id, b]),
     );
     const results = await verifyClaims(data, claims, {
       judgeMode: "off",

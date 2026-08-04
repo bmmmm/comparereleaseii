@@ -21,18 +21,22 @@ All notable changes to comparereleaseii are documented here. The format follows 
   join rides in the `--json` report as `reconciliation.bumps`; claims carry
   the class itself as `claim.bump`.
 
+  A claim the release diff cannot answer at all gets one fallback: the diff
+  of the commit it names. Those are not the same evidence, and the
+  difference is not academic — traefik v3.6.25 moves `dd-trace-go`
+  v2.2.3 → v2.8.2 inside the commit its note names while the module's
+  go.mod line is unchanged across the release range, because the base
+  branch already carried the destination. Order is fixed: what the release
+  ships decides, and the commit is consulted only where the range is silent.
+
   Why it matters, measured on the 80-release corpus: eight of the twelve
   contradicted claims in it are bump claims, and six of those are notes that
-  say nothing false. Re-checked against the same diffs, seven of the eight
-  are gone — nextcloud/desktop v34.0.0's six become verified (twelve of its
-  thirteen bump claims are settled off the pins), and traefik v2.11.54's
-  reads as overtaken, the release having moved dd-trace-go v2.2.3 → v2.8.2
-  past the 2.8.1 the note names. The eighth survives and is a different
-  problem: in traefik v3.6.25 the diff moves that pin nowhere at all — the
-  module appears only in the CHANGELOG — so nothing is joined, and the judge
-  still answers `contradicted` citing go.mod and go.sum lines that are not
-  in the diff it was shown. That is a judge inventing evidence, not a bump
-  claim being mis-cut, and it is tracked separately in ROADMAP.md.
+  say nothing false. Re-checked against the same diffs, **all eight are
+  gone** — nextcloud/desktop v34.0.0's six become verified (twelve of its
+  thirteen bump claims are settled off the pins), traefik v2.11.54's reads
+  as overtaken, and v3.6.25's is answered by its own commit — that release
+  re-checks from 35 ("suspicious") to 88 ("solid") with the same judge and
+  the same base, its critical flag gone with the contradiction.
 
   The golden set carries the three shapes, and one of them is a finding of
   its own: `bump-release-overtakes-its-own-note` came back `contradicted`
