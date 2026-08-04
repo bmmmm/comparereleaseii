@@ -4,6 +4,21 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **`pnpm corpus-stats` reads a whole watch home at once.** What one
+  operator's accumulated reports say about release notes in general —
+  verdict shares, score and coverage distributions, how often each risk
+  flag fires — deduplicated across the two report path layouts and the
+  tool versions that wrote them, as Markdown or `--json`. Repository names
+  stay out of the output unless `--named` asks: the settled "not a wall of
+  shame" rule is encoded in the default rather than left to discipline.
+  The first corpus — 80 releases across 13 repositories — is written up in
+  [docs/corpus.md](docs/corpus.md), including the finding that notes are
+  bimodal (46 of 80 cover ≥ 90 % of their diff, 15 cover under 25 %) and
+  that a third of all contradicted claims are an artefact of comparing a
+  per-PR note against a per-release diff.
+
 ## 0.8.0 — 2026-08-04
 
 ### Added

@@ -361,6 +361,18 @@ caught against the actual diff:
   contradicting the claim of complete removal.
 ```
 
+### What it found once it ran on its own
+
+80 releases across 13 repositories, checked in both directions:
+[docs/corpus.md](docs/corpus.md). The short version is that notes are
+bimodal — 46 of 80 cover at least 90 % of the lines they changed, 15 cover
+under 25 %, and there is almost nothing in between. Outright false claims
+are rare (12 in 2,911, and a third of those turned out to be an artefact of
+comparing a per-PR note against a per-release diff); silence is not — 19
+releases changed a file with no reviewable patch, and 11 of those said
+nothing about it. Regenerate any figure with `pnpm corpus-stats <reports
+dir>`; it aggregates without naming repositories, on purpose.
+
 ## Development
 
 ```console

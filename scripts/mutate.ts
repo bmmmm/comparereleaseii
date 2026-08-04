@@ -422,6 +422,24 @@ const MUTANTS: Mutant[] = [
     find: "if (order.some((v, i) => v !== i)) uncoveredOrder = order;",
     replace: "uncoveredOrder = order;",
   },
+  {
+    guard: "a release stored under both path layouts is one release, not two",
+    file: "scripts/corpus-aggregate.ts",
+    find: "if (!byRelease.has(key)) byRelease.set(key, r);",
+    replace: "byRelease.set(`${key}|${byRelease.size}`, r);",
+  },
+  {
+    guard: "several critical flags in one release are one affected release",
+    file: "scripts/corpus-aggregate.ts",
+    find: "if (critical) withCritical++;",
+    replace: 'withCritical += (m.flags ?? []).filter((f) => f.severity === "critical").length;',
+  },
+  {
+    guard: "an unmeasured coverage ratio is skipped, never read as 0 %",
+    file: "scripts/corpus-aggregate.ts",
+    find: 'if (typeof m.churnCoveredRatio === "number") coverage.push(m.churnCoveredRatio);',
+    replace: "coverage.push(m.churnCoveredRatio ?? 0);",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up
