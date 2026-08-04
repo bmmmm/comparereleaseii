@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pinBumps } from "../src/pins.ts";
+import { detectBumpClaim, pinBumps } from "../src/pins.ts";
 import type { DiffFile } from "../src/types.ts";
 
 function df(path: string, patch: string): DiffFile {
@@ -333,4 +333,58 @@ test("repoUrl marks the loadable sources — certain hosts only, never guessed",
   );
   assert.equal(foreign[0].firstParty, true, "owner still matches");
   assert.equal(foreign[0].repoUrl, undefined);
+});
+
+// ---------- the claim side: what a note says a pin did ----------
+//
+// Every text below is verbatim from the corpus (docs/corpus.md), which is
+// also where the shapes come from: dependabot writes two sides, renovate
+// writes one, hand-written dependency sections write either.
+
+test("dependabot's two-sided form is a bump claim", () => {
+  assert.deepEqual(
+    detectBumpClaim("chore(deps): bump actions/cache from 5.0.3 to 5.0.4 by @dependabot[bot] in #9668"),
+    { name: "actions/cache", from: "5.0.3", to: "5.0.4" },
+  );
+});
+
+test("the noun never eats the pin name — `actions/cache` is not `action` plus `s/cache`", () => {
+  // The noun list has to end on a word boundary: "action" is a prefix of
+  // "actions", and swallowing it named the pin "s/cache" for every single
+  // GitHub-Actions bump in the corpus — the largest group there is.
+  const bump = detectBumpClaim("bump actions/stale from 10.1.1 to 10.2.0");
+  assert.equal(bump?.name, "actions/stale");
+});
+
+test("renovate's one-sided form is a bump claim — the destination is enough", () => {
+  assert.deepEqual(detectBumpClaim("[deps] Platform: Update @babel/core to v7.29.6 [SECURITY]"), {
+    name: "@babel/core",
+    to: "v7.29.6",
+  });
+  assert.deepEqual(detectBumpClaim("[deps] Platform: Update Rust crate serde_with to v3.21.0"), {
+    name: "serde_with",
+    to: "v3.21.0",
+  });
+  assert.deepEqual(
+    detectBumpClaim("**[tracing]** Bump github.com/DataDog/dd-trace-go/v2 to 2.8.1 (#13530 @kevinpollet)"),
+    { name: "github.com/DataDog/dd-trace-go/v2", to: "2.8.1" },
+  );
+});
+
+test("a backticked name is a pin name whatever it is spelled like", () => {
+  assert.deepEqual(detectBumpClaim("Bumped `tokio` from 1.2.0 to 1.3.0"), {
+    name: "tokio",
+    from: "1.2.0",
+    to: "1.3.0",
+  });
+});
+
+test("prose with a version in it is not a bump claim", () => {
+  // A bare word plus a number is the shape of half of all release notes.
+  // Without the pin-shape bar this class would swallow them.
+  assert.equal(detectBumpClaim("Upgrade protocol to 3.1"), undefined);
+  // The app's own version is not a pin, and no version is named at all.
+  assert.equal(detectBumpClaim("Bump client version(s) by @github-actions in #21554"), undefined);
+  // A count is not a version — one dotted number is the bar.
+  assert.equal(detectBumpClaim("Update `foo` to 3"), undefined);
 });

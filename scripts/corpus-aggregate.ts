@@ -2,7 +2,22 @@
 // The arithmetic behind `pnpm corpus-stats`, kept free of I/O so the counting
 // rules can be tested against fixtures. `corpus-stats.ts` reads the files and
 // renders; everything that decides a number lives here.
+import { detectBumpClaim } from "../src/pins.ts";
 import type { Report } from "../src/types.ts";
+
+/**
+ * The dependency-bump class, counted against everything else. A bump claim
+ * states a pin and a version, which is the one claim shape a diff can settle
+ * without reading a word of prose — and the corpus is what decides whether
+ * it deserves its own channel.
+ */
+export interface BumpSummary {
+  claims: number;
+  verdicts: Record<string, number>;
+  /** Same counts for every claim that is NOT a bump claim — the comparison
+   * is the whole point of the number. */
+  otherVerdicts: Record<string, number>;
+}
 
 export interface CorpusSummary {
   releases: number;
@@ -11,6 +26,7 @@ export interface CorpusSummary {
   claims: number;
   judged: number;
   verdicts: Record<string, number>;
+  bumps: BumpSummary;
   releasesWithCriticalFlag: number;
   releasesWithContradictedClaim: number;
   score: { min: number | null; median: number | null; max: number | null; labels: Record<string, number> };
@@ -48,6 +64,9 @@ export function dedupeReports(reports: Report[]): Report[] {
 
 export function aggregate(reports: Report[]): CorpusSummary {
   const verdicts: Record<string, number> = {};
+  const bumpVerdicts: Record<string, number> = {};
+  const otherVerdicts: Record<string, number> = {};
+  let bumpClaims = 0;
   const flagKinds: Record<string, number> = {};
   const labels: Record<string, number> = {};
   const scores: number[] = [];
@@ -67,6 +86,13 @@ export function aggregate(reports: Report[]): CorpusSummary {
       verdicts[res.verdict] = (verdicts[res.verdict] ?? 0) + 1;
       if (res.judged) judged++;
       if (res.verdict === "contradicted") contradicted = true;
+      // Reports written before the trait existed carry no `bump`, and this
+      // number exists precisely to predate the fix — so the class is read
+      // off the stored claim text when the report does not name it.
+      const bump = res.claim?.bump ?? detectBumpClaim(res.claim?.text ?? "");
+      const bucket = bump ? bumpVerdicts : otherVerdicts;
+      if (bump) bumpClaims++;
+      bucket[res.verdict] = (bucket[res.verdict] ?? 0) + 1;
     }
     if (contradicted) withContradicted++;
     if (r.reverseChecked) reverseChecked++;
@@ -93,6 +119,7 @@ export function aggregate(reports: Report[]): CorpusSummary {
     claims,
     judged,
     verdicts,
+    bumps: { claims: bumpClaims, verdicts: bumpVerdicts, otherVerdicts },
     releasesWithCriticalFlag: withCritical,
     releasesWithContradictedClaim: withContradicted,
     score: {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { extractIdentifiers } from "./match.ts";
+import { detectBumpClaim } from "./pins.ts";
 import { FENCE_LINE } from "./util.ts";
 import type { Claim, ClaimPromise } from "./types.ts";
 
@@ -62,6 +63,10 @@ function extract(text: string): Omit<Claim, "id" | "section" | "kind" | "text"> 
     codeSpans,
     author,
     promise: detectPromise(text),
+    // Read off the cleaned text: a linked pin name ("bump [actions/cache](…)
+    // from 5.0.3") is the same claim as a bare one, and the raw form hides
+    // it behind the link syntax.
+    bump: detectBumpClaim(cleanText(text)),
   };
 }
 

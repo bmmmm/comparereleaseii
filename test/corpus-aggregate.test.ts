@@ -99,3 +99,19 @@ test("median averages the middle pair on an even count", () => {
   assert.equal(median([3, 1, 2]), 2);
   assert.equal(median([]), null);
 });
+
+test("bump claims are counted apart — and read off the text when the report predates the trait", () => {
+  // The whole point of the number is that it predates the fix, so a watch
+  // home full of older reports (which carry no `bump` trait) has to count.
+  const legacy = report({ repo: "o/r", tag: "v1.0.0", verdicts: ["contradicted", "verified"] });
+  legacy.results[0].claim.text = "chore(deps): bump actions/cache from 5.0.3 to 5.0.4";
+  legacy.results[1].claim.text = "Rewrote the retry loop";
+
+  const s = aggregate([legacy]);
+  assert.equal(s.bumps.claims, 1);
+  assert.equal(s.bumps.verdicts.contradicted, 1);
+  assert.equal(s.bumps.otherVerdicts.verified, 1);
+  assert.equal(s.bumps.verdicts.verified, undefined, "a non-bump claim must not land in the class");
+  // The two buckets partition the claims — a rate computed off them is honest.
+  assert.equal(s.bumps.claims + (s.bumps.otherVerdicts.verified ?? 0), s.claims);
+});

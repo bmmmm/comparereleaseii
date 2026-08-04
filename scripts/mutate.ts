@@ -423,6 +423,18 @@ const MUTANTS: Mutant[] = [
     replace: "uncoveredOrder = order;",
   },
   {
+    guard: "a bump claim needs a pin-shaped name — prose with a version in it is not one",
+    file: "src/pins.ts",
+    find: "if (!noun && !tick && !PIN_NAME_SHAPE.test(name)) return undefined;",
+    replace: "",
+  },
+  {
+    guard: "the bump-claim noun ends on a word boundary (`actions/cache` is not `action` + `s/cache`)",
+    file: "src/pins.ts",
+    find: "(?:dependencies|dependency|crate|module|package|action|image|plugin|gem|library)\\s+)?",
+    replace: "(?:dependencies|dependency|crate|module|package|action|image|plugin|gem|library)\\s*)?",
+  },
+  {
     guard: "a release stored under both path layouts is one release, not two",
     file: "scripts/corpus-aggregate.ts",
     find: "if (!byRelease.has(key)) byRelease.set(key, r);",

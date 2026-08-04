@@ -103,6 +103,27 @@ for (const [v, n] of Object.entries(summary.verdicts).sort((a, b) => b[1] - a[1]
   out.push(`| \`${v}\` | ${n} | ${pct(n, summary.claims)} |`);
 }
 out.push("");
+out.push(`## Dependency-bump claims`);
+out.push("");
+const b = summary.bumps;
+const others = summary.claims - b.claims;
+const rate = (n: number, d: number) => (d === 0 ? "—" : `${((n / d) * 100).toFixed(2)} %`);
+out.push(
+  `A bump claim names a pin and a version, so the diff can settle it without` +
+    ` reading prose. Counted apart because the corpus is what decides whether` +
+    ` the class needs its own channel:`,
+);
+out.push("");
+out.push(`| | Bump claims | Every other claim |`);
+out.push(`|---|---:|---:|`);
+out.push(`| Claims | ${b.claims} (${pct(b.claims, summary.claims)}) | ${others} |`);
+for (const v of ["verified", "partial", "no-evidence", "contradicted", "skipped"]) {
+  out.push(`| \`${v}\` | ${b.verdicts[v] ?? 0} | ${b.otherVerdicts[v] ?? 0} |`);
+}
+out.push(
+  `| Contradicted rate | **${rate(b.verdicts.contradicted ?? 0, b.claims)}** | **${rate(b.otherVerdicts.contradicted ?? 0, others)}** |`,
+);
+out.push("");
 out.push(`## Score labels`);
 out.push("");
 out.push(`| Label | Releases | Share |`);

@@ -8,7 +8,7 @@
 // as one WEB_ASSETS_VERSION line). Deterministic and score-neutral: nothing
 // here feeds the trust score.
 import { DEP_MANIFEST, cargoDeps, depEntry, packageJsonDeps, type DepEntry } from "./deps.ts";
-import type { DiffFile, PinBump } from "./types.ts";
+import type { ClaimBump, DiffFile, PinBump } from "./types.ts";
 
 export interface PinContext {
   /** owner/repo of the checked repo — the owner match behind first-party. */
@@ -299,4 +299,33 @@ export function pinBumps(files: DiffFile[], ctx: PinContext = {}): PinBump[] {
       a.file.localeCompare(b.file) ||
       a.name.localeCompare(b.name),
   );
+}
+
+/**
+ * The claim side of the same fact: a note line stating that a pin moved.
+ * Dependabot, Renovate and hand-written dependency sections all write it the
+ * same few ways — "bump `actions/cache` from 5.0.3 to 5.0.4", "Update
+ * dependency @types/node to v26.1.2", "Bump github.com/x/y to 2.8.1".
+ *
+ * A name alone is not enough to tell a pin from prose ("update the docs to
+ * 3 sections"), so the name has to look like one: a path/scope/dotted
+ * spelling, a backticked span, or a noun that says what it is. That keeps
+ * "Upgrade Go to 1.24" out — a real bump claim whose name no manifest pin
+ * carries either, so admitting it would only add a class that can never
+ * join. A line naming several bumps yields the first: one claim, one pin.
+ */
+const BUMP_CLAIM =
+  /\b(?:bump|bumps|bumped|upgrade|upgrades|upgraded|update|updates|updated)\s+(?:the\s+)?(?:(?:go|npm|rust|python|docker|helm)\s+)?((?:dependencies|dependency|crate|module|package|action|image|plugin|gem|library)\s+)?(`?)([A-Za-z0-9@][\w@./+-]*)\2(?:\s+from\s+`?(v?\d[\w.+-]*)`?)?\s+(?:to|→|->)\s+`?(v?\d[\w.+-]*)`?/i;
+
+/** A pin name states what it is: a path, a scope, a dotted module, a version-suffixed one. */
+const PIN_NAME_SHAPE = /[@/._-]/;
+
+export function detectBumpClaim(text: string): ClaimBump | undefined {
+  const m = text.match(BUMP_CLAIM);
+  if (!m) return undefined;
+  const [, noun, tick, name, from, to] = m;
+  if (!VERSION_SHAPE.test(to)) return undefined;
+  if (from !== undefined && !VERSION_SHAPE.test(from)) return undefined;
+  if (!noun && !tick && !PIN_NAME_SHAPE.test(name)) return undefined;
+  return from === undefined ? { name, to } : { name, from, to };
 }

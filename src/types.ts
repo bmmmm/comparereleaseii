@@ -82,6 +82,19 @@ export interface PromiseCheck {
   note: string;
 }
 
+/**
+ * A note line that asserts a version pin moved: "bump `actions/cache` from
+ * 5.0.3 to 5.0.4", "Bump github.com/DataDog/dd-trace-go/v2 to 2.8.1". The
+ * name is the pin's spelling as the note writes it, and `from` is absent
+ * when the note gives only the destination — one side is enough to check.
+ * Read off the text alone; nothing here has seen the diff.
+ */
+export interface ClaimBump {
+  name: string;
+  from?: string;
+  to: string;
+}
+
 export interface Claim {
   id: number;
   section: string;
@@ -99,6 +112,8 @@ export interface Claim {
   carriedOverFrom?: string;
   /** Set when the claim commits to a FUTURE change ("will be removed in 2.0"). */
   promise?: ClaimPromise;
+  /** Set when the claim states a version pin move — the class the pin join checks. */
+  bump?: ClaimBump;
 }
 
 export type Verdict =

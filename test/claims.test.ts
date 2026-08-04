@@ -226,3 +226,20 @@ test("fenced code blocks never become claims, headings or bullets", () => {
   assert.equal(fixed?.section, "Upgrade notes");
   assert.equal(fixed?.kind, "change");
 });
+
+test("a dependency-bump line carries its pin as a claim trait", () => {
+  const notes = [
+    "## Dependencies",
+    "",
+    "- chore(deps): bump actions/cache from 5.0.3 to 5.0.4 by @dependabot[bot] in #9668",
+    "- [Update `@types/node`](https://github.com/o/r/pull/12) to v22.20.0",
+    "- Rewrote the retry loop so a flaky upload no longer fails the job",
+    "",
+  ].join("\n");
+  const claims = parseClaims(notes);
+  assert.deepEqual(claims[0].bump, { name: "actions/cache", from: "5.0.3", to: "5.0.4" });
+  // A linked pin name is the same claim as a bare one — the trait is read
+  // off the cleaned text, not off the markdown.
+  assert.deepEqual(claims[1].bump, { name: "@types/node", to: "v22.20.0" });
+  assert.equal(claims[2].bump, undefined);
+});
