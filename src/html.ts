@@ -4,6 +4,7 @@ import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_QUESTIONABLE, SCORE_SOLID } from "./theme.ts";
 import {
   budgetLine,
+  bumpSummary,
   carriedOver,
   componentBits,
   countVerdicts,
@@ -455,6 +456,34 @@ function pinsHtml(pins: PinBump[], components?: ComponentCheck[]): string {
   }`;
 }
 
+/**
+ * Bump claims as one class. The overtaken rows are the point: both numbers
+ * side by side, so the difference between what the note says and what the
+ * release did is readable without opening the diff.
+ */
+function bumpsHtml(report: Report): string {
+  const bumps = bumpSummary(report);
+  if (!bumps) return "";
+  const color: Record<string, string> = {
+    contradicted: "#f85149",
+    overtaken: "#d29922",
+    unmatched: "#6e7681",
+  };
+  const rows = bumps.lines
+    .map(
+      (b) =>
+        `<tr><td>${esc(b.name)}</td><td><span class="chip" style="background:${color[b.status] ?? "#6e7681"}">${esc(b.status)}</span></td><td>${esc(b.claimed)}</td><td>${b.observed ? esc(b.observed) : "—"}</td><td>${b.file ? esc(b.file) : "—"}</td></tr>`,
+    )
+    .join("");
+  return (
+    `<h2>Dependency bumps <span class="note">— what the notes say a pin did, held against what the diff moved; deterministic, never scored</span></h2>` +
+    `<p>${bumps.total} bump claim(s): ${esc(bumps.counts)}.</p>` +
+    (rows
+      ? `<table><tr><th>pin</th><th></th><th>the note says</th><th>the diff moves</th><th>file</th></tr>${rows}</table>`
+      : "")
+  );
+}
+
 function flagsHtml(flags: RiskFlag[], linkBase?: string, style?: LinkStyle): string {
   if (!flags.length) return `<p class="ok">No risk flags.</p>`;
   const sevColor = { critical: "#f85149", warn: "#d29922", info: "#58a6ff" };
@@ -723,6 +752,7 @@ ${
 ${report.surface?.categories.length ? surfaceHtml(report.surface) : ""}
 ${report.findings ? findingsHtml(report) : ""}
 ${report.pins?.length ? pinsHtml(report.pins, report.components) : ""}
+${bumpsHtml(report)}
 <h2>Undocumented commits</h2>
 ${
   !report.reverseChecked

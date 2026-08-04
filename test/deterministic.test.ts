@@ -11,6 +11,8 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { loadGoldenCases } from "../src/calibrate.ts";
 import { parseClaims } from "../src/claims.ts";
+import { pinBumps } from "../src/pins.ts";
+import { resolveBumpClaims } from "../src/reconcile.ts";
 import { verifyClaims } from "../src/verify.ts";
 import type { ReleaseData } from "../src/types.ts";
 
@@ -39,6 +41,15 @@ test("the --judge off ladder answers are pinned over the golden set", async () =
       commitFiles: async () => [],
       warnings: [],
     };
+    // Same wiring as analyzeRelease: the pin join is part of the ladder, so
+    // the pin has to measure it. Building it here rather than passing an
+    // empty map is what keeps this file honest about what --judge off does.
+    const pins = pinBumps(data.files, { repoLabel: data.repoLabel });
+    const bumps = new Map(
+      resolveBumpClaims(claims, pins)
+        .filter((b) => b.pin !== undefined)
+        .map((b) => [claims[b.claim].id, { resolution: b, pin: pins[b.pin!] }]),
+    );
     const results = await verifyClaims(data, claims, {
       judgeMode: "off",
       engine: null,
@@ -46,6 +57,7 @@ test("the --judge off ladder answers are pinned over the golden set", async () =
       concurrency: 4,
       maxHunks: 6,
       maxEvidenceChars: 20000,
+      bumps,
     });
     assert.equal(results.length, 1, `${gc.name}: one claim in, one result out`);
     verdicts[gc.name] = results[0].verdict;

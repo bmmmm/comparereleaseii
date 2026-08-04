@@ -79,8 +79,9 @@ classified by hand:
 That last group matters more than its size suggests, because a contradicted
 claim is a hard cap on the trust score. Two of the five releases carrying a
 `critical/contradicted-claim` flag are pushed to 35/100 ("suspicious") by a
-single dependency version digit. See [the open question](#the-open-question)
-below.
+single dependency version digit. That is what the table above measured; what
+came of it is [below](#the-question-this-corpus-opened-and-what-came-of-it) —
+seven of the eight bump contradictions no longer exist.
 
 ## The silent direction is where the risk sits
 
@@ -122,19 +123,43 @@ across the corpus run 25 to 100, median 80.
 | suspicious | 9 |
 | unverified | 3 |
 
-## The open question
+## The question this corpus opened, and what came of it
 
-The corpus supplies the facts `ROADMAP.md` was waiting for before reopening
-the identifier-anchor question, and sharpens it: bump claims do not merely
-dominate the *unsupported* line, they dominate the *contradicted* verdict —
-eight of twelve — and through the hard cap they demonstrably move scores.
+The corpus supplied the facts `ROADMAP.md` was waiting for before reopening
+the identifier-anchor question, and sharpened it: bump claims did not merely
+dominate the *unsupported* line, they dominated the *contradicted* verdict —
+eight of twelve — and through the hard cap they demonstrably moved scores.
 Two releases read "suspicious" on the strength of a patch-version digit in a
 dependency note.
 
-Whether that is wrong is a judgement call, not a bug: the note does state a
-version the diff does not support. But a score that says "suspicious" is
-claiming something stronger than "one bump note is off by a patch level",
-and this corpus is the first evidence that the two routinely get conflated.
+**That question is now closed, without the score being touched.** A bump
+claim states a pin and a version; the diff carries the same pin and its own
+version, so the comparison needs no model at all. Since this release the two
+are joined deterministically before any judge runs (see `SCORING.md`), and a
+release that moves a pin *past* the version its note names reads as
+**overtaken** — not as a contradiction.
+
+Re-checked against the same diffs, seven of the eight are gone.
+nextcloud/desktop v34.0.0 settles twelve of its thirteen bump claims off the
+pins alone, all six former contradictions among them; traefik v2.11.54's
+reads as overtaken (the release moved `dd-trace-go` v2.2.3 → v2.8.2, past
+the 2.8.1 the note names). Nothing about the scoring formula, the hard cap
+or the golden set's scoring semantics changed to achieve that — the class
+simply stopped being a guess.
+
+The eighth is worth stating plainly, because it is a different failure. In
+traefik v3.6.25 the diff moves that pin nowhere: `dd-trace-go` appears in
+that release's diff only inside `CHANGELOG.md`. Nothing joins, the claim
+takes the ordinary route, and the judge answers `contradicted` — reasoning
+about `go.mod` and `go.sum` lines that are not in the diff it was shown.
+Whatever that is, it is not a bump claim cut at the wrong granularity, and
+no cap semantics would fix it. It is tracked as its own question in
+`ROADMAP.md`.
+
+The 106 bump claims across the corpus are now counted apart by
+`pnpm corpus-stats`, so the same number can be re-derived on any watch home:
+7.6 % of them contradicted against 0.14 % for every other claim, which is
+the ratio this whole line of work started from.
 
 ## What this does not show
 

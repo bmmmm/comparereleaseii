@@ -26,6 +26,21 @@ sha raises a claim's priority for judging and stops there. Only identifiers
 from the claim actually found in the diff (score ≥ 5, the same bar with and
 without an anchor) can settle a claim deterministically — plus
 auto-generated entries, which are true by construction.
+One class never reaches the judge at all: a **dependency-bump claim** the
+diff's own pin delta answers. "Bump `actions/cache` from 5.0.3 to 5.0.4"
+states a pin and a version, and the diff carries the same pin and its own
+version — the whole question is a comparison, and a model reading it adds
+variance without adding evidence. On this class it added error: eight of the
+twelve contradicted claims in the 80-release corpus were bump claims, and
+six of those were a note correctly describing one slice of a bump the
+release had aggregated (the note says 5.0.3 → 5.0.4, the release moves the
+pin 4.3.0 → 5.0.5). That reads as **overtaken**, not as a contradiction, and
+it verifies: the bump the note states is in this diff. A pin landing short
+of the claimed version, or moving the other way, is `contradicted` on the
+same deterministic evidence. Where no pin of that name moved, or the two
+versions cannot be ordered, nothing is settled and the claim takes the
+ordinary route.
+
 Verdicts that would fail a release (`no-evidence`, `contradicted`) are never
 accepted from a single model call, and neither is a `verified` whose evidence
 touches sensitive paths (auth/crypto, dependency manifests, CI) or whose claim

@@ -453,6 +453,24 @@ const MUTANTS: Mutant[] = [
     replace: "(?:dependencies|dependency|crate|module|package|action|image|plugin|gem|library)\\s*)?",
   },
   {
+    guard: "an overtaken bump line shows both numbers — the note's and the diff's",
+    file: "src/report.ts",
+    find: "observed: pin ? `${pin.from} → ${pin.to}` : undefined,",
+    replace: "observed: undefined,",
+  },
+  {
+    guard: "a bump claim the pins settle never reaches a judge",
+    file: "src/verify.ts",
+    find: "    const bump = opts.bumps?.get(claim.id);\n    if (bump) {",
+    replace: "    const bump = opts.bumps?.get(claim.id);\n    if (false && bump) {",
+  },
+  {
+    guard: "an overtaken bump claim is verified, not contradicted",
+    file: "src/verify.ts",
+    find: 'resolution.status === "overtaken"',
+    replace: 'resolution.status === "unmatched"',
+  },
+  {
     guard: "a release overtaking its own bump note is never read as a contradiction",
     file: "src/reconcile.ts",
     find: '? "overtaken"',

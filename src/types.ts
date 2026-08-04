@@ -134,6 +134,8 @@ export type JudgedVerdict = Exclude<Verdict, "skipped">;
 export type MatchMethod =
   | "pr-anchor"
   | "sha-anchor"
+  /** The diff's own pin delta settled the claim — no judge was asked. */
+  | "pin-anchor"
   | "lexical"
   | "llm"
   | "escalated"

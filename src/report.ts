@@ -4,6 +4,7 @@ import { SCORE_MINOR, SCORE_SOLID } from "./theme.ts";
 import { surfaceLine } from "./substance.ts";
 import type {
   Audience,
+  BumpJoin,
   ClaimResult,
   ComponentCheck,
   Finding,
@@ -121,6 +122,59 @@ export function componentBits(m: ComponentCheck): string[] {
   }
   if (m.truncated) bits.push("diff truncated");
   return bits;
+}
+
+/**
+ * One bump claim as every renderer shows it: what the note said, what the
+ * diff moved, and the file that decided it. The overtaken line carries both
+ * numbers, because that difference IS the finding — "the note says 5.0.4,
+ * the release moves it 4.3.0 → 5.0.5" tells a reader in one line what the
+ * verdict alone cannot.
+ */
+export interface BumpLine {
+  status: BumpJoin;
+  name: string;
+  /** What the note names, `from → to` when it named both sides. */
+  claimed: string;
+  /** What the diff moved this pin through. Absent when nothing matched. */
+  observed?: string;
+  file?: string;
+}
+
+const BUMP_LABEL: Record<BumpJoin, string> = {
+  confirmed: "confirmed",
+  overtaken: "overtaken by the release",
+  contradicted: "contradicted",
+  unmatched: "no pin of that name in the diff",
+};
+
+/** Bump claims as one class: the counts, and the lines worth reading. */
+export function bumpSummary(
+  report: Report,
+): { total: number; counts: string; lines: BumpLine[] } | null {
+  const bumps = report.reconciliation?.bumps;
+  if (!bumps?.length) return null;
+  const order: BumpJoin[] = ["confirmed", "overtaken", "contradicted", "unmatched"];
+  const counts = order
+    .map((s) => ({ s, n: bumps.filter((b) => b.status === s).length }))
+    .filter(({ n }) => n > 0)
+    .map(({ s, n }) => `${n} ${BUMP_LABEL[s]}`)
+    .join(", ");
+  // Confirmed lines say nothing a reader has to act on — the count carries
+  // them. Everything else is a difference between the note and the diff.
+  const lines = bumps
+    .filter((b) => b.status !== "confirmed")
+    .map((b): BumpLine => {
+      const pin = b.pin === undefined ? undefined : report.pins?.[b.pin];
+      return {
+        status: b.status,
+        name: b.claimed.name,
+        claimed: b.claimed.from ? `${b.claimed.from} → ${b.claimed.to}` : b.claimed.to,
+        observed: pin ? `${pin.from} → ${pin.to}` : undefined,
+        file: pin?.file,
+      };
+    });
+  return { total: bumps.length, counts, lines };
 }
 
 /** Severity order shared by every renderer — breaking first, internal last. */
@@ -453,6 +507,23 @@ export function printTerminal(report: Report): void {
     }
   }
 
+  const bumps = bumpSummary(report);
+  if (bumps) {
+    console.log(
+      c.bold("\nDependency bumps") +
+        c.dim(` — ${bumps.total} claim(s) held against the diff's pins: ${bumps.counts}`),
+    );
+    for (const b of bumps.lines) {
+      const mark =
+        b.status === "contradicted" ? c.red("✘") : b.status === "overtaken" ? c.yellow("↗") : c.dim("·");
+      const detail = b.observed
+        ? `the note says ${b.claimed}, the diff moves it ${b.observed}`
+        : `the note says ${b.claimed}`;
+      console.log(`  ${mark} ${safe(`${b.name} — ${detail}`)}`);
+      if (b.file) console.log(c.dim(`    ${safe(b.file)}`));
+    }
+  }
+
   if (!report.reverseChecked) {
     console.log(c.dim("\nCompleteness check skipped (--no-reverse)."));
   } else if (report.uncovered.length) {
@@ -636,6 +707,21 @@ export function toMarkdown(report: Report): string {
       lines.push(`  - its check: ${componentBits(comp).join(" · ")}`);
       const shipped = comp.surface ? surfaceLine(comp.surface) : undefined;
       if (shipped) lines.push(`  - shipped: ${shipped}`);
+    }
+  }
+
+  const bumps = bumpSummary(report);
+  if (bumps) {
+    lines.push("", "## Dependency bumps", "");
+    lines.push(`${bumps.total} bump claim(s) held against the diff's own pins: ${bumps.counts}.`);
+    if (bumps.lines.length) lines.push("");
+    for (const b of bumps.lines) {
+      const detail = b.observed
+        ? `the note says ${b.claimed}, the diff moves it ${b.observed}`
+        : `the note says ${b.claimed}`;
+      lines.push(
+        `- **${b.name}** — ${detail}${b.file ? ` (\`${b.file}\`)` : ""} — ${BUMP_LABEL[b.status]}`,
+      );
     }
   }
   lines.push("", "## Undocumented changes", "");

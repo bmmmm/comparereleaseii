@@ -594,6 +594,53 @@
     ]
   },
   {
+    "name": "bump-pin-lands-on-claimed-version",
+    "section": "Dependencies",
+    "claim": "chore(deps): bump actions/cache from 5.0.3 to 5.0.4 by @dependabot[bot] in #9668",
+    "hunks": [
+      {
+        "path": ".github/workflows/build.yml",
+        "hunk": "@@ -18,7 +18,7 @@ jobs:\n     steps:\n       - uses: actions/checkout@v6.0.3\n-      - uses: actions/cache@v5.0.3\n+      - uses: actions/cache@v5.0.4\n         with:\n           path: ~/.cache"
+      }
+    ],
+    "expected": [
+      "verified"
+    ],
+    "category": "core"
+  },
+  {
+    "name": "bump-release-overtakes-its-own-note",
+    "section": "Dependencies",
+    "claim": "chore(deps): bump `actions/cache` from 5.0.3 to 5.0.4 by @dependabot[bot] in #9668",
+    "hunks": [
+      {
+        "path": ".github/workflows/build.yml",
+        "hunk": "@@ -18,7 +18,7 @@ jobs:\n     steps:\n       - uses: actions/checkout@v6.0.3\n-      - uses: actions/cache@v4.3.0\n+      - uses: actions/cache@v5.0.5\n         with:\n           path: ~/.cache"
+      }
+    ],
+    "expected": [
+      "verified",
+      "partial"
+    ],
+    "category": "partial"
+  },
+  {
+    "name": "bump-pin-lands-short-of-claimed-version",
+    "section": "Dependencies",
+    "claim": "**[tracing]** Bump DataDog/dd-trace-go/v2 to 2.8.1 (#13530 @kevinpollet)",
+    "hunks": [
+      {
+        "path": "go.mod",
+        "hunk": "@@ -12,7 +12,7 @@ require (\n \tgithub.com/coreos/go-systemd/v22 v22.7.0\n-\tgithub.com/DataDog/dd-trace-go/v2 v2.7.0\n+\tgithub.com/DataDog/dd-trace-go/v2 v2.8.0\n \tgithub.com/docker/docker v29.1.4"
+      }
+    ],
+    "expected": [
+      "contradicted",
+      "partial"
+    ],
+    "category": "core"
+  },
+  {
     "name": "lc-toctou-atomic-update",
     "category": "long-context",
     "padFrom": "toctou-atomic-update",

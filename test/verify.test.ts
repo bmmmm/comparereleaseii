@@ -11,6 +11,7 @@ import {
   medianVerdict,
   resolveVotes,
   verifyClaims,
+  type BumpAnchor,
 } from "../src/verify.ts";
 import { hunkFunctions } from "../src/match.ts";
 import {
@@ -20,10 +21,11 @@ import {
   extractJsonObject,
   selectEngine,
   resolveEngines,
+  type JudgeEngine,
   type JudgeVerdict,
 } from "../src/judge.ts";
 import { withVerdictCache } from "../src/cache.ts";
-import type { Claim, Commit } from "../src/types.ts";
+import type { BumpJoin, Claim, ClaimBump, Commit, PinBump } from "../src/types.ts";
 
 function claim(text: string, prNumbers: number[] = []): Claim {
   return {
@@ -876,4 +878,102 @@ test("the claude-missing fallback refuses to auto-pick from an aggregator", asyn
     process.env.PATH = origPath;
     if (origKey !== undefined) process.env.ANTHROPIC_API_KEY = origKey;
   }
+});
+
+// ---------- the pin anchor ----------
+
+/** A judge that fails the test if anything reaches it. */
+function forbiddenEngine(): JudgeEngine {
+  return {
+    name: "forbidden",
+    async judge(): Promise<string> {
+      throw new Error("a bump claim the pins settle must never reach a judge");
+    },
+  };
+}
+
+function bumpAnchor(status: BumpJoin, claimed: ClaimBump, pin: Partial<PinBump>): Map<number, BumpAnchor> {
+  return new Map([
+    [
+      0,
+      {
+        resolution: { claim: 0, status, claimed, pin: 0 },
+        pin: {
+          name: "actions/cache",
+          from: "4.3.0",
+          to: "5.0.5",
+          file: ".github/workflows/build.yml",
+          firstParty: false,
+          ...pin,
+        },
+      },
+    ],
+  ]);
+}
+
+const BUMP_TEXT = "chore(deps): bump actions/cache from 5.0.3 to 5.0.4 by @dependabot[bot] in #9668";
+const BUMP_CLAIMED: ClaimBump = { name: "actions/cache", from: "5.0.3", to: "5.0.4" };
+
+test("a bump claim the pins settle is answered off the diff, never by a judge", async () => {
+  const data = releaseData([{ path: ".github/workflows/build.yml", patch: "@@ -1 +1 @@\n-a\n+b\n" }]);
+  const opts = {
+    judgeMode: "all" as const,
+    engine: forbiddenEngine(),
+    concurrency: 1,
+    maxHunks: 4,
+    maxEvidenceChars: 4000,
+  };
+
+  // Overtaken: the release aggregates several bumps of the pin and the note
+  // describes one of them. This is the case that used to come back
+  // `contradicted` and floor the release at 35.
+  const [overtaken] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    ...opts,
+    bumps: bumpAnchor("overtaken", BUMP_CLAIMED, {}),
+  });
+  assert.equal(overtaken.verdict, "verified");
+  assert.equal(overtaken.judged, false);
+  assert.ok(overtaken.evidence.methods.includes("pin-anchor"));
+  assert.deepEqual(overtaken.evidence.files, [".github/workflows/build.yml"]);
+  assert.match(overtaken.reasoning, /5\.0\.4.*5\.0\.5|5\.0\.5.*5\.0\.4/s, "both numbers are named");
+
+  const [confirmed] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    ...opts,
+    bumps: bumpAnchor("confirmed", BUMP_CLAIMED, { from: "5.0.3", to: "5.0.4" }),
+  });
+  assert.equal(confirmed.verdict, "verified");
+
+  // The direction that is genuinely wrong stays wrong — and is still
+  // settled deterministically, off the same lines.
+  const [wrong] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    ...opts,
+    bumps: bumpAnchor("contradicted", BUMP_CLAIMED, { from: "5.0.1", to: "5.0.2" }),
+  });
+  assert.equal(wrong.verdict, "contradicted");
+  assert.match(wrong.reasoning, /5\.0\.2/);
+});
+
+test("an unresolved bump claim still takes the ordinary route", async () => {
+  // No pin of that name moved: nothing was settled, so the claim is judged
+  // like any other. The anchor stage must not swallow the whole class.
+  let asked = 0;
+  const engine: JudgeEngine = {
+    name: "counting",
+    async judge(): Promise<string> {
+      asked++;
+      return '{"verdict":"verified","confidence":0.8,"files":[],"reasoning":"the diff carries it"}';
+    },
+  };
+  const data = releaseData([{ path: "src/a.ts", patch: "@@ -1 +1 @@\n-a\n+b\n" }]);
+  const [only] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    judgeMode: "auto",
+    engine,
+    concurrency: 1,
+    maxHunks: 4,
+    maxEvidenceChars: 4000,
+    bumps: new Map(),
+  });
+  assert.equal(asked, 1, "the claim was put to the judge like any other");
+  assert.equal(only.verdict, "verified");
+  assert.equal(only.judged, true);
 });

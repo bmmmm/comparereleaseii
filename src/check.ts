@@ -337,6 +337,11 @@ export async function analyzeRelease(
     linkStyle: link?.style,
   });
   const bumps = resolveBumpClaims(claims, pins);
+  const bumpAnchors = new Map(
+    bumps
+      .filter((b) => b.pin !== undefined)
+      .map((b) => [claims[b.claim].id, { resolution: b, pin: pins[b.pin!] }]),
+  );
 
   const [results, baselineSnapshots] = await Promise.all([
     verifyClaims(data, claims, {
@@ -346,6 +351,7 @@ export async function analyzeRelease(
       concurrency: s.concurrency,
       maxHunks: 6,
       maxEvidenceChars: 20000,
+      bumps: bumpAnchors,
     }),
     baselinePromise,
   ]);

@@ -8,6 +8,7 @@ import type {
   ClaimResult,
   ComponentCheck,
   PinBump,
+  Reconciliation,
   ReleaseSurface,
   Report,
   Unverifiable,
@@ -400,4 +401,83 @@ test("a failed component sub-check renders its actionable error under the pin", 
   const md = toMarkdown({ ...report(null), pins: PINS, components: [failed] });
   assert.match(md, /- sub-check: component load failed: no such tag — tried v7\.2\.0 and 7\.2\.0/);
   assert.doesNotMatch(md, /its check:/);
+});
+
+// ---------- the bump class ----------
+
+const BUMP_PINS: PinBump[] = [
+  {
+    name: "actions/cache",
+    from: "4.3.0",
+    to: "5.0.5",
+    file: ".github/workflows/build.yml",
+    firstParty: false,
+  },
+  {
+    name: "actions/checkout",
+    from: "6.0.2",
+    to: "6.0.3",
+    file: ".github/workflows/build.yml",
+    firstParty: false,
+  },
+];
+
+const BUMP_RECONCILIATION: Reconciliation = {
+  confirmed: [],
+  undocumented: [],
+  unsupported: [],
+  bumps: [
+    {
+      claim: 0,
+      status: "overtaken",
+      claimed: { name: "actions/cache", from: "5.0.3", to: "5.0.4" },
+      pin: 0,
+    },
+    {
+      claim: 1,
+      status: "confirmed",
+      claimed: { name: "actions/checkout", from: "6.0.2", to: "6.0.3" },
+      pin: 1,
+    },
+    { claim: 2, status: "unmatched", claimed: { name: "serde", to: "1.0.200" } },
+  ],
+};
+
+test("bump claims read as one class, and an overtaken line shows both numbers", () => {
+  const r = { ...report(null), pins: BUMP_PINS, reconciliation: BUMP_RECONCILIATION };
+
+  const md = toMarkdown(r);
+  assert.match(md, /## Dependency bumps/);
+  assert.match(md, /3 bump claim\(s\).*1 confirmed, 1 overtaken by the release, 1 no pin of that name/);
+  // The finding a reader wants: what the note said next to what the release did.
+  assert.match(
+    md,
+    /\*\*actions\/cache\*\* — the note says 5\.0\.3 → 5\.0\.4, the diff moves it 4\.3\.0 → 5\.0\.5/,
+  );
+  // A confirmed bump is carried by the count alone — no line of its own.
+  assert.doesNotMatch(md, /actions\/checkout — the note says/);
+
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(" "));
+  };
+  try {
+    printTerminal(r);
+  } finally {
+    console.log = orig;
+  }
+  const out = lines.join("\n");
+  assert.match(out, /Dependency bumps/);
+  assert.match(out, /actions\/cache — the note says 5\.0\.3 → 5\.0\.4, the diff moves it 4\.3\.0 → 5\.0\.5/);
+  assert.match(out, /serde — the note says 1\.0\.200/);
+
+  const html = toHtml(r);
+  assert.match(html, /<h2>Dependency bumps/);
+  assert.match(html, /4\.3\.0 → 5\.0\.5/);
+  assert.match(html, /overtaken/);
+
+  // No bump claims, no section anywhere.
+  assert.doesNotMatch(toMarkdown(report(null)), /Dependency bumps/);
+  assert.doesNotMatch(toHtml(report(null)), /Dependency bumps/);
 });

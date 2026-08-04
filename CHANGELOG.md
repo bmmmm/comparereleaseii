@@ -6,6 +6,59 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **Dependency-bump claims are settled by the diff's own pins, not by a
+  judge.** "Bump `actions/cache` from 5.0.3 to 5.0.4" states a pin and a
+  version; the diff carries the same pin and its own version. The two halves
+  have existed since 0.7.0 and never met. They meet now, deterministically
+  and before any escalation ladder runs, with four outcomes: **confirmed**
+  (the diff lands on the claimed version), **overtaken** (it moves past it —
+  the release aggregates several bumps and the note describes one of them),
+  **contradicted** (the pin lands short or moves the other way), and
+  **unmatched** (no pin of that name moved, or the versions cannot be
+  ordered — the claim then takes the ordinary route). The class reads as one
+  block in every report format, and an overtaken line shows both numbers,
+  the note's and the diff's, because that difference is the finding. The
+  join rides in the `--json` report as `reconciliation.bumps`; claims carry
+  the class itself as `claim.bump`.
+
+  Why it matters, measured on the 80-release corpus: eight of the twelve
+  contradicted claims in it are bump claims, and six of those are notes that
+  say nothing false. Re-checked against the same diffs, seven of the eight
+  are gone — nextcloud/desktop v34.0.0's six become verified (twelve of its
+  thirteen bump claims are settled off the pins), and traefik v2.11.54's
+  reads as overtaken, the release having moved dd-trace-go v2.2.3 → v2.8.2
+  past the 2.8.1 the note names. The eighth survives and is a different
+  problem: in traefik v3.6.25 the diff moves that pin nowhere at all — the
+  module appears only in the CHANGELOG — so nothing is joined, and the judge
+  still answers `contradicted` citing go.mod and go.sum lines that are not
+  in the diff it was shown. That is a judge inventing evidence, not a bump
+  claim being mis-cut, and it is tracked separately in ROADMAP.md.
+
+  The golden set carries the three shapes, and one of them is a finding of
+  its own: `bump-release-overtakes-its-own-note` came back `contradicted`
+  from claude-cli/haiku in four independent calibration runs — this is a
+  reproducible judge failure, not verdict flicker, and it is exactly the
+  class the pin join takes off the judge route. The frozen reference moves
+  to 37/39 (escalate-only) accordingly.
+
+- **Workflow `uses:` refs are version pins.** `pinBumps()` read manifests,
+  Makefiles, Dockerfiles and download URLs but not the one place CI pins
+  live, which is where the corpus's largest bump group sits. A ref pins only
+  when it names a version (`@main` does not); the hardened sha-pinned form
+  bumps by the version in the trailing comment the bumping bot maintains.
+  Actions under `.github/` link to their own release page; under `.gitea/`
+  or `.forgejo/` the forge they resolve to is instance configuration, so
+  those classify and link nothing. One pin moving one way is now one bump
+  however many files repeat it — an action bumped across nine workflows used
+  to fill the pin section nine times over.
+
+- **`pnpm corpus-stats` counts the bump class apart from every other claim.**
+  Its own verdict table, and the contradicted rate of each side next to the
+  other: 106 bump claims across the corpus (3.6 % of 2,911), 7.6 %
+  contradicted against 0.14 % for everything else. Reports written before
+  the class existed are classified from their stored claim text, because the
+  number exists precisely to predate the fix.
+
 - **`pnpm corpus-stats` reads a whole watch home at once.** What one
   operator's accumulated reports say about release notes in general —
   verdict shares, score and coverage distributions, how often each risk
