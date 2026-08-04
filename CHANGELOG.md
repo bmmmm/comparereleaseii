@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.9.0 — 2026-08-04
+
 ### Added
 
 - **Dependency-bump claims are settled by the diff's own pins, not by a
