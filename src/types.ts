@@ -171,6 +171,16 @@ export interface ClaimResult {
    * visible in the report, not only in the reasoning string.
    */
   judgeFailed?: boolean;
+  /**
+   * Every vote the independent verification passes returned, in the order
+   * they came back, when that path ran at all. The default engine is the
+   * `claude` CLI, which exposes no temperature or seed, so the sampling
+   * variance behind a verdict cannot be pinned away — it can only be
+   * recorded. Three identical passes disagreeing is the difference between a
+   * finding and a coin flip, and until this field existed that difference
+   * lived in one anecdote instead of in the data.
+   */
+  votes?: Verdict[];
   /** Auto-generated notes entry (PR-list boilerplate), down-weighted in scoring. */
   generated: boolean;
   /** Changes hidden behind a vague claim (reverse-direction audit). */

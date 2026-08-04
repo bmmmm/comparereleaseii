@@ -188,6 +188,54 @@ test("extractJsonObject reports whether the repair path ran", () => {
   assert.equal(clean.repaired, false);
 });
 
+test("extractJsonObject survives the two shapes that made judge answers unusable", () => {
+  // Measured on a watch home: 22 of 101 releases lost a claim to an
+  // unparseable answer, and the fallback is by construction the milder
+  // reading — so every one of these silently nudged a score upward.
+
+  // A cut landing right after a comma or a key is where a truncated answer
+  // most often stops, and closing brackets alone cannot rescue it.
+  const afterComma = extractJsonObject('{"verdict":"verified","files":["a.go"],') as {
+    verdict: string;
+    files: string[];
+  };
+  assert.equal(afterComma.verdict, "verified");
+  assert.deepEqual(afterComma.files, ["a.go"]);
+
+  const afterKey = extractJsonObject('{"verdict":"verified","confidence":0.85,"reasoning"') as {
+    verdict: string;
+    confidence: number;
+  };
+  assert.equal(afterKey.verdict, "verified");
+  assert.equal(afterKey.confidence, 0.85);
+
+  // A model that answers and then adds a remark containing a brace: the
+  // greedy scan from the last "}" swallows the remark, the object is fine.
+  const withRemark = extractJsonObject(
+    '{"verdict":"partial","confidence":0.5,"files":[],"reasoning":"x"}\n\nNote: run() {} is unchanged.',
+  ) as { verdict: string };
+  assert.equal(withRemark.verdict, "partial");
+
+  // Both are format issues, so calibration still hears about them.
+  const meta = { repaired: false };
+  extractJsonObject('{"verdict":"verified","files":["a.go"],', meta);
+  assert.equal(meta.repaired, true);
+});
+
+test("a malformed answer is quoted head and tail, because the tail is the diagnosis", () => {
+  // Head-only excerpts could not distinguish "the model was cut off" from
+  // "the model wrapped its answer in prose" — the two need opposite fixes,
+  // and only the tail tells them apart.
+  const unrepairable = `{"reasoning":"${"x".repeat(600)}","verdict":verifie`;
+  assert.throws(
+    () => extractJsonObject(unrepairable),
+    (err: Error) =>
+      /\(\d+ chars\)/.test(err.message) &&
+      /…\[\d+ chars\]…/.test(err.message) &&
+      err.message.includes("verifie"),
+  );
+});
+
 test("selectEngine: openai needs an explicit model, then builds the engine", () => {
   assert.throws(() => selectEngine({ engine: "openai" }), /--model/);
   const engine = selectEngine({ engine: "openai", model: "qwen3:8b" });
@@ -709,6 +757,11 @@ test("without an escalation engine a risky 'verified' still gets a second look",
   });
   assert.equal(calls, 3, "two independent passes follow the risky verified");
   assert.equal(r.verdict, "contradicted");
+  // Every vote is kept, not just the one that won. The default engine is the
+  // `claude` CLI, which offers no temperature or seed, so disagreement between
+  // identical passes is the only observable the tool has for how firm a
+  // release-critical verdict actually was.
+  assert.deepEqual(r.votes, ["verified", "contradicted", "contradicted"]);
 
   // A verified on paths nobody is worried about is not re-asked.
   const plain = { ...file, path: "src/ui.rs" };

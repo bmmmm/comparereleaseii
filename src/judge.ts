@@ -36,8 +36,15 @@ export function makeClaudeCliEngine(model: string): JudgeEngine {
 }
 
 export function makeApiEngine(model: string, apiKey: string): JudgeEngine {
+  // The same 1024 that truncated local answers mid-object truncated these,
+  // and the lesson was only ever applied to the OpenAI path. Sampling is
+  // pinned for the same reason it is pinned there: a verdict that decides a
+  // hard cap must not depend on the draw. Both belong in the engine name
+  // because it is part of the cache key — otherwise a budget change keeps
+  // serving the answers the old budget cut off.
+  const maxTokens = 4096;
   return {
-    name: `api/${model}`,
+    name: `api/${model}@${maxTokens}`,
     async judge(prompt: string): Promise<string> {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -48,7 +55,8 @@ export function makeApiEngine(model: string, apiKey: string): JudgeEngine {
         },
         body: JSON.stringify({
           model,
-          max_tokens: 1024,
+          max_tokens: maxTokens,
+          temperature: 0,
           messages: [{ role: "user", content: prompt }],
         }),
       });
@@ -295,32 +303,20 @@ export type JudgeResponse = JudgeVerdict | { need: string[] };
 /** The judge's output was malformed — distinct from engine/transport errors. */
 export class JudgeFormatError extends Error {}
 
-/**
- * Parse a JSON object out of model output, repairing unterminated tails.
- * Small models (Qwen3.5-9B) routinely emit `{"…":"…"` and then stop without
- * the closing braces — close open strings/brackets before giving up.
- * `meta.repaired` reports that the repair path ran: needing it at all is a
- * calibration signal, even when the repair succeeds.
- */
-export function extractJsonObject(raw: string, meta?: { repaired: boolean }): unknown {
-  const start = raw.indexOf("{");
-  if (start === -1) {
-    throw new JudgeFormatError(`output contains no JSON object: ${raw.slice(0, 200)}`);
-  }
-  const end = raw.lastIndexOf("}");
-  if (end > start) {
-    try {
-      return JSON.parse(raw.slice(start, end + 1));
-    } catch {
-      // fall through to repair
-    }
-  }
-  if (meta) meta.repaired = true;
-  const fragment = raw.slice(start);
+/** Where a fragment left off: open string, unclosed brackets, first balanced end. */
+interface Scan {
+  inString: boolean;
+  closers: string;
+  balancedEnd: number;
+}
+
+function scanJson(fragment: string): Scan {
   let inString = false;
   let escaped = false;
+  let balancedEnd = -1;
   const stack: string[] = [];
-  for (const ch of fragment) {
+  for (let i = 0; i < fragment.length; i++) {
+    const ch = fragment[i];
     if (escaped) {
       escaped = false;
       continue;
@@ -336,13 +332,83 @@ export function extractJsonObject(raw: string, meta?: { repaired: boolean }): un
     if (inString) continue;
     if (ch === "{") stack.push("}");
     else if (ch === "[") stack.push("]");
-    else if (ch === "}" || ch === "]") stack.pop();
+    else if (ch === "}" || ch === "]") {
+      stack.pop();
+      if (!stack.length && balancedEnd === -1) balancedEnd = i + 1;
+    }
   }
-  try {
-    return JSON.parse(fragment + (inString ? '"' : "") + stack.reverse().join(""));
-  } catch {
-    throw new JudgeFormatError(`output is not parseable JSON even after repair: ${raw.slice(0, 200)}`);
+  return { inString, closers: [...stack].reverse().join(""), balancedEnd };
+}
+
+/**
+ * Parse a JSON object out of model output, repairing unterminated tails.
+ * Small models (Qwen3.5-9B) routinely emit `{"…":"…"` and then stop without
+ * the closing braces — close open strings/brackets before giving up.
+ * `meta.repaired` reports that the repair path ran: needing it at all is a
+ * calibration signal, even when the repair succeeds.
+ *
+ * Two shapes defeated the naive version, both measured on real runs. A model
+ * that answers correctly and then adds a closing remark containing braces
+ * makes the greedy `lastIndexOf` swallow the remark, so the first balanced
+ * object is tried before any repair. And a cut landing right after a comma or
+ * a key — by far the likeliest place for a truncated answer to stop — leaves a
+ * fragment no amount of closing brackets can rescue, so the unterminated tail
+ * is dropped progressively rather than only closed.
+ */
+export function extractJsonObject(raw: string, meta?: { repaired: boolean }): unknown {
+  const start = raw.indexOf("{");
+  if (start === -1) {
+    throw new JudgeFormatError(`output contains no JSON object: ${excerpt(raw)}`);
   }
+  const end = raw.lastIndexOf("}");
+  if (end > start) {
+    try {
+      return JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      // fall through to the balanced scan, then to repair
+    }
+  }
+  const fragment = raw.slice(start);
+  const { inString, closers, balancedEnd } = scanJson(fragment);
+  if (balancedEnd !== -1 && balancedEnd < fragment.length) {
+    try {
+      const value = JSON.parse(fragment.slice(0, balancedEnd));
+      if (meta) meta.repaired = true;
+      return value;
+    } catch {
+      // fall through to repair
+    }
+  }
+  if (meta) meta.repaired = true;
+  // Longest first: only drop tail the shorter candidate could not have used.
+  const quoted = fragment + (inString ? '"' : "");
+  const candidates = [quoted];
+  const noComma = quoted.replace(/,\s*$/, "");
+  if (noComma !== quoted) candidates.push(noComma);
+  // A dangling `"key":` or `"key"` has no value for the closers to complete.
+  const noKey = noComma.replace(/(?:,\s*)?"(?:[^"\\]|\\.)*"\s*:?\s*$/, "").replace(/,\s*$/, "");
+  if (noKey !== noComma) candidates.push(noKey);
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate + closers);
+    } catch {
+      // next candidate
+    }
+  }
+  throw new JudgeFormatError(
+    `output is not parseable JSON even after repair (${raw.length} chars): ${excerpt(raw)}`,
+  );
+}
+
+/**
+ * Head and tail of a malformed answer. The tail is what diagnoses it — stopping
+ * mid-token means the model was cut off, prose means it wrapped the answer —
+ * and quoting only the head is why these failures were never diagnosable.
+ */
+function excerpt(raw: string, per = 160): string {
+  const text = raw.trim();
+  if (text.length <= per * 2) return text;
+  return `${text.slice(0, per)} …[${text.length - per * 2} chars]… ${text.slice(-per)}`;
 }
 
 export function parseJudgeResponse(raw: string, meta?: { repaired: boolean }): JudgeResponse {

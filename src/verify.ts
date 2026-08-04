@@ -475,6 +475,7 @@ export async function verifyClaims(
         }
         let verdict = response;
         let escalated = false;
+        let cast: JudgeVerdict[] | null = null;
         const severe = verdict.verdict === "no-evidence" || verdict.verdict === "contradicted";
         // A security claim can hide under any section name ("Packaging
         // cleanup"): a "verified" also escalates when the evidence behind it
@@ -525,6 +526,7 @@ export async function verifyClaims(
               // a failed vote simply doesn't count
             }
           }
+          cast = votes;
           verdict = resolveVotes(votes);
         }
         results.set(p.claim.id, {
@@ -540,6 +542,7 @@ export async function verifyClaims(
           },
           reasoning: verdict.reasoning,
           judged: true,
+          ...(cast ? { votes: cast.map((v) => v.verdict) } : {}),
           generated: p.generated,
         });
       } catch (err) {
