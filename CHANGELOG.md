@@ -4,6 +4,64 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **`pnpm mutate-notes` — does the detector catch a release that lies?**
+  `pnpm mutate` mutates this tool's own source and measures the test suite.
+  Nothing measured the detector, which is the thing the product is about:
+  SCORING.md states that "a fabricated release cannot look good by being good
+  at averages", and the only fabricated release in the repo was a four-line
+  fixture no test loaded. The new harness mutates the *notes* of real releases
+  from a watch home and holds the result against what the diff makes true —
+  hide the notes covering a documented high-churn commit, restate a settled
+  dependency bump as a version the release did not reach, restate it as a
+  version the pin never held, plant a claim from a different release of the
+  same repo, fabricate a claim padded with two identifiers the diff happens to
+  contain. Diffs come from the clone cache and notes are rebuilt from stored
+  claims, so it needs no network, and every expectation is settled
+  deterministically, so it needs no key.
+
+  Measured on 51 releases and frozen in `test/eval/reference-detection.json`:
+  omission 29/33, bump-overshoot 21/21, foreign-claim 43/46 — and
+  **bump-undershoot 1/21, backtick-noise 2/51**. Both open holes sit on one
+  bar: two backticked words occurring anywhere in the changed lines score 3
+  each, 6 clears the `>= 5` lexical bar, and clearing it settles a claim
+  `verified` with no judge *and* counts every commit it matches as
+  documented. Undershoot is the same shape in the pin join, which reads any
+  observed version above the claimed one as `overtaken` without checking that
+  the claimed version lies inside the interval the pin traversed. The rates
+  are recorded as measurements, not targets: a run that scores worse than the
+  frozen file fails, and re-freezing is a decision rather than a side effect.
+
+- **Every vote of the independent verification passes is kept on the claim
+  result.** The default engine is the `claude` CLI, which exposes no
+  temperature and no seed, so the sampling variance behind a release-critical
+  verdict cannot be pinned away — only recorded. Three identical passes
+  disagreeing is the difference between a finding and a coin flip, and until
+  now that difference lived in one anecdote instead of in the data.
+
+### Fixed
+
+- **A judge that could not answer was a fifth of a watch home, and the repair
+  was the reason.** Across 101 checked releases, 22 carried a
+  `judge-unavailable` flag; the fallback those take is by construction the
+  milder reading, so each one nudged a score upward with nothing to show why.
+  Three shapes were reproducibly unparseable and none of them was the model's
+  fault: a cut landing right after a comma or a key (where a truncated answer
+  most often stops) left a fragment no amount of closing brackets could
+  rescue, so the unterminated tail is now dropped progressively; and an answer
+  that was complete and then added a remark containing a brace made the greedy
+  scan from the last `}` swallow the remark, so the first balanced object is
+  tried before any repair runs. The failure message now quotes head *and*
+  tail with the length between them — "cut off mid-token" and "wrapped the
+  answer in prose" need opposite fixes and were indistinguishable.
+
+- **The API engine carried the 1024-token budget the OpenAI path already
+  documents as too small**, and neither engine pinned sampling. The budget
+  moves to 4096 and rides in the engine name, because that name is the cache
+  key: otherwise raising it keeps serving the answers the old budget cut off.
+  `temperature: 0` is set wherever the transport allows it.
+
 ## 0.9.0 — 2026-08-04
 
 ### Added
