@@ -417,7 +417,11 @@ word only when its shape says code on its own; `` `language` `` and
 `` `checksum` `` are words. The five that still get through are padded with
 tokens that genuinely are identifier-shaped — `github.com`, `0x0008`, a
 version literal — which is where this route stops being able to answer and
-the judge takes over.
+the judge takes over. The same bar decides which commits a claim documents,
+so completeness moved too, and further than the verdicts did: 6 of 34 control
+runs dropped, `zed@v1.14.2` from 100 to 68. A third of that release's churn
+had been counted as documented because a claim said `` `tab` ``. Scores from
+before and after this change are not comparable.
 
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,

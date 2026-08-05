@@ -88,6 +88,19 @@ All notable changes to comparereleaseii are documented here. The format follows 
   now asked rather than assumed. `test/eval/reference-detection.json` is
   re-frozen on 55 releases, where undershoot also reads 22/22.
 
+  **Completeness moves with it, and further than the verdicts do.** The same
+  bar decides which commits a claim documents, so a word that used to cover
+  a commit no longer does: measured over the harness's 34 control runs, 6
+  releases dropped — `zed@v1.14.2` 100 → 68, `opencloud@v6.2.0` 94 → 45,
+  `nextcloud/desktop@v34.0.0` 32 → 1 on a re-check. That is the same finding
+  from the other side: a third of `zed@v1.14.2`'s churn was counted as
+  documented because a claim said `` `tab` ``. The number was flattering, not
+  right, and the notes it flatters are honest ones — this route cannot tell
+  whether a sentence describes a commit when the only thing they share is an
+  ordinary word, and it used to answer anyway. Scores from before this
+  release are not comparable with the ones after it, and the relative alert
+  needs its three checks again on the repos above.
+
 - **A bump claim naming a version the release never passed through is no
   longer verified.** The pin join read any observed version above the claimed
   one as `overtaken` — the right answer for a per-PR note describing one slice
