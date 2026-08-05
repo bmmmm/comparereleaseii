@@ -61,6 +61,8 @@ import {
   type WatchedEntry,
 } from "./watch-state.ts";
 
+import { acquireStateLock } from "./watch-lock.ts";
+
 import type { PromiseCheck } from "./types.ts";
 import type { CarriedPromise } from "./promises.ts";
 
@@ -449,17 +451,36 @@ async function checkAndRecord(args: {
   return { checked: checkedRelease, promises: report.promises, ec, flagged, drifted, jsonPath };
 }
 
-export async function runWatch(
-  config: WatchConfig,
-  opts: {
-    configPath: string;
-    notify?: string;
-    stateFile?: string;
-    reportsDir?: string;
-    cache: boolean;
-  },
-): Promise<number> {
+interface RunWatchOptions {
+  configPath: string;
+  notify?: string;
+  stateFile?: string;
+  reportsDir?: string;
+  cache: boolean;
+}
+
+/**
+ * A run owns its state file from the first read to the last write. Skipping
+ * is the right answer to a lock someone else holds: the hourly job comes
+ * around again, and a queue of runs stacking up behind a long backfill would
+ * each finish against a state that moved under them.
+ */
+export async function runWatch(config: WatchConfig, opts: RunWatchOptions): Promise<number> {
   validateWatchConfig(config);
+  const { statePath } = resolveWatchPaths(config, opts);
+  const lock = await acquireStateLock(statePath);
+  if (!lock.ok) {
+    console.error(`watch: ${lock.message}`);
+    return 0;
+  }
+  try {
+    return await watchLocked(config, opts);
+  } finally {
+    await lock.release();
+  }
+}
+
+async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<number> {
   resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
   const notifyCmd = opts.notify ?? config.notify;
@@ -767,7 +788,25 @@ export interface BackfillOptions {
  * releases are never re-checked) and silent toward `--notify`: historical
  * alerts are noise, `flagged` stays in the record.
  */
+/** Does this `backfill [repo…]` selector name that entry? */
+const selects = (rc: WatchRepoConfig, sel: string): boolean =>
+  sel === entryKey(rc) || sel === rc.repo || sel === rc.repoUrl;
+
+function assertKnownSelectors(config: WatchConfig, only: string[]): void {
+  for (const sel of only) {
+    if (!config.repos.some((entry) => selects({ ...config.defaults, ...entry }, sel))) {
+      throw new Error(
+        `backfill: "${sel}" is not in the watch config — watched entries: ${config.repos
+          .map((entry) => entryKey({ ...config.defaults, ...entry }))
+          .join(", ")}.`,
+      );
+    }
+  }
+}
+
 export async function runBackfill(config: WatchConfig, opts: BackfillOptions): Promise<number> {
+  // Everything an argument alone can settle is settled before the lock: a
+  // misspelled scope must not be able to interrupt a running check.
   validateWatchConfig(config);
   if ((opts.releases === undefined) === (opts.since === undefined)) {
     throw new Error(
@@ -777,6 +816,21 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
   if (opts.since !== undefined && !/^\d{4}-\d{2}-\d{2}/.test(opts.since)) {
     throw new Error(`--since must be a date like 2024-01-01 (got "${opts.since}").`);
   }
+  assertKnownSelectors(config, opts.only);
+  const { statePath } = resolveWatchPaths(config, opts);
+  const lock = await acquireStateLock(statePath);
+  if (!lock.ok) {
+    console.error(`backfill: ${lock.message}`);
+    return 0;
+  }
+  try {
+    return await backfillLocked(config, opts);
+  } finally {
+    await lock.release();
+  }
+}
+
+async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promise<number> {
   resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
   const historyLimit = config.historyLimit ?? DEFAULT_HISTORY_LIMIT;
@@ -785,20 +839,9 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
   const configured = configuredEntries(config);
   const writeIndex = () => writeIndexFiles(reportsDir, state, configured);
 
-  const matches = (rc: WatchRepoConfig, sel: string) =>
-    sel === entryKey(rc) || sel === rc.repo || sel === rc.repoUrl;
   const entries = config.repos
     .map((entry) => ({ ...config.defaults, ...entry }) as WatchRepoConfig)
-    .filter((rc) => !opts.only.length || opts.only.some((sel) => matches(rc, sel)));
-  for (const sel of opts.only) {
-    if (!config.repos.some((entry) => matches({ ...config.defaults, ...entry }, sel))) {
-      throw new Error(
-        `backfill: "${sel}" is not in the watch config — watched entries: ${config.repos
-          .map((entry) => entryKey({ ...config.defaults, ...entry }))
-          .join(", ")}.`,
-      );
-    }
-  }
+    .filter((rc) => !opts.only.length || opts.only.some((sel) => selects(rc, sel)));
 
   const codes: number[] = [];
   const scope = (rc: WatchRepoConfig) => ({

@@ -62,6 +62,15 @@ The reports directory works the same way: `reportsDir` in the config, or
   The skip is never silent: it is logged, and the release stays listed
   under "Unchecked releases" on the repo's history page — a gap there
   means "unchecked", not "fine".
+- One run at a time per state file. A run takes `<state>.lock` before it
+  reads anything and drops it when it is done; a second run — the hourly job
+  meeting a backfill that is still going — prints who holds the lock and
+  exits 0 without checking anything. Two runs sharing a watch home used to
+  each write a whole state file from the same starting point, and the second
+  one silently dropped what the first had learned. A lock left behind by a
+  crash is taken over automatically: it is honoured only while its process
+  is alive. To work alongside a running check anyway, point `--state` at a
+  copy.
 
 ## Backfill: solve the cold start
 

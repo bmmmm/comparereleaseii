@@ -507,6 +507,24 @@ const MUTANTS: Mutant[] = [
     replace: "return a.endsWith(`/${b}`) || b.endsWith(`/${a}`);",
   },
   {
+    guard: "a state file has one writer at a time",
+    file: "src/watch.ts",
+    find: "  const lock = await acquireStateLock(statePath);\n  if (!lock.ok) {\n    console.error(`watch: ${lock.message}`);\n    return 0;\n  }",
+    replace: "  const lock = { ok: true as const, release: async () => {} };",
+  },
+  {
+    guard: "a lock is removed by its holder, never by whoever came after",
+    file: "src/watch-lock.ts",
+    find: "if (holder && (holder.pid !== mine.pid || holder.startedAt !== mine.startedAt)) return;",
+    replace: "if (false) return;",
+  },
+  {
+    guard: "the lock of a process that no longer exists is taken over",
+    file: "src/watch-lock.ts",
+    find: "    return (err as NodeJS.ErrnoException).code === \"EPERM\";",
+    replace: "    return true;",
+  },
+  {
     guard: "a backticked dictionary word is worth a word, not an identifier",
     file: "src/match.ts",
     find: "return codeSpans.includes(term) && looksLikeIdentifier(term) ? 3 : 2;",

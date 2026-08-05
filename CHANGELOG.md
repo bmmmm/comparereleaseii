@@ -42,6 +42,21 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **Two watch runs sharing a state file no longer overwrite each other.**
+  Every write was atomic, which is a different question: two runs that both
+  read the state and then both write it each produce a whole file, and the
+  second one drops everything the first learned. On 2026-08-04 an hourly job
+  and two backfills shared a watch home and three release records
+  disappeared — the file was never corrupt for a moment, it was written twice
+  from the same starting point. A run now holds `<state>.lock` from the first
+  read to the last write; a second one names the holder and exits 0 without
+  checking anything, because the hourly job comes around again and a queue
+  stacking up behind a long backfill would each finish against a state that
+  moved underneath it. Liveness is the holder's pid, not a timeout: a
+  backfill judging hundreds of releases legitimately runs for hours, and a
+  lock that expires under a working process is worse than none. A lock left
+  by a crash is taken over; one from another machine expires after a day.
+
 - **Backticks around a word no longer buy the evidence to settle a claim.**
   A term found in the diff was worth 3 when the note had wrapped it in
   backticks and 2 otherwise, and the bar that settles a claim `verified` with
