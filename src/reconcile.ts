@@ -24,6 +24,13 @@ import type {
  * diff; a finding is one sentence plus a handful of paths, so the bar
  * here is one code span or two identifiers — strong enough that a single
  * stray token cannot marry a claim to a finding it never described.
+ *
+ * Deliberately without `termWeight`'s discount for backticked dictionary
+ * words: that discount exists because a common word is background noise in a
+ * diff of a thousand files, and a one-sentence finding is not that haystack.
+ * Nor is there anything to defend against here — the note author writes the
+ * claim, but the judge writes the finding, so no markup of theirs can
+ * manufacture the other side of this join.
  */
 const MATCH_BAR = 3;
 

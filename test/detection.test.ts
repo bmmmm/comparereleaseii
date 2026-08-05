@@ -46,19 +46,20 @@ test("the detection reference covers exactly the harness's mutation classes", as
 });
 
 test("the frozen rates are a measurement, not an aspiration", async () => {
-  // Two classes are known open holes, and the reference records them as such
-  // on purpose: freezing 100 % everywhere would turn the yardstick into a
-  // wish and hide the very findings the harness was built to produce. This
-  // test fails when someone "fixes" the reference instead of the detector.
+  // The reference records open holes as such on purpose: freezing 100 %
+  // everywhere would turn the yardstick into a wish and hide the very
+  // findings the harness was built to produce. This test fails when someone
+  // "fixes" the reference instead of the detector.
   const reference = await loadReference();
   for (const [name, { applicable, detected }] of Object.entries(reference.classes)) {
     assert.ok(applicable > 0, `${name} has no applicable cases in the reference`);
     assert.ok(detected <= applicable, `${name} detects more than it applies to`);
   }
-  const noise = reference.classes["backtick-noise"];
+  // The day every class reads perfect there are two possible explanations,
+  // and "the harness stopped asking hard questions" is the likelier one.
+  // Whoever gets there deletes this assertion and says which it was.
   assert.ok(
-    noise.detected / noise.applicable < 0.5,
-    "backtick-noise now detects a majority — that is a real improvement, so re-freeze " +
-      "the reference and delete this assertion along with the hole it guards",
+    Object.values(reference.classes).some(({ applicable, detected }) => detected < applicable),
+    "every mutation class detects everything — the harness has run out of questions",
   );
 });

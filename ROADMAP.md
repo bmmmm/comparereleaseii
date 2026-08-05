@@ -16,11 +16,19 @@
 > (what shipped), SCORING.md (score semantics), AGENTS.md (working
 > rules), docs/ (operations).
 
-## Open (2026-08-04): nothing planned
+## Open (2026-08-05): nothing planned
 
 The bump block closed the last planned question. What is left is the list
 below — settled decisions, kept so they do not get re-litigated. New work
 starts from a fact: an issue, a corpus number, a release that reads wrong.
+
+Both holes `pnpm mutate-notes` found are closed — bump-undershoot 22/22,
+backtick-noise 50/55, re-frozen on 55 releases. The next fact of that kind is
+`omission` at 30/34: hiding the notes of a documented high-churn commit left
+completeness unmoved in four releases, all of them opencloud-eu, one of them
+hiding 29 027 lines behind a single claim (96 → 96, 87 → 87, 95 → 95, 78 →
+78). Whether that is coverage the rest of the notes legitimately earn or a
+denominator that stops noticing at that size is unexamined.
 
 ## Settled — do not reopen without new facts
 

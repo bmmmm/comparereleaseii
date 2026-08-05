@@ -507,6 +507,24 @@ const MUTANTS: Mutant[] = [
     replace: "return a.endsWith(`/${b}`) || b.endsWith(`/${a}`);",
   },
   {
+    guard: "a backticked dictionary word is worth a word, not an identifier",
+    file: "src/match.ts",
+    find: "return codeSpans.includes(term) && looksLikeIdentifier(term) ? 3 : 2;",
+    replace: "return codeSpans.includes(term) ? 3 : 2;",
+  },
+  {
+    guard: "a span too short to discriminate is no identifier",
+    file: "src/match.ts",
+    find: "claim.codeSpans.map((s) => s.trim()).filter((s) => s.length >= 3),",
+    replace: "claim.codeSpans.map((s) => s.trim()),",
+  },
+  {
+    guard: "one hyphen does not make a token code (`well-known` is a word)",
+    file: "src/match.ts",
+    find: "/-.*-/.test(w)",
+    replace: "/-/.test(w)",
+  },
+  {
     guard: "a release stored under both path layouts is one release, not two",
     file: "scripts/corpus-aggregate.ts",
     find: "if (!byRelease.has(key)) byRelease.set(key, r);",

@@ -26,6 +26,12 @@ sha raises a claim's priority for judging and stops there. Only identifiers
 from the claim actually found in the diff (score ≥ 5, the same bar with and
 without an anchor) can settle a claim deterministically — plus
 auto-generated entries, which are true by construction.
+A found term is worth 3 when it is a backticked span whose shape is code on
+its own (`snake_case`, camelCase, a path, a sigil, `cmd-shift-v`, a file
+name, a deep version), and 2 otherwise. The split is there because the
+backticks belong to the author of the notes: marking a dictionary word as
+code must not buy the two of them the bar between them. A span under three
+characters is no identifier at all — `!` is in nearly every diff.
 One class never reaches the judge at all: a **dependency-bump claim** the
 diff's own pin delta answers. "Bump `actions/cache` from 5.0.3 to 5.0.4"
 states a pin and a version, and the diff carries the same pin and its own

@@ -32,21 +32,63 @@ export function tokenize(text: string): string[] {
   return [...out];
 }
 
+/**
+ * A word in prose that could be code: an underscore, a long flag, an internal
+ * capital, a file extension, a deep version. Kept narrow on purpose — this
+ * decides what a sentence is *about*, and free text that mentions "2nd" or
+ * "24h" is not naming a symbol.
+ */
+function proseIdentifier(w: string): boolean {
+  return (
+    /_/.test(w) ||
+    /^--/.test(w) ||
+    /[a-z][A-Z]/.test(w) ||
+    /^[\w-]+\.[a-z]{1,4}$/.test(w) ||
+    // Two-dot versions only: "2026.7.0" is a real anchor, "5.3" (CVSS score,
+    // generic version) matches half the diff by accident.
+    /^\d+\.\d+\.\d+/.test(w)
+  );
+}
+
+/**
+ * A token carrying a mark prose does not — the test a backticked span has to
+ * pass to be worth more than a word. Everything `proseIdentifier` accepts,
+ * plus what only survives inside backticks: a path separator, a sigil
+ * (`$ref`), a digit among letters (`sha256`), a second hyphen (`cmd-shift-v`
+ * is a keybinding, `well-known` is a word — one hyphen decides nothing).
+ */
+export function looksLikeIdentifier(w: string): boolean {
+  return (
+    proseIdentifier(w) ||
+    /[/$@#%:]/.test(w) ||
+    /[A-Za-z]\d|\d[A-Za-z]/.test(w) ||
+    /-.*-/.test(w)
+  );
+}
+
+/**
+ * What a matched term is worth as evidence. Backticks are the note author's
+ * own markup — the input under test — so they cannot buy weight by
+ * themselves: a span earns the higher one when its shape is an identifier,
+ * and a backticked dictionary word counts the same as any other matched word.
+ * Without that split, `language` and `checksum` in backticks were worth 6
+ * between them, which settled a claim nobody wrote as verified.
+ */
+export function termWeight(term: string, codeSpans: string[]): number {
+  return codeSpans.includes(term) && looksLikeIdentifier(term) ? 3 : 2;
+}
+
 /** Terms that look like code identifiers — the high-signal part of a claim. */
 export function extractIdentifiers(claim: Claim): string[] {
-  const ids = new Set<string>(claim.codeSpans.map((s) => s.trim()));
+  // Under three characters a span cannot discriminate: `!` is in nearly every
+  // diff, so finding it there says nothing about this one.
+  const ids = new Set<string>(
+    claim.codeSpans.map((s) => s.trim()).filter((s) => s.length >= 3),
+  );
   const wordRe = /[A-Za-z0-9_.\-]{3,}/g;
   for (const m of claim.text.matchAll(wordRe)) {
     const w = m[0];
-    const isIdent =
-      /_/.test(w) ||
-      /^--/.test(w) ||
-      /[a-z][A-Z]/.test(w) ||
-      /^[\w-]+\.[a-z]{1,4}$/.test(w) ||
-      // Two-dot versions only: "2026.7.0" is a real anchor, "5.3" (CVSS score,
-      // generic version) matches half the diff by accident.
-      /^\d+\.\d+\.\d+/.test(w);
-    if (isIdent && !STOPWORDS.has(w.toLowerCase())) ids.add(w);
+    if (proseIdentifier(w) && !STOPWORDS.has(w.toLowerCase())) ids.add(w);
   }
   return [...ids];
 }
@@ -83,7 +125,7 @@ export function anchorMatch(claim: Claim, commits: Commit[]): AnchorMatch {
 export interface LexicalMatch {
   files: DiffFile[];
   matchedTerms: string[];
-  /** Weighted score: exact code-span hits count 3, other identifiers 2. */
+  /** Weighted score: identifier-shaped code spans count 3, everything else 2. */
   score: number;
 }
 
@@ -156,7 +198,7 @@ export function lexicalMatch(claim: Claim, files: DiffFile[]): LexicalMatch {
         hitFiles.set(file.path, file);
         if (!terms.has(ident)) {
           terms.add(ident);
-          score += claim.codeSpans.includes(ident) ? 3 : 2;
+          score += termWeight(ident, claim.codeSpans);
         }
       }
     }

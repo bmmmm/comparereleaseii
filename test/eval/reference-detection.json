@@ -1,27 +1,27 @@
 {
   "date": "2026-08-05",
-  "releases": 51,
+  "releases": 55,
   "engine": "off (deterministic only)",
   "classes": {
     "omission": {
-      "applicable": 33,
-      "detected": 29
+      "applicable": 34,
+      "detected": 30
     },
     "bump-overshoot": {
-      "applicable": 21,
-      "detected": 21
+      "applicable": 22,
+      "detected": 22
     },
     "bump-undershoot": {
-      "applicable": 21,
-      "detected": 1
+      "applicable": 22,
+      "detected": 22
     },
     "foreign-claim": {
-      "applicable": 46,
-      "detected": 43
+      "applicable": 50,
+      "detected": 50
     },
     "backtick-noise": {
-      "applicable": 51,
-      "detected": 2
+      "applicable": 55,
+      "detected": 50
     }
   }
 }

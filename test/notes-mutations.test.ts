@@ -85,10 +85,10 @@ test("noiseTokens picks diff identifiers no real claim already names", () => {
   assert.deepEqual(headersOnly, []);
 });
 
-test("the fabricated claim is exactly the shape the lexical bar settles", () => {
-  // Two backticked identifiers score 3 each, and 6 clears the >= 5 bar that
-  // settles a claim as verified with no judge involved. If this stops being
-  // true the class stops measuring what it was built to measure.
+test("the fabricated claim still lands in the diff, and no longer settles there", () => {
+  // Both halves matter. The padding has to occur in the changed lines, or the
+  // class would measure nothing but a typo; and it must no longer reach the
+  // >= 5 bar, because two backticked dictionary words are the whole attack.
   const files: DiffFile[] = [
     {
       path: "src/net.rs",
@@ -100,7 +100,14 @@ test("the fabricated claim is exactly the shape the lexical bar settles", () => 
   ];
   const planted = fabricatedClaim(noiseTokens(files, [], 2));
   assert.equal(planted.codeSpans.length, 2);
-  assert.ok(lexicalMatch(planted, files).score >= 5);
+  const lex = lexicalMatch(planted, files);
+  assert.deepEqual(lex.matchedTerms.sort(), ["budget", "retry"]);
+  assert.equal(lex.score, 4);
+
+  // The discount is about the shape of the token, not about ignoring
+  // backticks: padding that is an identifier on its own still scores 3 each.
+  const shaped = fabricatedClaim(["retry_budget", "socket_timeout"]);
+  assert.equal(lexicalMatch(shaped, files).score, 6);
 });
 
 test("restateBumpTarget moves only the target, never the origin", () => {

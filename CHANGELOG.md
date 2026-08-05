@@ -42,6 +42,37 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **Backticks around a word no longer buy the evidence to settle a claim.**
+  A term found in the diff was worth 3 when the note had wrapped it in
+  backticks and 2 otherwise, and the bar that settles a claim `verified` with
+  no judge is 5. So two backticked words — any two, as long as they occur
+  somewhere in the changed lines — settled a claim nobody wrote, and counted
+  every commit they matched as documented. The markup is written by the same
+  hand as the claim it is supposed to support. It cannot be the evidence.
+
+  A span now earns the higher weight only when its shape is code without the
+  backticks: an underscore, an internal capital, a path, a sigil, a digit
+  among letters, a second hyphen (`cmd-shift-v` is a keybinding, `read-only`
+  is a word), a file name, a deep version. And a span under three characters
+  is no identifier at all — `` `!` `` is in nearly every diff, so finding it
+  in this one says nothing about it. What a claim's *prose* contributes is
+  unchanged: this is about what a backtick is worth, not about widening what
+  counts as an identifier.
+
+  `backtick-noise` goes from 2 of 55 applicable releases caught to 50, with
+  no other class regressing. The five survivors are padded with tokens that
+  really are identifier-shaped — `github.com`, `0x0008`, a version literal —
+  which is where the deterministic route runs out and the judge takes over.
+  Admitting hex and keybindings as shapes is what costs the fifth one; it
+  buys back three of the honest claims below, and the trade was made in that
+  direction on purpose: this route decides `verified` without a judge, and
+  the judge is still there for what it declines to settle. The cost
+  is 17 claims across 106 stored reports that read `verified` without a judge
+  and now read `partial`: every one of them rested on common words in
+  backticks (`stderr`, `tab`, `prompt`), and with a judge configured they are
+  now asked rather than assumed. `test/eval/reference-detection.json` is
+  re-frozen on 55 releases, where undershoot also reads 22/22.
+
 - **A bump claim naming a version the release never passed through is no
   longer verified.** The pin join read any observed version above the claimed
   one as `overtaken` — the right answer for a per-PR note describing one slice
@@ -57,11 +88,13 @@ All notable changes to comparereleaseii are documented here. The format follows 
   This is the hole `pnpm mutate-notes` measured into existence one commit
   ago, which is the whole point of having built it: 1 of 6 applicable
   releases caught before, 6 of 6 after, with `bump-overshoot` unchanged at
-  6/6 and no other class moving. Measured over the 12 releases this machine's
-  clone cache can rebuild, not the 51 behind `reference-detection.json` — the
-  comparison is a rate, so it holds, but the frozen reference stays as it is
-  until someone re-measures the full set. Re-freezing on a smaller sample
-  would trade a yardstick for a nicer number. Across 101 checked releases, 22 carried a
+  6/6 and no other class moving. That run covered 12 releases because 12 is
+  the harness's default case limit — not, as this entry first claimed, the
+  most the clone cache could rebuild. Re-measured on the full 55 it holds at
+  22/22 (see the entry below), and the reference is frozen there.
+
+- **A judge that could not answer was a fifth of a watch home, and the repair
+  was the reason.** Across 101 checked releases, 22 carried a
   `judge-unavailable` flag; the fallback those take is by construction the
   milder reading, so each one nudged a score upward with nothing to show why.
   Three shapes were reproducibly unparseable and none of them was the model's

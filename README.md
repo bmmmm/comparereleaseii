@@ -115,7 +115,8 @@ first, an LLM judge only for what remains unclear:
    against the commits in the release range.
 2. **Lexical** — code identifiers extracted from the claim (`code spans`,
    `SCREAMING_CASE`, camelCase, file names, deep versions) are grepped in the
-   changed lines of the diff.
+   changed lines of the diff. A span whose shape is a plain word counts as a
+   word: backticks are the note author's own markup, so they buy no evidence.
 3. **Ranking** — the diff's hunks are ranked against the claim (tiny tf-idf +
    path boost) to select the evidence worth judging.
 4. **LLM judge** — claim + top hunks go to a model which rules `verified` /
@@ -396,29 +397,31 @@ against the clone cache, so it needs no key and no network: every expectation
 below is settled deterministically, and a miss here is a miss no model was
 involved in.
 
-Measured on 51 releases (`test/eval/reference-detection.json`, 2026-08-05):
+Measured on 55 releases (`test/eval/reference-detection.json`, 2026-08-05):
 
 | Mutation | What it does | Detected |
 |---|---|---:|
-| `omission` | drops the notes covering a documented high-churn commit | 29/33 |
-| `bump-overshoot` | restates a settled bump as a version the release did not reach | 21/21 |
-| `bump-undershoot` | restates it as a version the pin never held | **1/21** |
-| `foreign-claim` | plants a claim from a different release of the same repo | 43/46 |
-| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | **2/51** |
+| `omission` | drops the notes covering a documented high-churn commit | 30/34 |
+| `bump-overshoot` | restates a settled bump as a version the release did not reach | 22/22 |
+| `bump-undershoot` | restates it as a version the pin never held | 22/22 |
+| `foreign-claim` | plants a claim from a different release of the same repo | 50/50 |
+| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | 50/55 |
 
-The last row is the finding: two backticked words that occur anywhere in the
-changed lines score 3 each, 6 clears the `>= 5` lexical bar, and clearing that
-bar settles a claim as `verified` without a judge — *and* counts every commit
-it matches as documented. `bump-undershoot` is the same shape one layer down:
-a pin that moved past the claimed version reads as `overtaken`, which is right
-for the case it was built for — a per-PR note describing one slice of an
-aggregated bump — but the rule never checks that the claimed version lies
-inside the interval the pin actually traversed, so "bumped to 0.0.1" verifies
-against a release that moved 10.54.0 → 10.65.0.
+The last two rows were the finding of the previous round, and both are now
+closed. `backtick-noise` read 2/51: two backticked words occurring anywhere in
+the changed lines scored 3 each, 6 cleared the `>= 5` lexical bar, and clearing
+that bar settles a claim as `verified` without a judge — *and* counts every
+commit it matches as documented. The backtick was doing the work, and the note
+author writes the backticks. Now a span is worth more than an ordinary matched
+word only when its shape says code on its own; `` `language` `` and
+`` `checksum` `` are words. The five that still get through are padded with
+tokens that genuinely are identifier-shaped — `github.com`, `0x0008`, a
+version literal — which is where this route stops being able to answer and
+the judge takes over.
 
-Both are open. The reference records them as measured, not as a target: a run
-that scores worse than the frozen file fails, and re-freezing is a decision
-someone makes, not a side effect.
+The reference records rates as measured, not as a target: a run that scores
+worse than the frozen file fails, and re-freezing is a decision someone makes,
+not a side effect. `omission` is the open one at 30/34.
 
 ### Releasing
 

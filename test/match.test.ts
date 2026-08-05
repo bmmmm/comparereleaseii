@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractIdentifiers, anchorMatch, lexicalMatch, rankHunks } from "../src/match.ts";
+import {
+  extractIdentifiers,
+  anchorMatch,
+  lexicalMatch,
+  looksLikeIdentifier,
+  rankHunks,
+} from "../src/match.ts";
 import type { Claim, Commit, DiffFile } from "../src/types.ts";
 
 function claim(text: string, over: Partial<Claim> = {}): Claim {
@@ -70,6 +76,37 @@ test("lexicalMatch finds identifier hits in changed lines", () => {
   assert.equal(m.files.length, 1);
   assert.equal(m.files[0].path, "src/api/icons.rs");
   assert.ok(m.score >= 3);
+});
+
+test("backticks around a dictionary word buy no extra weight", () => {
+  // The bar (>= 5) settles a claim without a judge, and the note author owns
+  // the backticks. Two common words that happen to occur in the diff must
+  // therefore stay under it, while two real identifiers still clear it.
+  const words = claim("Adds `true` and `bool` support", { codeSpans: ["true", "bool"] });
+  assert.equal(lexicalMatch(words, files).score, 4);
+
+  const shaped = claim("Adds `should_block_host` and `Cargo.toml` support", {
+    codeSpans: ["should_block_host", "Cargo.toml"],
+  });
+  assert.equal(lexicalMatch(shaped, files).score, 6);
+
+  // One hyphen decides nothing — prose writes "read-only" too. A second one
+  // is a keybinding, and those are exactly the spans release notes name.
+  assert.equal(looksLikeIdentifier("read-only"), false);
+  assert.equal(looksLikeIdentifier("cmd-shift-v"), true);
+  assert.equal(looksLikeIdentifier("$ref"), true);
+  assert.equal(looksLikeIdentifier("sha256"), true);
+});
+
+test("a span under three characters is not an identifier at all", () => {
+  // `!` occurs in nearly every diff, so finding it in this one is not
+  // evidence — and the terms it would drag in are not the claim's evidence
+  // either.
+  const short = claim("Support search prefixes `!` and `->`", { codeSpans: ["!", "->"] });
+  assert.deepEqual(extractIdentifiers(short), []);
+  const m = lexicalMatch(short, files);
+  assert.equal(m.score, 0);
+  assert.deepEqual(m.files, []);
 });
 
 test("rankHunks prefers path matches over incidental content hits", () => {

@@ -643,9 +643,10 @@ export async function computeCoverage(
   // by naming real components — measured +20 on the negative control. So
   // coverage is earned at the bar the forward direction calls strong
   // evidence: the claim's identifiers demonstrably appear in this commit's
-  // own diff (lexicalMatch ≥ 5 — a code-span hit plus an identifier, or
-  // three identifiers). Changelog files never count inside lexicalMatch,
-  // so notes-only commits cannot cover themselves.
+  // own diff (lexicalMatch ≥ 5 — an identifier-shaped code span plus one
+  // more term, or three terms; backticks around a word buy nothing here
+  // either). Changelog files never count inside lexicalMatch, so notes-only
+  // commits cannot cover themselves.
   const changeClaims = results
     .filter((r) => r.claim.kind === "change" && r.verdict !== "skipped")
     .map((r) => r.claim);
