@@ -16,11 +16,102 @@
 > (what shipped), SCORING.md (score semantics), AGENTS.md (working
 > rules), docs/ (operations).
 
-## Open (2026-08-05): nothing planned
+## Open (2026-08-06): the block that makes running this tool teach it
 
-The bump block closed the last planned question. What is left is the list
-below — settled decisions, kept so they do not get re-litigated. New work
-starts from a fact: an issue, a corpus number, a release that reads wrong.
+New work starts from a fact: an issue, a corpus number, a release that reads
+wrong. Three of those turned into fixes in two days — undershoot, backtick
+weight, and the coverage-union diagnosis below — and every one of them was
+found by running the thing, not by reading it. That is worth building on
+deliberately.
+
+**The line this block does not cross.** What running the tool teaches is
+*where it is wrong* and *where it wastes work*. It never teaches the tool to
+look better. Verdicts, weights and bars stay decided by a person, changed
+with an A/B, and frozen afterwards — a threshold that drifts by itself makes
+every score incomparable with every other and turns the frozen references
+into decoration. Nothing here adjusts a number to improve a score. The gain
+is the opposite: findings the corpus already contains, and judge calls that
+were never needed.
+
+The precedent is the bump block. It did not start as a plan; it started as a
+corpus count — 8 of 12 contradicted claims were dependency bumps — and ended
+as a deterministic rule that is *both* more accurate than the judge on that
+class and free. That is the shape to repeat: measure the corpus, find a class
+the judge is being asked about needlessly or answers badly, settle it
+deterministically, measure again.
+
+### 1. Cut the release (v0.10.0)
+
+Nothing built on 2026-08-05/06 is in effect: the hourly job runs the gh
+extension, which is pinned to v0.9.0. The state lock, the backtick rule and
+the pin-join fixes reach the watch home only through a release and the
+extension's pin. Notes are written; the gate is `pnpm release:prepare`, the
+calibration run, and `pnpm release:publish`.
+
+### 2. Every record says which rules produced it
+
+Completeness moved by up to 50 points today through *correct* fixes. The
+watch state holds records from four scoring generations side by side and
+cannot tell them apart, so the baseline median, the relative alert and the
+drift detection all compare across a discontinuity they cannot see. Put the
+scoring generation into each `RepoState.history` entry and into every report;
+have the dashboard mark a history that spans more than one, and make the
+baseline refuse to average across generations. Until this exists, every
+improvement quietly damages the series it is measured on — including the
+repair in step 6.
+
+### 3. The golden set grows out of the watch home
+
+Today a wrong verdict has no way back into the tool: the issue template ends
+at a human, and every one of the golden cases was invented by hand. Add a way
+to lift a claim out of a stored report with the verdict it *should* have had
+(`--add-golden <report.json> <claim-id> <verdict> [why]`). From then on every
+misjudgement anyone noticed is a regression test, and the judge calibration
+runs against cases that actually occurred. The human decides what is right —
+that is the point, not a limitation.
+
+### 4. Corpus statistics as the source of efficiency
+
+`judgeBalance()` already counts fresh and cached calls per run; nothing looks
+at *what* they were spent on. A re-check of one large release cost 230 fresh
+calls. Extend `pnpm corpus-stats` to break the judge bill down by claim class
+(bump, generated entry, meta, anchored-and-strong, unanchored-lexical) and by
+outcome, so the classes where the judge adds variance instead of evidence
+become visible the way the bump class did. Each one found is a deterministic
+rule that costs nothing and answers better.
+
+### 5. Threshold search as a tool, never as automation
+
+The bars are hand-set constants — `>= 5`, `MATCH_BAR = 3`, the 0.5 file
+majority, `0.25`. Three of them were changed by feel this week and measured
+afterwards. Build a script that sweeps them over the corpus and prints the
+Pareto front: detection rate against golden-set fidelity against judge cost.
+It reports; a person picks the point; the constant stays a constant in the
+source with the measurement in its comment.
+
+### 6. `omission` 30/34 — coverage's fourth route (`FIXME(coverage-union)`)
+
+Diagnosed, not repaired. Wait for step 2, then A/B — landing it in the same
+release as the backtick rule would make the two effects indistinguishable.
+
+### 7. Mutation classes nobody thought of
+
+The harness measures five classes, and those five are the ones someone
+invented. All three holes found so far were the same mistake wearing
+different clothes: a route reading "similar enough" as "supported". Generate
+the lies instead — plausible fabrications from a model, applied to real notes
+— and see which ones survive. Self-testing, not self-tuning.
+
+### 8. A watchdog for silent softening
+
+22 of 101 checked releases carried `judge-unavailable`, and that fallback is
+by construction the milder reading. There is a flag per release and nothing
+that notices a *streak*: three runs in a row judging without a judge is an
+alarm, not a score.
+
+---
+
+### The coverage-union finding in full
 
 Both holes `pnpm mutate-notes` found are closed — bump-undershoot 22/22,
 backtick-noise 50/55, re-frozen on 55 releases. The next one is open and
