@@ -23,12 +23,22 @@ below — settled decisions, kept so they do not get re-litigated. New work
 starts from a fact: an issue, a corpus number, a release that reads wrong.
 
 Both holes `pnpm mutate-notes` found are closed — bump-undershoot 22/22,
-backtick-noise 50/55, re-frozen on 55 releases. The next fact of that kind is
-`omission` at 30/34: hiding the notes of a documented high-churn commit left
-completeness unmoved in four releases, all of them opencloud-eu, one of them
-hiding 29 027 lines behind a single claim (96 → 96, 87 → 87, 95 → 95, 78 →
-78). Whether that is coverage the rest of the notes legitimately earn or a
-denominator that stops noticing at that size is unexamined.
+backtick-noise 50/55, re-frozen on 55 releases. The next one is open and
+diagnosed: `omission` sits at 30/34 because coverage has a fourth route that
+belongs to no claim. `evidenceFiles` is the union over every verified/partial
+claim, and a commit whose files mostly land in that union counts as
+documented. Hiding the notes of a 10 056-line commit in `opencloud@v7.2.0`
+leaves it covered at 144/145 files against a union contributed by 108 claims,
+none of which mentions it; in `v7.1.0` the union that keeps a commit covered
+comes from a single dependabot bump naming `go.mod`. The union grows with the
+notes, so the bigger the release, the less this route can distinguish.
+
+Two candidate repairs, neither obviously right: require the majority to sit
+in *one* claim's evidence (which does nothing for `go.mod`/`go.sum`, since
+every bump touches them), or discount files that many commits in the range
+touch — a manifest is not a fingerprint. Both move completeness across the
+whole corpus, so this needs an A/B, not a patch. The anchor is
+`FIXME(coverage-union)` in `src/verify.ts`.
 
 ## Settled — do not reopen without new facts
 

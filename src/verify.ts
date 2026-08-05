@@ -665,6 +665,18 @@ export async function computeCoverage(
     if (covered.has(commit.sha) || mergeShas.has(commit.sha)) return;
     const files = commitFileLists[i];
     // A commit mostly touching files already cited as evidence counts as covered.
+    //
+    // FIXME(coverage-union): this route is claim-independent — `evidenceFiles`
+    // is the union over every verified/partial claim, so it grows with the
+    // number of claims until it covers commits nothing describes. Measured
+    // 2026-08-06 with `pnpm mutate-notes`: hiding the notes of a 10 056-line
+    // commit in opencloud@v7.2.0 leaves it covered at 144/145 files, and that
+    // union comes from 108 claims, none of which mentions it. It is the reason
+    // 4 of 34 `omission` mutations go unnoticed. Two candidate repairs, both
+    // needing a corpus A/B before anyone believes them: require the majority
+    // to sit in ONE claim's evidence (does nothing for go.mod/go.sum, which
+    // every bump touches), or discount files many commits in the range touch —
+    // a manifest is not a fingerprint. Do not "fix" this by raising 0.5.
     if (files.length) {
       const hit = files.filter((f) => evidenceFiles.has(f.path)).length;
       if (hit / files.length >= 0.5) {
