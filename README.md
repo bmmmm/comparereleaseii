@@ -342,12 +342,12 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-08) |
+| Release | Notes style | Score (validation run, 2026-08-06) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
-| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 90 (solid) |
+| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 95 (solid) |
 | restic v0.19.1 | setext sections, issue anchors, cherry-picks | 89 (solid) |
-| vaultwarden 1.37.0 | generated PR list + handwritten security | 79 (flags a few unprovable claims) |
+| vaultwarden 1.37.0 | generated PR list + handwritten security | 76 (minor gaps — flags a few unprovable claims) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
@@ -418,10 +418,11 @@ word only when its shape says code on its own; `` `language` `` and
 tokens that genuinely are identifier-shaped — `github.com`, `0x0008`, a
 version literal — which is where this route stops being able to answer and
 the judge takes over. The same bar decides which commits a claim documents,
-so completeness moved too, and further than the verdicts did: 6 of 34 control
-runs dropped, `zed@v1.14.2` from 100 to 68. A third of that release's churn
-had been counted as documented because a claim said `` `tab` ``. Scores from
-before and after this change are not comparable.
+so completeness moved too, and further than the verdicts did: of the 34
+releases the harness reports a control completeness for, 6 dropped —
+`zed@v1.14.2` from 100 to 68. A third of that release's churn had been counted
+as documented because a claim said `` `tab` ``. Scores from before and after
+this change are not comparable.
 
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,

@@ -21,17 +21,21 @@ All notable changes to comparereleaseii are documented here. The format follows 
   claims, so it needs no network, and every expectation is settled
   deterministically, so it needs no key.
 
-  Measured on 51 releases and frozen in `test/eval/reference-detection.json`:
-  omission 29/33, bump-overshoot 21/21, foreign-claim 43/46 — and
-  **bump-undershoot 1/21, backtick-noise 2/51**. Both open holes sit on one
-  bar: two backticked words occurring anywhere in the changed lines score 3
-  each, 6 clears the `>= 5` lexical bar, and clearing it settles a claim
-  `verified` with no judge *and* counts every commit it matches as
-  documented. Undershoot is the same shape in the pin join, which reads any
-  observed version above the claimed one as `overtaken` without checking that
-  the claimed version lies inside the interval the pin traversed. The rates
-  are recorded as measurements, not targets: a run that scores worse than the
-  frozen file fails, and re-freezing is a decision rather than a side effect.
+  Its first run measured 51 releases: omission 29/33, bump-overshoot 21/21,
+  foreign-claim 43/46 — and **bump-undershoot 1/21, backtick-noise 2/51**.
+  Those last two are the holes it was built to find, and both sat on one bar:
+  two backticked words occurring anywhere in the changed lines score 3 each,
+  6 clears the `>= 5` lexical bar, and clearing it settles a claim `verified`
+  with no judge *and* counts every commit it matches as documented.
+  Undershoot is the same shape in the pin join, which read any observed
+  version above the claimed one as `overtaken` without checking that the
+  claimed version lies inside the interval the pin traversed. Both are fixed
+  below, and `test/eval/reference-detection.json` is frozen on the 55
+  releases those fixes were re-measured against: omission 30/34,
+  bump-overshoot 22/22, bump-undershoot 22/22, foreign-claim 50/50,
+  backtick-noise 50/55. The rates are recorded as measurements, not targets:
+  a run that scores worse than the frozen file fails, and re-freezing is a
+  decision rather than a side effect.
 
 - **Every vote of the independent verification passes is kept on the claim
   result.** The default engine is the `claude` CLI, which exposes no
@@ -90,11 +94,12 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
   **Completeness moves with it, and further than the verdicts do.** The same
   bar decides which commits a claim documents, so a word that used to cover
-  a commit no longer does: measured over the harness's 34 control runs, 6
-  releases dropped — `zed@v1.14.2` 100 → 68, `opencloud@v6.2.0` 94 → 45,
-  `nextcloud/desktop@v34.0.0` 32 → 1 on a re-check. That is the same finding
-  from the other side: a third of `zed@v1.14.2`'s churn was counted as
-  documented because a claim said `` `tab` ``. The number was flattering, not
+  a commit no longer does: over the 34 releases the harness reports a control
+  completeness for, 6 dropped — `zed@v1.14.2` 100 → 68,
+  `opencloud-eu/opencloud@v6.2.0` 94 → 45, `nextcloud/desktop@v34.0.0` 32 → 1
+  on a re-check. That is the same finding from the other side: a third of
+  `zed@v1.14.2`'s churn was counted as documented because a claim said
+  `` `tab` ``. The number was flattering, not
   right, and the notes it flatters are honest ones — this route cannot tell
   whether a sentence describes a commit when the only thing they share is an
   ordinary word, and it used to answer anyway. Scores from before this
@@ -119,7 +124,7 @@ All notable changes to comparereleaseii are documented here. The format follows 
   6/6 and no other class moving. That run covered 12 releases because 12 is
   the harness's default case limit — not, as this entry first claimed, the
   most the clone cache could rebuild. Re-measured on the full 55 it holds at
-  22/22 (see the entry below), and the reference is frozen there.
+  22/22 (see the backtick entry above), and the reference is frozen there.
 
 - **A judge that could not answer was a fifth of a watch home, and the repair
   was the reason.** Across 101 checked releases, 22 carried a
@@ -140,6 +145,18 @@ All notable changes to comparereleaseii are documented here. The format follows 
   moves to 4096 and rides in the engine name, because that name is the cache
   key: otherwise raising it keeps serving the answers the old budget cut off.
   `temperature: 0` is set wherever the transport allows it.
+
+- **The README's validation table says what the current code produces.** Five
+  published scores are this repo's own claim about its checker, and two of
+  them had drifted: git-cliff v2.13.0 reads 95 where the table said 90 — its
+  dependency bumps have been settled off the diff's pins since 0.9.0, which
+  is exactly the escalation that no longer happens — and vaultwarden 1.37.0
+  reads 76 where it said 79. headscale v0.29.2 holds at 100, restic v0.19.1
+  at 89, and the fabricated negative control at 5 with exit 1: the row whose
+  movement would matter most is the one that did not move. Re-measured
+  2026-08-06 against the current code, because a table this code no longer
+  reproduces is the drift the tool exists to find, and nothing automated
+  catches that one — it takes real judge runs.
 
 ## 0.9.0 — 2026-08-04
 
