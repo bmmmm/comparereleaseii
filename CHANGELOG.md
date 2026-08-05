@@ -42,8 +42,26 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
-- **A judge that could not answer was a fifth of a watch home, and the repair
-  was the reason.** Across 101 checked releases, 22 carried a
+- **A bump claim naming a version the release never passed through is no
+  longer verified.** The pin join read any observed version above the claimed
+  one as `overtaken` — the right answer for a per-PR note describing one slice
+  of a bump the release aggregated, where the claimed version lies *inside*
+  the interval the pin traversed. Below that interval there is no such
+  reading, and nothing checked: "bumped to 0.0.1" verified against a release
+  moving `jest-preset-angular` 10.54.0 → 10.65.0. `overtaken` now requires the
+  claimed version to sit above where the pin started; anything below is
+  `contradicted`, which is what a claim about a move this release never made
+  is. The boundary counts as outside — claiming the version the release
+  started from describes no move either.
+
+  This is the hole `pnpm mutate-notes` measured into existence one commit
+  ago, which is the whole point of having built it: 1 of 6 applicable
+  releases caught before, 6 of 6 after, with `bump-overshoot` unchanged at
+  6/6 and no other class moving. Measured over the 12 releases this machine's
+  clone cache can rebuild, not the 51 behind `reference-detection.json` — the
+  comparison is a rate, so it holds, but the frozen reference stays as it is
+  until someone re-measures the full set. Re-freezing on a smaller sample
+  would trade a yardstick for a nicer number. Across 101 checked releases, 22 carried a
   `judge-unavailable` flag; the fallback those take is by construction the
   milder reading, so each one nudged a score upward with nothing to show why.
   Three shapes were reproducibly unparseable and none of them was the model's

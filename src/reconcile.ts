@@ -7,6 +7,7 @@
 // no I/O, same inputs, same join. Informational, never scored.
 import { extractIdentifiers } from "./match.ts";
 import type {
+  BumpJoin,
   BumpResolution,
   Claim,
   ClaimResult,
@@ -118,9 +119,30 @@ export function resolveBumpClaims(
       out.push({ claim: index, status: "unmatched", claimed });
       return;
     }
+    let status: BumpJoin;
+    if (order === 0) {
+      status = "confirmed";
+    } else if (order < 0) {
+      status = "contradicted";
+    } else {
+      // The release moved the pin past the claimed version — which only reads
+      // as `overtaken` when the claimed version lies inside the interval the
+      // pin actually traversed. That is what a per-PR note describing one
+      // slice of an aggregated bump looks like. Below where the pin started
+      // there is no such reading: the release neither held that version nor
+      // passed through it, so "bumped to 0.0.1" against a 10.54.0 → 10.65.0
+      // move is a claim about some other release. Without this the whole
+      // class was undetectable — `pnpm mutate-notes` caught 1 of 6.
+      const inside = compareVersions(claimed.to, best.from);
+      if (inside === null) {
+        out.push({ claim: index, status: "unmatched", claimed });
+        return;
+      }
+      status = inside > 0 ? "overtaken" : "contradicted";
+    }
     out.push({
       claim: index,
-      status: order === 0 ? "confirmed" : order > 0 ? "overtaken" : "contradicted",
+      status,
       claimed,
       observed: {
         from: best.from,

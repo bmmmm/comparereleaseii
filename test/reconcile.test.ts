@@ -533,3 +533,39 @@ test("the commit retry never overrides what the release diff already settled", a
   assert.equal(dep.status, "confirmed");
   assert.equal(dep.observed?.viaCommit, true);
 });
+
+test("a claimed version below where the pin started is not overtaken — it is wrong", () => {
+  // `overtaken` exists for a per-PR note describing one slice of a bump the
+  // release aggregated, so the claimed version has to lie inside the interval
+  // the pin traversed. Without that bound, any invented version below the
+  // range verified: `pnpm mutate-notes` restates settled bumps as 0.0.1 and
+  // caught 1 of 6 before this.
+  const c = bumpClaim("Update `jest-preset-angular` to 0.0.1", {
+    name: "jest-preset-angular",
+    to: "0.0.1",
+  });
+  const below = resolveBumpClaims([c], [
+    pin({ name: "jest-preset-angular", from: "10.54.0", to: "10.65.0", file: "package.json" }),
+  ]);
+  assert.equal(below[0].status, "contradicted", "0.0.1 is nowhere in 10.54.0 → 10.65.0");
+
+  // The boundary itself: claiming the version the release started from
+  // describes no move this release made.
+  const atStart = bumpClaim("Update `foo` to 1.0.0", { name: "foo", to: "1.0.0" });
+  const startCase = resolveBumpClaims([atStart], [
+    pin({ name: "foo", from: "1.0.0", to: "2.0.0", file: "package.json" }),
+  ]);
+  assert.equal(startCase[0].status, "contradicted");
+
+  // And the case the rule was built for still reads as overtaken: inside the
+  // interval, one slice of an aggregated bump.
+  const inside = bumpClaim("bump `foo` from 1.2.0 to 1.5.0", {
+    name: "foo",
+    from: "1.2.0",
+    to: "1.5.0",
+  });
+  const insideCase = resolveBumpClaims([inside], [
+    pin({ name: "foo", from: "1.0.0", to: "2.0.0", file: "package.json" }),
+  ]);
+  assert.equal(insideCase[0].status, "overtaken");
+});

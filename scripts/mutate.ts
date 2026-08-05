@@ -483,6 +483,12 @@ const MUTANTS: Mutant[] = [
     replace: 'resolution.status === "unmatched"',
   },
   {
+    guard: "overtaken needs the claimed version inside the interval the pin traversed",
+    file: "src/reconcile.ts",
+    find: 'status = inside > 0 ? "overtaken" : "contradicted";',
+    replace: 'status = "overtaken";',
+  },
+  {
     guard: "a release overtaking its own bump note is never read as a contradiction",
     file: "src/reconcile.ts",
     find: '? "overtaken"',
