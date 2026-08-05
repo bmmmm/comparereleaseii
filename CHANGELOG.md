@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.10.0 — 2026-08-06
+
 ### Added
 
 - **`pnpm mutate-notes` — does the detector catch a release that lies?**
