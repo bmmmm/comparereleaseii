@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { runWatch, runBackfill, sanitizeTag, validateWatchConfig } from "../src/watch.ts";
+import {
+  nothingNewMessage,
+  runWatch,
+  runBackfill,
+  sanitizeTag,
+  validateWatchConfig,
+} from "../src/watch.ts";
 import { toWatchIndexHtml, toWatchAtomFeed } from "../src/watch-index.ts";
 import { runNotify } from "../src/util.ts";
 import {
@@ -104,6 +110,32 @@ test("pickNewReleases: tagPattern keeps non-matching tags out entirely", () => {
   // countSkipped counts only what would have been checked.
   assert.equal(countSkipped(releases, "2026-05-01T00:00:00Z", { tagPattern: "^v\\d", cap: 1 }), 1);
   assert.equal(countSkipped(releases, "2026-05-01T00:00:00Z", { cap: 1 }), 3);
+});
+
+// A typo'd tagPattern looks exactly like a quiet repo — nothing matches,
+// nothing is new — and a watch run that prints "up to date" for both leaves the
+// mistake running for weeks. Telling them apart is the only reason this line
+// exists, and nothing pinned it: the diagnosis could have been deleted whole
+// and every test still passed.
+test("a tagPattern that matches nothing says so instead of 'up to date'", () => {
+  const releases = [rel("2026.2", "2026-02-01T00:00:00Z"), rel("2026.1", "2026-01-01T00:00:00Z")];
+
+  const typo = nothingNewMessage("o/r", { repo: "o/r", tagPattern: "^v\\d" }, releases, null);
+  assert.match(typo, /no release tag matches tagPattern/);
+  assert.ok(typo.includes(JSON.stringify("^v\\d")), `the pattern itself must be quoted back: ${typo}`);
+
+  // A pattern that does match, with nothing newer than the cursor: really up to date.
+  assert.match(
+    nothingNewMessage("o/r", { repo: "o/r", tagPattern: "^20" }, releases, "2026.2"),
+    /up to date \(2026\.2\)/,
+  );
+  // No pattern, no releases — a repo that has never published is not a typo.
+  assert.match(nothingNewMessage("o/r", { repo: "o/r" }, [], null), /up to date \(no releases\)/);
+  // A pattern is only suspect when there is something for it to have matched.
+  assert.match(
+    nothingNewMessage("o/r", { repo: "o/r", tagPattern: "^v\\d" }, [], null),
+    /up to date \(no releases\)/,
+  );
 });
 
 test("pickBackfillReleases: tagPattern scopes the backfill the same way", () => {

@@ -480,6 +480,73 @@ export async function runWatch(config: WatchConfig, opts: RunWatchOptions): Prom
   }
 }
 
+/**
+ * The poll: one release listing per repo, from whichever API the entry names.
+ * It stays one call either way — a repoUrl entry's clone happens only once a
+ * new release is actually there to check. The forge listing rides along
+ * because preparing that clone can reuse it.
+ *
+ * Throws with a message naming the repo's own problem; the caller decides what
+ * a repo that cannot be polled does to the run.
+ */
+async function listRepoReleases(
+  rc: WatchRepoConfig,
+): Promise<{ releases: ReleaseInfo[]; forge: ForgeListing | null }> {
+  if (rc.repoUrl) {
+    const forge = await fetchForgeReleases(parseRepoUrl(rc.repoUrl)!);
+    if (!forge) {
+      throw new Error(
+        `no Forgejo/Gitea or GitLab release API answered for ${rc.repoUrl} — watch polls the ` +
+          "release list, so it needs one. A private repo needs FORGEJO_TOKEN/GITEA_TOKEN or " +
+          `GITLAB_TOKEN exported; a host without the API can still be checked one-off with --repo-url.`,
+      );
+    }
+    return {
+      forge,
+      releases: forge.releases.map((r) => ({
+        tag: r.tag_name,
+        publishedAt: r.published_at ?? null,
+        prerelease: r.prerelease,
+        draft: r.draft,
+      })),
+    };
+  }
+  const raw = await ghApi<
+    Array<{ tag_name: string; published_at: string | null; prerelease: boolean; draft: boolean }>
+  >(`repos/${assertRepoSlug(rc.repo!)}/releases?per_page=30`);
+  return {
+    forge: null,
+    releases: raw.map((r) => ({
+      tag: r.tag_name,
+      publishedAt: r.published_at,
+      prerelease: r.prerelease,
+      draft: r.draft,
+    })),
+  };
+}
+
+/**
+ * What to print for a repo with nothing new. "Up to date" must not paper over
+ * a pattern that matches nothing — a typo'd tagPattern looks exactly like a
+ * quiet repo otherwise.
+ */
+export function nothingNewMessage(
+  key: string,
+  rc: WatchRepoConfig,
+  releases: ReleaseInfo[],
+  lastTag: string | null,
+): string {
+  const patternMatchesNothing =
+    rc.tagPattern != null &&
+    releases.length > 0 &&
+    !releases.some((r) =>
+      eligibleRelease(r, { includePrerelease: rc.includePrerelease, tagPattern: rc.tagPattern }),
+    );
+  return patternMatchesNothing
+    ? `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`
+    : `${key}: up to date (${lastTag ?? "no releases"})`;
+}
+
 async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<number> {
   resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
@@ -503,37 +570,10 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
       lastTag: null,
       history: [],
     };
-    // The poll stays one API call per repo either way; a repoUrl entry's
-    // clone happens only once a new release is actually there to check.
     let releases: ReleaseInfo[];
-    let forge: ForgeListing | null = null;
+    let forge: ForgeListing | null;
     try {
-      if (rc.repoUrl) {
-        forge = await fetchForgeReleases(parseRepoUrl(rc.repoUrl)!);
-        if (!forge) {
-          throw new Error(
-            `no Forgejo/Gitea or GitLab release API answered for ${rc.repoUrl} — watch polls the ` +
-              "release list, so it needs one. A private repo needs FORGEJO_TOKEN/GITEA_TOKEN or " +
-              `GITLAB_TOKEN exported; a host without the API can still be checked one-off with --repo-url.`,
-          );
-        }
-        releases = forge.releases.map((r) => ({
-          tag: r.tag_name,
-          publishedAt: r.published_at ?? null,
-          prerelease: r.prerelease,
-          draft: r.draft,
-        }));
-      } else {
-        const raw = await ghApi<
-          Array<{ tag_name: string; published_at: string | null; prerelease: boolean; draft: boolean }>
-        >(`repos/${assertRepoSlug(rc.repo!)}/releases?per_page=30`);
-        releases = raw.map((r) => ({
-          tag: r.tag_name,
-          publishedAt: r.published_at,
-          prerelease: r.prerelease,
-          draft: r.draft,
-        }));
-      }
+      ({ releases, forge } = await listRepoReleases(rc));
     } catch (err) {
       console.error(`${key}: listing releases failed — ${(err as Error).message}`);
       codes.push(2);
@@ -546,19 +586,7 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
       cap,
     });
     if (!fresh.length) {
-      // "Up to date" must not paper over a pattern that matches nothing —
-      // a typo'd tagPattern looks exactly like a quiet repo otherwise.
-      const patternMatchesNothing =
-        rc.tagPattern != null &&
-        releases.length > 0 &&
-        !releases.some((r) =>
-          eligibleRelease(r, { includePrerelease: rc.includePrerelease, tagPattern: rc.tagPattern }),
-        );
-      console.error(
-        patternMatchesNothing
-          ? `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`
-          : `${key}: up to date (${repoState.lastTag ?? "no releases"})`,
-      );
+      console.error(nothingNewMessage(key, rc, releases, repoState.lastTag));
       state.repos[key] = repoState;
       continue;
     }
