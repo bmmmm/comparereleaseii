@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.10.1 — 2026-08-06
+
 ### Fixed
 
 - **A release the tool could not fully read no longer scores better for it.**
