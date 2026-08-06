@@ -55,26 +55,40 @@ baseline refuse to average across generations. Until this exists, every
 improvement quietly damages the series it is measured on — including the
 repair in step 5.
 
-**Measured 2026-08-06, and smaller than it reads above.** v0.9.0 against
-v0.10.0, `--judge off --baseline 0`, on the newest checked release of each of
-the 15 watched repos: **14 are bit-identical in all three components.** One
-moves — `zed@v1.14.2`, 77 → 45 — and the reason is not the component the
-entry names. Completeness falls 100 → 68, which costs 8 points of a weighted
-score; what actually moves it is that 12 undocumented commits become 57, and
-that turns a `undocumented-sensitive` warn into a **critical** flag, which
-caps the release at 45. A critical flag is an unconditional alert in
-`isFlagged()` — it never consults the baseline at all.
+**Measured 2026-08-06 — the discontinuity this entry is built on is not
+there.** v0.9.0 against v0.10.0, `--judge off --baseline 0`, every release in
+every watched repo's baseline window: **90 pairs, 80 bit-identical in all
+three components.** Nine of the thirteen medians move by exactly 0; the four
+that move go 74 → 69, 32 → 30, 31 → 30, 67 → 66. `SCORE_DROP` is 20. Nothing
+in the baseline, the relative alert or the drift detector can see a shift
+that small, so the premise — records from several generations dragging the
+median across a break — measures as false on this corpus.
 
-So the damage is not the false alert this entry implies. That alert is
-*correct*: those 45 commits really are undocumented, and the old rule counted
-them as covered because a claim said `` `tab` ``. The damage is that the
-operator reads it against a median of 95 that a different rule produced, and
-that `segmentPhases()` will open a phase with reason `level-shift` — the tool
-asserting zed changed its note culture on the day this repo changed its
-measuring stick. `PHASE_SHIFT` is 20, the same magnitude, so the long view
-mislabels every generation boundary as an event in the repo. That is a fourth
-consumer this entry does not list, and it is the one that states a falsehood
-rather than merely comparing across a gap.
+What is real: alerts go from 16 to 19, and all three additions are
+`zed@v1.12.0`, `zed@v1.14.2` and `sniffnet@v1.5.0`. In each one the alert bar
+is *identical* on both sides (53 → 53, 12 → 12) and only the critical-flag
+count moves (0 → 1, 0 → 1, 0 → 3). They fire through `isFlagged()`'s
+unconditional branch, which never consults the baseline at all — and they are
+*correct*: those commits really are undocumented, and the old rule counted
+them as covered because a claim said `` `tab` ``.
+
+So the damage is not a false alert. It is that the operator reads a correct
+alert against a median a different rule produced — and that `segmentPhases()`
+will open a phase with reason `level-shift`, the tool asserting zed changed
+its note culture on the day this repo changed its measuring stick.
+`PHASE_SHIFT` is 20, the same magnitude, so the long view mislabels a
+generation boundary as an event in the repo. That consumer is not in the list
+above, and it is the only one that states something false rather than
+comparing across a gap it cannot see. Build this for the long view first;
+the baseline can wait for a rule change that actually moves a median.
+
+One measurement note, because it cost a wrong conclusion first: the A/B's own
+first pass ran twelve workers in parallel, tripped GitHub's rate limit, and
+produced a `sniffnet@v1.5.1` reading of +15 that was pure artefact — the fix
+in 0.10.1 is that a release the tool could not fully read now reports
+completeness as unknown instead of better. Re-measured serially, that release
+is bit-identical. Any future A/B here must filter runs carrying load warnings
+before it counts anything.
 
 Design note for whoever builds it: the generation must be an explicit
 constant, not `VERSION`. The cache is keyed by tool version and over-keying
