@@ -116,6 +116,12 @@ const MUTANTS: Mutant[] = [
     replace: "false)",
   },
   {
+    guard: "a verified on overlap-only evidence is reviewed, never one model's word",
+    file: "src/verify.ts",
+    find: "    (identifierOnly ||",
+    replace: "    (false ||",
+  },
+  {
     guard: "a verified resting on identifier overlap alone still costs a judge call",
     file: "src/verify.ts",
     find: "route.identifierOnly)",

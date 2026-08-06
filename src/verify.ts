@@ -558,12 +558,27 @@ async function reviewSevere(
  * under any section name ("Packaging cleanup"), and the rubber stamp is the
  * most expensive verdict to get wrong: it used to be the one nobody looked at
  * twice.
+ *
+ * `identifierOnly` joins that list because the deterministic pass knew nothing
+ * about those claims beyond "the words appear somewhere", so a single model
+ * vote is the whole judgement. Measured on the sniffnet v1.4.1 inversion, four
+ * runs of the same prompt and engine: three answered `contradicted`, one
+ * answered `verified` — and only that one ended the question, because a lone
+ * `verified` was never reviewed. The judge could read the sentence; it just
+ * did not have to be right the first time.
  */
-function needsSecondLook(claim: Claim, verdict: JudgeVerdict, evidencePaths: string[]): boolean {
+function needsSecondLook(
+  claim: Claim,
+  verdict: JudgeVerdict,
+  evidencePaths: string[],
+  identifierOnly: boolean,
+): boolean {
   if (verdict.verdict === "no-evidence" || verdict.verdict === "contradicted") return true;
   return (
     verdict.verdict === "verified" &&
-    (isSecuritySensitive(claim) || evidencePaths.some((path) => sensitiveCategory(path) !== null))
+    (identifierOnly ||
+      isSecuritySensitive(claim) ||
+      evidencePaths.some((path) => sensitiveCategory(path) !== null))
   );
 }
 
@@ -698,7 +713,7 @@ export async function verifyClaims(
           ...verdict.files,
           ...p.evidence.files,
         ];
-        if (needsSecondLook(p.claim, verdict, evidencePaths)) {
+        if (needsSecondLook(p.claim, verdict, evidencePaths, p.identifierOnly)) {
           const review = await reviewSevere(
             engine,
             opts.escalateEngine,

@@ -116,37 +116,58 @@ reads the sentence — `judgeMode: auto` never asks about a claim the
 deterministic pass already called verified. It is the same mistake the other
 three holes were, found by a class nobody would have written.
 
-**Half of it is closed (2026-08-07), and the half that is left moved house.**
-The route is repaired: a `verified` resting on identifier overlap alone is no
-longer settled deterministically, it buys the claim a judge call
-(`identifierOnly` in `src/verify.ts`). Overlap cannot see negation, so it was
-never entitled to end the question. Measured on the 108-release corpus: 61
-claims of 5013 take that branch newly, roughly 3 % on top of 1924 judged. The
-five deterministic detection rates do not move — they are measured judge-off,
-where nothing routes anywhere — and `--judge off` stays bit-identical.
+**Closed 2026-08-07, and it took two repairs, neither of them the one this
+entry proposed.** `pnpm mutate-notes --generate --no-cache` now reads
+`inverted-claim 1/1`.
 
-What that did **not** do is catch the survivor, and this is the finding:
+The first repair is the routing one: a `verified` resting on identifier
+overlap alone is no longer settled deterministically, it buys the claim a judge
+call (`identifierOnly` in `src/verify.ts`). Overlap cannot see negation, so it
+was never entitled to end the question. Measured on the 108-release corpus: 61
+claims of 5013 take that branch newly.
 
-    haiku    "Fix support…" → "Break support…"                  → verified
-    sonnet   the field rename reversed (country_code → country) → verified
+**That alone did not catch it, and what it exposed is the more useful half.**
+With the claim finally in front of a model, the model kept answering
+`verified` — until the run was repeated. Four runs of the same prompt and the
+same engine on `sniffnet@v1.4.1`:
 
-Both readings are now made by a model that was handed the diff, and both are
-wrong. The claim's parenthetical (*"the most recent version renamed the
-`country` field to `country_code`"*) describes the diff correctly whichever way
-the sentence is flipped, and the judge settles on the half it can confirm. So
-the open question is no longer routing or the lexical bar — the
-`lexical-bar` sweep (`pnpm sweep`, 2026-08-06) already showed raising it costs
-six of 28 detections — it is that **a claim is judged as a whole while its
-truth lives in one clause**. Whoever picks this up starts at the prompt in
-`src/judge.ts`, not at a threshold, and the cheap first probe is whether asking
-about the leading assertion separately from its justification changes either
-verdict above.
+    contradicted · contradicted · contradicted · verified
 
-One correction to the entry this replaces: it priced the repair off
-`anchored-strong` (5.6 % of the bill). That is the wrong class — the sniffnet
-claim names no commit, so it is `unanchored-lexical` (2.7 %). The number that
-actually governs is the 61 above, which spans both classes and is countable
-from any watch home.
+The judge could read the sentence. It just did not have to be right the first
+time, because a lone `verified` was never reviewed — `needsSecondLook` asked
+for more votes on severe verdicts and on sensitive paths, and an overlap-only
+claim has neither. One lucky pass ended the question. So the second repair
+gives that class the second look: three votes and the median, exactly where the
+deterministic pass knew nothing beyond "the words appear somewhere". Re-measured
+after it, three runs, first vote shown:
+
+    [verified, contradicted, contradicted] → contradicted
+    [verified, contradicted, contradicted] → contradicted
+    [contradicted, verified, contradicted] → contradicted
+
+Twice the first vote was the one that used to settle it.
+
+Two things this cost, both worth stating. It buys up to two extra calls per
+overlap-only `verified` — an upper bound of roughly 8 % on top of 1924 judged
+if every one of the 61 comes back verified, not separately measured. And the
+prompt is untouched, so the entry this replaces was wrong about where to look:
+it priced the repair off `anchored-strong` (5.6 % of the bill), while the
+sniffnet claim names no commit and is `unanchored-lexical` (2.7 %) — and the
+answer was in neither class but in the review policy.
+
+**A trap this left behind.** Measuring a ladder fix with `--generate` needs
+`--no-cache`. The model writes the same inversion for the same claim, so the
+prompt and the cache key are identical between runs, while a change to routing
+or to the second look changes neither — the pre-fix `verified` came straight
+back out of the cache and the repaired ladder read as still broken. Same run
+with `--no-cache`: 1/1. The note now sits at the top of `scripts/mutate-notes.ts`.
+
+**Still open, and separate.** The judge's own reasoning in the caught runs
+leans on the linked commit's subject ("the commit message states 'fix
+support'…") rather than on the diff. It reaches the right verdict here, but a
+note and a commit message come from the same hand — the settled entry below
+says only the diff is evidence, and `buildJudgePrompt` carries a `COMMITS`
+block with no rule against using it that way. Worth its own measurement.
 
 ---
 

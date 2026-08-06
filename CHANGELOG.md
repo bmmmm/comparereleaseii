@@ -150,12 +150,25 @@ All notable changes to comparereleaseii are documented here. The format follows 
   the only one of the five carrying such claims (two), re-measured with a judge
   at 100, and the other four carry none.
 
-  **The survivor this was found by is still open, and it moved.** With the
-  route repaired, a model reads the sentence and still gets it wrong — haiku
-  passes the "Break support" inversion, sonnet passes a version that reverses
-  the field rename itself. The parenthetical describes the diff correctly
-  either way, and the judge settles on the half it can confirm. That is a
-  prompt question now, not a routing one; ROADMAP.md carries it.
+- **A `verified` on that evidence is never one model's word.** Routing the
+  claim to a judge was not enough on its own: the model kept answering
+  `verified` until the run was repeated. Four runs of the same prompt and
+  engine on the sniffnet inversion came back `contradicted` three times and
+  `verified` once — and only the `verified` ended the question, because
+  `needsSecondLook` asked for more votes on severe verdicts and on sensitive
+  paths, and an overlap-only claim has neither. One lucky pass settled it.
+
+  That class now gets the second look it was missing: three votes and the
+  median, exactly where the deterministic pass knew nothing beyond "the words
+  appear somewhere". Re-measured after the change, three runs, first vote
+  shown: `[verified, …] → contradicted`, `[verified, …] → contradicted`,
+  `[contradicted, …] → contradicted` — twice the first vote was the one that
+  used to settle it. `pnpm mutate-notes --generate --no-cache` reads
+  `inverted-claim 1/1`, so the survivor that motivated all of this is caught.
+
+  The cost is up to two extra calls per overlap-only `verified`, an upper
+  bound of ~8 % on top of the 1924 already judged. The judge prompt is
+  untouched.
 
 - **`mutate-notes` priced the judge bill off a copy of the routing rule, and
   the copy went stale.** `wouldReachJudge` mirrored `verifyClaims` by hand, so

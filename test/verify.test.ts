@@ -627,6 +627,27 @@ test("identifier overlap alone buys a reading, not a verified verdict", async ()
     assert.equal(result.verdict, "partial");
   }
 
+  // And a `verified` on this evidence is never one model's word. Four runs of
+  // the real sniffnet inversion split 3 contradicted / 1 verified, and only
+  // the lone verified ended the question — a single vote was the judgement
+  // exactly where the deterministic pass knew nothing.
+  {
+    const votes = ["verified", "contradicted", "contradicted"];
+    let call = 0;
+    const engine = {
+      name: "splitting",
+      judge: async () => {
+        const v = votes[Math.min(call++, votes.length - 1)];
+        return `{"verdict":"${v}","confidence":1,"files":[],"reasoning":"vote"}`;
+      },
+    };
+    const [result] = await verifyClaims(data, [spanned(inverted)], {
+      judgeMode: "auto", engine, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+    });
+    assert.equal(call, 3, "a verified on overlap-only evidence must be reviewed, not taken");
+    assert.equal(result.verdict, "contradicted");
+  }
+
   // With no judge the deterministic contract stands: same input, same output
   // as before — the fallback still reads verified, and says so on overlap.
   const [deterministic] = await verifyClaims(data, [spanned(inverted)], {

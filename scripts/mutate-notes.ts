@@ -50,6 +50,14 @@
 // clears on them, and the claim is settled before the sentence is ever read —
 // the same mistake again, found by a class nobody would have written.
 //
+// Measuring a fix to the ladder with --generate needs --no-cache, and this is
+// not the usual "verify parser changes" caveat. The model tends to write the
+// SAME inversion for the same claim, so the prompt — and with it the cache key
+// — is identical across runs, while a change to routing or to the second look
+// changes neither. On 2026-08-07 that served the pre-fix `verified` back and
+// the repaired ladder read as still broken; --no-cache turned the same run
+// from 0/1 detected into 1/1.
+//
 // Diffs come from the clone cache and notes are rebuilt from the claims the
 // stored reports carry, so a run needs no network. The rebuild normalises
 // headings and bullet syntax; control and mutant are built the same way, so
