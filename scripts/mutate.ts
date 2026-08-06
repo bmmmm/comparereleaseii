@@ -112,8 +112,8 @@ const MUTANTS: Mutant[] = [
   {
     guard: "a local primary's verified on sensitive evidence paths escalates",
     file: "src/verify.ts",
-    find: "evidencePaths.some((path) => sensitiveCategory(path) !== null));",
-    replace: "false);",
+    find: "evidencePaths.some((path) => sensitiveCategory(path) !== null))",
+    replace: "false)",
   },
   {
     guard: "fenced code blocks never become claims",
@@ -311,7 +311,7 @@ const MUTANTS: Mutant[] = [
   {
     guard: "a phase opens only on a score shift past the threshold",
     file: "src/watch-longview.ts",
-    find: "if (Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",
+    find: "if (sameStick && Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",
     replace: "if (false) {",
   },
   {
@@ -497,8 +497,8 @@ const MUTANTS: Mutant[] = [
   {
     guard: "a bump claim the pins settle never reaches a judge",
     file: "src/verify.ts",
-    find: "    const bump = opts.bumps?.get(claim.id);\n    if (bump?.observed) {",
-    replace: "    const bump = opts.bumps?.get(claim.id);\n    if (false && bump?.observed) {",
+    find: "    const settledBump = bump && settleBump(claim, bump, anchors);\n    if (settledBump) {",
+    replace: "    const settledBump = bump && settleBump(claim, bump, anchors);\n    if (false && settledBump) {",
   },
   {
     guard: "an overtaken bump claim is verified, not contradicted",
