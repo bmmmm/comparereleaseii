@@ -9,7 +9,7 @@ import { safeSegment } from "./paths.ts";
 import { esc } from "./util.ts";
 import { CLASS_COLOR, scoreClass } from "./theme.ts";
 import { STALE_AFTER } from "./promises.ts";
-import { longviewSections } from "./watch-longview.ts";
+import { GENERATION_UNRECORDED, generationRuns, longviewSections } from "./watch-longview.ts";
 import type { ReportNav } from "./html.ts";
 import type { PromiseCheck } from "./types.ts";
 import {
@@ -146,6 +146,29 @@ function scoreChart(history: CheckedRelease[], level: number | null, root: strin
     )
     .join("");
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Trust score per release">${grid}${median}${line}${dots}${labels}</svg>`;
+}
+
+/**
+ * The mark a score series carries when it spans more than one scoring
+ * generation. The chart draws every check as one continuous line whatever
+ * produced it, so without this the reader takes a step at a boundary for the
+ * repo's doing — it is this tool's. Empty for the ordinary case of one
+ * generation, which is what a series should be.
+ */
+function generationNote(history: CheckedRelease[]): string {
+  const runs = generationRuns(history);
+  const distinct = new Set(runs.map((r) => r.generation)).size;
+  if (distinct < 2) return "";
+  const spans = runs
+    .map(
+      (r) =>
+        `${r.generation === GENERATION_UNRECORDED ? "unmarked" : `gen ${r.generation}`}: ` +
+        `${r.from} … ${r.to} (${r.checks} check${r.checks === 1 ? "" : "s"})`,
+    )
+    .join(" · ");
+  return `<p class="note">&#9888; this series spans ${distinct} scoring generations${
+    runs.length > distinct ? ` in ${runs.length} stretches` : ""
+  } — ${esc(spans)}. Scores from different generations were produced by different rules and are not directly comparable; a step at a boundary is this tool changing, not the repo. &ldquo;unmarked&rdquo; means the check predates the marker.</p>`;
 }
 
 /** Verdict composition per release — status-colored stacked counts, aligned
@@ -425,7 +448,7 @@ ${
     : ""
 }
 <h2>Trust score over time <span class="note">— dots open that release&#39;s report; red ring = flagged</span></h2>
-${scoreChart(history, level, root)}
+${generationNote(history)}${scoreChart(history, level, root)}
 <h2>Verdicts per release <span class="note">— claim verdict composition of each check</span></h2>
 ${verdictChart(history, root)}
 ${longviewSections(rs, root)}

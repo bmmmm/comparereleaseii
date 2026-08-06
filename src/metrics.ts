@@ -28,6 +28,35 @@ import {
   opacityIssue,
 } from "./deps.ts";
 
+/**
+ * Which set of rules produced a score. Bump it by hand whenever a change can
+ * move a score for input that did not change — the weights and caps here, the
+ * coverage routes in `verify.ts`, the pin join in `reconcile.ts`. Records
+ * carrying different generations were measured with different sticks, and the
+ * consumers that would otherwise read the difference as the repo's doing
+ * consult this: the long view refuses to open a `level-shift` phase across a
+ * boundary, and the history page marks a series that spans one.
+ *
+ * Explicitly NOT `VERSION`. The cache is keyed by tool version and over-keying
+ * there costs only judge calls; over-keying the record would empty the
+ * baseline every release, and with `BASELINE_MIN_CHECKS = 3` each one would
+ * leave three checks with no relative alert at all. Most releases change
+ * nothing about scoring, and this must stay put for those.
+ *
+ * The baseline median, the relative alert and the drift detector deliberately
+ * do NOT read it. Measured 2026-08-06 over 90 release pairs (v0.9.0 vs
+ * v0.10.0): 80 were bit-identical in all three components, and the four
+ * medians that moved moved by 5, 2, 1 and 1 points — far under `SCORE_DROP`
+ * of 20. Nothing there can see a shift that small, so the cost of keying them
+ * is real and the gain is not.
+ *
+ * 1 — the first generation to carry a marker at all: everything up to and
+ * including the bump-claim coverage fix (a bump claim documents the commits
+ * that move the pin it names). A record without the field predates the
+ * marker; `GENERATION_UNRECORDED` is how the long view spells that.
+ */
+export const SCORING_GENERATION = 1;
+
 const CI_BUILD =
   /(^|\/)\.(github|gitlab|circleci|woodpecker)\/|(^|\/)(Dockerfile[^/]*|Makefile|justfile|build\.rs|setup\.py|\.pre-commit-config\.yaml|Jenkinsfile)$|\.(gradle|cmake)$/i;
 // `token(?!i[sz])` keeps token/tokens/token_store but not tokenize(r) —

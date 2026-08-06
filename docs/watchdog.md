@@ -130,6 +130,15 @@ not, when did it change?" is a regime question no score line answers.
   event instead of splitting the history. Per phase: period, releases,
   score median with range, identities and top share, cadence, issues, and
   what opened it — the transitions carry the information.
+
+  A level shift is only read as the repo's doing when both sides were scored
+  by the same rules. Every check records its **scoring generation**, and a
+  shift across a generation boundary opens no phase: at that boundary the
+  measuring stick moved, and saying otherwise would state something false
+  about the project. The other three reasons read authorship and dates, which
+  no scoring change touches, so they still fire. The score chart above marks a
+  series that spans more than one generation and names where the boundaries
+  are — see [SCORING.md](../SCORING.md#scoring-generations).
 - **Event log** lists what stood out across the record: critical flags,
   level shifts, top-author changes, broken promises, and a first-seen
   identity immediately authoring half a release or more. Facts only, each

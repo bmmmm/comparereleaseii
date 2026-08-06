@@ -540,6 +540,13 @@ export interface Report {
   /** Diff was incomplete (API caps) — external consumers need not string-match warnings. */
   truncated: boolean;
   engine: string;
+  /**
+   * Which set of scoring rules produced these numbers (`SCORING_GENERATION`
+   * in `src/metrics.ts`). Absent in reports written before the marker existed
+   * — a score from one generation is not comparable with a score from
+   * another, and without this nobody can tell which is which after the fact.
+   */
+  scoringGeneration?: number;
   /** Web URL prefix for commit links, e.g. https://github.com/o/r — optional. */
   linkBase?: string;
   /** URL path dialect: GitLab spells commit/compare routes with a `/-/`. */

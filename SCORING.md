@@ -291,3 +291,42 @@ says "unknown", not "fine".
 Scores are comparable across repos, but the baseline block in the report
 (median churn and note coverage of the repo's own previous releases) is the
 better calibration for "is this normal *here*?".
+
+## Scoring generations
+
+Every rule on this page can be wrong, and fixing one moves scores for input
+that did not change. Two such fixes moved completeness by up to 50 points in a
+single day — correctly, both times. That leaves a reader of a score series
+with a question the numbers alone cannot answer: did the repo change, or did
+the measuring stick?
+
+So every report and every watch record carries a **scoring generation** — the
+constant `SCORING_GENERATION` in `src/metrics.ts`, bumped by hand whenever a
+change can move a score for unchanged input. It is deliberately not the tool
+version: most releases change nothing about scoring, and a generation that
+moved every release would empty the series it exists to protect.
+
+Two numbers are comparable when they carry the same generation. Two consumers
+act on that:
+
+- The **long view** refuses to open a `level-shift` phase across a generation
+  boundary. Its threshold is the same magnitude as the alert's, so without
+  this it would assert — as a fact about the repo — that the project changed
+  its note culture on the day this tool changed its rules. Phases opened by
+  authorship, concentration or cadence are untouched: no scoring change can
+  move those.
+- The **history page** marks a score series that spans more than one
+  generation, and names where the boundaries are. The chart draws every check
+  as one continuous line whatever produced it.
+
+The baseline median, the relative alert and the drift detector deliberately do
+**not** read the generation. Measured over 90 release pairs across two
+versions, 80 were bit-identical in all three components and the four medians
+that moved moved by 5, 2, 1 and 1 points — far below the 20-point drop those
+three react to. Keying them on the generation would empty each repo's series
+at every bump and leave the next three checks with no relative alert at all,
+which is a real cost against a difference none of them can see.
+
+A record without a generation predates the marker. That is its own
+generation, not a wildcard: those numbers were produced by different rules
+too.

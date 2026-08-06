@@ -16,7 +16,7 @@ import { anchorMatch } from "./match.ts";
 import { pooled } from "./util.ts";
 import { verifyClaims, computeCoverage } from "./verify.ts";
 import { suggestNotes } from "./suggest.ts";
-import { authorActivity, computeMetrics } from "./metrics.ts";
+import { authorActivity, computeMetrics, SCORING_GENERATION } from "./metrics.ts";
 import { checkPromises, type CarriedPromise } from "./promises.ts";
 import { pinBumps } from "./pins.ts";
 import { releaseSurface } from "./substance.ts";
@@ -434,6 +434,7 @@ export async function analyzeRelease(
     warnings: data.warnings,
     truncated: data.truncated ?? false,
     engine: s.engine ? s.engine.name : "off (deterministic only)",
+    scoringGeneration: SCORING_GENERATION,
     linkBase: link?.base,
     linkStyle: link?.style,
     promises: promises.length ? promises : undefined,

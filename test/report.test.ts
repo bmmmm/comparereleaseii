@@ -649,3 +649,30 @@ test("the baseline and the repo context reach all three renderers", () => {
     assert.doesNotMatch(text, /^Repo: /m, `${label} printed an empty repo line`);
   }
 });
+
+// A score is only comparable with a score the same rules produced. Two
+// reports side by side are the ordinary way that comparison happens, and
+// without the generation on the page the reader has no way back to which
+// rules made which number — the report file outlives the release that wrote it.
+test("the scoring generation reaches all three renderers", () => {
+  const r: Report = { ...report(null), scoringGeneration: 7 };
+  for (const [label, text] of [
+    ["terminal", terminalOf(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    assert.match(text, /scoring generation 7/, `${label} drops the scoring generation`);
+  }
+
+  // A report from before the marker existed claims no generation rather than
+  // inventing one — "generation 0" would be a fact nobody recorded.
+  const old = report(null);
+  assert.equal(old.scoringGeneration, undefined);
+  for (const [label, text] of [
+    ["terminal", terminalOf(old)],
+    ["markdown", toMarkdown(old)],
+    ["html", toHtml(old)],
+  ] as Array<[string, string]>) {
+    assert.doesNotMatch(text, /scoring generation/, `${label} invented a generation`);
+  }
+});

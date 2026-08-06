@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   collectEvents,
+  generationRuns,
   segmentPhases,
   selectEvents,
   longviewSections,
@@ -56,6 +57,87 @@ test("a stable series is one phase; a confirmed level shift opens a second", () 
   assert.equal(shifted[1].start, 10, "the phase opens where the level moved");
   assert.equal(shifted[1].reasons[0].kind, "level-shift");
   assert.match(shifted[1].reasons[0].text, /fell: 90 → 50/);
+});
+
+// PHASE_SHIFT and SCORE_DROP are the same magnitude, and a correct scoring
+// fix moved completeness by up to 50 points in one day. Without this the long
+// view states, as a fact about the repo, that its note culture changed on the
+// day this tool changed its measuring stick — the one consumer that asserts
+// something false rather than comparing across a gap it cannot see.
+test("a level shift across a scoring-generation boundary opens no phase", () => {
+  const scores = [...Array(10).fill(90), ...Array(10).fill(50)];
+  const gen = (i: number, score: number, g: number) =>
+    check(i, score, { scoringGeneration: g });
+
+  // Same series, same shift — but the second half was scored by other rules.
+  const acrossBoundary = scores.map((s, i) => gen(i, s, i < 10 ? 1 : 2));
+  const phases = segmentPhases(acrossBoundary);
+  assert.equal(phases.length, 1, "a measuring-stick change is not a regime change");
+
+  // The identical series inside ONE generation still splits — the guard must
+  // not have silently disabled level-shift detection altogether.
+  const oneGeneration = scores.map((s, i) => gen(i, s, 1));
+  const split = segmentPhases(oneGeneration);
+  assert.equal(split.length, 2);
+  assert.equal(split[1].reasons[0].kind, "level-shift");
+
+  // A record written before the marker existed is its own generation: the
+  // boundary between "unmarked" and generation 1 is exactly the release that
+  // introduced the marker, and it is a real boundary.
+  const markerAppeared = scores.map((s, i) =>
+    i < 10 ? check(i, s) : gen(i, s, 1),
+  );
+  assert.equal(segmentPhases(markerAppeared).length, 1, "unmarked is a generation too");
+
+  // Authorship and dates are untouched by a scoring change, so those reasons
+  // must survive a boundary — suppressing everything would hide real regimes.
+  const authored = (name: string) => ({ total: 3, new: 0, top1Share: 0.6, top1Name: name });
+  const handover = Array.from({ length: 16 }, (_, i) =>
+    check(i, 90, {
+      scoringGeneration: i < 8 ? 1 : 2,
+      authors: authored(i < 8 ? "Alice" : "Mallory"),
+    }),
+  );
+  const handoverPhases = segmentPhases(handover);
+  assert.equal(handoverPhases.length, 2, "a top-author change still opens a phase");
+  assert.equal(handoverPhases[1].reasons[0].kind, "top-change");
+});
+
+test("the history page marks a series that spans more than one generation", () => {
+  const oneGeneration = series(Array(6).fill(90)).map((h) => ({
+    ...h,
+    scoringGeneration: 1,
+  }));
+  assert.deepEqual(
+    generationRuns(oneGeneration).map((r) => r.generation),
+    [1],
+  );
+  const plain = toRepoDetailHtml({ key: "o/r", repo: "o/r" }, state(oneGeneration), 90, "t");
+  assert.doesNotMatch(plain, /scoring generation/i, "one generation needs no warning");
+
+  const mixed = series(Array(6).fill(90)).map((h, i) => ({
+    ...h,
+    scoringGeneration: i < 3 ? 1 : 2,
+  }));
+  assert.deepEqual(generationRuns(mixed), [
+    { generation: 1, from: "v0", to: "v2", checks: 3 },
+    { generation: 2, from: "v3", to: "v5", checks: 3 },
+  ]);
+  const html = toRepoDetailHtml({ key: "o/r", repo: "o/r" }, state(mixed), 90, "t");
+  assert.match(html, /spans 2 scoring generations/, "the series says it is not one measurement");
+  assert.match(html, /gen 1: v0 … v2/, "…and names where the boundary is");
+
+  // A backfill after a bump inserts a newly-scored old release among older
+  // records — three stretches, two generations, and the page says both.
+  const interleaved = series(Array(6).fill(90)).map((h, i) => ({
+    ...h,
+    scoringGeneration: i === 2 ? 2 : 1,
+  }));
+  assert.equal(generationRuns(interleaved).length, 3);
+  assert.match(
+    toRepoDetailHtml({ key: "o/r", repo: "o/r" }, state(interleaved), 90, "t"),
+    /spans 2 scoring generations in 3 stretches/,
+  );
 });
 
 test("a single outlier release is an event, not a regime change", () => {

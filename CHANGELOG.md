@@ -4,6 +4,28 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **Every report and every watch record says which scoring rules produced
+  it.** A correct fix to the scoring rules moves scores for releases that did
+  not change — twice this week, by up to 50 points. The watch state then holds
+  numbers from before and after the fix side by side with no way to tell them
+  apart, and the consumer that suffers most is not the alert (measured over 90
+  release pairs, 80 were bit-identical and no median moved by more than 5
+  points, far under the 20-point drop that alerts). It is the long view, which
+  would open a phase labelled `level-shift` at the boundary — the tool
+  asserting that a watched project changed its note culture on the day this
+  repo changed its measuring stick.
+
+  Reports now carry `scoringGeneration`, a hand-bumped constant that is
+  explicitly not the tool version, and so do the records `watch` writes. The
+  long view refuses to open a `level-shift` phase across a generation
+  boundary; phases opened by authorship, concentration or cadence still do,
+  since no scoring change can move those. The history page marks a score
+  series that spans more than one generation and names where the boundaries
+  are. The baseline, the relative alert and the drift detector deliberately do
+  not read it — see SCORING.md for the measurement that decided that.
+
 ### Fixed
 
 - **The Markdown report carries the baseline and the repo context, like the

@@ -125,6 +125,18 @@ export function baselineLine(report: Report): string | null {
     : null;
 }
 
+/**
+ * Which scoring generation produced these numbers, as every renderer names it
+ * — or null for a report written before the marker existed. A score is only
+ * comparable with another score from the same generation, and that is exactly
+ * the fact a reader holding two reports side by side cannot otherwise recover.
+ */
+export function scoringGenerationLabel(report: Report): string | null {
+  return report.scoringGeneration === undefined
+    ? null
+    : `scoring generation ${report.scoringGeneration}`;
+}
+
 /** What kind of repo this is — languages, size, how often it ships. */
 export function contextLine(report: Report): string | null {
   const ctx = report.metrics.context;
@@ -357,7 +369,8 @@ export function printTerminal(report: Report): void {
       c.dim(
         `(${stats.commits} commits, ${stats.files} files, +${stats.additions}/−${stats.deletions})`,
       ) +
-      `\n${c.dim(`judge engine: ${report.engine}`)}\n`,
+      `\n${c.dim(`judge engine: ${report.engine}`)}` +
+      `${scoringGenerationLabel(report) ? c.dim(` · ${scoringGenerationLabel(report)}`) : ""}\n`,
   );
 
   const note = unverifiableNote(report);
@@ -642,7 +655,8 @@ export function toMarkdown(report: Report): string {
   const lines: string[] = [
     `# Release-note fact check: ${report.repoLabel} ${report.baseRef} → ${report.headRef}`,
     "",
-    `Judge engine: \`${report.engine}\` · ${report.stats.commits} commits, ${report.stats.files} files, +${report.stats.additions}/−${report.stats.deletions}`,
+    `Judge engine: \`${report.engine}\` · ${report.stats.commits} commits, ${report.stats.files} files, +${report.stats.additions}/−${report.stats.deletions}` +
+      (scoringGenerationLabel(report) ? ` · ${scoringGenerationLabel(report)}` : ""),
     "",
     `**Trust score: ${s.overall}/100 (${s.label})** — correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
     "",

@@ -118,6 +118,13 @@ export interface CheckedRelease {
   /** Absent in state files written before the field existed. */
   components?: { correctness: number; completeness: number | null; risk: number };
   /**
+   * Which set of scoring rules produced this score (`SCORING_GENERATION`).
+   * Absent in records written before the marker existed — the long view
+   * spells that `GENERATION_UNRECORDED` and treats it as its own generation,
+   * because it is: those records were measured with a different stick.
+   */
+  scoringGeneration?: number;
+  /**
    * Set when the release's claims could not be checked against this repo's
    * own diff. Without it the index cannot tell a fork/docs-only release from
    * a repo whose notes genuinely stopped matching its code.

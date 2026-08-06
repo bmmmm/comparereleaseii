@@ -53,6 +53,59 @@ export interface Phase {
   reasons: PhaseReason[];
 }
 
+/**
+ * The generation of a record written before the marker existed. Zero rather
+ * than "unknown" on purpose: such a record WAS produced by a different set of
+ * rules than generation 1, so for every comparison here it is its own
+ * generation — treating it as "matches whatever it is next to" would hide the
+ * one boundary this whole mechanism exists to see.
+ */
+export const GENERATION_UNRECORDED = 0;
+
+const generation = (h: CheckedRelease): number =>
+  h.scoringGeneration ?? GENERATION_UNRECORDED;
+
+/**
+ * The generation a stretch of checks was scored under, or null when the
+ * stretch itself spans more than one — a median over mixed generations is not
+ * a level, so a comparison against it cannot be attributed to the repo.
+ */
+function generationOf(checks: CheckedRelease[]): number | null {
+  const gens = new Set(checks.map(generation));
+  return gens.size === 1 ? [...gens][0] : null;
+}
+
+/** One run of consecutive checks scored under the same generation. */
+export interface GenerationRun {
+  generation: number;
+  /** Tags of the first and last check of the run, in history order. */
+  from: string;
+  to: string;
+  checks: number;
+}
+
+/**
+ * The history split into runs of one scoring generation each. More than one
+ * run means the series compares numbers that different rules produced —
+ * which is a fact about this tool, not about the repo, and the page that
+ * draws the series has to say so. Interleaving is real and stays visible: a
+ * backfill run after a bump inserts newly-scored old releases chronologically
+ * among the records of the generation before it.
+ */
+export function generationRuns(history: CheckedRelease[]): GenerationRun[] {
+  const runs: GenerationRun[] = [];
+  for (const h of history) {
+    const last = runs[runs.length - 1];
+    if (last && last.generation === generation(h)) {
+      last.to = h.tag;
+      last.checks++;
+    } else {
+      runs.push({ generation: generation(h), from: h.tag, to: h.tag, checks: 1 });
+    }
+  }
+  return runs;
+}
+
 function median(nums: number[]): number | null {
   if (!nums.length) return null;
   const s = [...nums].sort((a, b) => a - b);
@@ -107,9 +160,19 @@ function breakReasons(
   ahead: CheckedRelease[],
 ): { reasons: PhaseReason[]; offset: number } {
   const reasons: PhaseReason[] = [];
-  const medCur = median(cur.slice(-5).map((h) => h.score))!;
+  const winCur = cur.slice(-5);
+  const medCur = median(winCur.map((h) => h.score))!;
   const medAhead = median(ahead.map((h) => h.score))!;
-  if (Math.abs(medAhead - medCur) >= PHASE_SHIFT) {
+  // A score level can only move for the repo's reasons when both sides were
+  // measured with the same stick. Across a scoring-generation boundary the
+  // move is this tool changing, and `PHASE_SHIFT` is the same magnitude as
+  // the relative alert's `SCORE_DROP` — so without this guard the long view
+  // states, as a fact about the repo, that its note culture changed on the
+  // day the measuring stick did. The other three reasons read authorship and
+  // dates, which no scoring change touches; they stay live across a boundary.
+  const sameStick =
+    generationOf(winCur) !== null && generationOf(winCur) === generationOf(ahead);
+  if (sameStick && Math.abs(medAhead - medCur) >= PHASE_SHIFT) {
     reasons.push({
       kind: "level-shift",
       text: `score level ${medAhead > medCur ? "rose" : "fell"}: ${Math.round(medCur)} → ${Math.round(medAhead)}`,

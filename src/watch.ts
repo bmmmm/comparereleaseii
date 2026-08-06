@@ -459,6 +459,9 @@ async function checkAndRecord(args: {
       completeness: report.metrics.scores.completeness,
       risk: report.metrics.scores.risk,
     },
+    ...(report.scoringGeneration !== undefined
+      ? { scoringGeneration: report.scoringGeneration }
+      : {}),
     exitCode: ec,
     criticalFlags: critical,
     flagCount: report.metrics.flags.length,

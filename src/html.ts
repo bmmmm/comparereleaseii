@@ -12,6 +12,7 @@ import {
   findingTagger,
   lensFindings,
   pinDisplayName,
+  scoringGenerationLabel,
   topLanguages,
   uncoveredInOrder,
   unverifiableNote,
@@ -663,7 +664,9 @@ ${
   nav
     ? `<p class="sub"><a href="${esc(nav.historyHref)}">&larr; this repo's history</a> · <a href="${esc(nav.indexHref)}">all watched repos</a></p>\n`
     : ""
-}<div class="sub">${esc(report.baseRef)} → ${esc(report.headRef)} · ${report.stats.commits} commits · ${report.stats.files} files · +${report.stats.additions}/−${report.stats.deletions} · judge: ${esc(report.engine)}</div>
+}<div class="sub">${esc(report.baseRef)} → ${esc(report.headRef)} · ${report.stats.commits} commits · ${report.stats.files} files · +${report.stats.additions}/−${report.stats.deletions} · judge: ${esc(report.engine)}${
+  scoringGenerationLabel(report) ? ` · ${esc(scoringGenerationLabel(report)!)}` : ""
+}</div>
 
 <div class="cards">
   ${scoreRing(s.overall, s.label)}

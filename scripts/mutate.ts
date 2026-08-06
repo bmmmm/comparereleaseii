@@ -38,6 +38,12 @@ const MUTANTS: Mutant[] = [
     replace: "bumpClaims.length > 0",
   },
   {
+    guard: "a level shift across a scoring-generation boundary is not the repo's doing",
+    file: "src/watch-longview.ts",
+    find: "if (sameStick && Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",
+    replace: "if (Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",
+  },
+  {
     guard: "a release the tool could not fully read reports completeness as unknown",
     file: "src/metrics.ts",
     find: "if (coverage && coverage.unreadableShas.size === 0) {",
