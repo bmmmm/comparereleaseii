@@ -20,6 +20,9 @@ import {
   pickBackfillReleases,
   isFlagged,
   hasDrifted,
+  hasSoftened,
+  alertDecision,
+  judgeSofteningStreak,
   releaseWebUrl,
   scoreBaseline,
   baselineLevel,
@@ -288,6 +291,63 @@ test("toWatchIndexHtml marks a score the check could not fully see", () => {
   assert.ok(html.includes("Partial-clone fallback failed"), "the title carries the reason");
 });
 
+// The dashboard's whole job is "which repo needs a look today", and a repo
+// whose judge stopped answering looks better than one whose judge works —
+// the deterministic fallback is the milder reading. Without the mark, the
+// row that most needs a look is the one that looks fine.
+test("toWatchIndexHtml marks a repo whose judge stopped answering, and the feed says which claims fell back", () => {
+  const silent = [1, 2, 3].map((i) => {
+    const h = checked(`v${i}`, 90, false);
+    h.checkedAt = `2026-07-2${i}T00:00:00Z`;
+    h.unjudged = 4;
+    return h;
+  });
+  const working = checked("w1", 90, false);
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "silent/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v3",
+        latest: silent[2],
+        history: silent,
+      },
+      "working/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "w1",
+        latest: working,
+        history: [working],
+      },
+    },
+  };
+  const html = toWatchIndexHtml(state, "2026-07-26T00:00:00Z");
+  assert.equal(html.match(/class="incomplete"/g)?.length, 1, "only the silent repo is marked");
+  assert.ok(html.includes("3 checks unjudged"), "the badge counts the streak");
+
+  const feed = toWatchAtomFeed(state, "2026-07-26T00:00:00Z");
+  assert.match(
+    feed,
+    /4 claim\(s\) judged by the deterministic fallback/,
+    "a feed reader told only the score is told the flattering half",
+  );
+
+  // Two outages are not a streak — the bar is three, and a repo that had one
+  // bad night must not carry an alarm.
+  const twice = silent.slice(0, 2);
+  const short: WatchState = {
+    version: 1,
+    repos: {
+      "silent/repo": {
+        lastPublishedAt: "2026-07-20T00:00:00Z",
+        lastTag: "v2",
+        latest: twice[1],
+        history: twice,
+      },
+    },
+  };
+  assert.doesNotMatch(toWatchIndexHtml(short, "t"), /checks unjudged/);
+});
+
 test("toWatchIndexHtml gives an unverified score its own bucket, not the same as a genuine mid score", () => {
   const capped = checked("v2", 65, false);
   capped.scoreLabel = "unverified";
@@ -526,6 +586,74 @@ test("a repo whose own level slid is flagged, not normalised", () => {
   assert.equal(hasDrifted(h(40, 45, 42, 70, 75, 72, 74, 71)), false);
   // Too little history to read a trend.
   assert.equal(hasDrifted(h(90, 50, 40)), false);
+});
+
+// 22 of 101 checked releases carried `judge-unavailable`. The fallback is by
+// construction the MILDER reading, so an outage does not show up as a dip —
+// the scores keep arriving, slightly generous, and every existing signal on
+// the page reads them as the repo's level. Only a streak says otherwise.
+test("three checks in a row judged without a judge is the finding, not the score", () => {
+  const run = (day: number, unjudged?: number) => ({
+    checkedAt: `2026-08-${String(day).padStart(2, "0")}T00:00:00Z`,
+    ...(unjudged === undefined ? {} : { unjudged }),
+  });
+
+  // One outage is an outage; the third consecutive one is the alarm.
+  assert.equal(judgeSofteningStreak([run(1), run(2, 4), run(3, 2)]), 2);
+  assert.equal(hasSoftened([run(1), run(2, 4), run(3, 2)]), false);
+  assert.equal(judgeSofteningStreak([run(1), run(2, 4), run(3, 2), run(4, 1)]), 3);
+  assert.equal(hasSoftened([run(1), run(2, 4), run(3, 2), run(4, 1)]), true);
+
+  // One answered check ends the streak — the judge came back.
+  assert.equal(hasSoftened([run(1, 3), run(2, 3), run(3, 3), run(4)]), false);
+
+  // `judge: off` is a configured choice, not a silence: no judge was asked,
+  // so nothing fell back and there is nothing to alarm about.
+  assert.equal(hasSoftened([run(1), run(2), run(3), run(4)]), false);
+
+  // Ordered by when each check RAN. A backfill of old releases interleaves
+  // freshly-checked past tags into a release-ordered history; reading that
+  // order would let one backfilled entry hide a live outage mid-series.
+  const outOfOrder = [run(4, 1), run(1), run(2, 4), run(3, 2)];
+  assert.equal(judgeSofteningStreak(outOfOrder), 3, "sorted by check time, not by position");
+});
+
+// The three reasons a check reaches the operator used to be assembled inline
+// in the run loop, where nothing could reach them: `|| drifted` had no test of
+// its own, and neither would `|| softened`.
+test("the alert decision: the release, the level under it, and the judge behind it", () => {
+  const run = (day: number, unjudged?: number) => ({
+    checkedAt: `2026-08-${String(day).padStart(2, "0")}T00:00:00Z`,
+    ...(unjudged === undefined ? {} : { unjudged }),
+  });
+  const level = [{ score: 90 }, { score: 91 }, { score: 89 }];
+  const base = { exitCode: 0, criticalFlags: 0, notifyBelow: 65, past: level };
+
+  const quiet = alertDecision({ ...base, score: 90, runs: [run(1), run(2)] });
+  assert.deepEqual(quiet, { flagged: false, drifted: false, softeningStreak: 0, scoreLevel: 90 });
+
+  // The release itself.
+  assert.equal(alertDecision({ ...base, score: 60, runs: [run(1)] }).flagged, true);
+  assert.equal(alertDecision({ ...base, score: 90, exitCode: 1, runs: [run(1)] }).flagged, true);
+
+  // The level sliding under a release that is otherwise inside the bar.
+  const sliding = [90, 88, 91, 89, 70, 68, 71].map((score) => ({ score }));
+  const slid = alertDecision({ ...base, past: sliding, score: 69, runs: [run(1)] });
+  assert.equal(slid.drifted, true);
+  assert.equal(slid.flagged, true, "a bar that came down to meet the score still alerts");
+
+  // The judge behind it: a perfectly ordinary score, three runs of silence.
+  const softened = alertDecision({
+    ...base,
+    score: 90,
+    runs: [run(1), run(2, 3), run(3, 2), run(4, 1)],
+  });
+  assert.equal(softened.softeningStreak, 3);
+  assert.equal(softened.flagged, true, "an outage must not pass as a good release");
+  // Two is not three — the streak is reported only once it IS the finding.
+  const short = alertDecision({ ...base, score: 90, runs: [run(1), run(2, 3), run(3, 2)] });
+  assert.equal(short.softeningStreak, 0);
+  assert.equal(short.flagged, false);
 });
 
 test("an exact 20-point drop is the case the constant names", () => {

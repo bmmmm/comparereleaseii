@@ -282,6 +282,20 @@ function fileCoverageMap(data: ReleaseData, coverage: Coverage | null): Map<stri
   return map;
 }
 
+/**
+ * The judge was asked about this claim and could not answer, so the milder
+ * deterministic reading stood in. One predicate for both consumers — the
+ * release's own `judge-unavailable` flag and the watch record whose streak
+ * rule reads it — because a report saying "2 unjudged" next to a record
+ * counting three would make the streak detector unfalsifiable.
+ */
+const judgeFellBack = (r: ClaimResult): boolean => r.judgeFailed === true;
+
+/** How many claims of this release fell back to the deterministic reading. */
+export function unjudgedClaims(results: ClaimResult[]): number {
+  return results.filter(judgeFellBack).length;
+}
+
 export function buildFlags(
   data: ReleaseData,
   results: ClaimResult[],
@@ -318,7 +332,7 @@ export function buildFlags(
   // and that fallback is by construction the milder reading. Not answering
   // must therefore never be quietly better for the release than answering:
   // say how many claims went unjudged, on the record.
-  const unjudged = results.filter((r) => r.judgeFailed);
+  const unjudged = results.filter(judgeFellBack);
   if (unjudged.length) {
     flags.push({
       severity: "warn",

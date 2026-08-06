@@ -26,6 +26,7 @@ import {
   type RepoLink,
 } from "./check.ts";
 import { githubHistory } from "./history.ts";
+import { unjudgedClaims } from "./metrics.ts";
 import { toMarkdown, exitCode } from "./report.ts";
 import { toHtml } from "./html.ts";
 import { reportDirOf, reportNavFor, toRepoDetailHtml } from "./watch-detail.ts";
@@ -36,14 +37,13 @@ import {
   MAX_AUTHOR_LEDGER,
   MAX_CHECK_ATTEMPTS,
   MAX_PROMISE_LEDGER,
+  alertDecision,
   baselineLevel,
   capLedger,
   carriedFromLedger,
   countSkipped,
   eligibleRelease,
   entryKey,
-  hasDrifted,
-  isFlagged,
   pickBackfillReleases,
   pickNewReleases,
   recordCheckFailure,
@@ -281,6 +281,10 @@ interface CheckOutcome {
   ec: number;
   flagged: boolean;
   drifted: boolean;
+  /** Consecutive checks judged without a judge, this one included — 0 when
+   * the judge answered. Reported by the run, not stored: the record keeps the
+   * per-check fact, the streak is a rule over it. */
+  softeningStreak: number;
   jsonPath: string;
 }
 
@@ -425,10 +429,16 @@ async function checkAndRecord(args: {
   const past = repoState.history.filter(
     (h) => (h.publishedAt ?? h.checkedAt) < (rel.publishedAt ?? "￿"),
   );
-  const scoreLevel = baselineLevel(past);
-  const drifted = hasDrifted([...past, { score: report.metrics.scores.overall }]);
-  const flagged =
-    isFlagged(report.metrics.scores.overall, ec, critical, rc.notifyBelow, scoreLevel) || drifted;
+  const checkedAt = new Date().toISOString();
+  const unjudged = unjudgedClaims(report.results);
+  const { flagged, drifted, softeningStreak, scoreLevel } = alertDecision({
+    score: report.metrics.scores.overall,
+    exitCode: ec,
+    criticalFlags: critical,
+    notifyBelow: rc.notifyBelow,
+    past,
+    runs: [...repoState.history, { checkedAt, unjudged }],
+  });
   const verdicts = {
     verified: report.results.filter((r) => r.verdict === "verified").length,
     partial: report.results.filter((r) => r.verdict === "partial").length,
@@ -451,7 +461,7 @@ async function checkAndRecord(args: {
   const checkedRelease: CheckedRelease = {
     tag: rel.tag,
     publishedAt: rel.publishedAt,
-    checkedAt: new Date().toISOString(),
+    checkedAt,
     score: report.metrics.scores.overall,
     scoreLabel: report.metrics.scores.label,
     components: {
@@ -471,6 +481,7 @@ async function checkAndRecord(args: {
       ? { brokenPromises: report.promises.filter((p) => p.status === "broken").length }
       : {}),
     engine: report.engine,
+    ...(unjudged ? { unjudged } : {}),
     verdicts,
     ...(report.authors?.length
       ? {
@@ -490,7 +501,7 @@ async function checkAndRecord(args: {
     ...(args.backfilled ? { backfilled: true } : {}),
   };
   recordChecked(repoState, checkedRelease, args.historyLimit);
-  return { checked: checkedRelease, promises: report.promises, ec, flagged, drifted, jsonPath };
+  return { checked: checkedRelease, promises: report.promises, ec, flagged, drifted, softeningStreak, jsonPath };
 }
 
 interface RunWatchOptions {
@@ -689,7 +700,10 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
         console.error(
           `${key}: ${rel.tag} → score ${outcome.checked.score} (${outcome.checked.scoreLabel})` +
             (outcome.flagged ? " — FLAGGED" : "") +
-            (outcome.drifted ? " (this repo's own level has been sliding)" : ""),
+            (outcome.drifted ? " (this repo's own level has been sliding)" : "") +
+            (outcome.softeningStreak
+              ? ` (${outcome.softeningStreak} checks in a row fell back to the deterministic reading — the judge has not been answering, and that fallback is the milder one; these scores read better than the evidence supports)`
+              : ""),
         );
         if (outcome.flagged) {
           flaggedTotal++;
@@ -1105,7 +1119,10 @@ async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promi
         if (outcome.flagged) flaggedTotal++;
         console.error(
           `${key}: ${rel.tag} → score ${outcome.checked.score} (${outcome.checked.scoreLabel})` +
-            (outcome.flagged ? " — flagged (recorded; backfill never notifies)" : ""),
+            (outcome.flagged ? " — flagged (recorded; backfill never notifies)" : "") +
+            (outcome.softeningStreak
+              ? ` (${outcome.softeningStreak} checks in a row judged without a judge — every score in this backfill is the milder deterministic reading)`
+              : ""),
         );
         await saveState(statePath, state);
         await writeIndex();

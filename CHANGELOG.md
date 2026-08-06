@@ -6,6 +6,29 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **A judge that quietly stops answering is now an alarm, not a run of good
+  scores.** 22 of 101 checked releases in the corpus carried
+  `judge-unavailable`: the engine was asked, could not answer, and the claim
+  kept the deterministic reading. That fallback is by construction the milder
+  one, so an outage does not produce a dip anyone would look at — it produces
+  a series of perfectly ordinary, slightly generous scores, and every other
+  signal in the watcher reads them as the repo's level. There was a flag per
+  release and nothing at all watching for a streak.
+
+  Each check now records how many claims fell back, and three consecutive
+  checks flag the release and fire `--notify`. The streak is counted in the
+  order the checks ran, not the order the releases were published, so a
+  backfill cannot hide a live outage in the middle of the series. `judge:
+  "off"` stays silent — nothing was asked, so nothing fell back. The
+  dashboard row and the repo's history page say how long the judge has been
+  quiet, each affected release carries its own unjudged count, and the Atom
+  feed names it per check.
+
+  The three reasons a check reaches the operator (the release, the level
+  sliding under it, the judge behind it) now live in one function in the pure
+  rules module instead of being assembled in the run loop, where nothing
+  could test them.
+
 - **Every report and every watch record says which scoring rules produced
   it.** A correct fix to the scoring rules moves scores for releases that did
   not change — twice this week, by up to 50 points. The watch state then holds

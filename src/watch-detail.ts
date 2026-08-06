@@ -15,6 +15,8 @@ import type { PromiseCheck } from "./types.ts";
 import {
   BASELINE_WINDOW,
   MAX_CHECK_ATTEMPTS,
+  SOFTENING_STREAK,
+  judgeSofteningStreak,
   type AuthorRecord,
   type CheckedRelease,
   type RepoState,
@@ -171,6 +173,22 @@ function generationNote(history: CheckedRelease[]): string {
   } — ${esc(spans)}. Scores from different generations were produced by different rules and are not directly comparable; a step at a boundary is this tool changing, not the repo. &ldquo;unmarked&rdquo; means the check predates the marker.</p>`;
 }
 
+/**
+ * The banner a repo carries while its judge has stopped answering. The scores
+ * kept arriving through the outage and each one is the deterministic
+ * fallback, which is by construction the milder reading — so the series does
+ * not dip during a softening streak, it drifts up. Nothing else on this page
+ * would say so: every affected release renders a perfectly ordinary number.
+ */
+function softeningBanner(history: CheckedRelease[]): string {
+  const streak = judgeSofteningStreak(history);
+  if (streak < SOFTENING_STREAK) return "";
+  const from = history[history.length - streak];
+  return `<p class="alarm">&#9888; <b>${streak} checks in a row were judged without a judge</b> — since ${esc(
+    from.tag,
+  )} every claim the judge could not answer fell back to the deterministic reading, which is the milder one. These scores read better than the evidence behind them supports; fix the engine and re-check with <code>--no-cache</code> before reading the recent series as the repo's level.</p>`;
+}
+
 /** Verdict composition per release — status-colored stacked counts, aligned
  * with the score chart above; the releases table repeats the numbers. */
 function verdictChart(history: CheckedRelease[], root: string): string {
@@ -221,7 +239,12 @@ function scoreCell(h: CheckedRelease): string {
   const broken = h.brokenPromises
     ? ` <span class="notice" title="an earlier release promised a change this release was due to ship">&#9888; ${h.brokenPromises} broken promise${h.brokenPromises > 1 ? "s" : ""}</span>`
     : "";
-  return `<span class="score ${cls}">${h.score}</span> ${esc(h.scoreLabel)}${drop}${partial}${broken}`;
+  // The judge stayed silent on some claims and the deterministic fallback
+  // stood in — the milder reading, so this score is an upper bound.
+  const unjudged = h.unjudged
+    ? ` <span class="notice" title="the judge was asked and could not answer; the deterministic fallback is the milder reading, so this score is an upper bound">&#9888; ${h.unjudged} unjudged</span>`
+    : "";
+  return `<span class="score ${cls}">${h.score}</span> ${esc(h.scoreLabel)}${drop}${partial}${broken}${unjudged}`;
 }
 
 /**
@@ -398,6 +421,8 @@ svg{width:100%;height:auto}
 .notice{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .bot{display:inline-block;border:1px solid var(--muted);color:var(--muted);border-radius:.6em;padding:0 .4em;font-size:.8em}
 .mutedcell{color:var(--muted)}
+.alarm{background:var(--card);border:1px solid #cf222e;border-left:4px solid #cf222e;border-radius:6px;padding:9px 12px;margin:12px 0;font-size:13px}
+.alarm code{font-family:ui-monospace,monospace;font-size:.92em}
 @media (prefers-color-scheme:dark){.notice{border-color:#d29922;color:#d29922}}
 table{border-collapse:collapse;width:100%;margin-top:6px}
 th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid var(--border);font-size:13px}
@@ -447,6 +472,7 @@ ${
 </div>`
     : ""
 }
+${softeningBanner(history)}
 <h2>Trust score over time <span class="note">— dots open that release&#39;s report; red ring = flagged</span></h2>
 ${generationNote(history)}${scoreChart(history, level, root)}
 <h2>Verdicts per release <span class="note">— claim verdict composition of each check</span></h2>

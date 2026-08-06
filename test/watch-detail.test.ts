@@ -51,6 +51,35 @@ test("every recorded check renders as a dot linking to its own report", () => {
   assert.ok(html.includes("<polyline"), "two or more checks draw the series line");
 });
 
+// The fallback reads milder than the judge would, so an outage produces a run
+// of ordinary — slightly generous — scores. Nothing else on the page can show
+// that: the chart draws a perfectly healthy series.
+test("a repo judged without a judge says so, on the page and per release", () => {
+  const outage = [
+    check("v1", 90),
+    check("v2", 91, { unjudged: 3 }),
+    check("v3", 92, { unjudged: 2 }),
+    check("v4", 93, { unjudged: 1 }),
+  ].map((h, i) => ({ ...h, checkedAt: `2026-07-0${i + 1}T00:00:00Z` }));
+  const html = toRepoDetailHtml(ENTRY, state(outage), scoreBaseline(outage), "t");
+  assert.match(html, /3 checks in a row were judged without a judge/, "the streak is the banner");
+  assert.match(html, /since v2/, "…and it says where the silence started");
+  assert.match(html, /3 unjudged/, "each affected release carries its own count");
+
+  // The judge answering again ends it — a banner that outlives the outage is
+  // an alarm nobody can clear.
+  const recovered = [...outage, { ...check("v5", 94), checkedAt: "2026-07-05T00:00:00Z" }];
+  assert.doesNotMatch(
+    toRepoDetailHtml(ENTRY, state(recovered), scoreBaseline(recovered), "t"),
+    /checks in a row were judged without a judge/,
+  );
+
+  // A repo with a working judge says nothing at all.
+  const healthy = [check("v1", 90), check("v2", 91), check("v3", 92)];
+  const clean = toRepoDetailHtml(ENTRY, state(healthy), scoreBaseline(healthy), "t");
+  assert.doesNotMatch(clean, /unjudged/);
+});
+
 test("a single check renders its dot but no line", () => {
   const history = [check("v1", 90)];
   const html = toRepoDetailHtml(ENTRY, state(history), null, "t");

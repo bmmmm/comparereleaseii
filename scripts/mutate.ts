@@ -38,6 +38,12 @@ const MUTANTS: Mutant[] = [
     replace: "bumpClaims.length > 0",
   },
   {
+    guard: "a streak of checks judged without a judge reaches the operator",
+    file: "src/watch-state.ts",
+    find: "const softened = streak >= SOFTENING_STREAK;",
+    replace: "const softened = false;",
+  },
+  {
     guard: "a level shift across a scoring-generation boundary is not the repo's doing",
     file: "src/watch-longview.ts",
     find: "if (sameStick && Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",

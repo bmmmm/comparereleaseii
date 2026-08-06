@@ -7,6 +7,7 @@ import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_SOLID, scoreClass } from "./theme.ts";
 import { reportDirOf } from "./watch-detail.ts";
 import type { UnverifiableKind } from "./types.ts";
+import { judgeSofteningStreak, SOFTENING_STREAK } from "./watch-state.ts";
 import type { RepoState, WatchState, WatchedEntry } from "./watch-state.ts";
 
 /** Short enough for a table cell; the title carries the explanation. */
@@ -19,6 +20,18 @@ const UNVERIFIABLE_TITLE: Record<UnverifiableKind, string> = {
   "out-of-repo": "These notes describe code that is not in this repo's own diff (fork, build or distribution repo).",
 };
 
+
+/**
+ * The mark a repo carries while its judge has stopped answering. Nothing else
+ * in the row can show it: the fallback is the milder reading, so an outage
+ * produces a run of perfectly ordinary — slightly generous — scores rather
+ * than a dip anyone would look at twice.
+ */
+function softeningTag(rs: RepoState): string {
+  const streak = judgeSofteningStreak(rs.history);
+  if (streak < SOFTENING_STREAK) return "";
+  return ` <span class="incomplete" title="the judge could not answer on the last ${streak} checks; every one fell back to the deterministic reading, which is the milder one — these scores are upper bounds">&#9888; ${streak} checks unjudged</span>`;
+}
 
 /** Self-contained watch overview: one row per watched repo, red rows first,
  * whole rows link to the report; repos awaiting their first check are listed
@@ -187,7 +200,7 @@ ${feedRows}
         l.brokenPromises
           ? ` <span class="incomplete" title="an earlier release promised a change this release was due to ship">&#9888; ${l.brokenPromises} broken promise${l.brokenPromises > 1 ? "s" : ""}</span>`
           : ""
-      }</td>
+      }${softeningTag(rs!)}</td>
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
@@ -349,6 +362,11 @@ export function toWatchAtomFeed(
       `verdicts: ${v.verified} verified, ${v.partial} partial, ${v.noEvidence} no-evidence, ${v.contradicted} contradicted · ` +
       `flags: ${h.flagCount}${h.criticalFlags ? ` (${h.criticalFlags} critical)` : ""}` +
       (h.brokenPromises ? ` · ${h.brokenPromises} broken promise(s)` : "") +
+      // The fallback is the milder reading, so a feed reader who is told only
+      // the score is told the flattering half of what happened.
+      (h.unjudged
+        ? ` · ${h.unjudged} claim(s) judged by the deterministic fallback — the judge could not answer`
+        : "") +
       (h.warnings?.length ? ` · ${h.warnings.join(" · ")}` : "");
     return `<entry>
 <id>${esc(id)}</id>

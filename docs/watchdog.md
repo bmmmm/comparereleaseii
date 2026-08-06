@@ -327,7 +327,21 @@ A release is flagged when any of these hold:
   newer half is 20 or more below the median of the older half. The relative
   bar fires once on a step down and then the lower level *is* the normal it
   compares against — this catches the case where nothing looks anomalous
-  because the anomaly became the baseline.
+  because the anomaly became the baseline,
+- three checks in a row were **judged without a judge**. When the engine is
+  asked and cannot answer, the claim keeps the deterministic reading, which
+  is by construction the *milder* one — so an outage does not show up as a
+  dip in the series. The scores keep arriving, slightly generous, and every
+  other signal here reads them as this repo's level. One release is a warn
+  flag on that release; three consecutive checks is the finding, and the
+  streak is counted in the order the checks *ran*, so a backfill cannot hide
+  a live outage in the middle of a release-ordered series. `judge: "off"` is
+  a configured choice, not a silence: nothing was asked, so nothing fell
+  back. The dashboard row and the repo's history page both say how long the
+  judge has been quiet, each affected release carries its own unjudged
+  count, and the Atom feed names it per check — a reader told only the score
+  is told the flattering half. After fixing the engine, re-check with
+  `--no-cache`.
 
 With `--notify <cmd>` (or `"notify"` in the config) every flagged release
 runs `<cmd> <path-to-json-report>` — composable with whatever you have:

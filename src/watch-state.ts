@@ -147,6 +147,14 @@ export interface CheckedRelease {
   /** Promises from earlier releases this release was due to keep and did not. */
   brokenPromises?: number;
   engine: string;
+  /**
+   * Claims that fell back to the deterministic reading because the judge was
+   * asked and could not answer. Zero when no judge ran at all (`judge: off`)
+   * — that is a configured choice, not a silence. Recorded per check so the
+   * rule that reads a STREAK of them has something to read: one release
+   * judged without its judge is a flag, three in a row is the finding.
+   */
+  unjudged?: number;
   verdicts: { verified: number; partial: number; noEvidence: number; contradicted: number };
   /**
    * Author facts of this release: identities total, identities the ledger
@@ -609,6 +617,38 @@ export function isFlagged(
   return score < notifyBelow;
 }
 
+/**
+ * Consecutive checks judged without their judge before the silence itself is
+ * the finding. The fallback is by construction the MILDER reading — a claim
+ * nobody could disprove keeps whatever the deterministic pass gave it — so a
+ * judge that quietly stopped answering does not lower a single score; it
+ * raises them, slowly, and every release still reports a number. One release
+ * is an outage; three in a row means the watcher has been measuring something
+ * other than what it says it measures, and nothing but this counts them.
+ */
+export const SOFTENING_STREAK = 3;
+
+/**
+ * How many of the most recent checks in a row fell back to the deterministic
+ * reading. Ordered by when each check RAN, not by release date: this is a
+ * fact about the watcher, and a backfilled old release is as much a run as
+ * the hourly poll — sorting by publication would let one backfill hide a
+ * live outage in the middle of the series.
+ */
+export function judgeSofteningStreak(
+  checks: Array<{ checkedAt: string; unjudged?: number }>,
+): number {
+  const byRun = [...checks].sort((a, b) => a.checkedAt.localeCompare(b.checkedAt));
+  let streak = 0;
+  for (let i = byRun.length - 1; i >= 0 && (byRun[i].unjudged ?? 0) > 0; i--) streak++;
+  return streak;
+}
+
+/** Has this repo been judged without a judge long enough to say so? */
+export function hasSoftened(checks: Array<{ checkedAt: string; unjudged?: number }>): boolean {
+  return judgeSofteningStreak(checks) >= SOFTENING_STREAK;
+}
+
 /** Below this many checks there is no trend to read, only noise. */
 const DRIFT_MIN_CHECKS = 6;
 /** The newest checks the drift detector reads — a fixed window, like the
@@ -633,6 +673,68 @@ export function hasDrifted(history: Array<{ score: number }>): boolean {
   const newer = scoreBaseline(window.slice(-half));
   if (older === null || newer === null) return false;
   return newer <= older - SCORE_DROP;
+}
+
+export interface AlertDecision {
+  /** Does this check reach the operator (`--notify`, the red row)? */
+  flagged: boolean;
+  /** The repo's own level has been sliding — the release sits inside the
+   * relative bar only because the bar came down to meet it. */
+  drifted: boolean;
+  /** Consecutive checks judged by the deterministic fallback, this one
+   * included — 0 unless the run reached `SOFTENING_STREAK`. */
+  softeningStreak: number;
+  /** This repo's median before this check; stored on the record so a reader
+   * of the row sees what the score was compared against. */
+  scoreLevel: number | null;
+}
+
+/**
+ * Everything that decides whether a checked release reaches the operator.
+ * Three reasons, answering three different questions, and none of them can
+ * substitute for another:
+ *
+ * - the release itself — exit code, critical flags, or a score that dropped
+ *   below what this repo normally does;
+ * - the level it was measured against sliding out from under it;
+ * - the watcher's judge having stopped answering, which makes every score
+ *   since a milder reading than the evidence supports.
+ *
+ * They live here together because the last two are properties of the record,
+ * not of the report, and because a decision assembled inline at the call site
+ * is a decision nothing can test.
+ */
+export function alertDecision(args: {
+  score: number;
+  exitCode: number;
+  criticalFlags: number;
+  notifyBelow?: number;
+  /**
+   * Checks of releases published BEFORE this one — release order, not check
+   * order: a backfilled past release must be measured against its own past,
+   * not against checks of releases that came after it.
+   */
+  past: Array<{ score: number }>;
+  /**
+   * Every check this watcher recorded for the repo, this one included. Run
+   * order, not release order — a backfill is a run like any other, and the
+   * judge being down during one is the same outage.
+   */
+  runs: Array<{ checkedAt: string; unjudged?: number }>;
+}): AlertDecision {
+  const scoreLevel = baselineLevel(args.past);
+  const drifted = hasDrifted([...args.past, { score: args.score }]);
+  const streak = judgeSofteningStreak(args.runs);
+  const softened = streak >= SOFTENING_STREAK;
+  return {
+    flagged:
+      isFlagged(args.score, args.exitCode, args.criticalFlags, args.notifyBelow, scoreLevel) ||
+      drifted ||
+      softened,
+    drifted,
+    softeningStreak: softened ? streak : 0,
+    scoreLevel,
+  };
 }
 
 /** Worst exit code of the batch: 2 (errors) > 1 (failed gate) > 0. */
