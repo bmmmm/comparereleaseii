@@ -113,3 +113,32 @@ test("the module maps list each module once", async () => {
     );
   }
 });
+
+// CLAUDE.md is re-read every turn, so a symbol name that moved there is a wrong
+// instruction repeated all session — worse than the README's, which is read
+// once. It names the shared renderer helpers and two guards by identifier;
+// every camelCase name it quotes must still be declared somewhere in src/.
+test("CLAUDE.md quotes no symbol that src/ has renamed away", async () => {
+  const text = await readFile(join(ROOT, "CLAUDE.md"), "utf8");
+  const files = [
+    ...(await readdir(join(ROOT, "src"))).filter((f) => f.endsWith(".ts")).map((f) => `src/${f}`),
+    ...(await readdir(join(ROOT, "src/sources")))
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => `src/sources/${f}`),
+  ];
+  const sources = await Promise.all(files.map((f) => readFile(join(ROOT, f), "utf8")));
+  const declared = new Set<string>();
+  for (const src of sources) {
+    for (const m of src.matchAll(/^\s*(?:export\s+)?(?:async\s+)?(?:function|const|class)\s+([A-Za-z0-9_$]+)/gm)) {
+      declared.add(m[1] as string);
+    }
+  }
+  // camelCase only: `origin`, `github` and `main` are prose, not symbols.
+  const quoted = [...text.matchAll(/`([a-z][a-z0-9]*[A-Z][A-Za-z0-9]*)`/g)].map((m) => m[1] as string);
+  assert.notEqual(quoted.length, 0, "no symbols found — the extraction broke, not the doc");
+  assert.deepEqual(
+    [...new Set(quoted)].filter((s) => !declared.has(s)),
+    [],
+    "CLAUDE.md names symbols that no longer exist in src/",
+  );
+});
