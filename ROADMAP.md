@@ -1,6 +1,9 @@
 # Roadmap
 
-> **Status 2026-08-04:** the bump block landed — bump claims are settled by
+> **Status 2026-08-06:** v0.10.0 is out and the gh extension's pin follows
+> it, so the state lock, the backtick rule and the pin-join fixes are what
+> the hourly job now runs — the release block that opened this section is
+> closed. Before it: the bump block landed — bump claims are settled by
 > the diff's own pin delta before any judge runs, and the corpus question
 > that opened it closed without the score being touched. Everything else is
 > on `main` — the three original phases (distribution, watchdog, judge
@@ -40,15 +43,7 @@ class and free. That is the shape to repeat: measure the corpus, find a class
 the judge is being asked about needlessly or answers badly, settle it
 deterministically, measure again.
 
-### 1. Cut the release (v0.10.0)
-
-Nothing built on 2026-08-05/06 is in effect: the hourly job runs the gh
-extension, which is pinned to v0.9.0. The state lock, the backtick rule and
-the pin-join fixes reach the watch home only through a release and the
-extension's pin. Notes are written; the gate is `pnpm release:prepare`, the
-calibration run, and `pnpm release:publish`.
-
-### 2. Every record says which rules produced it
+### 1. Every record says which rules produced it
 
 Completeness moved by up to 50 points today through *correct* fixes. The
 watch state holds records from four scoring generations side by side and
@@ -58,9 +53,9 @@ scoring generation into each `RepoState.history` entry and into every report;
 have the dashboard mark a history that spans more than one, and make the
 baseline refuse to average across generations. Until this exists, every
 improvement quietly damages the series it is measured on — including the
-repair in step 6.
+repair in step 5.
 
-### 3. The golden set grows out of the watch home
+### 2. The golden set grows out of the watch home
 
 Today a wrong verdict has no way back into the tool: the issue template ends
 at a human, and every one of the golden cases was invented by hand. Add a way
@@ -70,7 +65,7 @@ misjudgement anyone noticed is a regression test, and the judge calibration
 runs against cases that actually occurred. The human decides what is right —
 that is the point, not a limitation.
 
-### 4. Corpus statistics as the source of efficiency
+### 3. Corpus statistics as the source of efficiency
 
 `judgeBalance()` already counts fresh and cached calls per run; nothing looks
 at *what* they were spent on. A re-check of one large release cost 230 fresh
@@ -80,7 +75,7 @@ outcome, so the classes where the judge adds variance instead of evidence
 become visible the way the bump class did. Each one found is a deterministic
 rule that costs nothing and answers better.
 
-### 5. Threshold search as a tool, never as automation
+### 4. Threshold search as a tool, never as automation
 
 The bars are hand-set constants — `>= 5`, `MATCH_BAR = 3`, the 0.5 file
 majority, `0.25`. Three of them were changed by feel this week and measured
@@ -89,12 +84,12 @@ Pareto front: detection rate against golden-set fidelity against judge cost.
 It reports; a person picks the point; the constant stays a constant in the
 source with the measurement in its comment.
 
-### 6. `omission` 30/34 — coverage's fourth route (`FIXME(coverage-union)`)
+### 5. `omission` 30/34 — coverage's fourth route (`FIXME(coverage-union)`)
 
-Diagnosed, not repaired. Wait for step 2, then A/B — landing it in the same
+Diagnosed, not repaired. Wait for step 1, then A/B — landing it in the same
 release as the backtick rule would make the two effects indistinguishable.
 
-### 7. Mutation classes nobody thought of
+### 6. Mutation classes nobody thought of
 
 The harness measures five classes, and those five are the ones someone
 invented. All three holes found so far were the same mistake wearing
@@ -102,7 +97,7 @@ different clothes: a route reading "similar enough" as "supported". Generate
 the lies instead — plausible fabrications from a model, applied to real notes
 — and see which ones survive. Self-testing, not self-tuning.
 
-### 8. A watchdog for silent softening
+### 7. A watchdog for silent softening
 
 22 of 101 checked releases carried `judge-unavailable`, and that fallback is
 by construction the milder reading. There is a flag per release and nothing
