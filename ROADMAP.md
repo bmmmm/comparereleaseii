@@ -55,6 +55,33 @@ baseline refuse to average across generations. Until this exists, every
 improvement quietly damages the series it is measured on — including the
 repair in step 5.
 
+**Measured 2026-08-06, and smaller than it reads above.** v0.9.0 against
+v0.10.0, `--judge off --baseline 0`, on the newest checked release of each of
+the 15 watched repos: **14 are bit-identical in all three components.** One
+moves — `zed@v1.14.2`, 77 → 45 — and the reason is not the component the
+entry names. Completeness falls 100 → 68, which costs 8 points of a weighted
+score; what actually moves it is that 12 undocumented commits become 57, and
+that turns a `undocumented-sensitive` warn into a **critical** flag, which
+caps the release at 45. A critical flag is an unconditional alert in
+`isFlagged()` — it never consults the baseline at all.
+
+So the damage is not the false alert this entry implies. That alert is
+*correct*: those 45 commits really are undocumented, and the old rule counted
+them as covered because a claim said `` `tab` ``. The damage is that the
+operator reads it against a median of 95 that a different rule produced, and
+that `segmentPhases()` will open a phase with reason `level-shift` — the tool
+asserting zed changed its note culture on the day this repo changed its
+measuring stick. `PHASE_SHIFT` is 20, the same magnitude, so the long view
+mislabels every generation boundary as an event in the repo. That is a fourth
+consumer this entry does not list, and it is the one that states a falsehood
+rather than merely comparing across a gap.
+
+Design note for whoever builds it: the generation must be an explicit
+constant, not `VERSION`. The cache is keyed by tool version and over-keying
+there costs only judge calls; over-keying the baseline is fatal — every
+release would empty the series, and with `BASELINE_MIN_CHECKS = 3` each one
+would leave three checks with no relative alert at all.
+
 ### 2. The golden set grows out of the watch home
 
 Today a wrong verdict has no way back into the tool: the issue template ends
