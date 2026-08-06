@@ -100,6 +100,18 @@ not add a dependency, a build step, or a framework.
 
 ## Traps
 
+- **`pnpm mutate` owns `src/` while it runs.** It patches a file, runs the
+  suite, writes the original back — from the copy it read at the start. Editing
+  a source file or running `pnpm test` during a mutation run therefore either
+  loses the edit or fails a test against someone else's mutant. Let it finish;
+  it takes about fifteen minutes for the full set.
+- **A/B against the forge: measure serially, and filter warnings.** Fanning
+  parallel checks at one GitHub account trips the rate limit, and a run that
+  loses commit diffs to it is not a data point — before 0.10.1 it scored
+  *better* for the loss. Any before/after comparison drops runs whose report
+  carries a load warning before it counts anything, and compares two
+  `git worktree` checkouts rather than the live tree, which moves under an
+  edit.
 - **Verdict spelling.** Internally and on the CLI it is `no-evidence`. The judge
   prompt asks the model for `no_evidence`, and `src/judge.ts` normalises both.
   This is intentional — do not "unify" it.
