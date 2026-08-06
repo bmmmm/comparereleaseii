@@ -43,7 +43,7 @@ import { loadLocalRange, localRepoContext } from "../src/sources/local.ts";
 import { lexicalMatch, tokenize } from "../src/match.ts";
 import { run } from "../src/util.ts";
 import type { Claim, ClaimResult, DiffFile, Report } from "../src/types.ts";
-import { dedupeReports } from "./corpus-aggregate.ts";
+import { dedupeReports, median } from "./corpus-aggregate.ts";
 import {
   anchorsTo,
   fabricatedClaim,
@@ -154,9 +154,40 @@ if (!reports.length) {
 const byRepo = new Map<string, Report[]>();
 for (const r of reports) byRepo.set(r.repoLabel, [...(byRepo.get(r.repoLabel) ?? []), r]);
 
+/**
+ * What a judge would have been asked, across the control runs. Free to count
+ * here — the control analysis already ran — and it is the third axis a
+ * threshold sweep needs: a bar that catches more fabrications by sending more
+ * claims to a model has not made the tool better for nothing.
+ *
+ * The condition mirrors `verifyClaims`: a claim reaches the judge unless the
+ * deterministic pass settled it as verified, the pins settled it, or it
+ * asserts nothing about this release.
+ */
+function wouldReachJudge(r: ClaimResult): boolean {
+  return (
+    r.verdict !== "skipped" &&
+    r.verdict !== "verified" &&
+    !r.evidence.methods.includes("pin-anchor")
+  );
+}
+
 const cases: Case[] = [];
 const skipped: string[] = [];
 let analysed = 0;
+const cost = { claims: 0, wouldJudge: 0 };
+/**
+ * The control runs' own scores. Not a quality axis and never to be optimized —
+ * the whole point of the frozen thresholds is that a number moving by itself
+ * makes every score incomparable with every other. It is here so that a change
+ * to a bar can be seen to move scores, and a person can decide whether that
+ * movement is right. Higher is not better.
+ */
+const controlScores: { correctness: number[]; completeness: number[]; overall: number[] } = {
+  correctness: [],
+  completeness: [],
+  overall: [],
+};
 
 for (const report of reports) {
   if (analysed >= limit) break;
@@ -202,6 +233,13 @@ for (const report of reports) {
     continue;
   }
   analysed++;
+  cost.claims += control.results.length;
+  cost.wouldJudge += control.results.filter(wouldReachJudge).length;
+  controlScores.correctness.push(control.metrics.scores.correctness);
+  controlScores.overall.push(control.metrics.scores.overall);
+  if (control.metrics.scores.completeness !== null) {
+    controlScores.completeness.push(control.metrics.scores.completeness);
+  }
   const label = `${report.repoLabel}@${report.headRef}`;
   const add = (mutation: MutationClass, applicable: boolean, detected: boolean | undefined, detail: string) =>
     cases.push({ repoLabel: report.repoLabel, headRef: report.headRef, mutation, applicable, detected, detail });
@@ -406,8 +444,20 @@ try {
   // No reference yet — --freeze writes the first one.
 }
 
+const medianScores = {
+  correctness: median(controlScores.correctness),
+  completeness: median(controlScores.completeness),
+  overall: median(controlScores.overall),
+};
+
 if (asJson) {
-  console.log(JSON.stringify({ releases: analysed, summary, cases, skipped, regressed }, null, 2));
+  console.log(
+    JSON.stringify(
+      { releases: analysed, summary, cost, scores: medianScores, cases, skipped, regressed },
+      null,
+      2,
+    ),
+  );
   process.exit(regressed.length ? 1 : 0);
 }
 
@@ -419,6 +469,12 @@ for (const s of summary) {
       `${String(s.missed + s.inconclusive).padStart(8)}${String(s.skipped).padStart(5)}`,
   );
 }
+console.log(
+  `\n  judge cost of the control runs: ${cost.wouldJudge}/${cost.claims} claim(s) the` +
+    ` deterministic pass leaves for a model` +
+    `\n  their median scores: correctness ${medianScores.correctness ?? "—"} ·` +
+    ` completeness ${medianScores.completeness ?? "—"} · overall ${medianScores.overall ?? "—"}`,
+);
 const misses = cases.filter((c) => c.applicable && c.detected !== true);
 if (misses.length) {
   console.log("\nmissed:");

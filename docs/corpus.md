@@ -207,6 +207,44 @@ returned. It records nothing about a `need` round that asked for more files,
 a pass that threw, an escalation that failed, or a surplus audit that found
 nothing — so a class that already looks expensive here is only more so.
 
+## Sweeping a threshold, without letting it tune itself
+
+The bars this tool judges by are hand-set numbers, and three of them were
+changed by feel and measured afterwards. `pnpm sweep <reports dir>` runs that
+order forwards: it patches the literal in the source, measures, restores, and
+prints the Pareto front over three axes — fabricated releases the
+deterministic stages catch (`mutate-notes`), golden cases the judge-free
+ladder answers within `expected` plus the ones it rubber-stamps, and claims
+left for a model.
+
+It reports. It never writes a constant, and it must not learn how: a
+threshold that moves by itself makes every score incomparable with every
+other and turns the frozen references into decoration. A person reads the
+front, picks a point, and edits the source with the measurement in the
+comment.
+
+Three things it says out loud rather than leaving to be inferred:
+
+- **A flat axis did not hold; it was not looking.** When the golden column
+  does not move across a dial, that is printed — otherwise a flat column
+  reads as "fidelity checked and fine", the same mistake as a green test
+  that cannot go red.
+- **Scores are shown, never ranked.** The corpus's median correctness,
+  completeness and overall appear beside the front, explicitly outside it.
+  Higher is not better here; a sweep that picked the point with the best
+  scores would be the tuning loop the whole script refuses to be. Measured
+  on the live watch home, `generated-weight` swings median correctness from
+  44 to 83 while all three ranking axes stay flat — a dial the front cannot
+  advise on, and a person decides on the semantics.
+- **A dial that moves scores says so**, and names `SCORING_GENERATION` as
+  the thing to bump in the same commit.
+
+`MATCH_BAR` (`src/reconcile.ts`) is the fourth hand-set bar and is
+deliberately not swept: it gates which findings a claim is said to describe,
+in a layer that is informational and never scored, and that layer only exists
+when the findings pass ran — which needs a judge. None of the three axes can
+see it, so a sweep would report three zeros and call it a front.
+
 ## What this does not show
 
 - **One judge.** Every verdict here comes from `claude-cli/haiku`. A

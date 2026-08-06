@@ -6,6 +6,27 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **`pnpm sweep` — the hand-set thresholds get measured before they move, not
+  after.** The lexical bar of 5, the 0.5 file majority in coverage and the
+  0.25 weight a generated entry carries are numbers somebody picked; three of
+  them were changed by feel and measured afterwards, which is the wrong order.
+  The sweep patches the literal in the source, measures, restores, and prints
+  the Pareto front over the three things that actually trade off: fabricated
+  releases the deterministic stages catch, golden cases the judge-free ladder
+  answers within `expected` (plus the ones it rubber-stamps, which is its own
+  axis and must never rise), and claims left for a model.
+
+  It reports and does not decide. The corpus's own median scores are printed
+  beside the front and explicitly outside it — a sweep that ranked points by
+  the scores they produce would be a tuning loop, and a threshold that moves
+  by itself makes every score incomparable with every other. A dial that moves
+  scores says so and names `SCORING_GENERATION` as the thing to bump with it.
+  An axis that stayed flat across a dial says that too, rather than letting a
+  motionless column read as "checked and fine".
+
+  `pnpm mutate-notes` now also reports the judge cost and median scores of its
+  control runs, which is where two of the sweep's axes come from.
+
 - **`pnpm corpus-stats` breaks the judge bill down by claim class.** The
   existing counter knows how many judge calls a run made and nothing about
   what they bought. The bump class — the one place where counting the corpus
