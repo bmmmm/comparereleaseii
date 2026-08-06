@@ -18,6 +18,21 @@ The real forge host never enters a tracked file (placeholders only, real values
 from `~/.env`). A leak-gate block is solved by rewording neutrally, never by a
 private variant of the commit.
 
+## The corpus lives in the checkout, not in `$HOME`
+
+`corpus-stats`, `sweep` and `mutate-notes` take a reports directory, and
+AGENTS.md makes a run against one part of the definition of done for any change
+to matching, coverage or the pin join. That directory is **`tmp/corpus/`**,
+inside this repo and covered by the existing `tmp/` ignore rule — refresh it
+from a watch home with `cp -R <watch home>/reports tmp/corpus` and then stay in
+the checkout. A session that reaches into `~/release-watch` to measure has left
+the working folder for no reason; the numbers are identical either way.
+
+What does *not* change is the user-facing documentation. `~/release-watch` is
+the right answer in README.md and `docs/` because that is where `watch setup`
+puts a real operator's watch home. `tmp/corpus/` is a development convention,
+not a product default — do not rewrite the docs to match it.
+
 ## One report, three renderers
 
 `printTerminal`, `toMarkdown` (`src/report.ts`) and `toHtml` (`src/html.ts`)
