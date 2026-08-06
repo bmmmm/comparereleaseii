@@ -11,7 +11,7 @@ const GUIDE_PATH = join(
   "writing-release-notes.md",
 );
 
-export const AGENT_SECTION_HEADING = "Rules for AI coding agents";
+const AGENT_SECTION_HEADING = "Rules for AI coding agents";
 
 /**
  * docs/writing-release-notes.md is the single source of truth for both the

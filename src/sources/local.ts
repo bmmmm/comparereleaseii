@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
-import { FENCE_LINE, run } from "../util.ts";
+import { run, sliceHeadingSection } from "../util.ts";
 import { extractPrNumbers } from "./github.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
@@ -111,43 +111,11 @@ async function loadCommits(repo: string, base: string, head: string): Promise<Co
 
 /** Extract the section for `tag` from a Keep-a-Changelog-style file. */
 export function extractChangelogSection(changelog: string, tag: string): string | null {
-  const lines = changelog.split("\n");
   const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // The version may follow the heading marker directly ("## 0.1.0 — date")
   // or after a prefix ending in a separator ("## [1.2.0] - date").
-  const headingRe = new RegExp(`^(#{1,4})\\s+(?:.*[^\\w.])?${escaped}(?:[^\\w.]|$)`);
-  let start = -1;
-  let level = 0;
-  let inFence = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (FENCE_LINE.test(lines[i])) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    const m = lines[i].match(headingRe);
-    if (m) {
-      start = i;
-      level = m[1].length;
-      break;
-    }
-  }
-  if (start === -1) return null;
-  let end = lines.length;
-  inFence = false;
-  for (let i = start + 1; i < lines.length; i++) {
-    if (FENCE_LINE.test(lines[i])) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    const m = lines[i].match(/^(#{1,4})\s/);
-    if (m && m[1].length <= level) {
-      end = i;
-      break;
-    }
-  }
-  return lines.slice(start + 1, end).join("\n").trim();
+  const headingRe = new RegExp(`^(?:.*[^\\w.])?${escaped}(?:[^\\w.]|$)`);
+  return sliceHeadingSection(changelog, (heading) => headingRe.test(heading));
 }
 
 /** The tag's section under whichever v-prefix convention the CHANGELOG uses —

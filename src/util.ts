@@ -97,10 +97,22 @@ export async function pooled<T, R>(
  * section). */
 export const FENCE_LINE = /^\s{0,3}(?:```|~~~)/;
 
-/** Slice out one heading's body from markdown, matched by exact heading text. */
-export function extractMarkdownSection(markdown: string, heading: string): string | null {
-  const lines = markdown.split("\n");
-  const headingRe = /^(#{1,4})\s+(.*)$/;
+const HEADING_LINE = /^(#{1,4})\s+(.*)$/;
+
+/**
+ * Slice out the body under the first heading `matches` accepts, ending before
+ * the next heading of the same or higher level. Both scans skip fenced code
+ * blocks, so a `#` inside a shell example neither starts nor ends a section.
+ *
+ * The predicate sees the heading text without its marker and the marker's
+ * level — callers decide what "the right heading" means (exact text, a version
+ * somewhere in the line), the traversal is the same either way.
+ */
+export function sliceHeadingSection(
+  text: string,
+  matches: (heading: string, level: number) => boolean,
+): string | null {
+  const lines = text.split("\n");
   let start = -1;
   let level = 0;
   let inFence = false;
@@ -110,8 +122,8 @@ export function extractMarkdownSection(markdown: string, heading: string): strin
       continue;
     }
     if (inFence) continue;
-    const m = lines[i].match(headingRe);
-    if (m && m[2].trim() === heading) {
+    const m = lines[i].match(HEADING_LINE);
+    if (m && matches(m[2].trim(), m[1].length)) {
       start = i;
       level = m[1].length;
       break;
@@ -133,6 +145,11 @@ export function extractMarkdownSection(markdown: string, heading: string): strin
     }
   }
   return lines.slice(start + 1, end).join("\n").trim();
+}
+
+/** Slice out one heading's body from markdown, matched by exact heading text. */
+export function extractMarkdownSection(markdown: string, heading: string): string | null {
+  return sliceHeadingSection(markdown, (h) => h === heading);
 }
 
 export function truncate(text: string, maxChars: number): string {

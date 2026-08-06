@@ -7,7 +7,7 @@ import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
  * an hour, so a limit hit early in one costs nearly that; a watch run that
  * blocks for an hour is worse than one that stops and says why.
  */
-export const RATE_LIMIT_MAX_WAIT_MS = 15 * 60 * 1000;
+const RATE_LIMIT_MAX_WAIT_MS = 15 * 60 * 1000;
 
 /** Overridable for tests — a real sleep would make them take minutes. */
 export const rateLimitHooks = {

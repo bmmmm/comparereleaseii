@@ -96,7 +96,7 @@ export function carriedOver(report: Report): { baseRef: string; count: number } 
 }
 
 /** The sub-check summary of a first-party pin, when one ran for it. */
-export function componentFor(
+function componentFor(
   report: Report,
   pin: PinBump,
 ): ComponentCheck | undefined {
@@ -178,7 +178,7 @@ export function bumpSummary(
 }
 
 /** Severity order shared by every renderer — breaking first, internal last. */
-export const KIND_ORDER: FindingKind[] = [
+const KIND_ORDER: FindingKind[] = [
   "breaking",
   "security",
   "behavior",

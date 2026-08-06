@@ -59,7 +59,7 @@ export function mergeCandidates(lists: RepoCandidate[][]): {
   return { candidates: sortByActivity([...seen.values()]), archivedDropped };
 }
 
-export function sortByActivity(candidates: RepoCandidate[]): RepoCandidate[] {
+function sortByActivity(candidates: RepoCandidate[]): RepoCandidate[] {
   return [...candidates].sort((a, b) => (b.pushedAt ?? "").localeCompare(a.pushedAt ?? ""));
 }
 
@@ -88,7 +88,7 @@ export function addRepos(
  * every forge prints for the same URL, and an exact-string dedupe would store
  * them as two entries — two state keys, two report directories, one repo.
  */
-export function normalizeRepoUrl(url: string): string {
+function normalizeRepoUrl(url: string): string {
   return url.replace(/\/+$/, "").replace(/\.git$/, "");
 }
 
@@ -144,7 +144,7 @@ const toCandidate =
     description: r.description,
   });
 
-export async function fetchCandidates(source: CandidateSource): Promise<RepoCandidate[]> {
+async function fetchCandidates(source: CandidateSource): Promise<RepoCandidate[]> {
   if (source === "watched" || source === "starred") {
     const path = source === "watched" ? "user/subscriptions" : "user/starred";
     const { items, capped } = await ghPaged(path, 3);
