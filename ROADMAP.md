@@ -2,151 +2,59 @@
 
 > **Status 2026-08-06:** v0.10.1 is out and the gh extension's pin follows
 > it, so the state lock, the backtick rule, the pin-join fixes and the
-> unreadable-commit repair are what the hourly job now runs — the release
-> block that opened this section is closed. **Unreleased on `main`:** the
-> bump-claim coverage fix (a scoring change — see step 1's note on ordering)
-> and a cleanup round that left behaviour bit-identical (the three renderers
-> now share their decisions via `src/report.ts`, and the Markdown report no
-> longer drops the baseline and repo context). Next release is 0.11.0. Before it: the bump block landed — bump claims are settled by
-> the diff's own pin delta before any judge runs, and the corpus question
-> that opened it closed without the score being touched. Everything else is
-> on `main` — the three original phases (distribution, watchdog, judge
-> trust), iterations 2–4, the 2026-07-27 block series (bughunt follow-up,
-> hardening backlog, forge watching, presentation + author ledger), the long
-> view (backfill, phases/events/heatmap), the second axis (pins → substance →
-> first-party expansion → findings/lenses → substance coverage; shipped
-> as v0.7.0 on 2026-08-03), and the reconciliation layer (claims meet
-> findings — landed 2026-08-03, rides the next release). This file
-> carries only what is open. The landed
-> plans and their dated landed notes live in this file's git history (up
-> to `039460a`); durable outcomes live where they belong — CHANGELOG
-> (what shipped), SCORING.md (score semantics), AGENTS.md (working
-> rules), docs/ (operations).
-
-## Open (2026-08-06): the block that makes running this tool teach it
-
-New work starts from a fact: an issue, a corpus number, a release that reads
-wrong. Three of those turned into fixes in two days — undershoot, backtick
-weight, and the coverage-union diagnosis below — and every one of them was
-found by running the thing, not by reading it. That is worth building on
-deliberately.
-
-**The line this block does not cross.** What running the tool teaches is
-*where it is wrong* and *where it wastes work*. It never teaches the tool to
-look better. Verdicts, weights and bars stay decided by a person, changed
-with an A/B, and frozen afterwards — a threshold that drifts by itself makes
-every score incomparable with every other and turns the frozen references
-into decoration. Nothing here adjusts a number to improve a score. The gain
-is the opposite: findings the corpus already contains, and judge calls that
-were never needed.
-
-The precedent is the bump block. It did not start as a plan; it started as a
-corpus count — 8 of 12 contradicted claims were dependency bumps — and ended
-as a deterministic rule that is *both* more accurate than the judge on that
-class and free. That is the shape to repeat: measure the corpus, find a class
-the judge is being asked about needlessly or answers badly, settle it
-deterministically, measure again.
-
-### 1. Every record says which rules produced it
-
-> **Start here — the scope is narrower than the paragraph below it.** Put an
-> explicit scoring-generation constant into `CheckedRelease`
-> (`src/watch-state.ts`) and into every report, and teach `segmentPhases()`
-> (`src/watch-longview.ts`) not to open a `level-shift` phase across a
-> generation boundary. Have the history page mark a series that spans more than
-> one. **Leave the baseline out of it** — the measurement below shows it does
-> not need this, and `BASELINE_MIN_CHECKS` (`src/watch-state.ts`) makes a wrong
-> key there expensive: a generation tied to `VERSION` would empty the series
-> every release and leave three checks with no relative alert at all. The
-> constant is explicit and hand-bumped, never `VERSION`.
+> unreadable-commit repair are what the hourly job now runs. Next release is
+> 0.11.0.
 >
-> Do this *before* the next release if the release carries a scoring change —
-> the unreleased bump-claim fix is one. Records shipped without the marker
-> create exactly the boundary nobody can label later, in the users' watch
-> homes rather than here.
+> **Unreleased on `main`:** the bump-claim coverage fix (a scoring change), a
+> cleanup round that left behaviour bit-identical, and the whole
+> "running it teaches it" block below except the two entries this file still
+> carries — the scoring-generation marker, `--add-golden`, the judge bill by
+> claim class, `pnpm sweep`, the `inverted-claim` generator and the
+> silent-softening watchdog all landed 2026-08-06. What they measured lives
+> where it belongs: CHANGELOG (what shipped), SCORING.md (score semantics and
+> the generation rule), docs/corpus.md (the bill and the sweep),
+> docs/watchdog.md (alerting), AGENTS.md (commands).
+>
+> Everything before that is on `main` too — the three original phases
+> (distribution, watchdog, judge trust), iterations 2–4, the 2026-07-27 block
+> series (bughunt follow-up, hardening backlog, forge watching, presentation
+> + author ledger), the long view (backfill, phases/events/heatmap), the
+> second axis (pins → substance → first-party expansion → findings/lenses →
+> substance coverage; shipped as v0.7.0 on 2026-08-03), and the
+> reconciliation layer (claims meet findings — landed 2026-08-03). This file
+> carries only what is open; the landed plans and their dated landed notes
+> live in this file's git history (up to `039460a`).
 
-The original framing, kept because the measurement under it refutes the part
-about the baseline: completeness moved by up to 50 points today through
-*correct* fixes. The watch state holds records from four scoring generations
-side by side and cannot tell them apart, so the baseline median, the relative
-alert and the drift detection all compare across a discontinuity they cannot
-see. Put the scoring generation into each `RepoState.history` entry and into
-every report; have the dashboard mark a history that spans more than one, and
-make the baseline refuse to average across generations. Until this exists,
-every improvement quietly damages the series it is measured on — including the
-repair in step 5.
+## Open (2026-08-06): what the instruments found and nobody has closed
 
-**Measured 2026-08-06 — the discontinuity this entry is built on is not
-there.** v0.9.0 against v0.10.0, `--judge off --baseline 0`, every release in
-every watched repo's baseline window: **90 pairs, 80 bit-identical in all
-three components.** Nine of the thirteen medians move by exactly 0; the four
-that move go 74 → 69, 32 → 30, 31 → 30, 67 → 66. `SCORE_DROP` is 20. Nothing
-in the baseline, the relative alert or the drift detector can see a shift
-that small, so the premise — records from several generations dragging the
-median across a break — measures as false on this corpus.
+The "running it teaches it" block is built. Six of its seven entries landed on
+2026-08-06; the two below are what those instruments then found, and neither
+has a repair that survives measurement yet.
 
-What is real: alerts go from 16 to 19, and all three additions are
-`zed@v1.12.0`, `zed@v1.14.2` and `sniffnet@v1.5.0`. In each one the alert bar
-is *identical* on both sides (53 → 53, 12 → 12) and only the critical-flag
-count moves (0 → 1, 0 → 1, 0 → 3). They fire through `isFlagged()`'s
-unconditional branch, which never consults the baseline at all — and they are
-*correct*: those commits really are undocumented, and the old rule counted
-them as covered because a claim said `` `tab` ``.
+**The line that block did not cross, and this one does not either.** What
+running the tool teaches is *where it is wrong* and *where it wastes work*. It
+never teaches the tool to look better. Verdicts, weights and bars stay decided
+by a person, changed with an A/B, and frozen afterwards — a threshold that
+drifts by itself makes every score incomparable with every other and turns the
+frozen references into decoration. Nothing here adjusts a number to improve a
+score.
 
-So the damage is not a false alert. It is that the operator reads a correct
-alert against a median a different rule produced — and that `segmentPhases()`
-will open a phase with reason `level-shift`, the tool asserting zed changed
-its note culture on the day this repo changed its measuring stick.
-`PHASE_SHIFT` is 20, the same magnitude, so the long view mislabels a
-generation boundary as an event in the repo. That consumer is not in the list
-above, and it is the only one that states something false rather than
-comparing across a gap it cannot see. Build this for the long view first;
-the baseline can wait for a rule change that actually moves a median.
+The instruments now on hand, and what each is for:
 
-One measurement note, because it cost a wrong conclusion first: the A/B's own
-first pass ran twelve workers in parallel, tripped GitHub's rate limit, and
-produced a `sniffnet@v1.5.1` reading of +15 that was pure artefact — the fix
-in 0.10.1 is that a release the tool could not fully read now reports
-completeness as unknown instead of better. Re-measured serially, that release
-is bit-identical. Any future A/B here must filter runs carrying load warnings
-before it counts anything.
+| Command | Answers |
+|---|---|
+| `pnpm corpus-stats <dir>` | where the judge bill goes, by claim class — the axis a free deterministic rule can be built on |
+| `pnpm sweep <dir>` | what a hand-set bar costs on detection, golden fidelity and judge calls. Reports; never writes a constant |
+| `pnpm mutate-notes <dir>` | do the deterministic stages catch a release that lies — five classes, frozen rates |
+| `pnpm mutate-notes <dir> --generate` | …and one the model writes, whose survivors are leads to read |
+| `comparerelease --add-golden` | a wrong verdict becomes a regression case, in the `field` category that never moves the frozen fitness gate |
 
-Design note for whoever builds it: the generation must be an explicit
-constant, not `VERSION`. The cache is keyed by tool version and over-keying
-there costs only judge calls; over-keying the baseline is fatal — every
-release would empty the series, and with `BASELINE_MIN_CHECKS = 3` each one
-would leave three checks with no relative alert at all.
+The precedent both entries below are measured against is the bump block. It
+did not start as a plan; it started as a corpus count — 8 of 12 contradicted
+claims were dependency bumps — and ended as a deterministic rule that is
+*both* more accurate than the judge on that class and free.
 
-### 2. The golden set grows out of the watch home
-
-Today a wrong verdict has no way back into the tool: the issue template ends
-at a human, and every one of the golden cases was invented by hand. Add a way
-to lift a claim out of a stored report with the verdict it *should* have had
-(`--add-golden <report.json> <claim-id> <verdict> [why]`). From then on every
-misjudgement anyone noticed is a regression test, and the judge calibration
-runs against cases that actually occurred. The human decides what is right —
-that is the point, not a limitation.
-
-### 3. Corpus statistics as the source of efficiency
-
-`judgeBalance()` already counts fresh and cached calls per run; nothing looks
-at *what* they were spent on. A re-check of one large release cost 230 fresh
-calls. Extend `pnpm corpus-stats` to break the judge bill down by claim class
-(bump, generated entry, meta, anchored-and-strong, unanchored-lexical) and by
-outcome, so the classes where the judge adds variance instead of evidence
-become visible the way the bump class did. Each one found is a deterministic
-rule that costs nothing and answers better.
-
-### 4. Threshold search as a tool, never as automation
-
-The bars are hand-set constants — `>= 5`, `MATCH_BAR = 3`, the 0.5 file
-majority, `0.25`. Three of them were changed by feel this week and measured
-afterwards. Build a script that sweeps them over the corpus and prints the
-Pareto front: detection rate against golden-set fidelity against judge cost.
-It reports; a person picks the point; the constant stays a constant in the
-source with the measurement in its comment.
-
-### 5. `omission` 32/34 — coverage's fourth route, two cases left
+### 1. `omission` 32/34 — coverage's fourth route, two cases left
 
 Mostly closed 2026-08-06. The union was never the whole story: what covered
 the commits it should not was *bump-claim evidence*, which is `go.mod` and
@@ -190,7 +98,7 @@ What that leaves for whoever reopens it: churn share cannot tell "this commit
 A signal that can would have to read the pin move against the rest of the
 commit's *substance* rather than its size — and it has to survive v7.1.0.
 
-### 6. `inverted-claim` — built, and it found one on the first corpus
+### 2. `inverted-claim` — built, and it found one on the first corpus
 
 Built 2026-08-06 as `pnpm mutate-notes --generate`. A model rewrites a claim
 the control run VERIFIED so that it asserts the opposite; the diff
@@ -214,13 +122,6 @@ Whoever closes it starts from what that implies rather than from the bar: the
 question is whether a claim whose evidence is *only* identifier overlap should
 be settled deterministically at all, or should always cost a judge call — and
 `pnpm corpus-stats` now prices that: `anchored-strong` is 5.6 % of the bill.
-
-### 7. A watchdog for silent softening
-
-22 of 101 checked releases carried `judge-unavailable`, and that fallback is
-by construction the milder reading. There is a flag per release and nothing
-that notices a *streak*: three runs in a row judging without a judge is an
-alarm, not a score.
 
 ---
 
