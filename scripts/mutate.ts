@@ -116,6 +116,12 @@ const MUTANTS: Mutant[] = [
     replace: "false)",
   },
   {
+    guard: "a verified resting on identifier overlap alone still costs a judge call",
+    file: "src/verify.ts",
+    find: "route.identifierOnly)",
+    replace: "false)",
+  },
+  {
     guard: "fenced code blocks never become claims",
     file: "src/claims.ts",
     find: "if (inFence) continue;",

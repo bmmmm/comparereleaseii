@@ -234,11 +234,16 @@ for (const r of reports) byRepo.set(r.repoLabel, [...(byRepo.get(r.repoLabel) ??
  * asserts nothing about this release.
  */
 function wouldReachJudge(r: ClaimResult): boolean {
-  return (
-    r.verdict !== "skipped" &&
-    r.verdict !== "verified" &&
-    !r.evidence.methods.includes("pin-anchor")
-  );
+  if (r.verdict === "skipped") return false;
+  if (r.evidence.methods.includes("pin-anchor")) return false;
+  if (r.verdict !== "verified") return true;
+  // A `verified` the deterministic pass reached on identifier overlap alone is
+  // not settled — `verifyClaims` sends it to a judge anyway (`identifierOnly`
+  // there). Read off the stored result, that is a verdict nobody judged, whose
+  // evidence is lexical, and which is not true by construction. Missing this
+  // case does not just understate the bill: `pnpm sweep` reads this axis to
+  // price a bar, so a bar that moves overlap-only claims would have looked free.
+  return !r.generated && r.evidence.methods.includes("lexical");
 }
 
 const cases: Case[] = [];

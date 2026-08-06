@@ -106,6 +106,17 @@ interface Pending {
   hunkPool: DiffFile[];
   commits: Commit[];
   generated: boolean;
+  /**
+   * The `verified` this route would settle on rests on nothing but identifier
+   * overlap — the claim's symbols appear in the diff, and no one read what the
+   * sentence says about them. Overlap is blind to negation: "Fix support for
+   * IPinfo's databases" and "Break support for IPinfo's databases" carry the
+   * same `country`/`country_code` spans and score identically, so the second
+   * one settles as verified against a diff that demonstrably does the first.
+   * That is the `inverted-claim` survivor of 2026-08-06, and it is why such a
+   * verdict is a lead for the judge rather than an answer.
+   */
+  identifierOnly: boolean;
   fallback: { verdict: ClaimResult["verdict"]; confidence: number; reasoning: string };
 }
 
@@ -357,6 +368,9 @@ function routeAnchored(claim: Claim, anchors: AnchorMatch, pool: DiffFile[]): Ro
     },
     hunkPool: pool,
     generated,
+    // A generated entry is true by construction and costs no call; a `strong`
+    // reached any other way is identifier overlap and nothing more.
+    identifierOnly: !generated && lex.score >= 5,
     fallback: strong
       ? {
           verdict: "verified",
@@ -390,6 +404,7 @@ function routeUnanchored(claim: Claim, data: ReleaseData): Route {
     },
     hunkPool: data.files,
     generated: false,
+    identifierOnly: lex.score >= 5,
     fallback:
       lex.score >= 5
         ? {
@@ -620,8 +635,20 @@ export async function verifyClaims(
     }
 
     // Both routes share one rule: anything the diff does not settle outright
-    // goes to the judge, and `--judge all` sends everything.
-    if (useJudge && (opts.judgeMode === "all" || route.fallback.verdict !== "verified")) {
+    // goes to the judge, and `--judge all` sends everything. A `verified` that
+    // rests on identifier overlap alone is not settled outright — overlap
+    // cannot see that a sentence asserts the opposite of what the diff does
+    // (see `identifierOnly`), so it buys the claim a reading, not a verdict.
+    // Measured on the 108-release corpus: 61 claims of 5013 take this branch
+    // newly, about 3 % on top of 1924 judged. The bump route is untouched —
+    // a pin delta is evidence, not overlap — and with `--judge off` nothing
+    // moves at all, so the deterministic contract holds.
+    if (
+      useJudge &&
+      (opts.judgeMode === "all" ||
+        route.fallback.verdict !== "verified" ||
+        route.identifierOnly)
+    ) {
       pending.push({
         claim,
         ...route,

@@ -28,6 +28,13 @@ from a watch home with `cp -R <watch home>/reports tmp/corpus` and then stay in
 the checkout. A session that reaches into `~/release-watch` to measure has left
 the working folder for no reason; the numbers are identical either way.
 
+One thing the checkout cannot hold: `mutate-notes` rebuilds notes from the
+stored reports but reads the **diffs from the clone cache**
+(`$XDG_CACHE_HOME/comparereleaseii`, else `~/.cache/comparereleaseii`). That
+cache stays where it is — it is derived data, it is large, and a clone of
+someone else's repository has no business inside this one. So `tmp/corpus`
+makes the corpus repo-local; it does not make the harness self-contained.
+
 What does *not* change is the user-facing documentation. `~/release-watch` is
 the right answer in README.md and `docs/` because that is where `watch setup`
 puts a real operator's watch home. `tmp/corpus/` is a development convention,

@@ -129,6 +129,40 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **A `verified` that rests on identifier overlap alone now costs a judge
+  call.** Both routes settled a claim outright once its identifiers scored 5
+  against the diff, and `judgeMode: auto` never asks about a claim the
+  deterministic pass already called verified. Overlap cannot see negation:
+  "Fix support for IPinfo's databases (the most recent version renamed the
+  `country` field to `country_code`)" and the same sentence with **Break**
+  carry the same two spans, hit the same files and score the same 5. The
+  second one was settled as verified against a diff that demonstrably does the
+  first — found by `--generate` on its first corpus, and the reason that class
+  exists.
+
+  Overlap now buys a claim a reading, not a verdict. Measured on a 108-release
+  watch home: 61 claims of 5013 take the new branch, about 3 % on top of the
+  1924 already judged. The bump route is untouched — a pin delta is evidence,
+  not overlap — an entry true by construction still costs nothing, and with
+  `--judge off` every output is bit-identical, so the deterministic contract
+  holds. The five frozen detection rates are measured judge-off and do not
+  move; the README's validation table does not either: headscale v0.29.2 is
+  the only one of the five carrying such claims (two), re-measured with a judge
+  at 100, and the other four carry none.
+
+  **The survivor this was found by is still open, and it moved.** With the
+  route repaired, a model reads the sentence and still gets it wrong — haiku
+  passes the "Break support" inversion, sonnet passes a version that reverses
+  the field rename itself. The parenthetical describes the diff correctly
+  either way, and the judge settles on the half it can confirm. That is a
+  prompt question now, not a routing one; ROADMAP.md carries it.
+
+- **`mutate-notes` priced the judge bill off a copy of the routing rule, and
+  the copy went stale.** `wouldReachJudge` mirrored `verifyClaims` by hand, so
+  the moment routing changed it silently undercounted — and `pnpm sweep` reads
+  that axis to decide what a threshold costs, which would have made a bar that
+  moves overlap-only claims look free.
+
 - **The Markdown report carries the baseline and the repo context, like the
   other two formats already did.** A trust score answers "how well does this
   release document itself"; the baseline line answers "compared to what" —

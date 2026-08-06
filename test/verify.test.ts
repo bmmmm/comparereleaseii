@@ -575,6 +575,67 @@ test("a note echoing its own commit subject is not evidence about the diff", asy
   assert.match(deterministic.reasoning, /restates the commit subject/);
 });
 
+test("identifier overlap alone buys a reading, not a verified verdict", async () => {
+  // GyulyVGC/sniffnet@v1.4.1 — the `inverted-claim` survivor found on
+  // 2026-08-06. The real note and a version negating it carry the same two
+  // spans, hit the same diff and score the same 5, so overlap cannot tell
+  // them apart. Pre-fix both settled as verified (0.80) with no judge call:
+  // `judgeMode: auto` never asks about a claim the deterministic pass already
+  // called verified.
+  const renamed = {
+    path: "src/networking/manage_packets.rs",
+    status: "modified",
+    additions: 3,
+    deletions: 2,
+    patch:
+      "@@ -1,4 +1,5 @@ fn lookup_country(ip: &IpAddr)\n" +
+      "-    let country = record.country;\n" +
+      "+    let country_code = record.country_code;\n",
+  };
+  const data = {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [] as Commit[],
+    files: [renamed],
+    commitFiles: async () => [renamed],
+    warnings: [] as string[],
+  };
+  const spanned = (text: string): Claim => {
+    const c = claim(text);
+    c.codeSpans = ["country", "country_code"];
+    return c;
+  };
+  const honest = "Fix support for IPinfo's databases (the most recent version renamed the `country` field to `country_code`)";
+  const inverted = honest.replace("Fix", "Break");
+
+  for (const text of [honest, inverted]) {
+    let judged = 0;
+    const engine = {
+      name: "counting",
+      judge: async () => {
+        judged++;
+        return '{"verdict":"partial","confidence":1,"files":[],"reasoning":"read the sentence"}';
+      },
+    };
+    const [result] = await verifyClaims(data, [spanned(text)], {
+      judgeMode: "auto", engine, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+    });
+    assert.equal(judged, 1, `overlap-only evidence must reach the judge: ${text.slice(0, 20)}`);
+    assert.equal(result.judged, true);
+    assert.equal(result.verdict, "partial");
+  }
+
+  // With no judge the deterministic contract stands: same input, same output
+  // as before — the fallback still reads verified, and says so on overlap.
+  const [deterministic] = await verifyClaims(data, [spanned(inverted)], {
+    judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(deterministic.verdict, "verified");
+  assert.equal(deterministic.judged, false);
+});
+
 test("one identifier hit in the linked commit is a lead, not a verified verdict", async () => {
   const linked: Commit = { sha: "aa11bb22cc", subject: "chore: tidy", body: "", author: "dev", prNumbers: [7] };
   const file = {

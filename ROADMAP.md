@@ -108,20 +108,45 @@ frozen reference: its expectation carries one link the other five do not —
 whether the model really inverted the sentence rather than rewording it — so
 a survivor is a lead to read by hand, not a rate.
 
-**The survivor it found, still open.** `GyulyVGC/sniffnet@v1.4.1`: *"Fix
-support for IPinfo's databases"* inverted to *"**Break** support for IPinfo's
-databases"* comes back `verified`. The inversion keeps every identifier, the
-lexical bar clears on those identifiers alone, and the claim is settled before
-any judge reads the sentence — `judgeMode: auto` never asks about a claim the
+**The survivor it found.** `GyulyVGC/sniffnet@v1.4.1`: *"Fix support for
+IPinfo's databases"* inverted to *"**Break** support for IPinfo's databases"*
+comes back `verified`. The inversion keeps every identifier, the lexical bar
+clears on those identifiers alone, and the claim is settled before any judge
+reads the sentence — `judgeMode: auto` never asks about a claim the
 deterministic pass already called verified. It is the same mistake the other
 three holes were, found by a class nobody would have written.
 
-Whoever closes it starts from what that implies rather than from the bar: the
-`lexical-bar` sweep (`pnpm sweep`, 2026-08-06) shows raising it costs six of
-28 detections and buys three judge calls, so the number is not the fix. The
-question is whether a claim whose evidence is *only* identifier overlap should
-be settled deterministically at all, or should always cost a judge call — and
-`pnpm corpus-stats` now prices that: `anchored-strong` is 5.6 % of the bill.
+**Half of it is closed (2026-08-07), and the half that is left moved house.**
+The route is repaired: a `verified` resting on identifier overlap alone is no
+longer settled deterministically, it buys the claim a judge call
+(`identifierOnly` in `src/verify.ts`). Overlap cannot see negation, so it was
+never entitled to end the question. Measured on the 108-release corpus: 61
+claims of 5013 take that branch newly, roughly 3 % on top of 1924 judged. The
+five deterministic detection rates do not move — they are measured judge-off,
+where nothing routes anywhere — and `--judge off` stays bit-identical.
+
+What that did **not** do is catch the survivor, and this is the finding:
+
+    haiku    "Fix support…" → "Break support…"                  → verified
+    sonnet   the field rename reversed (country_code → country) → verified
+
+Both readings are now made by a model that was handed the diff, and both are
+wrong. The claim's parenthetical (*"the most recent version renamed the
+`country` field to `country_code`"*) describes the diff correctly whichever way
+the sentence is flipped, and the judge settles on the half it can confirm. So
+the open question is no longer routing or the lexical bar — the
+`lexical-bar` sweep (`pnpm sweep`, 2026-08-06) already showed raising it costs
+six of 28 detections — it is that **a claim is judged as a whole while its
+truth lives in one clause**. Whoever picks this up starts at the prompt in
+`src/judge.ts`, not at a threshold, and the cheap first probe is whether asking
+about the leading assertion separately from its justification changes either
+verdict above.
+
+One correction to the entry this replaces: it priced the repair off
+`anchored-strong` (5.6 % of the bill). That is the wrong class — the sniffnet
+claim names no commit, so it is `unanchored-lexical` (2.7 %). The number that
+actually governs is the 61 above, which spans both classes and is countable
+from any watch home.
 
 ---
 
