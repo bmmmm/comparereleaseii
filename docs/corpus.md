@@ -171,6 +171,42 @@ The 106 bump claims across the corpus are now counted apart by
 7.6 % of them contradicted against 0.14 % for every other claim, which is
 the ratio this whole line of work started from.
 
+## Where the judge bill goes
+
+The bump class was found by counting: it dominated one column, and the
+deterministic rule that replaced it is both cheaper and more accurate than
+the model was. `pnpm corpus-stats` now breaks the whole judge bill down the
+same way, so the next such class can be found the same way instead of
+noticed by accident.
+
+The classes are the **routes** a claim takes, not its topic — what separates
+them is the evidence the deterministic pass already held before anything was
+asked:
+
+| Class | what it means |
+|---|---|
+| `bump` | names a pin and a version; the diff's own pin delta settles it |
+| `generated` | PR-list boilerplate whose title equals the squash commit |
+| `anchored-strong` | names a commit in the range *and* its identifiers appear in that commit's diff |
+| `anchored-weak` | names a commit, but the claim text could not be matched to its diff |
+| `unanchored-lexical` | no commit, but identifiers hit somewhere in the release diff |
+| `unanchored-none` | no commit, no identifier match |
+| `meta` | asserts nothing about this release — links, thanks, headings |
+
+Per class the report gives claims, how many reached a judge, a floor on the
+calls spent, that class's share of the bill, how many went through the
+independent verification passes, and how many of *those* came back with the
+passes disagreeing. The last column is the sharp one: the same engine, the
+same prompt, a different answer means the judge is contributing variance
+rather than evidence, and on that class a deterministic rule cannot do worse
+than a coin.
+
+Call counts are deliberately a **floor**. A report records that a judge
+answered, that a second engine reviewed, and every vote a verification pass
+returned. It records nothing about a `need` round that asked for more files,
+a pass that threw, an escalation that failed, or a surplus audit that found
+nothing — so a class that already looks expensive here is only more so.
+
 ## What this does not show
 
 - **One judge.** Every verdict here comes from `claude-cli/haiku`. A

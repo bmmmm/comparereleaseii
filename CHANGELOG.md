@@ -6,6 +6,23 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **`pnpm corpus-stats` breaks the judge bill down by claim class.** The
+  existing counter knows how many judge calls a run made and nothing about
+  what they bought. The bump class — the one place where counting the corpus
+  produced a deterministic rule that is both free and more accurate than the
+  model was — was found by accident; this is the instrument that would have
+  found it on purpose.
+
+  Claims are partitioned into the routes they take (`bump`, `generated`,
+  `meta`, `anchored-strong`, `anchored-weak`, `unanchored-lexical`,
+  `unanchored-none`), and per class the report gives the claims, how many
+  reached a judge, that class's share of the call bill, and how many of the
+  claims that went through the independent verification passes came back with
+  the passes disagreeing — the same engine, the same prompt, a different
+  answer. Plus the verdict distribution per class. Call counts are stated as
+  a floor: a `need` round, a pass that threw and an escalation that failed
+  leave no trace in a report, so an expensive-looking class is only more so.
+
 - **`--add-golden` — a wrong verdict you noticed has a route back into the
   tool.** Every golden case used to be invented by hand, and a misjudgement
   spotted in the field ended at a human: the issue template is where it

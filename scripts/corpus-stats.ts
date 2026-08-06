@@ -10,7 +10,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Report } from "../src/types.ts";
-import { aggregate, dedupeReports } from "./corpus-aggregate.ts";
+import { CLAIM_CLASSES, aggregate, dedupeReports } from "./corpus-aggregate.ts";
 
 const args = process.argv.slice(2);
 const named = args.includes("--named");
@@ -123,6 +123,51 @@ for (const v of ["verified", "partial", "no-evidence", "contradicted", "skipped"
 out.push(
   `| Contradicted rate | **${rate(b.verdicts.contradicted ?? 0, b.claims)}** | **${rate(b.otherVerdicts.contradicted ?? 0, others)}** |`,
 );
+out.push("");
+out.push(`## The judge bill, by claim class`);
+out.push("");
+out.push(
+  `Where the judge calls went. The classes are the ROUTES a claim takes, not` +
+    ` its topic: what separates them is the evidence the deterministic pass` +
+    ` already had before anything was asked. A class that costs a large share` +
+    ` of the bill and answers with variance — the same engine, the same` +
+    ` prompt, passes that disagree — is a candidate for a deterministic rule,` +
+    ` the way the bump class was.`,
+);
+out.push("");
+out.push(
+  `Call counts are a **floor**: the report records that a judge answered, that` +
+    ` a second engine reviewed, and every vote an independent pass returned.` +
+    ` It records nothing about a \`need\` round that asked for more files, a` +
+    ` verification pass that threw, an escalation that failed, or a surplus` +
+    ` audit that found nothing. A class that looks expensive here is only more so.`,
+);
+out.push("");
+const bill = summary.judgeBill;
+out.push(`| Class | Claims | Judged | Calls (≥) | Share of bill | Second look | Split votes | Judge failed |`);
+out.push(`|---|---:|---:|---:|---:|---:|---:|---:|`);
+for (const cls of CLAIM_CLASSES) {
+  const cb = bill.byClass[cls];
+  if (!cb) continue;
+  out.push(
+    `| \`${cls}\` | ${cb.claims} | ${cb.judged} | ${cb.calls} | ${pct(cb.calls, bill.calls)} |` +
+      ` ${cb.secondLook} | ${cb.split} | ${cb.failed} |`,
+  );
+}
+out.push(
+  `| **total** | **${summary.claims}** | **${summary.judged}** | **${bill.calls}** | | | | |`,
+);
+out.push("");
+out.push(`### What each class answered`);
+out.push("");
+const VERDICT_ORDER = ["verified", "partial", "no-evidence", "contradicted", "skipped"];
+out.push(`| Class | ${VERDICT_ORDER.map((v) => `\`${v}\``).join(" | ")} |`);
+out.push(`|---|${VERDICT_ORDER.map(() => "---:").join("|")}|`);
+for (const cls of CLAIM_CLASSES) {
+  const cb = bill.byClass[cls];
+  if (!cb) continue;
+  out.push(`| \`${cls}\` | ${VERDICT_ORDER.map((v) => cb.verdicts[v] ?? 0).join(" | ")} |`);
+}
 out.push("");
 out.push(`## Score labels`);
 out.push("");
