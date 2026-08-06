@@ -743,7 +743,14 @@ export function computeMetrics(opts: {
   }));
 
   let churnCoveredRatio: number | null = null;
-  if (coverage) {
+  // A commit whose diff could not be fetched contributes no churn, so it
+  // leaves the ratio's denominator entirely — and the fewer commits a run
+  // manages to read, the better documented the release looks. That is the one
+  // direction this tool must never move in, so an unreadable commit makes
+  // completeness unknown instead of flattering: null takes the same route a
+  // release with --no-reverse takes, where the score reads as not measured
+  // rather than as measured and clean.
+  if (coverage && coverage.unreadableShas.size === 0) {
     let total = 0;
     let covered = 0;
     for (const [sha, cfiles] of coverage.commitFiles) {

@@ -32,6 +32,12 @@ const MUTANTS: Mutant[] = [
     replace: "else if (false) overall = Math.min(overall, 45);",
   },
   {
+    guard: "a release the tool could not fully read reports completeness as unknown",
+    file: "src/metrics.ts",
+    find: "if (coverage && coverage.unreadableShas.size === 0) {",
+    replace: "if (coverage) {",
+  },
+  {
     guard: "an unverifiable release is capped and labeled, never 'solid'",
     file: "src/metrics.ts",
     find: "overall: Math.min(overall, UNVERIFIED_CAP),",

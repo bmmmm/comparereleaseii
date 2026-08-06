@@ -594,6 +594,16 @@ export interface Coverage {
   commitFiles: Map<string, DiffFile[]>;
   /** Merge commits — bundles of other commits, neutral for coverage math. */
   mergeShas: Set<string>;
+  /**
+   * Commits whose own diff could not be fetched. They are NOT the same as
+   * commits that changed nothing, and the difference decides a score: an
+   * empty file list contributes zero churn, so treating a failed fetch as
+   * one drops that commit out of the coverage ratio's denominator and the
+   * release reads as better documented the less of it could be read. Seen
+   * for real on 2026-08-06 — 14 commit diffs lost to a rate limit took
+   * `GyulyVGC/sniffnet@v1.5.1` from completeness 1 to 100.
+   */
+  unreadableShas: Set<string>;
 }
 
 /** Completeness check: which commits are not covered by any release-note claim? */
@@ -629,8 +639,12 @@ export async function computeCoverage(
       .flatMap((r) => r.evidence.files),
   );
 
+  const unreadableShas = new Set<string>();
   const commitFileLists = await pooled(data.commits, 6, (c) =>
-    data.commitFiles(c.sha).catch(() => [] as DiffFile[]),
+    data.commitFiles(c.sha).catch(() => {
+      unreadableShas.add(c.sha);
+      return [] as DiffFile[];
+    }),
   );
   const commitFiles = new Map<string, DiffFile[]>();
   data.commits.forEach((c, i) => commitFiles.set(c.sha, commitFileLists[i]));
@@ -699,5 +713,5 @@ export async function computeCoverage(
     });
   });
   uncovered.sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions));
-  return { uncovered, coveredShas: covered, evidenceFiles, commitFiles, mergeShas };
+  return { uncovered, coveredShas: covered, evidenceFiles, commitFiles, mergeShas, unreadableShas };
 }

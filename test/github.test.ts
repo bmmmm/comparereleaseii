@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   assertRepoSlug,
   extractPrNumbers,
+  ghApi,
   pickBaseRelease,
+  rateLimitHooks,
   ref,
   type GhRelease,
 } from "../src/sources/github.ts";
@@ -122,4 +127,116 @@ test("extractPrNumbers reads the merge dialect of whichever forge cut the commit
   // A version in parentheses is not a review reference.
   assert.deepEqual(extractPrNumbers("Release (1.2.0)"), []);
   assert.deepEqual(extractPrNumbers("Fix the thing"), []);
+});
+
+test("a rate limit is waited out, not answered with partial data", async () => {
+  // A rate limit is the same request answerable N seconds later, not a
+  // missing resource. Answering it with a load failure is what let a
+  // partially-read release outscore a fully-read one, so ghApi retries once
+  // after the reset — and when the reset is too far out it fails saying so
+  // rather than handing back a hole. The fake `gh` fails the first data call
+  // and succeeds after; `rate_limit` reports a window that has just reset.
+  const dir = await mkdtemp(join(tmpdir(), "crii-gh-"));
+  const marker = join(dir, "called");
+  const reset = Math.floor(Date.now() / 1000) + 1;
+  await writeFile(
+    join(dir, "gh"),
+    `#!/usr/bin/env bash
+if [ "$2" = "rate_limit" ]; then
+  echo '{"resources":{"core":{"remaining":0,"limit":5000,"reset":${reset}}}}'
+  exit 0
+fi
+if [ -f "${marker}" ]; then echo '{"ok":true}'; exit 0; fi
+touch "${marker}"
+echo "gh: API rate limit exceeded for user ID 1" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  const slept: number[] = [];
+  const realSleep = rateLimitHooks.sleep;
+  rateLimitHooks.sleep = async (ms: number) => {
+    slept.push(ms);
+  };
+  try {
+    const got = await ghApi<{ ok: boolean }>("repos/o/r/releases/tags/v1");
+    assert.deepEqual(got, { ok: true }, "the retry after the reset is what answers");
+    assert.equal(slept.length, 1, "it waited exactly once");
+  } finally {
+    rateLimitHooks.sleep = realSleep;
+    process.env.PATH = previousPath;
+  }
+});
+
+test("a rate limit resetting beyond the cap fails naming the wait", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "crii-gh-"));
+  const reset = Math.floor(Date.now() / 1000) + 3600;
+  await writeFile(
+    join(dir, "gh"),
+    `#!/usr/bin/env bash
+if [ "$2" = "rate_limit" ]; then
+  echo '{"resources":{"core":{"remaining":0,"limit":5000,"reset":${reset}}}}'
+  exit 0
+fi
+echo "gh: API rate limit exceeded for user ID 1" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  try {
+    await assert.rejects(
+      () => ghApi("repos/o/r/releases/tags/v1"),
+      // The message has to carry both halves: how long, and that nothing was
+      // scored on what did come back.
+      (err: Error) =>
+        /rate limit/i.test(err.message) &&
+        /resets in ~\d+ min/.test(err.message) &&
+        /partial data/.test(err.message),
+    );
+  } finally {
+    process.env.PATH = previousPath;
+  }
+});
+
+test("a refusal the rate_limit endpoint does not admit is the secondary limit", async () => {
+  // The case that actually happened: twelve parallel workers tripped GitHub's
+  // anti-abuse limit while `rate_limit` still reported core at 5000/5000.
+  // There is no reset to read, so a run that only trusts the endpoint would
+  // give up — but this limit clears in under a minute, so one short wait is
+  // the right answer and a hole in the data never is.
+  const dir = await mkdtemp(join(tmpdir(), "crii-gh-"));
+  const marker = join(dir, "called");
+  await writeFile(
+    join(dir, "gh"),
+    `#!/usr/bin/env bash
+if [ "$2" = "rate_limit" ]; then
+  echo '{"resources":{"core":{"remaining":5000,"limit":5000,"reset":0}}}'
+  exit 0
+fi
+if [ -f "${marker}" ]; then echo '{"ok":true}'; exit 0; fi
+touch "${marker}"
+echo "gh: You have exceeded a secondary rate limit" >&2
+exit 1
+`,
+    { mode: 0o755 },
+  );
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  const slept: number[] = [];
+  const realSleep = rateLimitHooks.sleep;
+  rateLimitHooks.sleep = async (ms: number) => {
+    slept.push(ms);
+  };
+  try {
+    assert.deepEqual(await ghApi<{ ok: boolean }>("repos/o/r/releases/tags/v1"), { ok: true });
+    assert.equal(slept.length, 1);
+    assert.ok(slept[0] > 0 && slept[0] <= 60_000, `waited ${slept[0]}ms, expected a short bounded wait`);
+  } finally {
+    rateLimitHooks.sleep = realSleep;
+    process.env.PATH = previousPath;
+  }
 });

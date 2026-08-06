@@ -344,6 +344,7 @@ test("baselineFlags: the email key matches authors across sources", () => {
       ["abc1234", [{ path: "src/auth/login.ts", status: "modified", additions: 5, deletions: 2 }]],
     ]),
     mergeShas: new Set(),
+    unreadableShas: new Set(),
   };
   const authorFlag = (knownAuthors: string[]) => {
     const base = baselineOf(0.5);
@@ -370,6 +371,7 @@ test("baselineFlags: a broken email→account pairing is the spoofing signature"
     evidenceFiles: new Set(),
     commitFiles: new Map([["abc1234", sensitiveFiles]]),
     mergeShas: new Set(),
+    unreadableShas: new Set(),
   };
   const commit = (email: string, login: string | null | undefined) => ({
     sha: "abc1234",

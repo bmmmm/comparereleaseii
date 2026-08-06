@@ -4,6 +4,40 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **A release the tool could not fully read no longer scores better for it.**
+  Completeness is the share of changed lines the notes cover, and it was
+  computed over the commits whose diffs came back. A commit whose diff could
+  not be fetched came back as an empty file list — indistinguishable from a
+  commit that changed nothing, and a commit that changed nothing contributes
+  no churn. So it left the ratio's denominator entirely, and the less of a
+  release the tool managed to read, the better documented that release
+  appeared. Found while measuring something else on 2026-08-06: twelve
+  parallel workers checking one watch home tripped GitHub's rate limit, and
+  the run that lost 14 commit diffs to it read `GyulyVGC/sniffnet@v1.5.1` at
+  completeness **100** where the complete run reads **1**. The same hole
+  opens on a dropped connection or a deleted commit; the rate limit only made
+  it loud.
+
+  Coverage now records which commits it could not read, and one of them makes
+  completeness `null` — the same "not measured" route `--no-reverse` takes,
+  where the score reads as unknown instead of as measured and clean. That
+  matters twice over, because the same ratio decides whether an undocumented
+  auth/crypto path is a warn or a **critical** flag: reading less could
+  previously both flatter the score and harden a flag, on evidence that was
+  never loaded. An unreadable commit is still reported as undocumented —
+  unknown is not documented.
+
+- **A rate limit is waited out, not answered with a hole.** It is not a
+  missing resource: it is the same request, answerable a known number of
+  seconds later. `ghApi` now retries once after the reset when the wait is
+  bounded (15 min), and otherwise fails naming the reset rather than
+  returning partial data. GitHub's *secondary* limit — the anti-abuse one
+  that refuses a burst while `rate_limit` still reports every window intact,
+  which is exactly what twelve parallel workers hit — publishes no reset at
+  all, so it gets one short bounded wait instead.
+
 ## 0.10.0 — 2026-08-06
 
 ### Added

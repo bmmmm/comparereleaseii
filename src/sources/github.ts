@@ -2,9 +2,83 @@
 import { run } from "../util.ts";
 import type { Commit, DiffFile, ReleaseData, RepoContext } from "../types.ts";
 
+/**
+ * How long a run is willing to sit out a rate limit. GitHub's core window is
+ * an hour, so a limit hit early in one costs nearly that; a watch run that
+ * blocks for an hour is worse than one that stops and says why.
+ */
+export const RATE_LIMIT_MAX_WAIT_MS = 15 * 60 * 1000;
+
+/** Overridable for tests — a real sleep would make them take minutes. */
+export const rateLimitHooks = {
+  sleep: (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)),
+  now: (): number => Date.now(),
+};
+
+function isRateLimited(message: string): boolean {
+  return /rate limit exceeded|secondary rate limit|API rate limit/i.test(message);
+}
+
+/**
+ * What to wait when a request is refused but `rate_limit` reports every window
+ * intact. That combination is GitHub's *secondary* limit — the anti-abuse one
+ * that answers 403 for a burst of concurrent requests and publishes no reset.
+ * Lived through 2026-08-06: twelve parallel workers checking one watch home
+ * hit it while the core window still read 5000/5000. It clears in well under
+ * a minute, so one short wait recovers the run.
+ */
+const SECONDARY_LIMIT_WAIT_MS = 60 * 1000;
+
+/**
+ * When the limit resets, in ms from now — null when it cannot be read.
+ * `gh api rate_limit` does not itself count against the limit.
+ */
+async function rateLimitWaitMs(): Promise<number | null> {
+  try {
+    const { stdout } = await run("gh", ["api", "rate_limit"]);
+    const parsed = JSON.parse(stdout) as {
+      resources?: Record<string, { remaining?: number; limit?: number; reset?: number }>;
+    };
+    const resets = Object.values(parsed.resources ?? {})
+      .filter((r) => typeof r.reset === "number" && (r.remaining ?? 1) < (r.limit ?? 0))
+      .map((r) => r.reset as number);
+    if (!resets.length) return null;
+    // The soonest exhausted window: the caller retries once, and a retry that
+    // is still too early fails with the message rather than looping.
+    return Math.max(0, Math.min(...resets) * 1000 - rateLimitHooks.now()) + 1000;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A rate limit is not a missing resource: it is the same request, answerable
+ * a known number of seconds later. Treating it like a load failure is what
+ * made a partially-read release score *better* than a fully-read one — the
+ * unreadable commits dropped out of the coverage denominator (see
+ * `unreadableShas` in src/verify.ts). So wait it out once when the wait is
+ * bounded, and otherwise fail naming the reset, never return partial data.
+ */
 export async function ghApi<T>(path: string): Promise<T> {
-  const { stdout } = await run("gh", ["api", path]);
-  return JSON.parse(stdout) as T;
+  try {
+    const { stdout } = await run("gh", ["api", path]);
+    return JSON.parse(stdout) as T;
+  } catch (err) {
+    const message = (err as Error).message;
+    if (!isRateLimited(message)) throw err;
+    // No exhausted window means the secondary limit, which publishes no reset.
+    const waitMs = (await rateLimitWaitMs()) ?? SECONDARY_LIMIT_WAIT_MS;
+    if (waitMs > RATE_LIMIT_MAX_WAIT_MS) {
+      throw new Error(
+        `GitHub API rate limit reached, resets in ~${Math.ceil(waitMs / 60000)} min — ` +
+          `waiting is capped at ${RATE_LIMIT_MAX_WAIT_MS / 60000} min. Re-run after the reset, ` +
+          `or narrow the work (fewer repos per run, --baseline 0). Nothing was scored on partial data.`,
+      );
+    }
+    await rateLimitHooks.sleep(waitMs);
+    const { stdout } = await run("gh", ["api", path]);
+    return JSON.parse(stdout) as T;
+  }
 }
 const ghJson = ghApi;
 

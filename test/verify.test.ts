@@ -1033,3 +1033,88 @@ test("an unresolved bump claim still takes the ordinary route", async () => {
   assert.equal(only.verdict, "verified");
   assert.equal(only.judged, true);
 });
+
+test("a commit whose diff cannot be read is recorded, not counted as empty", async () => {
+  // The difference decides a score. An unfetchable commit used to come back
+  // as an empty file list, which is indistinguishable from a commit that
+  // changed nothing — and a commit that changed nothing contributes no churn,
+  // so it leaves the coverage ratio's denominator. Measured on the real thing
+  // 2026-08-06: 14 commit diffs lost to a GitHub rate limit took
+  // GyulyVGC/sniffnet@v1.5.1 from completeness 1 to 100. Reading less made
+  // the release look better documented.
+  const readable: Commit = {
+    sha: "aaaa111122", subject: "Add the loader", body: "", author: "dev", prNumbers: [],
+  };
+  const unreadable: Commit = {
+    sha: "bbbb333344", subject: "Touch everything", body: "", author: "dev", prNumbers: [],
+  };
+  const file = {
+    path: "src/loader.js", status: "modified", additions: 40, deletions: 2,
+    patch: "@@ -1,2 +1,42 @@\n+class PluginLoader {\n+  const lazy = () => import(modulePath);\n+}\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [readable, unreadable], files: [file],
+    commitFiles: async (sha: string) => {
+      if (sha === unreadable.sha) throw new Error("gh: API rate limit exceeded");
+      return [file];
+    },
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+  const cl = claim("Add the `PluginLoader` that lazy-loads via `modulePath`");
+  cl.codeSpans = ["PluginLoader", "modulePath"];
+  const results = await verifyClaims(data, [cl], opts);
+  const coverage = await computeCoverage(data, [cl], results);
+
+  assert.deepEqual([...coverage.unreadableShas], [unreadable.sha]);
+  assert.ok(
+    coverage.uncovered.some((u) => u.commit.sha === unreadable.sha),
+    "it is still reported as undocumented — unknown is not documented",
+  );
+});
+
+test("an unreadable commit makes completeness unknown, never better", async () => {
+  const { computeMetrics } = await import("../src/metrics.ts");
+  const commits: Commit[] = [
+    { sha: "aaaa111122", subject: "Add the loader", body: "", author: "dev", prNumbers: [] },
+    { sha: "bbbb333344", subject: "Touch everything", body: "", author: "dev", prNumbers: [] },
+  ];
+  const file = {
+    path: "src/loader.js", status: "modified", additions: 40, deletions: 2,
+    patch: "@@ -1,2 +1,42 @@\n+class PluginLoader {\n+  const lazy = () => import(modulePath);\n+}\n",
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+  const cl = () => {
+    const c = claim("Add the `PluginLoader` that lazy-loads via `modulePath`");
+    c.codeSpans = ["PluginLoader", "modulePath"];
+    return c;
+  };
+
+  const make = async (failing: string | null) => {
+    const data = {
+      repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+      commits, files: [file],
+      commitFiles: async (sha: string) => {
+        if (sha === failing) throw new Error("gh: API rate limit exceeded");
+        return [file];
+      },
+      warnings: [] as string[],
+    };
+    const c = cl();
+    const results = await verifyClaims(data, [c], opts);
+    const coverage = await computeCoverage(data, [c], results);
+    const context = { languages: null, codeBytes: null, releaseCadenceDays: null };
+    return computeMetrics({ data, results, coverage, context });
+  };
+
+  const whole = await make(null);
+  const partial = await make("bbbb333344");
+  assert.equal(typeof whole.scores.completeness, "number", "a fully read release is measured");
+  assert.equal(
+    partial.scores.completeness,
+    null,
+    "a release the tool could not fully read reports completeness as unknown",
+  );
+  assert.equal(partial.churnCoveredRatio, null);
+});
