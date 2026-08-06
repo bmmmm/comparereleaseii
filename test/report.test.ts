@@ -601,3 +601,51 @@ test("a finding says whether a note claims it, in all three renderers", () => {
     assert.ok(!middle.includes("claimed"), `${label} tagged a finding that is neither: ${middle}`);
   }
 });
+
+// The baseline and the repo context answer "is this normal for this repo?" —
+// without them a churn number has nothing to be big or small against. Both
+// reached the terminal and the HTML page; the Markdown file silently dropped
+// them, which is the one artifact a reader keeps, pastes into an issue, or
+// gets out of a watch run. toMarkdown's own comment says a report on disk
+// must not lose anything, so this holds every renderer to it.
+test("the baseline and the repo context reach all three renderers", () => {
+  const r: Report = {
+    ...report(null),
+    metrics: {
+      ...report(null).metrics,
+      context: {
+        languages: { TypeScript: 650_000, HTML: 340_000, Shell: 10_000 },
+        codeBytes: 1_000_000,
+        releaseCadenceDays: 7,
+      },
+      baseline: {
+        releases: 5,
+        medianChurn: 2172,
+        medianAnchoredCoverage: 0.42,
+        snapshots: [{ tag: "v1", churn: 100, coverage: 0.4 }],
+      },
+    },
+  };
+
+  for (const [label, text] of [
+    ["terminal", terminalOf(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    assert.match(text, /5 releases|5 rel\./, `${label} drops how many releases the baseline saw`);
+    assert.match(text, /median churn ±2172/, `${label} drops the baseline churn`);
+    assert.match(text, /42\s*%/, `${label} drops the baseline note coverage`);
+    assert.match(text, /TypeScript 65\s*%/, `${label} drops the repo's languages`);
+    assert.match(text, /release cadence ~7 d/, `${label} drops the release cadence`);
+  }
+
+  // A repo with neither says nothing about either — no empty "Baseline ():".
+  const bare = report(null);
+  for (const [label, text] of [
+    ["terminal", terminalOf(bare)],
+    ["markdown", toMarkdown(bare)],
+  ] as Array<[string, string]>) {
+    assert.doesNotMatch(text, /Baseline \(/, `${label} printed an empty baseline`);
+    assert.doesNotMatch(text, /^Repo: /m, `${label} printed an empty repo line`);
+  }
+});

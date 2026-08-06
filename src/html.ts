@@ -12,6 +12,7 @@ import {
   findingTagger,
   lensFindings,
   pinDisplayName,
+  topLanguages,
   uncoveredInOrder,
   unverifiableNote,
 } from "./report.ts";
@@ -573,13 +574,7 @@ export function toHtml(report: Report, nav?: ReportNav): string {
   const carried = carriedOver(report);
   const s = m.scores;
   const ctx = m.context;
-  const langs = ctx.languages
-    ? Object.entries(ctx.languages)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 4)
-        .map(([lang, bytes]) => `${lang} ${((bytes / (ctx.codeBytes || 1)) * 100).toFixed(0)}%`)
-        .join(" · ")
-    : "n/a";
+  const langs = topLanguages(ctx, 4) ?? "n/a";
   const style = report.linkStyle;
   const compareUrl = report.linkBase
     ? compareUrlOf(report.linkBase, report.baseRef, report.headRef, style)

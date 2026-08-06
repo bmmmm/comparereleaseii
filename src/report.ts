@@ -103,6 +103,39 @@ export function pinDisplayName(p: PinBump): string {
   return p.firstParty && p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
 }
 
+/** The repo's biggest languages by share of its code, most first. HTML has
+ * room for one more than a terminal line does — the limit is the only thing
+ * that legitimately differs, so it is the parameter. */
+export function topLanguages(context: Report["metrics"]["context"], limit: number): string | null {
+  if (!context.languages) return null;
+  return Object.entries(context.languages)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([lang, bytes]) => `${lang} ${((bytes / (context.codeBytes || 1)) * 100).toFixed(0)}%`)
+    .join(" · ");
+}
+
+/** How this release compares to the repo's own recent ones, or null when there
+ * is no baseline. Without it a churn number is a number with nothing to be big
+ * or small against. */
+export function baselineLine(report: Report): string | null {
+  const b = report.metrics.baseline;
+  return b
+    ? `Baseline (${b.releases} releases): median churn ±${b.medianChurn} · median note coverage ${Math.round(b.medianAnchoredCoverage * 100)}%`
+    : null;
+}
+
+/** What kind of repo this is — languages, size, how often it ships. */
+export function contextLine(report: Report): string | null {
+  const ctx = report.metrics.context;
+  const langs = topLanguages(ctx, 3);
+  if (!langs) return null;
+  return (
+    `Repo: ${langs} · ~${((ctx.codeBytes || 0) / 1_000_000).toFixed(1)} MB code` +
+    (ctx.releaseCadenceDays ? ` · release cadence ~${ctx.releaseCadenceDays} d` : "")
+  );
+}
+
 /** The sentence a bump line makes — kept here so the terminal and the Markdown
  * report cannot drift into describing the same mismatch two different ways. */
 export function bumpDetail(b: BumpLine): string {
@@ -390,28 +423,10 @@ export function printTerminal(report: Report): void {
   if (note) {
     console.log(`${c.bold(`${note.heading}:`)} ${c.cyan(note.reason)}`);
   }
-  const b = report.metrics.baseline;
-  if (b) {
-    console.log(
-      c.dim(
-        `Baseline (${b.releases} releases): median churn ±${b.medianChurn} · median note coverage ${Math.round(b.medianAnchoredCoverage * 100)}%`,
-      ),
-    );
-  }
-  const ctx = report.metrics.context;
-  if (ctx.languages) {
-    const langs = Object.entries(ctx.languages)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([l, b]) => `${l} ${((b / (ctx.codeBytes || 1)) * 100).toFixed(0)}%`)
-      .join(" · ");
-    console.log(
-      c.dim(
-        `Repo: ${langs} · ~${((ctx.codeBytes || 0) / 1_000_000).toFixed(1)} MB code` +
-          (ctx.releaseCadenceDays ? ` · release cadence ~${ctx.releaseCadenceDays} d` : ""),
-      ),
-    );
-  }
+  const baseline = baselineLine(report);
+  if (baseline) console.log(c.dim(baseline));
+  const context = contextLine(report);
+  if (context) console.log(c.dim(context));
   if (report.metrics.flags.length) {
     console.log(c.bold("\nRisk flags:"));
     for (const f of report.metrics.flags) {
@@ -631,6 +646,11 @@ export function toMarkdown(report: Report): string {
     "",
     `**Trust score: ${s.overall}/100 (${s.label})** — correctness ${s.correctness} · completeness ${s.completeness ?? "n/a"} · risk ${s.risk}`,
     "",
+    // A score with nothing to compare it against is half the finding. The
+    // terminal and the HTML report both carry these two lines; the file a
+    // reader keeps, pastes into an issue, or gets from a watch run did not.
+    ...(baselineLine(report) ? [baselineLine(report)!, ""] : []),
+    ...(contextLine(report) ? [contextLine(report)!, ""] : []),
     ...(note ? [`> **${note.heading}** — ${note.reason}`, ""] : []),
     ...(carried
       ? [

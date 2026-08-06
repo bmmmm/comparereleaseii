@@ -4,6 +4,23 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **The Markdown report carries the baseline and the repo context, like the
+  other two formats already did.** A trust score answers "how well does this
+  release document itself"; the baseline line answers "compared to what" —
+  median churn and median note coverage across the repo's recent releases —
+  and the context line says what kind of repo it is at all (languages, size,
+  release cadence). The terminal printed both, the HTML page showed both with
+  sparklines, and the Markdown file printed neither, though its own code says
+  a report on disk must not lose anything to a view. That file is the one a
+  reader keeps: it is what `watch` writes next to the HTML, and what gets
+  pasted into an issue. A reader of it saw ±2172 lines of churn with nothing
+  to judge it against.
+
+  Two lines, the same wording the terminal uses. Terminal and HTML output are
+  bit-identical to before; only the Markdown header grows.
+
 ### Changed
 
 - **A dependency-bump claim documents the commits that move the pin it
