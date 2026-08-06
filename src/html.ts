@@ -7,8 +7,12 @@ import {
   bumpSummary,
   carriedOver,
   componentBits,
+  configSurfaceEntries,
   countVerdicts,
+  findingTagger,
   lensFindings,
+  pinDisplayName,
+  uncoveredInOrder,
   unverifiableNote,
 } from "./report.ts";
 import { scoreBreakdown, type ScoreStep } from "./metrics.ts";
@@ -328,14 +332,7 @@ function surfaceHtml(s: ReleaseSurface): string {
         `<tr><td>${esc(t.category)}</td><td>${t.files}</td><td>+${t.additions}/−${t.deletions}</td></tr>`,
     )
     .join("");
-  const cfg = [
-    ...s.envVars.added.map((v) => `+env ${v}`),
-    ...s.envVars.removed.map((v) => `−env ${v}`),
-    ...s.cliFlags.added.map((v) => `+flag ${v}`),
-    ...s.cliFlags.removed.map((v) => `−flag ${v}`),
-    ...s.configKeys.added.map((v) => `+key ${v}`),
-    ...s.configKeys.removed.map((v) => `−key ${v}`),
-  ];
+  const cfg = configSurfaceEntries(s);
   const facts = [
     s.symbols.length
       ? `symbols: ${esc(s.symbols.join(", "))}${s.moreSymbols ? ` (+${s.moreSymbols} more)` : ""}`
@@ -372,12 +369,13 @@ function findingsHtml(report: Report): string {
   const lens = report.audience;
   const view = lensFindings(fin.findings, lens);
   const rec = report.reconciliation;
-  const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
-  const undocumentedIdx = new Set(rec?.undocumented ?? []);
+  const claimedOf = findingTagger(report);
   const tagOf = (f: Finding): string => {
-    const fi = fin.findings.indexOf(f);
-    if (confirmedIdx.has(fi)) return ` <span class="gen">· claimed</span>`;
-    if (undocumentedIdx.has(fi)) return ` <span class="gen" style="color:#d29922">· never claimed</span>`;
+    const claimed = claimedOf(f);
+    if (claimed === "claimed") return ` <span class="gen">· claimed</span>`;
+    if (claimed === "undocumented") {
+      return ` <span class="gen" style="color:#d29922">· never claimed</span>`;
+    }
     return "";
   };
   const budget = budgetLine(report);
@@ -429,7 +427,7 @@ function pinsHtml(pins: PinBump[], components?: ComponentCheck[]): string {
   const thirdParty = pins.filter((p) => !p.firstParty);
   const cards = firstParty
     .map((p) => {
-      const shown = p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
+      const shown = pinDisplayName(p);
       const comp = components?.find(
         (m) => m.repo === p.repo && m.from === p.from && m.to === p.to,
       );
@@ -590,10 +588,7 @@ export function toHtml(report: Report, nav?: ReportNav): string {
   // forges the tiles still link to the compare view, just without the jump.
   const anchorsWork = report.linkBase?.startsWith("https://github.com/") ?? false;
   const hasSuggestions = report.uncovered.some((u) => u.suggestedNote);
-  const uncoveredOrder = report.reconciliation?.uncoveredOrder;
-  const uncoveredListed = uncoveredOrder
-    ? uncoveredOrder.map((i) => report.uncovered[i])
-    : report.uncovered;
+  const { listed: uncoveredListed, reordered: uncoveredOrder } = uncoveredInOrder(report);
   const uncoveredRows = uncoveredListed
     .map(
       (u) =>

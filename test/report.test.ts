@@ -7,10 +7,12 @@ import { computeScores } from "../src/metrics.ts";
 import type {
   ClaimResult,
   ComponentCheck,
+  Finding,
   PinBump,
   Reconciliation,
   ReleaseSurface,
   Report,
+  UncoveredCommit,
   Unverifiable,
 } from "../src/types.ts";
 
@@ -480,4 +482,122 @@ test("bump claims read as one class, and an overtaken line shows both numbers", 
   // No bump claims, no section anywhere.
   assert.doesNotMatch(toMarkdown(report(null)), /Dependency bumps/);
   assert.doesNotMatch(toHtml(report(null)), /Dependency bumps/);
+});
+
+// ---------- decisions all three renderers share ----------
+
+/** Capture what printTerminal writes, so the terminal can be asserted on
+ * next to the Markdown and HTML built from the same report. */
+function terminalOf(r: Report): string {
+  const lines: string[] = [];
+  const orig = console.log;
+  console.log = (...args: unknown[]) => {
+    lines.push(args.join(" "));
+  };
+  try {
+    printTerminal(r);
+  } finally {
+    console.log = orig;
+  }
+  return lines.join("\n");
+}
+
+function uncoveredCommit(sha: string, subject: string): UncoveredCommit {
+  return {
+    commit: { sha, subject, body: "", author: "dev", prNumbers: [] },
+    additions: 1,
+    deletions: 0,
+    fileCount: 1,
+  };
+}
+
+// Reconciliation puts the commits that share files with an undocumented
+// finding first, because that is the one a reader should look at. Every
+// renderer applied the permutation with its own copy of the same two lines,
+// and nothing checked that any of them still did — all three could have gone
+// back to raw order and the suite would not have noticed.
+test("undocumented commits keep the order reconciliation chose, in all three renderers", () => {
+  const uncovered = [
+    uncoveredCommit("aaaaaaaa11", "routine chore"),
+    uncoveredCommit("bbbbbbbb22", "another chore"),
+    uncoveredCommit("cccccccc33", "touches the finding's files"),
+  ];
+  const r: Report = {
+    ...report(null),
+    uncovered,
+    reconciliation: { confirmed: [], undocumented: [], unsupported: [], uncoveredOrder: [2, 0, 1] },
+  };
+
+  const positions = (text: string): number[] =>
+    ["cccccccc", "aaaaaaaa", "bbbbbbbb"].map((sha) => text.indexOf(sha));
+  for (const [label, text] of [
+    ["terminal", terminalOf(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    const [first, second, third] = positions(text);
+    assert.ok(first >= 0 && second >= 0 && third >= 0, `${label} dropped a commit`);
+    assert.ok(first < second && second < third, `${label} ignored uncoveredOrder`);
+    assert.match(text, /ordered: commits sharing files with an undocumented finding first/i, label);
+  }
+
+  // Without a permutation nobody is told about an ordering that did not happen.
+  const plain: Report = { ...report(null), uncovered };
+  assert.doesNotMatch(terminalOf(plain), /ordered: commits sharing/i);
+  assert.doesNotMatch(toMarkdown(plain), /ordered: commits sharing/i);
+  assert.doesNotMatch(toHtml(plain), /ordered: commits sharing/i);
+});
+
+// "· claimed" and "· never claimed" are the whole point of reconciling
+// findings against notes: they say which observed change the notes actually
+// mention. Three renderers each rebuilt those two index sets by hand, and no
+// test read the resulting tag — every tag could have vanished silently.
+test("a finding says whether a note claims it, in all three renderers", () => {
+  const finding = (text: string): Finding => ({
+    kind: "feature",
+    audience: "user",
+    text,
+    files: ["src/a.ts"],
+    subsystem: "src",
+  });
+  const r: Report = {
+    ...report(null),
+    findings: {
+      findings: [finding("claimed by a note"), finding("neither"), finding("nobody wrote this down")],
+      budget: {
+        maxChars: 1000,
+        usedChars: 10,
+        subsystemsRead: 1,
+        subsystemsTotal: 1,
+        filesRead: 1,
+        filesTotal: 1,
+      },
+    },
+    reconciliation: {
+      confirmed: [{ finding: 0, claims: [0] }],
+      undocumented: [2],
+      unsupported: [],
+    },
+  };
+
+  for (const [label, text, claimed, never] of [
+    ["terminal", terminalOf(r), "· claimed", "· never claimed"],
+    ["markdown", toMarkdown(r), "*claimed*", "**never claimed**"],
+    ["html", toHtml(r), "· claimed", "· never claimed"],
+  ] as Array<[string, string, string, string]>) {
+    const at = (needle: string): number => text.indexOf(needle);
+    assert.ok(at("claimed by a note") >= 0, `${label} dropped the confirmed finding`);
+    assert.ok(at("nobody wrote this down") >= 0, `${label} dropped the undocumented finding`);
+    // The tag follows its own finding's text, before the next finding starts.
+    const confirmedTag = text.indexOf(claimed, at("claimed by a note"));
+    assert.ok(
+      confirmedTag > 0 && confirmedTag < at("neither"),
+      `${label} does not mark the confirmed finding as claimed`,
+    );
+    const undocumentedTag = text.indexOf(never, at("nobody wrote this down"));
+    assert.ok(undocumentedTag > 0, `${label} does not mark the undocumented finding`);
+    // The middle finding is neither — it must carry no tag at all.
+    const middle = text.slice(at("neither"), at("nobody wrote this down"));
+    assert.ok(!middle.includes("claimed"), `${label} tagged a finding that is neither: ${middle}`);
+  }
 });

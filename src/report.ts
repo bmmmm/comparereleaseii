@@ -10,7 +10,9 @@ import type {
   Finding,
   FindingKind,
   PinBump,
+  ReleaseSurface,
   Report,
+  UncoveredCommit,
   UnverifiableKind,
   Verdict,
 } from "./types.ts";
@@ -38,6 +40,76 @@ const COLOR: Record<Verdict, (s: string) => string> = {
   contradicted: c.red,
   skipped: c.gray,
 };
+
+// Three renderers — terminal, Markdown, HTML — show the same report in three
+// formats. What differs between them is markup; what must not differ is which
+// entries they pick, in what order, and under which name. Those decisions live
+// here, once, so a change lands in all three or in none.
+
+/** The uncovered commits in the order reconciliation put them — commits that
+ * share files with an undocumented finding first — or their own order when
+ * nothing reordered them. `reordered` is what a renderer says so about. */
+export function uncoveredInOrder(report: Report): {
+  listed: UncoveredCommit[];
+  reordered: boolean;
+} {
+  const order = report.reconciliation?.uncoveredOrder;
+  return {
+    listed: order ? order.map((i) => report.uncovered[i]) : report.uncovered,
+    reordered: Boolean(order),
+  };
+}
+
+/**
+ * Whether a finding is one the notes describe, one no note mentions, or
+ * neither — the decision behind every "· claimed" / "· never claimed" tag.
+ * Returns the verdict, not the markup: each renderer spells it its own way.
+ */
+export function findingTagger(report: Report): (f: Finding) => "claimed" | "undocumented" | null {
+  const fin = report.findings;
+  const rec = report.reconciliation;
+  const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
+  const undocumentedIdx = new Set(rec?.undocumented ?? []);
+  return (f) => {
+    const fi = fin?.findings.indexOf(f) ?? -1;
+    if (confirmedIdx.has(fi)) return "claimed";
+    if (undocumentedIdx.has(fi)) return "undocumented";
+    return null;
+  };
+}
+
+/**
+ * The config surface as one flat list, in the order every renderer shows it:
+ * env vars, CLI flags, config keys, additions before removals. `wrap` is how
+ * the target marks up a value (backticks in Markdown, nothing elsewhere).
+ */
+export function configSurfaceEntries(
+  s: ReleaseSurface,
+  wrap: (value: string) => string = (v) => v,
+): string[] {
+  return [
+    ...s.envVars.added.map((v) => `+env ${wrap(v)}`),
+    ...s.envVars.removed.map((v) => `−env ${wrap(v)}`),
+    ...s.cliFlags.added.map((v) => `+flag ${wrap(v)}`),
+    ...s.cliFlags.removed.map((v) => `−flag ${wrap(v)}`),
+    ...s.configKeys.added.map((v) => `+key ${wrap(v)}`),
+    ...s.configKeys.removed.map((v) => `−key ${wrap(v)}`),
+  ];
+}
+
+/** What to call a pin: a first-party component goes by its repo's own name
+ * ("web" for opencloud-eu/web), everything else by the pin variable. */
+export function pinDisplayName(p: PinBump): string {
+  return p.firstParty && p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
+}
+
+/** The sentence a bump line makes — kept here so the terminal and the Markdown
+ * report cannot drift into describing the same mismatch two different ways. */
+export function bumpDetail(b: BumpLine): string {
+  return b.observed
+    ? `the note says ${b.claimed}, the diff moves it ${b.observed}`
+    : `the note says ${b.claimed}`;
+}
 
 function evidenceLine(r: ClaimResult): string {
   const parts: string[] = [r.evidence.methods.join("+")];
@@ -384,14 +456,7 @@ export function printTerminal(report: Report): void {
         ),
       );
     }
-    const cfg = [
-      ...surf.envVars.added.map((v) => `+env ${v}`),
-      ...surf.envVars.removed.map((v) => `−env ${v}`),
-      ...surf.cliFlags.added.map((v) => `+flag ${v}`),
-      ...surf.cliFlags.removed.map((v) => `−flag ${v}`),
-      ...surf.configKeys.added.map((v) => `+key ${v}`),
-      ...surf.configKeys.removed.map((v) => `−key ${v}`),
-    ];
+    const cfg = configSurfaceEntries(surf);
     if (cfg.length) {
       const shown = cfg.slice(0, 10);
       console.log(
@@ -433,15 +498,15 @@ export function printTerminal(report: Report): void {
       console.log(c.dim(`  lens: ${lens} — security findings show under every lens`));
     }
     const rec = report.reconciliation;
-    const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
-    const undocumentedIdx = new Set(rec?.undocumented ?? []);
+    const tagOf = findingTagger(report);
     for (const f of view.shown) {
-      const fi = fin.findings.indexOf(f);
-      const tag = confirmedIdx.has(fi)
-        ? c.dim(" · claimed")
-        : undocumentedIdx.has(fi)
-          ? c.yellow(" · never claimed")
-          : "";
+      const claimed = tagOf(f);
+      const tag =
+        claimed === "claimed"
+          ? c.dim(" · claimed")
+          : claimed === "undocumented"
+            ? c.yellow(" · never claimed")
+            : "";
       console.log(`  ${kindColor[f.kind](f.kind)} ${c.dim(`[${f.audience}]`)} ${safe(f.text)}${tag}`);
       if (f.files.length) {
         const files = f.files.slice(0, 3).join(", ");
@@ -483,7 +548,7 @@ export function printTerminal(report: Report): void {
         c.dim(` — ${report.pins.length} pinned version(s) bumped in this diff:`),
     );
     for (const p of firstParty) {
-      const shown = p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
+      const shown = pinDisplayName(p);
       console.log(
         `  ${c.cyan("↑")} ${safe(`${shown} ${p.from} → ${p.to}`)} ${c.cyan("first-party")}` +
           (p.repo ? c.dim(` (${safe(p.repo)})`) : ""),
@@ -516,10 +581,7 @@ export function printTerminal(report: Report): void {
     for (const b of bumps.lines) {
       const mark =
         b.status === "contradicted" ? c.red("✘") : b.status === "overtaken" ? c.yellow("↗") : c.dim("·");
-      const detail = b.observed
-        ? `the note says ${b.claimed}, the diff moves it ${b.observed}`
-        : `the note says ${b.claimed}`;
-      console.log(`  ${mark} ${safe(`${b.name} — ${detail}`)}`);
+      console.log(`  ${mark} ${safe(`${b.name} — ${bumpDetail(b)}`)}`);
       if (b.file) console.log(c.dim(`    ${safe(b.file)}`));
     }
   }
@@ -531,9 +593,8 @@ export function printTerminal(report: Report): void {
       c.bold(`\nUndocumented changes`) +
         c.dim(` — ${report.uncovered.length} commit(s) not covered by any note:`),
     );
-    const order = report.reconciliation?.uncoveredOrder;
-    const listed = order ? order.map((i) => report.uncovered[i]) : report.uncovered;
-    if (order) {
+    const { listed, reordered } = uncoveredInOrder(report);
+    if (reordered) {
       console.log(c.dim("  ordered: commits sharing files with an undocumented finding first"));
     }
     for (const u of listed.slice(0, 10)) {
@@ -632,14 +693,7 @@ export function toMarkdown(report: Report): string {
         `- symbols: ${surf.symbols.map((s) => `\`${s}\``).join(", ")}${surf.moreSymbols ? ` (+${surf.moreSymbols} more)` : ""}`,
       );
     }
-    const cfg = [
-      ...surf.envVars.added.map((v) => `+env \`${v}\``),
-      ...surf.envVars.removed.map((v) => `−env \`${v}\``),
-      ...surf.cliFlags.added.map((v) => `+flag \`${v}\``),
-      ...surf.cliFlags.removed.map((v) => `−flag \`${v}\``),
-      ...surf.configKeys.added.map((v) => `+key \`${v}\``),
-      ...surf.configKeys.removed.map((v) => `−key \`${v}\``),
-    ];
+    const cfg = configSurfaceEntries(surf, (v) => `\`${v}\``);
     if (cfg.length) lines.push(`- config surface: ${cfg.join(", ")}`);
     if (surf.migrations.length) {
       lines.push(`- migrations: ${surf.migrations.map((m) => `\`${m}\``).join(", ")}`);
@@ -658,15 +712,15 @@ export function toMarkdown(report: Report): string {
     if (report.audience) lines.push(`Default lens: **${report.audience}**`, "");
     if (fin.summary) lines.push(fin.summary, "");
     const rec = report.reconciliation;
-    const confirmedIdx = new Set(rec?.confirmed.map((l) => l.finding) ?? []);
-    const undocumentedIdx = new Set(rec?.undocumented ?? []);
+    const tagOf = findingTagger(report);
     for (const f of lensFindings(fin.findings, undefined).shown) {
-      const fi = fin.findings.indexOf(f);
-      const tag = confirmedIdx.has(fi)
-        ? " — *claimed*"
-        : undocumentedIdx.has(fi)
-          ? " — **never claimed**"
-          : "";
+      const claimed = tagOf(f);
+      const tag =
+        claimed === "claimed"
+          ? " — *claimed*"
+          : claimed === "undocumented"
+            ? " — **never claimed**"
+            : "";
       const files = f.files.length
         ? ` (${f.files.slice(0, 4).map((p) => `\`${p}\``).join(", ")})`
         : "";
@@ -691,8 +745,7 @@ export function toMarkdown(report: Report): string {
   if (report.pins?.length) {
     lines.push("", "## Version pins moved", "");
     for (const p of report.pins) {
-      const shown = p.firstParty && p.repo ? (p.repo.split("/")[1] ?? p.repo) : p.name;
-      const head = `${shown} ${p.from} → ${p.to}`;
+      const head = `${pinDisplayName(p)} ${p.from} → ${p.to}`;
       lines.push(
         p.firstParty
           ? `- **${head} — first-party**${p.repo ? ` (\`${p.repo}\`)` : ""}${p.releaseUrl ? ` — [release](${p.releaseUrl})` : ""} · \`${p.file}\``
@@ -716,11 +769,8 @@ export function toMarkdown(report: Report): string {
     lines.push(`${bumps.total} bump claim(s) held against the diff's own pins: ${bumps.counts}.`);
     if (bumps.lines.length) lines.push("");
     for (const b of bumps.lines) {
-      const detail = b.observed
-        ? `the note says ${b.claimed}, the diff moves it ${b.observed}`
-        : `the note says ${b.claimed}`;
       lines.push(
-        `- **${b.name}** — ${detail}${b.file ? ` (\`${b.file}\`)` : ""} — ${BUMP_LABEL[b.status]}`,
+        `- **${b.name}** — ${bumpDetail(b)}${b.file ? ` (\`${b.file}\`)` : ""} — ${BUMP_LABEL[b.status]}`,
       );
     }
   }
@@ -730,9 +780,8 @@ export function toMarkdown(report: Report): string {
   } else if (!report.uncovered.length) {
     lines.push("None — all commits in the range are covered by the release notes.");
   } else {
-    const order = report.reconciliation?.uncoveredOrder;
-    const listed = order ? order.map((i) => report.uncovered[i]) : report.uncovered;
-    if (order) {
+    const { listed, reordered } = uncoveredInOrder(report);
+    if (reordered) {
       lines.push("_Ordered: commits sharing files with an undocumented finding first._", "");
     }
     for (const u of listed) {
