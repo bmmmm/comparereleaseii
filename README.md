@@ -397,11 +397,11 @@ against the clone cache, so it needs no key and no network: every expectation
 below is settled deterministically, and a miss here is a miss no model was
 involved in.
 
-Measured on 55 releases (`test/eval/reference-detection.json`, 2026-08-05):
+Measured on 55 releases (`test/eval/reference-detection.json`, 2026-08-06):
 
 | Mutation | What it does | Detected |
 |---|---|---:|
-| `omission` | drops the notes covering a documented high-churn commit | 30/34 |
+| `omission` | drops the notes covering a documented high-churn commit | 32/34 |
 | `bump-overshoot` | restates a settled bump as a version the release did not reach | 22/22 |
 | `bump-undershoot` | restates it as a version the pin never held | 22/22 |
 | `foreign-claim` | plants a claim from a different release of the same repo | 50/50 |
@@ -424,9 +424,16 @@ releases the harness reports a control completeness for, 6 dropped —
 as documented because a claim said `` `tab` ``. Scores from before and after
 this change are not comparable.
 
+`omission` moved 30 → 32 the same way, one layer along: a dependency-bump
+claim's evidence is `go.mod` and `go.sum` — not because the claim describes
+those files but because that is where the version line sits. Pooled with every
+other claim's evidence it covered any commit that happened to touch a
+manifest. Bump claims now document exactly the commits that move the pin they
+name, which is the join that already settles their verdict.
+
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,
-not a side effect. `omission` is the open one at 30/34.
+not a side effect. `omission` is the open one at 32/34.
 
 ### Releasing
 

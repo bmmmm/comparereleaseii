@@ -4,6 +4,48 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **A dependency-bump claim documents the commits that move the pin it
+  names — and nothing else.** Its evidence is `go.mod` and `go.sum`: not
+  because the claim describes those files, but because that is where the
+  version line sits. Coverage pooled every claim's evidence into one union and
+  counted a commit documented when the majority of its files landed in it, so
+  a single dependabot note put the manifests in that union and then covered
+  any commit that happened to touch one. `opencloud@v7.1.0` kept a test fix
+  ("run tests without remote.php") documented off a claim about
+  `golang.org/x/text` — 3 of its 6 files, all three manifests, all three from
+  that one claim. Hiding the notes that really described it changed the score
+  by nothing, which is what `pnpm mutate-notes` had been reporting as a missed
+  `omission` since the harness landed.
+
+  Bump claims now leave the file-majority route and take the one that fits
+  them: `pinBumps()` reads what a commit's own diff moves, and a bump claim
+  covers that commit when the names match — the same join that already settles
+  the claim's verdict, spent on coverage. Versions deliberately need not
+  agree: a release aggregating several bumps of one dependency carries a note
+  for the last of them, and the earlier commits are still the work that note
+  describes.
+
+  **Measured on the 55-release corpus** — `omission` 30/34 → **32/34**, no
+  other class moving, and completeness *up* by 29 points net across the
+  harness's control runs (7 releases rise, 3 fall; `opencloud-eu/web@v7.0.1`
+  gains 42 because its bump commits are now attributed to the notes that name
+  them). The reference is re-frozen there. Three other repairs were measured
+  first and rejected, which is why the code now carries their numbers instead
+  of another suggestion: requiring the majority inside one claim's evidence
+  moves no rate at all, discounting files that many commits touch moves none
+  either, and excluding manifests by file type reaches 33/34 only by counting
+  honestly documented dependency work as undocumented — `opencloud@v7.1.0`
+  falls from 96 to 1 there, and every commit it newly condemns is a bump whose
+  own note names it. Two `omission` cases stay open (`opencloud@v7.3.0`,
+  `opencloud-eu/web@v7.0.0`) rather than be closed that way.
+
+  Deterministic and judge-free, like the rest of coverage. The four releases
+  of the README's validation table come out bit-identical, so that table still
+  holds; scores move only where a release's notes carry bump claims and its
+  range carries manifest churn.
+
 ## 0.10.1 — 2026-08-06
 
 ### Fixed

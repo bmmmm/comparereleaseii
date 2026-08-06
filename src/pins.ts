@@ -388,3 +388,22 @@ export function detectBumpClaim(text: string): ClaimBump | undefined {
   if (!noun && !tick && !PIN_NAME_SHAPE.test(name)) return undefined;
   return from === undefined ? { name, to } : { name, from, to };
 }
+
+/**
+ * The two spellings name the same pin: identical, or one is the other's
+ * path tail — a note writes `DataDog/dd-trace-go/v2` for the module the
+ * manifest spells `github.com/DataDog/dd-trace-go/v2`. The tail has to
+ * start at a path boundary, so `cache` never matches `actions/cache`: a
+ * bare last segment is ambiguous across ecosystems.
+ *
+ * Lives here rather than in reconcile.ts because two callers need it: the
+ * bump join that settles a claim's verdict, and the coverage rule that
+ * decides which commits a bump claim documents.
+ */
+export function sameName(claim: string, pin: string): boolean {
+  const a = claim.toLowerCase();
+  const b = pin.toLowerCase();
+  if (a === b) return true;
+  if (a.includes("/") && b.endsWith(`/${a}`)) return true;
+  return b.includes("/") && a.endsWith(`/${b}`);
+}

@@ -32,6 +32,12 @@ const MUTANTS: Mutant[] = [
     replace: "else if (false) overall = Math.min(overall, 45);",
   },
   {
+    guard: "a bump claim documents only the commits that move the pin it names",
+    file: "src/verify.ts",
+    find: "bumpClaims.some((r) => pins.some((p) => sameName(r.claim.bump!.name, p.name)))",
+    replace: "bumpClaims.length > 0",
+  },
+  {
     guard: "a release the tool could not fully read reports completeness as unknown",
     file: "src/metrics.ts",
     find: "if (coverage && coverage.unreadableShas.size === 0) {",
@@ -508,7 +514,7 @@ const MUTANTS: Mutant[] = [
   },
   {
     guard: "a bare last segment never names a pin (`cache` is not `actions/cache`)",
-    file: "src/reconcile.ts",
+    file: "src/pins.ts",
     find: 'if (a.includes("/") && b.endsWith(`/${a}`)) return true;\n  return b.includes("/") && a.endsWith(`/${b}`);',
     replace: "return a.endsWith(`/${b}`) || b.endsWith(`/${a}`);",
   },

@@ -2,6 +2,7 @@
 import { pooled, truncate } from "./util.ts";
 import { anchorMatch, functionsOf, isChangelogPath, lexicalMatch, rankHunks, tokenize } from "./match.ts";
 import { commitSurface } from "./substance.ts";
+import { pinBumps, sameName } from "./pins.ts";
 import { sensitiveCategory } from "./metrics.ts";
 import {
   buildJudgePrompt,
@@ -633,10 +634,24 @@ export async function computeCoverage(
     }
   }
 
+  // A bump claim's evidence is `go.mod`, `go.sum`, `modules.txt` — not because
+  // the claim describes those files but because that is where the version
+  // line sits. As a fingerprint it is worthless in both directions: pooled
+  // into one union it covers any commit that happens to touch a manifest
+  // (opencloud@v7.1.0 kept a test fix documented off a claim about
+  // `golang.org/x/text`), and taken per claim it covers almost nothing,
+  // because one bump claim owns one line of a file the commit changes
+  // wholesale. So bump claims leave the file-majority route entirely and get
+  // the route that fits them, below: the pin they name.
+  const isBumpClaim = (r: ClaimResult): boolean =>
+    r.claim.bump !== undefined && r.claim.kind === "change";
   const evidenceFiles = new Set(
     results
-      .filter((r) => r.verdict === "verified" || r.verdict === "partial")
+      .filter((r) => (r.verdict === "verified" || r.verdict === "partial") && !isBumpClaim(r))
       .flatMap((r) => r.evidence.files),
+  );
+  const bumpClaims = results.filter(
+    (r) => (r.verdict === "verified" || r.verdict === "partial") && isBumpClaim(r),
   );
 
   const unreadableShas = new Set<string>();
@@ -678,19 +693,38 @@ export async function computeCoverage(
   data.commits.forEach((commit, i) => {
     if (covered.has(commit.sha) || mergeShas.has(commit.sha)) return;
     const files = commitFileLists[i];
-    // A commit mostly touching files already cited as evidence counts as covered.
+    // A bump claim documents the commits that move the pin it names — the
+    // same join that settles its verdict, spent on coverage. Version numbers
+    // deliberately do not have to agree: a release aggregating several bumps
+    // of one dependency has a note for the last of them, and the earlier
+    // commits are still the work that note describes.
+    if (bumpClaims.length && files.length) {
+      const pins = pinBumps(files);
+      if (
+        pins.length &&
+        bumpClaims.some((r) => pins.some((p) => sameName(r.claim.bump!.name, p.name)))
+      ) {
+        covered.add(commit.sha);
+        return;
+      }
+    }
+    // A commit mostly touching files already cited as evidence counts as
+    // covered. The route is claim-independent — the union grows with the
+    // number of claims — and that cost 4 of 34 `omission` mutations until the
+    // bump claims left it (above). Two of those four are still open
+    // (`opencloud@v7.3.0`, `opencloud-eu/web@v7.0.0`), and the two repairs
+    // this comment used to propose are both measured and rejected, on the
+    // 55-release corpus, 2026-08-06:
     //
-    // FIXME(coverage-union): this route is claim-independent — `evidenceFiles`
-    // is the union over every verified/partial claim, so it grows with the
-    // number of claims until it covers commits nothing describes. Measured
-    // 2026-08-06 with `pnpm mutate-notes`: hiding the notes of a 10 056-line
-    // commit in opencloud@v7.2.0 leaves it covered at 144/145 files, and that
-    // union comes from 108 claims, none of which mentions it. It is the reason
-    // 4 of 34 `omission` mutations go unnoticed. Two candidate repairs, both
-    // needing a corpus A/B before anyone believes them: require the majority
-    // to sit in ONE claim's evidence (does nothing for go.mod/go.sum, which
-    // every bump touches), or discount files many commits in the range touch —
-    // a manifest is not a fingerprint. Do not "fix" this by raising 0.5.
+    //   majority inside ONE claim's evidence   omission 30/34, completeness −8
+    //   discount files many commits touch      omission 30/34, completeness +9
+    //   the same by file type, incl. vendor/   omission 33/34, completeness −139
+    //
+    // The third "works" by counting honestly documented dependency commits as
+    // undocumented — opencloud@v7.1.0 falls 96 → 1, and every commit it newly
+    // condemns is a bump whose note names it. Whatever closes the last two has
+    // to keep that in view, and it is not a bigger number here: raising 0.5
+    // was measured and rejected before any of these.
     if (files.length) {
       const hit = files.filter((f) => evidenceFiles.has(f.path)).length;
       if (hit / files.length >= 0.5) {

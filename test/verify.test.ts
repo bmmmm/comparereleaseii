@@ -1118,3 +1118,51 @@ test("an unreadable commit makes completeness unknown, never better", async () =
   );
   assert.equal(partial.churnCoveredRatio, null);
 });
+
+test("a bump claim documents the commit that moves its pin — and only that one", async () => {
+  // The evidence of a bump claim is go.mod and go.sum: not because the claim
+  // describes those files, but because that is where the version line sits.
+  // Pooled into the file-majority union it used to cover any commit that
+  // happened to touch a manifest — opencloud@v7.1.0 kept a test fix
+  // documented off a claim about `golang.org/x/text`, and hiding that claim's
+  // notes changed nothing, which is what `pnpm mutate-notes` measured as a
+  // missed `omission`. Bump claims now leave that route and take the one that
+  // fits them: the pin they name.
+  const goMod = (from: string, to: string) => ({
+    path: "go.mod",
+    status: "modified",
+    additions: 1,
+    deletions: 1,
+    patch: `@@ -1,3 +1,3 @@\n-\t${from}\n+\t${to}\n`,
+  });
+  const ownBump: Commit = {
+    sha: "aaaa111122", subject: "bump the pin the note names", body: "", author: "dev", prNumbers: [],
+  };
+  const otherBump: Commit = {
+    sha: "bbbb333344", subject: "a test fix that also moves a different pin", body: "", author: "dev", prNumbers: [],
+  };
+  const filesFor = new Map([
+    [ownBump.sha, [goMod("golang.org/x/text v0.36.0", "golang.org/x/text v0.37.0")]],
+    [otherBump.sha, [goMod("example.com/reva/v2 v2.46.1", "example.com/reva/v2 v2.46.2")]],
+  ]);
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [ownBump, otherBump],
+    files: [goMod("golang.org/x/text v0.36.0", "golang.org/x/text v0.37.0")],
+    commitFiles: async (sha: string) => filesFor.get(sha) ?? [],
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+  const cl = claim("build(deps): bump golang.org/x/text from 0.36.0 to 0.37.0");
+  cl.bump = { name: "golang.org/x/text", from: "0.36.0", to: "0.37.0" };
+  const results = await verifyClaims(data, [cl], opts);
+  const coverage = await computeCoverage(data, [cl], results);
+
+  const uncovered = new Set(coverage.uncovered.map((u) => u.commit.sha));
+  assert.equal(uncovered.has(ownBump.sha), false, "the commit moving the claimed pin is documented");
+  assert.equal(
+    uncovered.has(otherBump.sha),
+    true,
+    "a commit moving some other pin is not documented by this claim",
+  );
+});

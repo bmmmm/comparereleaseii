@@ -125,10 +125,22 @@ Pareto front: detection rate against golden-set fidelity against judge cost.
 It reports; a person picks the point; the constant stays a constant in the
 source with the measurement in its comment.
 
-### 5. `omission` 30/34 — coverage's fourth route (`FIXME(coverage-union)`)
+### 5. `omission` 32/34 — coverage's fourth route, two cases left
 
-Diagnosed, not repaired. Wait for step 1, then A/B — landing it in the same
-release as the backtick rule would make the two effects indistinguishable.
+Mostly closed 2026-08-06. The union was never the whole story: what covered
+the commits it should not was *bump-claim evidence*, which is `go.mod` and
+`go.sum` by construction and therefore no fingerprint at all. Bump claims now
+document the commits that move the pin they name, and the corpus reads
+`omission` 32/34 with completeness up 29 points net. Three candidate repairs
+were measured and rejected on the way — the two this file used to propose move
+no rate whatsoever, and the file-type variant reaches 33/34 only by condemning
+honestly documented dependency work (`opencloud@v7.1.0` 96 → 1). Their numbers
+live in the comment at the route in `src/verify.ts`.
+
+What is left is two cases — `opencloud@v7.3.0` and `opencloud-eu/web@v7.0.0` —
+and no candidate that does not cost more than it buys. Whoever reopens this
+starts from the rejected three, and from the rule they all broke: a repair
+that counts a documented bump as undocumented is not a repair.
 
 ### 6. Mutation classes nobody thought of
 
@@ -147,27 +159,21 @@ alarm, not a score.
 
 ---
 
-### The coverage-union finding in full
-
-Both holes `pnpm mutate-notes` found are closed — bump-undershoot 22/22,
-backtick-noise 50/55, re-frozen on 55 releases. The next one is open and
-diagnosed: `omission` sits at 30/34 because coverage has a fourth route that
-belongs to no claim. `evidenceFiles` is the union over every verified/partial
-claim, and a commit whose files mostly land in that union counts as
-documented. Hiding the notes of a 10 056-line commit in `opencloud@v7.2.0`
-leaves it covered at 144/145 files against a union contributed by 108 claims,
-none of which mentions it; in `v7.1.0` the union that keeps a commit covered
-comes from a single dependabot bump naming `go.mod`. The union grows with the
-notes, so the bigger the release, the less this route can distinguish.
-
-Two candidate repairs, neither obviously right: require the majority to sit
-in *one* claim's evidence (which does nothing for `go.mod`/`go.sum`, since
-every bump touches them), or discount files that many commits in the range
-touch — a manifest is not a fingerprint. Both move completeness across the
-whole corpus, so this needs an A/B, not a patch. The anchor is
-`FIXME(coverage-union)` in `src/verify.ts`.
-
 ## Settled — do not reopen without new facts
+
+- **A repair that counts a documented bump as undocumented is not a repair**
+  (2026-08-06, closing the coverage-union block). Three candidates were built
+  and measured against the 55-release corpus before the one that shipped:
+  requiring the covering majority to sit inside a single claim's evidence
+  (`omission` unchanged at 30/34), discounting files that a quarter of the
+  range's commits touch (unchanged), and excluding manifests by file type
+  (33/34 — the best detection rate of the four, and rejected). The last one
+  drops `opencloud@v7.1.0` from completeness 96 to 1, and every commit it
+  newly condemns is a dependency bump whose own note names it. Detection rate
+  is not the only axis; a rule that wins it by punishing the most cleanly
+  documented class of change in the corpus loses. What shipped instead reads
+  the pin a bump claim names against the pins a commit moves — 32/34, and
+  completeness *up*.
 
 - **LLM calibration iterations: frozen.** Score deltas under ~10 points are
   noise; further model-ranking/golden-tuning work has poor marginal value.

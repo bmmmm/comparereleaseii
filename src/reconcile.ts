@@ -6,6 +6,7 @@
 // files, the same identifier currency substance coverage spends — no LLM,
 // no I/O, same inputs, same join. Informational, never scored.
 import { extractIdentifiers } from "./match.ts";
+import { sameName } from "./pins.ts";
 import type {
   BumpJoin,
   BumpResolution,
@@ -77,20 +78,6 @@ export function compareVersions(a: string, b: string): number | null {
   return 0;
 }
 
-/**
- * The two spellings name the same pin: identical, or one is the other's
- * path tail — a note writes `DataDog/dd-trace-go/v2` for the module the
- * manifest spells `github.com/DataDog/dd-trace-go/v2`. The tail has to
- * start at a path boundary, so `cache` never matches `actions/cache`: a
- * bare last segment is ambiguous across ecosystems.
- */
-function sameName(claim: string, pin: string): boolean {
-  const a = claim.toLowerCase();
-  const b = pin.toLowerCase();
-  if (a === b) return true;
-  if (a.includes("/") && b.endsWith(`/${a}`)) return true;
-  return b.includes("/") && a.endsWith(`/${b}`);
-}
 
 /**
  * Hold every bump claim against the pin delta of the same diff. Both sides
