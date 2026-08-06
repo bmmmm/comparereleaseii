@@ -63,7 +63,7 @@ import {
 
 import { acquireStateLock } from "./watch-lock.ts";
 
-import type { PromiseCheck } from "./types.ts";
+import type { PromiseCheck, Report } from "./types.ts";
 import type { CarriedPromise } from "./promises.ts";
 
 
@@ -285,6 +285,71 @@ interface CheckOutcome {
 }
 
 /**
+ * A watched repo's own config, translated into the settings one check runs
+ * under. Every `??` here is a watch default standing in for a CLI flag's —
+ * they are the same decisions the CLI makes, made from a config file instead.
+ */
+async function settingsFor(
+  rc: WatchRepoConfig,
+  args: { engines: EngineResolver; cache: boolean; carried: CarriedPromise[]; target?: ForgeTarget },
+): Promise<CheckSettings> {
+  const { engine, escalate } = await args.engines({
+    judgeMode: rc.judge ?? "auto",
+    engine: rc.engine ?? "claude-cli",
+    model: rc.model,
+    openaiUrl: rc.openaiUrl,
+    escalate: rc.escalate ?? "auto",
+    escalateModel: rc.escalateModel,
+    cache: args.cache,
+  });
+  return {
+    judgeMode: rc.judge ?? "auto",
+    engine,
+    escalateEngine: escalate,
+    concurrency: rc.concurrency ?? 4,
+    reverse: true,
+    baseline: rc.baseline ?? 5,
+    history: args.target ? args.target.history : githubHistory(rc.repo!),
+    // Promises older than the base release live only here: the caller
+    // carries every still-open one until a later diff resolves it — or
+    // until it ages out as stale (checkPromises counts the carries).
+    carriedPromises: args.carried,
+    components: rc.components,
+    expand: rc.expand === false ? undefined : componentLoader,
+    findings: rc.findings,
+    audience: rc.audience,
+  };
+}
+
+/**
+ * The three report files for one checked release. Returns the paths the state
+ * and the alert refer to afterwards.
+ *
+ * The tag goes through a sanitizer and the key did not — a config with
+ * `label: "../.."` wrote outside the reports directory.
+ */
+export async function writeReportFiles(args: {
+  report: Report;
+  key: string;
+  tag: string;
+  reportsDir: string;
+  repoState: RepoState;
+}): Promise<{ dirKey: string; base: string; jsonPath: string }> {
+  const dirKey = safeSegment(args.key);
+  const dir = join(args.reportsDir, dirKey);
+  await mkdir(dir, { recursive: true });
+  const base = sanitizeTag(args.tag);
+  const jsonPath = join(dir, `${base}.json`);
+  await writeFile(jsonPath, JSON.stringify(args.report, null, 2));
+  await writeFile(join(dir, `${base}.md`), toMarkdown(args.report));
+  await writeFile(
+    join(dir, `${base}.html`),
+    toHtml(args.report, reportNavFor(args.reportsDir, dir, args.repoState, args.key)),
+  );
+  return { dirKey, base, jsonPath };
+}
+
+/**
  * Check one release and fold the result into the repo's state — the one
  * code path both the watch loop and backfill run. Report files land in the
  * reports directory; state persistence and the index rewrite stay with the
@@ -309,32 +374,12 @@ async function checkAndRecord(args: {
   backfilled?: boolean;
 }): Promise<CheckOutcome> {
   const { key, rc, rel, repoState, target } = args;
-  const { engine, escalate } = await args.engines({
-    judgeMode: rc.judge ?? "auto",
-    engine: rc.engine ?? "claude-cli",
-    model: rc.model,
-    openaiUrl: rc.openaiUrl,
-    escalate: rc.escalate ?? "auto",
-    escalateModel: rc.escalateModel,
+  const settings = await settingsFor(rc, {
+    engines: args.engines,
     cache: args.cache,
+    carried: args.carried,
+    target,
   });
-  const settings: CheckSettings = {
-    judgeMode: rc.judge ?? "auto",
-    engine,
-    escalateEngine: escalate,
-    concurrency: rc.concurrency ?? 4,
-    reverse: true,
-    baseline: rc.baseline ?? 5,
-    history: target ? target.history : githubHistory(rc.repo!),
-    // Promises older than the base release live only here: the caller
-    // carries every still-open one until a later diff resolves it — or
-    // until it ages out as stale (checkPromises counts the carries).
-    carriedPromises: args.carried,
-    components: rc.components,
-    expand: rc.expand === false ? undefined : componentLoader,
-    findings: rc.findings,
-    audience: rc.audience,
-  };
   const notesFile = rc.notesFile ? resolve(args.configDir, rc.notesFile) : undefined;
   let data;
   let context;
@@ -360,19 +405,13 @@ async function checkAndRecord(args: {
   // instead of pinning the result on the innocent upstream repo.
   if (rc.label) report.repoLabel = `${rc.repo ?? target?.slug ?? rc.repoUrl} (${rc.label})`;
 
-  // The tag went through a sanitizer and the key did not — a config
-  // with `label: "../.."` wrote outside the reports directory.
-  const dirKey = safeSegment(key);
-  const dir = join(args.reportsDir, dirKey);
-  await mkdir(dir, { recursive: true });
-  const base = sanitizeTag(rel.tag);
-  const jsonPath = join(dir, `${base}.json`);
-  await writeFile(jsonPath, JSON.stringify(report, null, 2));
-  await writeFile(join(dir, `${base}.md`), toMarkdown(report));
-  await writeFile(
-    join(dir, `${base}.html`),
-    toHtml(report, reportNavFor(args.reportsDir, dir, repoState, key)),
-  );
+  const { dirKey, base, jsonPath } = await writeReportFiles({
+    report,
+    key,
+    tag: rel.tag,
+    reportsDir: args.reportsDir,
+    repoState,
+  });
 
   // Watch default is lenient: honest releases often carry unprovable
   // claims (private advisories) — alerting on every one is fatigue.

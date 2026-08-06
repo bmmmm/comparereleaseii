@@ -7,7 +7,9 @@ import {
   runBackfill,
   sanitizeTag,
   validateWatchConfig,
+  writeReportFiles,
 } from "../src/watch.ts";
+import { computeScores } from "../src/metrics.ts";
 import { toWatchIndexHtml, toWatchAtomFeed } from "../src/watch-index.ts";
 import { runNotify } from "../src/util.ts";
 import {
@@ -36,10 +38,10 @@ import {
   type CheckedRelease,
   type RepoState,
 } from "../src/watch-state.ts";
-import type { PromiseCheck } from "../src/types.ts";
+import type { PromiseCheck, Report } from "../src/types.ts";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 function rel(tag: string, publishedAt: string, extra: Partial<ReleaseInfo> = {}): ReleaseInfo {
   return { tag, publishedAt, prerelease: false, draft: false, ...extra };
@@ -1118,5 +1120,68 @@ test("the index states what scores measure — the entry page must not read as a
   assert.ok(
     html.includes("not project quality, and never people"),
     "framing line present on the dashboard",
+  );
+});
+
+// The tag has always gone through a sanitizer; the state key did not, and a
+// config entry with `label: "../.."` wrote its reports outside the reports
+// directory. The fix is one call, it is not visible in any output, and no
+// test held it: deleting `safeSegment` here passed the whole suite.
+test("a label that tries to climb out of the reports directory cannot", async () => {
+  const results: never[] = [];
+  const report: Report = {
+    repoLabel: "o/r",
+    baseRef: "v1",
+    headRef: "v2",
+    stats: { commits: 1, files: 1, additions: 1, deletions: 0 },
+    results,
+    uncovered: [],
+    reverseChecked: true,
+    metrics: {
+      scores: computeScores(results, 0, [], false),
+      flags: [],
+      files: [],
+      churnCoveredRatio: 0,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      baseline: null,
+      unverifiable: null,
+    },
+    warnings: [],
+    truncated: false,
+    engine: "off",
+  };
+  const repoState: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  const reportsDir = await mkdtemp(join(tmpdir(), "crii-reports-"));
+
+  const { dirKey, jsonPath } = await writeReportFiles({
+    report,
+    key: "../../escaped",
+    tag: "v2",
+    reportsDir,
+    repoState,
+  });
+
+  // `..` may survive as text — what must not survive is a separator, because
+  // only a whole `..` segment climbs. The property is where the path lands.
+  assert.ok(!dirKey.includes("/"), `the key stayed a path, not one segment: ${dirKey}`);
+  assert.ok(
+    resolve(jsonPath).startsWith(resolve(reportsDir) + sep),
+    `the report escaped its directory: ${resolve(jsonPath)}`,
+  );
+  // It really is on disk, under the sanitized name — not merely a safe string.
+  await stat(jsonPath);
+  await stat(join(reportsDir, dirKey, "v2.html"));
+
+  // A tag doing the same thing is caught by the sanitizer it always had.
+  const evil = await writeReportFiles({
+    report,
+    key: "o/r",
+    tag: "../../v9",
+    reportsDir,
+    repoState,
+  });
+  assert.ok(
+    resolve(evil.jsonPath).startsWith(resolve(reportsDir) + sep),
+    `the tag escaped: ${resolve(evil.jsonPath)}`,
   );
 });
