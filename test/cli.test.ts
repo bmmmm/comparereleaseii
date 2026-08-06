@@ -55,6 +55,30 @@ test("numeric flags reject non-numbers with an actionable error", async () => {
   }
 });
 
+// The counterpart to the numeric check above, and it had none: an unrecognised
+// word on a mode flag is the same class of bug — it used to pass the cast and
+// become a mode nobody implements. Each rejection has to name the choices, or
+// the reader is left guessing which spelling was wanted.
+test("mode flags reject unknown words and name the choices", async () => {
+  for (const [flag, expected] of [
+    ["--judge", /auto, all or off/],
+    ["--engine", /claude-cli, api, openai or off/],
+    ["--fail-on", /none, contradicted or no-evidence/],
+    ["--escalate", /auto, off, claude-cli, api or openai/],
+    ["--lens", /operator, integrator, user or all/],
+  ] as Array<[string, RegExp]>) {
+    const res = await exec(process.execPath, [CLI, "owner/repo", flag, "nonsense"]).then(
+      () => null,
+      (err: { code?: number; stderr?: string }) => err,
+    );
+    assert.ok(res, `${flag} nonsense exited 0`);
+    assert.equal(res.code, 2, `${flag}: exit ${res.code}`);
+    assert.match(res.stderr ?? "", new RegExp(`${flag} must be`), `${flag}: ${res.stderr}`);
+    assert.match(res.stderr ?? "", expected, `${flag} does not list its choices: ${res.stderr}`);
+    assert.match(res.stderr ?? "", /got "nonsense"/, `${flag} does not echo the input`);
+  }
+});
+
 test("--min-coverage rejects values above 100", async () => {
   const res = await exec(process.execPath, [CLI, "owner/repo", "--min-coverage", "150"]).then(
     () => null,

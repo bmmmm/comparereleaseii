@@ -202,6 +202,53 @@ function intFlag(name: string, raw: string, min: number): number {
   return n;
 }
 
+/** Parse a one-of-these flag or fail loudly — parseArgs only proves it is a
+ * string, and an unrecognised word used to pass straight through as a mode
+ * nobody implements. The error names the flag, the choices and what arrived. */
+function enumFlag<T extends string>(name: string, raw: string, allowed: readonly T[]): T {
+  if (!(allowed as readonly string[]).includes(raw)) {
+    throw new Error(
+      `--${name} must be ${allowed.slice(0, -1).join(", ")} or ${allowed[allowed.length - 1]} (got "${raw}")`,
+    );
+  }
+  return raw as T;
+}
+
+/** `--component <pin name>=<repo>`, the form the sub-check needs it in. */
+function parseComponents(specs: string[]): Record<string, string> {
+  const components: Record<string, string> = {};
+  for (const spec of specs) {
+    const eq = spec.indexOf("=");
+    if (eq < 1 || eq === spec.length - 1) {
+      throw new Error(
+        `--component expects <pin name>=<owner/repo or URL> (got "${spec}") — e.g. WEB_ASSETS_VERSION=opencloud-eu/web.`,
+      );
+    }
+    components[spec.slice(0, eq)] = spec.slice(eq + 1);
+  }
+  return components;
+}
+
+/** The report in every format the run asked for. Each path is announced on
+ * stderr, so a piped stdout carries the report and nothing else. */
+async function writeReports(
+  report: Report,
+  paths: { md?: string; json?: string; html?: string },
+): Promise<void> {
+  if (paths.md) {
+    await writeFile(paths.md, toMarkdown(report));
+    console.error(`\nMarkdown report written to ${paths.md}`);
+  }
+  if (paths.json) {
+    await writeFile(paths.json, JSON.stringify(report, null, 2));
+    console.error(`JSON report written to ${paths.json}`);
+  }
+  if (paths.html) {
+    await writeFile(paths.html, toHtml(report));
+    console.error(`HTML report written to ${paths.html}`);
+  }
+}
+
 async function main(): Promise<number> {
   if (process.argv[2] === "watch") {
     return runWatchCli(process.argv.slice(3));
@@ -266,32 +313,21 @@ async function main(): Promise<number> {
     throw new Error("--local and --repo-url both name the repository — pass one.");
   }
 
-  const judgeMode = values.judge as "auto" | "all" | "off";
-  const engineName = values.engine as "claude-cli" | "api" | "openai" | "off";
-  if (!["auto", "all", "off"].includes(judgeMode)) {
-    throw new Error(`--judge must be auto, all or off (got "${values.judge}")`);
-  }
-  if (!["claude-cli", "api", "openai", "off"].includes(engineName)) {
-    throw new Error(`--engine must be claude-cli, api, openai or off (got "${values.engine}")`);
-  }
-  const failOn = values["fail-on"] as "none" | "contradicted" | "no-evidence";
-  if (!["none", "contradicted", "no-evidence"].includes(failOn)) {
-    throw new Error(`--fail-on must be none, contradicted or no-evidence (got "${values["fail-on"]}")`);
-  }
+  const judgeMode = enumFlag("judge", values.judge, ["auto", "all", "off"] as const);
+  const engineName = enumFlag("engine", values.engine, ["claude-cli", "api", "openai", "off"] as const);
+  const failOn = enumFlag("fail-on", values["fail-on"], ["none", "contradicted", "no-evidence"] as const);
+  const escalateOpt = enumFlag("escalate", values.escalate, ["auto", "off", "claude-cli", "api", "openai"] as const);
+  const lensOpt =
+    values.lens === undefined
+      ? undefined
+      : enumFlag("lens", values.lens, ["operator", "integrator", "user", "all"] as const);
+
   const minCoverage =
     values["min-coverage"] === undefined
       ? undefined
       : intFlag("min-coverage", values["min-coverage"], 0);
   if (minCoverage !== undefined && minCoverage > 100) {
     throw new Error(`--min-coverage is a percentage 0–100 (got "${values["min-coverage"]}")`);
-  }
-  const escalateOpt = values.escalate as "auto" | "off" | "claude-cli" | "api" | "openai";
-  if (!["auto", "off", "claude-cli", "api", "openai"].includes(escalateOpt)) {
-    throw new Error(`--escalate must be auto, off, claude-cli, api or openai (got "${values.escalate}")`);
-  }
-  const lensOpt = values.lens as "operator" | "integrator" | "user" | "all" | undefined;
-  if (lensOpt !== undefined && !["operator", "integrator", "user", "all"].includes(lensOpt)) {
-    throw new Error(`--lens must be operator, integrator, user or all (got "${values.lens}")`);
   }
   const concurrency = intFlag("concurrency", values.concurrency, 1);
   const baseline = intFlag("baseline", values.baseline, 0);
@@ -302,16 +338,7 @@ async function main(): Promise<number> {
       : intFlag("findings-budget", values["findings-budget"], 1000);
   const historyCount = values.history === undefined ? null : intFlag("history", values.history, 1);
 
-  const components: Record<string, string> = {};
-  for (const spec of values.component ?? []) {
-    const eq = spec.indexOf("=");
-    if (eq < 1 || eq === spec.length - 1) {
-      throw new Error(
-        `--component expects <pin name>=<owner/repo or URL> (got "${spec}") — e.g. WEB_ASSETS_VERSION=opencloud-eu/web.`,
-      );
-    }
-    components[spec.slice(0, eq)] = spec.slice(eq + 1);
-  }
+  const components = parseComponents(values.component ?? []);
 
   // Every forge speaks git, so a clone answers almost everything the check
   // asks: diff, commits, subjects, authors, tags. Only the published notes and
@@ -497,18 +524,7 @@ async function main(): Promise<number> {
   );
 
   printTerminal(report);
-  if (values.md) {
-    await writeFile(values.md, toMarkdown(report));
-    console.error(`\nMarkdown report written to ${values.md}`);
-  }
-  if (values.json) {
-    await writeFile(values.json, JSON.stringify(report, null, 2));
-    console.error(`JSON report written to ${values.json}`);
-  }
-  if (values.html) {
-    await writeFile(values.html, toHtml(report));
-    console.error(`HTML report written to ${values.html}`);
-  }
+  await writeReports(report, values);
   return exitCode(report, failOn, minCoverage);
 }
 
