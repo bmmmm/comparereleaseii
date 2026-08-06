@@ -785,6 +785,72 @@ test("without an escalation engine a risky 'verified' still gets a second look",
   assert.equal(ok.verdict, "verified");
 });
 
+// The need protocol is the judge's only way to ask for evidence it was not
+// handed, and nothing checked that the answer actually arrives: a second round
+// that quietly re-sent the same hunks would have passed every other test in
+// this file. What the judge names, the judge gets — and exactly once, because
+// a judge that keeps asking has failed to judge.
+test("the need protocol delivers the files it asks for, and only one round of them", async () => {
+  const ranked = {
+    path: "src/parser.ts",
+    status: "modified",
+    additions: 1,
+    deletions: 0,
+    patch: "@@ -1,1 +1,2 @@ fn parseHeader()\n+  parseHeader(input)\n",
+  };
+  const unranked = {
+    path: "src/render.ts",
+    status: "modified",
+    additions: 1,
+    deletions: 0,
+    patch: "@@ -9,1 +9,2 @@ fn render()\n+  AUDIT_MARKER_ONLY_HERE\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [], files: [ranked, unranked],
+    commitFiles: async () => [], warnings: [] as string[],
+  };
+  const asked = claim("Rewrites `parseHeader` in the parser");
+  asked.codeSpans = ["parseHeader"];
+
+  const prompts: string[] = [];
+  const [r] = await verifyClaims(data, [asked], {
+    judgeMode: "all",
+    engine: {
+      name: "asks-once",
+      judge: async (prompt: string) => {
+        prompts.push(prompt);
+        return prompts.length === 1
+          ? '{"need":["src/render.ts"]}'
+          : '{"verdict":"partial","confidence":0.5,"files":["src/render.ts"],"reasoning":"reads on the second look"}';
+      },
+    },
+    concurrency: 1, maxHunks: 1, maxEvidenceChars: 10000,
+  });
+  assert.equal(prompts.length, 2);
+  assert.ok(!prompts[0].includes("AUDIT_MARKER_ONLY_HERE"), "the first round did not carry that file");
+  assert.ok(prompts[1].includes("AUDIT_MARKER_ONLY_HERE"), "the second round carries what was asked for");
+  assert.equal(r.verdict, "partial");
+  assert.equal(r.judged, true);
+
+  // A judge that keeps asking gets no third round: the claim falls back to the
+  // evidence it already had, and says the judge failed.
+  let asks = 0;
+  const [stuck] = await verifyClaims(data, [asked], {
+    judgeMode: "all",
+    engine: {
+      name: "asks-forever",
+      judge: async () => {
+        asks++;
+        return '{"need":["src/render.ts"]}';
+      },
+    },
+    concurrency: 1, maxHunks: 1, maxEvidenceChars: 10000,
+  });
+  assert.equal(asks, 2, "one retrieval round, not a loop");
+  assert.equal(stuck.judgeFailed, true);
+});
+
 // SCORING.md and docs/local-models.md both state that `--escalate auto` builds
 // a second engine only for a local primary — which is why the default setup
 // runs the three-vote path rather than the escalation path. That sentence had

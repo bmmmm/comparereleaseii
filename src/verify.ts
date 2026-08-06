@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { pooled, truncate } from "./util.ts";
-import { anchorMatch, functionsOf, isChangelogPath, lexicalMatch, rankHunks, tokenize } from "./match.ts";
+import {
+  anchorMatch,
+  functionsOf,
+  isChangelogPath,
+  lexicalMatch,
+  rankHunks,
+  tokenize,
+  type AnchorMatch,
+} from "./match.ts";
 import { commitSurface } from "./substance.ts";
 import { pinBumps, sameName } from "./pins.ts";
 import { sensitiveCategory } from "./metrics.ts";
@@ -166,21 +174,31 @@ export function capHunks(
   return out;
 }
 
-export async function verifyClaims(
+/** An entry the diff can neither confirm nor refute — recorded, not graded. */
+function skipped(claim: Claim, reasoning: string): ClaimResult {
+  return {
+    claim,
+    verdict: "skipped",
+    confidence: 1,
+    evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
+    reasoning,
+    judged: false,
+    generated: false,
+  };
+}
+
+/**
+ * Warm the source's per-commit and PR caches in parallel before the serial
+ * route loop below — its awaits then hit the cache (ReleaseData.commitFiles is
+ * cached by contract). gh-backed sources pay one process spawn per call
+ * (~0.35 s measured); paying them one claim at a time serialized the whole
+ * anchor phase. Routing is untouched: same lookups, same decisions, warmed.
+ */
+async function prefetchAnchorDiffs(
   data: ReleaseData,
   claims: Claim[],
-  opts: VerifyOptions,
-): Promise<ClaimResult[]> {
-  const results = new Map<number, ClaimResult>();
-  const pending: Pending[] = [];
-  const surplusQueue: Array<{ claim: Claim; pool: DiffFile[] }> = [];
-  const useJudge = opts.engine !== null && opts.judgeMode !== "off";
-
-  // Warm the source's per-commit and PR caches in parallel before the serial
-  // loop below — its awaits then hit the cache (ReleaseData.commitFiles is
-  // cached by contract). gh-backed sources pay one process spawn per call
-  // (~0.35 s measured); paying them one claim at a time serialized the whole
-  // anchor phase. Routing is untouched: same lookups, same decisions, warmed.
+  concurrency: number,
+): Promise<void> {
   const anchorShas = new Set<string>();
   const prefetchPrs = new Set<number>();
   for (const claim of claims) {
@@ -194,7 +212,7 @@ export async function verifyClaims(
   }
   if (data.resolvePr && prefetchPrs.size) {
     const resolvePr = data.resolvePr;
-    const resolved = await pooled([...prefetchPrs], opts.concurrency, (n) =>
+    const resolved = await pooled([...prefetchPrs], concurrency, (n) =>
       resolvePr(n).catch(() => null),
     );
     for (const sha of resolved) {
@@ -203,54 +221,316 @@ export async function verifyClaims(
       if (commit) anchorShas.add(commit.sha);
     }
   }
-  if (anchorShas.size) {
-    // Failures surface (or not) exactly where they did before — on the
-    // loop's own call; the prefetch itself never kills the run.
-    await pooled([...anchorShas], opts.concurrency, (sha) =>
-      data.commitFiles(sha).catch(() => []),
-    );
-  }
+  if (!anchorShas.size) return;
+  // Failures surface (or not) exactly where they did before — on the loop's
+  // own call; the prefetch itself never kills the run.
+  await pooled([...anchorShas], concurrency, (sha) => data.commitFiles(sha).catch(() => []));
+}
 
-  // One commit whose diff cannot be fetched must cost that claim its diff
-  // evidence, not the whole run (computeCoverage already degrades this way).
-  const fetchFailed = new Set<string>();
-  const commitFilesOr = (sha: string): Promise<DiffFile[]> =>
+/**
+ * `commitFiles` that degrades instead of throwing: one commit whose diff
+ * cannot be fetched must cost that claim its diff evidence, not the whole run
+ * (computeCoverage already degrades this way). Each commit is warned about once.
+ */
+function degradingCommitFiles(data: ReleaseData): (sha: string) => Promise<DiffFile[]> {
+  const reported = new Set<string>();
+  return (sha) =>
     data.commitFiles(sha).catch((err: Error) => {
-      if (!fetchFailed.has(sha)) {
-        fetchFailed.add(sha);
+      if (!reported.has(sha)) {
+        reported.add(sha);
         data.warnings.push(
           `Could not load the diff of ${sha.slice(0, 10)} (${err.message.split("\n")[0].slice(0, 100)}) — claims anchored to it are judged without it.`,
         );
       }
       return [];
     });
+}
+
+/**
+ * Squash-without-suffix repos: the note names a PR that no commit message
+ * mentions, so ask the forge which commit merged it. Extends `anchors` in
+ * place — a claim that gains an anchor here takes the anchored route.
+ */
+async function anchorViaPr(claim: Claim, anchors: AnchorMatch, data: ReleaseData): Promise<void> {
+  if (!data.resolvePr) return;
+  for (const pr of claim.prNumbers.slice(0, 5)) {
+    const sha = await data.resolvePr(pr);
+    const commit = sha && data.commits.find((c) => sha.startsWith(c.sha) || c.sha.startsWith(sha));
+    if (commit && !anchors.commits.includes(commit)) {
+      anchors.commits.push(commit);
+      anchors.viaPr.push(pr);
+    }
+  }
+}
+
+/**
+ * The pin anchor. A bump claim states a pin and a version, and the diff
+ * carries the same pin and its own version — that is the whole question,
+ * answered off the material both sides published, before any escalation
+ * ladder runs. Sending it to a judge was strictly worse: it costs a call,
+ * it varies between runs, and on this class it was measurably wrong.
+ * Eight of the twelve contradicted claims in the corpus are bump claims,
+ * and six of those are a note correctly describing one slice of a bump
+ * the release aggregated.
+ *
+ * Null when the diff moved no matching pin — that claim is judged like any other.
+ */
+function settleBump(claim: Claim, bump: BumpResolution, anchors: AnchorMatch): ClaimResult | null {
+  const { claimed, observed } = bump;
+  if (!observed) return null;
+  const where = observed.viaCommit
+    ? `the commit this note names moves ${claimed.name} ${observed.from} → ${observed.to} (${observed.file})`
+    : `the diff moves ${claimed.name} ${observed.from} → ${observed.to} (${observed.file})`;
+  const settled =
+    bump.status === "confirmed"
+      ? { verdict: "verified" as const, confidence: 0.95, reasoning: `${where}, the version this note names.` }
+      : bump.status === "overtaken"
+        ? {
+            verdict: "verified" as const,
+            confidence: 0.85,
+            reasoning:
+              `The note names ${claimed.to} and ${where} — past it. ` +
+              "The release aggregates several bumps of this pin and the note describes one of them; " +
+              "the bump it states is in this diff.",
+          }
+        : {
+            verdict: "contradicted" as const,
+            confidence: 0.9,
+            reasoning: `The note names ${claimed.to}, but ${where}.`,
+          };
+  return {
+    claim,
+    ...settled,
+    evidence: {
+      commitShas: anchors.commits.map((c) => c.sha),
+      files: [observed.file],
+      matchedTerms: [claimed.name],
+      methods: anchors.commits.length
+        ? [anchors.viaPr.length ? "pr-anchor" : "sha-anchor", "pin-anchor"]
+        : ["pin-anchor"],
+    },
+    judged: false,
+    generated: isGeneratedEntry(claim, anchors.commits),
+  };
+}
+
+/** What a route establishes on its own — the judge decides whether it stands. */
+type Route = Omit<Pending, "claim" | "commits">;
+
+/**
+ * A claim that names a commit in the release range, weighed against that
+ * commit's own diff.
+ *
+ * A note that restates its own commit subject says nothing about the diff —
+ * both texts are written by the same hand, and agreeing with yourself is not
+ * evidence. It anchors the claim (and raises its priority for judging), it
+ * never settles it. The lexical bar is the same one the unanchored route
+ * uses: a single identifier hit is a lead, not proof.
+ */
+function routeAnchored(claim: Claim, anchors: AnchorMatch, pool: DiffFile[]): Route {
+  const generated = isGeneratedEntry(claim, anchors.commits);
+  const lex = lexicalMatch(claim, pool);
+  const bestSim = Math.max(...anchors.commits.map((c) => similarity(coreText(claim), c.subject)));
+  const methods: Evidence["methods"] = [anchors.viaPr.length ? "pr-anchor" : "sha-anchor"];
+  if (generated) methods.push("generated");
+  if (lex.score > 0) methods.push("lexical");
+  const anchorLabel = anchors.viaPr.length
+    ? `PR #${anchors.viaPr.join(", #")}`
+    : `commit ${anchors.viaSha.join(", ")}`;
+  const strong = generated || lex.score >= 5;
+  const detail = generated
+    ? `auto-generated entry, title matches the squash commit`
+    : `identifiers ${lex.matchedTerms.slice(0, 4).join(", ")} appear in its diff`;
+  const gap =
+    lex.score >= 2
+      ? `only ${lex.matchedTerms.join(", ")} could be matched to its diff content`
+      : bestSim >= 0.5
+        ? `the claim restates the commit subject (${Math.round(bestSim * 100)}%), which asserts nothing about the diff`
+        : `the claim text could not be matched to its diff content`;
+  return {
+    evidence: {
+      commitShas: anchors.commits.map((c) => c.sha),
+      files: lex.files.map((f) => f.path),
+      matchedTerms: lex.matchedTerms,
+      methods,
+      functions: functionsOf(pool),
+    },
+    hunkPool: pool,
+    generated,
+    fallback: strong
+      ? {
+          verdict: "verified",
+          confidence: 0.9,
+          reasoning: `${anchorLabel} is in the release range (${anchors.commits[0].sha.slice(0, 10)}); ${detail}.`,
+        }
+      : {
+          verdict: "partial",
+          confidence: 0.6,
+          reasoning: `${anchorLabel} is in the release range, but ${gap}.`,
+        },
+  };
+}
+
+/**
+ * No usable anchor (or a referenced PR not findable in commit messages): fall
+ * back to lexical evidence over the whole diff.
+ */
+function routeUnanchored(claim: Claim, data: ReleaseData): Route {
+  const lex = lexicalMatch(claim, data.files);
+  const anchorNote = claim.prNumbers.length
+    ? `Referenced PR #${claim.prNumbers.join(", #")} matches no commit message in the range. `
+    : "";
+  return {
+    evidence: {
+      commitShas: [],
+      files: lex.files.map((f) => f.path),
+      matchedTerms: lex.matchedTerms,
+      methods: lex.score > 0 ? ["lexical"] : ["none"],
+      functions: functionsOf(lex.files),
+    },
+    hunkPool: data.files,
+    generated: false,
+    fallback:
+      lex.score >= 5
+        ? {
+            verdict: "verified",
+            confidence: 0.8,
+            reasoning: `${anchorNote}Identifiers ${lex.matchedTerms.slice(0, 5).join(", ")} all appear in the diff (${lex.files.length} file(s)).`,
+          }
+        : lex.score >= 2
+          ? {
+              verdict: "partial",
+              confidence: 0.55,
+              reasoning: `${anchorNote}Some identifiers (${lex.matchedTerms.join(", ")}) appear in the diff, but the match is weak.`,
+            }
+          : {
+              verdict: "no-evidence",
+              confidence: 0.5,
+              reasoning: `${anchorNote}No identifier from the claim appears in the diff.`,
+            },
+  };
+}
+
+type Hunks = Array<{ path: string; hunk: string }>;
+
+/** Builds the judge prompt for a given evidence set — bound to one claim. */
+type PromptFor = (hunks: Hunks, allowNeed: boolean, suffix?: string) => string;
+
+/**
+ * One judge call plus, at most, one bounded second retrieval round: when the
+ * judge answers "I need these files", hand over exactly those full file diffs
+ * and demand a verdict. A judge that keeps asking is a failed judgement.
+ */
+async function judgeWithRetrieval(
+  engine: JudgeEngine,
+  promptFor: PromptFor,
+  hunks: Hunks,
+  data: ReleaseData,
+  maxEvidenceChars: number,
+): Promise<{ verdict: JudgeVerdict; hunks: Hunks }> {
+  const response = parseJudgeResponse(await engine.judge(promptFor(hunks, true)));
+  if (!("need" in response)) return { verdict: response, hunks };
+  const wanted = data.files.filter((f) => f.patch && response.need.includes(f.path));
+  const finalHunks = capHunks(
+    [...wanted.map((f) => ({ path: f.path, hunk: f.patch! })), ...hunks],
+    maxEvidenceChars,
+  );
+  const second = parseJudgeResponse(await engine.judge(promptFor(finalHunks, false)));
+  if ("need" in second) throw new Error("judge kept requesting files");
+  return { verdict: second, hunks: finalHunks };
+}
+
+/**
+ * A second look at the verdicts that are most expensive to get wrong. With an
+ * escalation engine, a stronger second engine reviews independently and its
+ * verdict wins. Without one — and with the default `--engine claude-cli`,
+ * `--escalate auto` builds none, so this is the common path, not the fallback
+ * — the same engine votes twice more and the median settles it.
+ */
+async function reviewSevere(
+  engine: JudgeEngine,
+  escalateEngine: JudgeEngine | null | undefined,
+  promptFor: PromptFor,
+  hunks: Hunks,
+  verdict: JudgeVerdict,
+): Promise<{ verdict: JudgeVerdict; escalated: boolean; votes: JudgeVerdict[] | null }> {
+  if (escalateEngine) {
+    try {
+      const second = parseJudgeResponse(
+        await escalateEngine.judge(
+          promptFor(hunks, false, "\n(Escalation review by a second engine — judge independently.)"),
+        ),
+      );
+      if (!("need" in second)) return { verdict: second, escalated: true, votes: null };
+    } catch {
+      // keep the primary verdict if escalation fails
+    }
+    return { verdict, escalated: false, votes: null };
+  }
+  const votes = [verdict];
+  for (const pass of [2, 3]) {
+    try {
+      const vote = parseJudgeResponse(
+        await engine.judge(
+          promptFor(hunks, false, `\n(Independent verification pass ${pass} — judge from scratch.)`),
+        ),
+      );
+      if (!("need" in vote)) votes.push(vote);
+    } catch {
+      // a failed vote simply doesn't count
+    }
+  }
+  return { verdict: resolveVotes(votes), escalated: false, votes };
+}
+
+/**
+ * Whether this verdict gets the second look. Severe verdicts always do, and so
+ * does a "verified" whose evidence touches sensitive paths — install hooks,
+ * dependency manifests, lockfiles, auth/crypto. A security claim can hide
+ * under any section name ("Packaging cleanup"), and the rubber stamp is the
+ * most expensive verdict to get wrong: it used to be the one nobody looked at
+ * twice.
+ */
+function needsSecondLook(claim: Claim, verdict: JudgeVerdict, evidencePaths: string[]): boolean {
+  if (verdict.verdict === "no-evidence" || verdict.verdict === "contradicted") return true;
+  return (
+    verdict.verdict === "verified" &&
+    (isSecuritySensitive(claim) || evidencePaths.some((path) => sensitiveCategory(path) !== null))
+  );
+}
+
+/** The commit subjects closest to an unanchored claim — context for the judge. */
+function relatedCommits(claim: Claim, commits: Commit[]): Commit[] {
+  return commits
+    .map((c) => ({ c, s: similarity(coreText(claim), c.subject) }))
+    .filter((x) => x.s > 0.3)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, 3)
+    .map((x) => x.c);
+}
+
+export async function verifyClaims(
+  data: ReleaseData,
+  claims: Claim[],
+  opts: VerifyOptions,
+): Promise<ClaimResult[]> {
+  const results = new Map<number, ClaimResult>();
+  const pending: Pending[] = [];
+  const surplusQueue: Array<{ claim: Claim; pool: DiffFile[] }> = [];
+  const useJudge = opts.engine !== null && opts.judgeMode !== "off";
+
+  await prefetchAnchorDiffs(data, claims, opts.concurrency);
+  const commitFilesOr = degradingCommitFiles(data);
 
   for (const claim of claims) {
     if (claim.kind === "meta") {
-      results.set(claim.id, {
-        claim,
-        verdict: "skipped",
-        confidence: 1,
-        evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
-        reasoning: "Informational entry, nothing to verify against the diff.",
-        judged: false,
-        generated: false,
-      });
+      results.set(claim.id, skipped(claim, "Informational entry, nothing to verify against the diff."));
       continue;
     }
 
     const anchors = anchorMatch(claim, data.commits);
-
-    if (!anchors.commits.length && claim.prNumbers.length && data.resolvePr) {
-      // Squash-without-suffix repos: ask the forge which commit merged the PR.
-      for (const pr of claim.prNumbers.slice(0, 5)) {
-        const sha = await data.resolvePr(pr);
-        const commit = sha && data.commits.find((c) => sha.startsWith(c.sha) || c.sha.startsWith(sha));
-        if (commit && !anchors.commits.includes(commit)) {
-          anchors.commits.push(commit);
-          anchors.viaPr.push(pr);
-        }
-      }
+    if (!anchors.commits.length && claim.prNumbers.length) {
+      await anchorViaPr(claim, anchors, data);
     }
 
     // Standing text only. A repeated line that points at a commit in THIS
@@ -258,169 +538,50 @@ export async function verifyClaims(
     // sets of notes — "I said it last time too" cannot be what takes a claim
     // out of the check.
     if (claim.carriedOverFrom && !anchors.commits.length) {
-      results.set(claim.id, {
-        claim,
-        verdict: "skipped",
-        confidence: 1,
-        evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
-        reasoning: `Carried over verbatim from ${claim.carriedOverFrom} — describes the product, not this release.`,
-        judged: false,
-        generated: false,
-      });
+      results.set(
+        claim.id,
+        skipped(
+          claim,
+          `Carried over verbatim from ${claim.carriedOverFrom} — describes the product, not this release.`,
+        ),
+      );
       continue;
     }
 
-    // The pin anchor. A bump claim states a pin and a version, and the diff
-    // carries the same pin and its own version — that is the whole question,
-    // answered off the material both sides published, before any escalation
-    // ladder runs. Sending it to a judge was strictly worse: it costs a call,
-    // it varies between runs, and on this class it was measurably wrong.
-    // Eight of the twelve contradicted claims in the corpus are bump claims,
-    // and six of those are a note correctly describing one slice of a bump
-    // the release aggregated.
     const bump = opts.bumps?.get(claim.id);
-    if (bump?.observed) {
-      const { claimed, observed } = bump;
-      const where = observed.viaCommit
-        ? `the commit this note names moves ${claimed.name} ${observed.from} → ${observed.to} (${observed.file})`
-        : `the diff moves ${claimed.name} ${observed.from} → ${observed.to} (${observed.file})`;
-      const settled =
-        bump.status === "confirmed"
-          ? { verdict: "verified" as const, confidence: 0.95, reasoning: `${where}, the version this note names.` }
-          : bump.status === "overtaken"
-            ? {
-                verdict: "verified" as const,
-                confidence: 0.85,
-                reasoning:
-                  `The note names ${claimed.to} and ${where} — past it. ` +
-                  "The release aggregates several bumps of this pin and the note describes one of them; " +
-                  "the bump it states is in this diff.",
-              }
-            : {
-                verdict: "contradicted" as const,
-                confidence: 0.9,
-                reasoning: `The note names ${claimed.to}, but ${where}.`,
-              };
+    const settledBump = bump && settleBump(claim, bump, anchors);
+    if (settledBump) {
+      results.set(claim.id, settledBump);
+      continue;
+    }
+
+    let route: Route;
+    if (anchors.commits.length) {
+      const fileLists = await Promise.all(anchors.commits.map((c) => commitFilesOr(c.sha)));
+      const pool = fileLists.flat();
+      route = routeAnchored(claim, anchors, pool);
+      // Reverse-direction audit: what does this vague note hide?
+      if (useJudge && isVagueClaim(claim)) surplusQueue.push({ claim, pool });
+    } else {
+      route = routeUnanchored(claim, data);
+    }
+
+    // Both routes share one rule: anything the diff does not settle outright
+    // goes to the judge, and `--judge all` sends everything.
+    if (useJudge && (opts.judgeMode === "all" || route.fallback.verdict !== "verified")) {
+      pending.push({
+        claim,
+        ...route,
+        commits: anchors.commits.length ? anchors.commits : relatedCommits(claim, data.commits),
+      });
+    } else {
       results.set(claim.id, {
         claim,
-        ...settled,
-        evidence: {
-          commitShas: anchors.commits.map((c) => c.sha),
-          files: [observed.file],
-          matchedTerms: [claimed.name],
-          methods: anchors.commits.length
-            ? [anchors.viaPr.length ? "pr-anchor" : "sha-anchor", "pin-anchor"]
-            : ["pin-anchor"],
-        },
+        ...route.fallback,
+        evidence: route.evidence,
         judged: false,
-        generated: isGeneratedEntry(claim, anchors.commits),
+        generated: route.generated,
       });
-      continue;
-    }
-
-    if (anchors.commits.length) {
-      const fileLists = await Promise.all(
-        anchors.commits.map((c) => commitFilesOr(c.sha)),
-      );
-      const pool = fileLists.flat();
-      const generated = isGeneratedEntry(claim, anchors.commits);
-      const lex = lexicalMatch(claim, pool);
-      const bestSim = Math.max(
-        ...anchors.commits.map((c) => similarity(coreText(claim), c.subject)),
-      );
-      const methods: Evidence["methods"] = [anchors.viaPr.length ? "pr-anchor" : "sha-anchor"];
-      if (generated) methods.push("generated");
-      if (lex.score > 0) methods.push("lexical");
-      const evidence: Evidence = {
-        commitShas: anchors.commits.map((c) => c.sha),
-        files: lex.files.map((f) => f.path),
-        matchedTerms: lex.matchedTerms,
-        methods,
-        functions: functionsOf(pool),
-      };
-      const anchorLabel = anchors.viaPr.length
-        ? `PR #${anchors.viaPr.join(", #")}`
-        : `commit ${anchors.viaSha.join(", ")}`;
-      // A note that restates its own commit subject says nothing about the
-      // diff — both texts are written by the same hand, and agreeing with
-      // yourself is not evidence. It anchors the claim (and raises its
-      // priority for judging), it never settles it. The lexical bar is the
-      // same one the unanchored path uses: a single identifier hit is a lead,
-      // not proof.
-      const strong = generated || lex.score >= 5;
-      const detail = generated
-        ? `auto-generated entry, title matches the squash commit`
-        : `identifiers ${lex.matchedTerms.slice(0, 4).join(", ")} appear in its diff`;
-      const gap =
-        lex.score >= 2
-          ? `only ${lex.matchedTerms.join(", ")} could be matched to its diff content`
-          : bestSim >= 0.5
-            ? `the claim restates the commit subject (${Math.round(bestSim * 100)}%), which asserts nothing about the diff`
-            : `the claim text could not be matched to its diff content`;
-      const fallback = strong
-        ? {
-            verdict: "verified" as const,
-            confidence: 0.9,
-            reasoning: `${anchorLabel} is in the release range (${anchors.commits[0].sha.slice(0, 10)}); ${detail}.`,
-          }
-        : {
-            verdict: "partial" as const,
-            confidence: 0.6,
-            reasoning: `${anchorLabel} is in the release range, but ${gap}.`,
-          };
-      if (useJudge && isVagueClaim(claim)) {
-        // Reverse-direction audit: what does this vague note hide?
-        surplusQueue.push({ claim, pool });
-      }
-      if (useJudge && (opts.judgeMode === "all" || !strong)) {
-        pending.push({ claim, evidence, hunkPool: pool, commits: anchors.commits, generated, fallback });
-      } else {
-        results.set(claim.id, { claim, ...fallback, evidence, judged: false, generated });
-      }
-      continue;
-    }
-
-    // No usable anchor (or referenced PR not findable in commit messages):
-    // fall back to lexical + ranked-hunk evidence over the whole diff.
-    const lex = lexicalMatch(claim, data.files);
-    const evidence: Evidence = {
-      commitShas: [],
-      files: lex.files.map((f) => f.path),
-      matchedTerms: lex.matchedTerms,
-      methods: lex.score > 0 ? ["lexical"] : ["none"],
-      functions: functionsOf(lex.files),
-    };
-    const anchorNote = claim.prNumbers.length
-      ? `Referenced PR #${claim.prNumbers.join(", #")} matches no commit message in the range. `
-      : "";
-    const fallback =
-      lex.score >= 5
-        ? {
-            verdict: "verified" as const,
-            confidence: 0.8,
-            reasoning: `${anchorNote}Identifiers ${lex.matchedTerms.slice(0, 5).join(", ")} all appear in the diff (${lex.files.length} file(s)).`,
-          }
-        : lex.score >= 2
-          ? {
-              verdict: "partial" as const,
-              confidence: 0.55,
-              reasoning: `${anchorNote}Some identifiers (${lex.matchedTerms.join(", ")}) appear in the diff, but the match is weak.`,
-            }
-          : {
-              verdict: "no-evidence" as const,
-              confidence: 0.5,
-              reasoning: `${anchorNote}No identifier from the claim appears in the diff.`,
-            };
-    if (useJudge && (opts.judgeMode === "all" || fallback.verdict !== "verified")) {
-      const related = data.commits
-        .map((c) => ({ c, s: similarity(coreText(claim), c.subject) }))
-        .filter((x) => x.s > 0.3)
-        .sort((a, b) => b.s - a.s)
-        .slice(0, 3)
-        .map((x) => x.c);
-      pending.push({ claim, evidence, hunkPool: data.files, commits: related, generated: false, fallback });
-    } else {
-      results.set(claim.id, { claim, ...fallback, evidence, judged: false, generated: false });
     }
   }
 
@@ -438,11 +599,7 @@ export async function verifyClaims(
           .slice(0, opts.maxHunks)
           .map((f) => ({ path: f.path, hunk: f.patch!, score: 0 }));
       }
-      const promptFor = (
-        hunks: Array<{ path: string; hunk: string }>,
-        allowNeed: boolean,
-        suffix = "",
-      ): string =>
+      const promptFor: PromptFor = (hunks, allowNeed, suffix = "") =>
         buildJudgePrompt({
           repoLabel: data.repoLabel,
           baseRef: data.baseRef,
@@ -454,81 +611,34 @@ export async function verifyClaims(
           allPaths: data.files.map((f) => f.path),
           allowNeed,
         }) + suffix;
-      const hunks = capHunks(ranked, opts.maxEvidenceChars);
       try {
-        let finalHunks = hunks;
-        let response = parseJudgeResponse(await engine.judge(promptFor(hunks, true)));
-        if ("need" in response) {
-          // Bounded second retrieval round: hand over exactly the requested
-          // full file diffs, then demand a verdict.
-          const wanted = data.files.filter(
-            (f) => f.patch && (response as { need: string[] }).need.includes(f.path),
-          );
-          finalHunks = capHunks(
-            [
-              ...wanted.map((f) => ({ path: f.path, hunk: f.patch! })),
-              ...hunks,
-            ],
-            opts.maxEvidenceChars,
-          );
-          response = parseJudgeResponse(await engine.judge(promptFor(finalHunks, false)));
-          if ("need" in response) throw new Error("judge kept requesting files");
-        }
-        let verdict = response;
+        const judged = await judgeWithRetrieval(
+          engine,
+          promptFor,
+          capHunks(ranked, opts.maxEvidenceChars),
+          data,
+          opts.maxEvidenceChars,
+        );
+        const finalHunks = judged.hunks;
+        let verdict = judged.verdict;
         let escalated = false;
         let cast: JudgeVerdict[] | null = null;
-        const severe = verdict.verdict === "no-evidence" || verdict.verdict === "contradicted";
-        // A security claim can hide under any section name ("Packaging
-        // cleanup"): a "verified" also escalates when the evidence behind it
-        // touches sensitive paths — install hooks, dependency manifests,
-        // lockfiles, auth/crypto — not only when the claim says "security".
         const evidencePaths = [
           ...finalHunks.map((h) => h.path),
           ...verdict.files,
           ...p.evidence.files,
         ];
-        const riskyVerified =
-          verdict.verdict === "verified" &&
-          (isSecuritySensitive(p.claim) ||
-            evidencePaths.some((path) => sensitiveCategory(path) !== null));
-        if (opts.escalateEngine && (severe || riskyVerified)) {
-          // Release-critical decision from a weaker primary engine: a stronger
-          // second engine reviews independently and its verdict wins.
-          try {
-            const second = parseJudgeResponse(
-              await opts.escalateEngine.judge(
-                promptFor(finalHunks, false, "\n(Escalation review by a second engine — judge independently.)"),
-              ),
-            );
-            if (!("need" in second)) {
-              verdict = second;
-              escalated = true;
-            }
-          } catch {
-            // keep the primary verdict if escalation fails
-          }
-        } else if (severe || riskyVerified) {
-          // No escalation engine — and with the default --engine claude-cli,
-          // --escalate auto builds none, so this is the common path, not the
-          // fallback. It has to cover the rubber stamp too: a "verified" whose
-          // evidence touches auth, crypto, dependencies or CI is the most
-          // expensive verdict to get wrong, and it used to be the one verdict
-          // nobody looked at twice.
-          const votes = [verdict];
-          for (const pass of [2, 3]) {
-            try {
-              const vote = parseJudgeResponse(
-                await engine.judge(
-                  promptFor(finalHunks, false, `\n(Independent verification pass ${pass} — judge from scratch.)`),
-                ),
-              );
-              if (!("need" in vote)) votes.push(vote);
-            } catch {
-              // a failed vote simply doesn't count
-            }
-          }
-          cast = votes;
-          verdict = resolveVotes(votes);
+        if (needsSecondLook(p.claim, verdict, evidencePaths)) {
+          const review = await reviewSevere(
+            engine,
+            opts.escalateEngine,
+            promptFor,
+            finalHunks,
+            verdict,
+          );
+          verdict = review.verdict;
+          escalated = review.escalated;
+          cast = review.votes;
         }
         results.set(p.claim.id, {
           claim: p.claim,
