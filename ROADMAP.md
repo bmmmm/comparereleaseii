@@ -1,9 +1,13 @@
 # Roadmap
 
-> **Status 2026-08-06:** v0.10.0 is out and the gh extension's pin follows
-> it, so the state lock, the backtick rule and the pin-join fixes are what
-> the hourly job now runs — the release block that opened this section is
-> closed. Before it: the bump block landed — bump claims are settled by
+> **Status 2026-08-06:** v0.10.1 is out and the gh extension's pin follows
+> it, so the state lock, the backtick rule, the pin-join fixes and the
+> unreadable-commit repair are what the hourly job now runs — the release
+> block that opened this section is closed. **Unreleased on `main`:** the
+> bump-claim coverage fix (a scoring change — see step 1's note on ordering)
+> and a cleanup round that left behaviour bit-identical (the three renderers
+> now share their decisions via `src/report.ts`, and the Markdown report no
+> longer drops the baseline and repo context). Next release is 0.11.0. Before it: the bump block landed — bump claims are settled by
 > the diff's own pin delta before any judge runs, and the corpus question
 > that opened it closed without the score being touched. Everything else is
 > on `main` — the three original phases (distribution, watchdog, judge
@@ -45,14 +49,31 @@ deterministically, measure again.
 
 ### 1. Every record says which rules produced it
 
-Completeness moved by up to 50 points today through *correct* fixes. The
-watch state holds records from four scoring generations side by side and
-cannot tell them apart, so the baseline median, the relative alert and the
-drift detection all compare across a discontinuity they cannot see. Put the
-scoring generation into each `RepoState.history` entry and into every report;
-have the dashboard mark a history that spans more than one, and make the
-baseline refuse to average across generations. Until this exists, every
-improvement quietly damages the series it is measured on — including the
+> **Start here — the scope is narrower than the paragraph below it.** Put an
+> explicit scoring-generation constant into `CheckedRelease`
+> (`src/watch-state.ts`) and into every report, and teach `segmentPhases()`
+> (`src/watch-longview.ts`) not to open a `level-shift` phase across a
+> generation boundary. Have the history page mark a series that spans more than
+> one. **Leave the baseline out of it** — the measurement below shows it does
+> not need this, and `BASELINE_MIN_CHECKS` (`src/watch-state.ts`) makes a wrong
+> key there expensive: a generation tied to `VERSION` would empty the series
+> every release and leave three checks with no relative alert at all. The
+> constant is explicit and hand-bumped, never `VERSION`.
+>
+> Do this *before* the next release if the release carries a scoring change —
+> the unreleased bump-claim fix is one. Records shipped without the marker
+> create exactly the boundary nobody can label later, in the users' watch
+> homes rather than here.
+
+The original framing, kept because the measurement under it refutes the part
+about the baseline: completeness moved by up to 50 points today through
+*correct* fixes. The watch state holds records from four scoring generations
+side by side and cannot tell them apart, so the baseline median, the relative
+alert and the drift detection all compare across a discontinuity they cannot
+see. Put the scoring generation into each `RepoState.history` entry and into
+every report; have the dashboard mark a history that spans more than one, and
+make the baseline refuse to average across generations. Until this exists,
+every improvement quietly damages the series it is measured on — including the
 repair in step 5.
 
 **Measured 2026-08-06 — the discontinuity this entry is built on is not
