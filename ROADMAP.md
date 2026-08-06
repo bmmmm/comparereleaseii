@@ -163,6 +163,33 @@ and no candidate that does not cost more than it buys. Whoever reopens this
 starts from the rejected three, and from the rule they all broke: a repair
 that counts a documented bump as undocumented is not a repair.
 
+**Diagnosed 2026-08-06: the two are not one problem.** Both were re-measured
+and instrumented per route, and they sit on different ones:
+
+- `opencloud@v7.3.0` — commit `04a924f7`, **29,027 lines across 50 files**,
+  held by the **bump pin join**. Not by the union: 0 of its 50 files are cited
+  as evidence, and no claim clears the lexical bar on it. Four of the 50 files
+  move a pin some note names, and that route is blind to everything else the
+  commit does. The rule that closed this class is what now hides the largest
+  commit in the release.
+- `opencloud-eu/web@v7.0.0` — commit `86fff671`, 5,567 lines across 72 files,
+  held by the **evidence-file majority** at 57/72 = 0.79. This one is the
+  union route the original diagnosis named.
+
+**A fourth candidate, measured and rejected.** Requiring the pin files to
+carry at least half the commit's churn before a bump claim documents it:
+`opencloud` omission 8/9 → **9/9**, median completeness 51 → 35, and
+`opencloud@v7.1.0` falls from **98 to 6**. That is the canary the file-type
+variant died on (96 → 1), dying the same way — a vendored dependency update
+moves `go.mod` and `go.sum` while the vendor tree carries the churn, so the
+most cleanly documented dependency work in the corpus reads as undocumented.
+The numbers live in the comment at the route.
+
+What that leaves for whoever reopens it: churn share cannot tell "this commit
+*is* a bump" from "this commit *contains* a bump", and neither can file type.
+A signal that can would have to read the pin move against the rest of the
+commit's *substance* rather than its size — and it has to survive v7.1.0.
+
 ### 6. `inverted-claim` — built, and it found one on the first corpus
 
 Built 2026-08-06 as `pnpm mutate-notes --generate`. A model rewrites a claim

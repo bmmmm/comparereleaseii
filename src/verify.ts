@@ -851,6 +851,25 @@ export async function computeCoverage(
     // deliberately do not have to agree: a release aggregating several bumps
     // of one dependency has a note for the last of them, and the earlier
     // commits are still the work that note describes.
+    //
+    // This route is deliberately blind to how much ELSE the commit does, and
+    // that is one of the two remaining `omission` misses: opencloud@v7.3.0
+    // hides a 29,027-line commit across 50 files behind a bump claim, because
+    // four of those files also move a pin some note names. Requiring the pin
+    // files to carry at least half the commit's churn closes it — and is
+    // rejected, measured 2026-08-06:
+    //
+    //   pin churn >= 0.5 of commit churn   opencloud omission 8/9 → 9/9,
+    //                                      median completeness 51 → 35,
+    //                                      and v7.1.0 falls 98 → 6
+    //
+    // v7.1.0 is the canary the file-type variant died on (96 → 1) and it dies
+    // here the same way: a vendored dependency update moves go.mod and go.sum
+    // while the vendor tree carries the churn, so the most cleanly documented
+    // dependency work in the corpus reads as undocumented. Same rule as
+    // before — a repair that counts a documented bump as undocumented is not
+    // a repair. Whatever closes v7.3.0 has to tell "this commit is a bump"
+    // from "this commit contains a bump", and churn share cannot.
     if (bumpClaims.length && files.length) {
       const pins = pinBumps(files);
       if (
