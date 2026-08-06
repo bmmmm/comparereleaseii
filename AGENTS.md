@@ -12,6 +12,7 @@ pnpm test                        # node --test 'test/*.test.ts' — must pass
 pnpm eval                        # golden-set eval; needs a judge engine
 pnpm mutate                      # mutation harness: every listed guard's test must kill its mutant
 pnpm sweep <reports dir>         # threshold sweep: Pareto front per hand-set bar. Reports, never writes
+pnpm mutate-notes <dir> --generate  # + the model-written inverted-claim class (needs an engine)
 pnpm corpus-stats <reports dir>  # aggregate a watch home's reports; anonymous unless --named
 node src/cli.ts --help
 ```

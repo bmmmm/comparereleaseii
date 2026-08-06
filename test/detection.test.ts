@@ -25,21 +25,38 @@ test("the detection reference covers exactly the harness's mutation classes", as
   // got worse. A class added to the harness without an entry here is a class
   // nothing watches — the same way growing the golden set used to leave
   // reference-haiku.json silently stale.
+  //
+  // Exactly the classes whose expectation is a property of the DIFF. A
+  // generated class (`inverted-claim`) has one more link: whether the model
+  // really inverted the sentence. Its rate moves when a model phrases the lie
+  // differently, and freezing weather as a regression gate would make the file
+  // fail for reasons that have nothing to do with the detector.
   const source = await readFile(join(ROOT, "scripts/mutate-notes.ts"), "utf8");
   const declared = source
     .slice(source.indexOf("const MUTATION_CLASSES"), source.indexOf("] as const;"))
     .match(/"([a-z-]+)"/g)
     ?.map((s) => s.replaceAll('"', ""));
   assert.ok(declared?.length, "could not read MUTATION_CLASSES out of the harness");
+  const generated = source
+    .slice(source.indexOf("const FROZEN_CLASSES"), source.indexOf("/**\n * The generated class"))
+    .match(/m !== "([a-z-]+)"/g)
+    ?.map((s) => s.replace(/.*"([a-z-]+)".*/, "$1")) ?? [];
+  assert.ok(generated.length, "could not read the generated-class exclusions out of the harness");
+  const frozen = declared.filter((c) => !generated.includes(c));
 
   const reference = await loadReference();
   assert.deepEqual(
-    declared.filter((c) => !(c in reference.classes)),
+    frozen.filter((c) => !(c in reference.classes)),
     [],
     "mutation classes with no frozen rate — re-run `pnpm mutate-notes <reports> --freeze`",
   );
   assert.deepEqual(
-    Object.keys(reference.classes).filter((c) => !declared.includes(c)),
+    generated.filter((c) => c in reference.classes),
+    [],
+    "a generated class has a frozen rate — its number is weather, not a regression signal",
+  );
+  assert.deepEqual(
+    Object.keys(reference.classes).filter((c) => !frozen.includes(c)),
     [],
     "frozen rates for classes the harness no longer has",
   );

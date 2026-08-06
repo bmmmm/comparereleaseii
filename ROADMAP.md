@@ -163,13 +163,30 @@ and no candidate that does not cost more than it buys. Whoever reopens this
 starts from the rejected three, and from the rule they all broke: a repair
 that counts a documented bump as undocumented is not a repair.
 
-### 6. Mutation classes nobody thought of
+### 6. `inverted-claim` — built, and it found one on the first corpus
 
-The harness measures five classes, and those five are the ones someone
-invented. All three holes found so far were the same mistake wearing
-different clothes: a route reading "similar enough" as "supported". Generate
-the lies instead — plausible fabrications from a model, applied to real notes
-— and see which ones survive. Self-testing, not self-tuning.
+Built 2026-08-06 as `pnpm mutate-notes --generate`. A model rewrites a claim
+the control run VERIFIED so that it asserts the opposite; the diff
+demonstrably does X, so ¬X cannot hold of it either. Opt-in (it needs an
+engine to write the lie and one to catch it), and deliberately outside the
+frozen reference: its expectation carries one link the other five do not —
+whether the model really inverted the sentence rather than rewording it — so
+a survivor is a lead to read by hand, not a rate.
+
+**The survivor it found, still open.** `GyulyVGC/sniffnet@v1.4.1`: *"Fix
+support for IPinfo's databases"* inverted to *"**Break** support for IPinfo's
+databases"* comes back `verified`. The inversion keeps every identifier, the
+lexical bar clears on those identifiers alone, and the claim is settled before
+any judge reads the sentence — `judgeMode: auto` never asks about a claim the
+deterministic pass already called verified. It is the same mistake the other
+three holes were, found by a class nobody would have written.
+
+Whoever closes it starts from what that implies rather than from the bar: the
+`lexical-bar` sweep (`pnpm sweep`, 2026-08-06) shows raising it costs six of
+28 detections and buys three judge calls, so the number is not the fix. The
+question is whether a claim whose evidence is *only* identifier overlap should
+be settled deterministically at all, or should always cost a judge call — and
+`pnpm corpus-stats` now prices that: `anchored-strong` is 5.6 % of the bill.
 
 ### 7. A watchdog for silent softening
 

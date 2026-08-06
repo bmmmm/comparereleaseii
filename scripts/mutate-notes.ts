@@ -30,6 +30,26 @@
 // measures is therefore the deterministic floor: if a class is missed here, no
 // model is involved in the miss.
 //
+// Those five are the five somebody invented, and all three holes they found
+// were the same mistake wearing different clothes: a route reading "similar
+// enough" as "supported". `--generate` adds a sixth that nobody invented —
+//
+//   inverted-claim  a model rewrites a claim the control VERIFIED so it
+//                   asserts the opposite → it must not come out verified
+//
+// — which needs an engine twice over (to write the lie, to catch it) and is
+// therefore opt-in. Its expectation still rests on the diff: the diff
+// demonstrably does X, and both X and ¬X cannot hold of it. What it has that
+// the others do not is one more link — whether the model really inverted the
+// sentence instead of rewording it — so a survivor is a lead to read by hand,
+// its rate never joins the frozen reference, and the output says so.
+//
+// It has already earned its keep. GyulyVGC/sniffnet v1.4.1: "Fix support for
+// IPinfo's databases" inverted to "Break support for IPinfo's databases" comes
+// back `verified`. Every identifier survives the inversion, the lexical bar
+// clears on them, and the claim is settled before the sentence is ever read —
+// the same mistake again, found by a class nobody would have written.
+//
 // Diffs come from the clone cache and notes are rebuilt from the claims the
 // stored reports carry, so a run needs no network. The rebuild normalises
 // headings and bullet syntax; control and mutant are built the same way, so
@@ -46,13 +66,16 @@ import type { Claim, ClaimResult, DiffFile, Report } from "../src/types.ts";
 import { dedupeReports, median } from "./corpus-aggregate.ts";
 import {
   anchorsTo,
+  buildInversionPrompt,
   fabricatedClaim,
   noiseTokens,
   OVERSHOOT_VERSION,
+  parseInversion,
   renderNotes,
   restateBumpTarget,
   UNDERSHOOT_VERSION,
 } from "./notes-mutations.ts";
+import { resolveEngines, type JudgeEngine } from "../src/judge.ts";
 
 const args = process.argv.slice(2);
 const asJson = args.includes("--json");
@@ -75,8 +98,29 @@ const MUTATION_CLASSES = [
   "bump-undershoot",
   "foreign-claim",
   "backtick-noise",
+  "inverted-claim",
 ] as const;
 type MutationClass = (typeof MUTATION_CLASSES)[number];
+
+/**
+ * Classes whose expectation is a property of the diff alone, and nothing
+ * else's opinion. Only these belong in the frozen reference: a rate that can
+ * move because a model phrased something differently is not a regression
+ * signal, it is weather.
+ */
+const FROZEN_CLASSES: MutationClass[] = MUTATION_CLASSES.filter(
+  (m) => m !== "inverted-claim",
+);
+
+/**
+ * The generated class needs an engine twice over — once to write the lie, once
+ * to judge it — so it is opt-in and the rest of the harness stays keyless.
+ * Under `--judge off` it would also be meaningless: an inverted claim keeps
+ * the original's identifiers, so the lexical bar settles it `verified` without
+ * anything reading the sentence. That is the deterministic floor's known
+ * limit, not a finding.
+ */
+const generate = args.includes("--generate");
 
 interface Case {
   repoLabel: string;
@@ -102,6 +146,9 @@ async function commitChurn(
   }
 }
 
+// The four deterministic classes run judge-free, always — that is what makes
+// their rates reproducible without a key. The generated class needs an engine,
+// and only its own analysis gets one.
 const settings: CheckSettings = {
   judgeMode: "off",
   engine: null,
@@ -112,6 +159,28 @@ const settings: CheckSettings = {
   history: null,
   findings: false,
 };
+
+let engine: JudgeEngine | null = null;
+let judgedSettings: CheckSettings = settings;
+if (generate) {
+  const resolved = await resolveEngines({
+    judgeMode: "auto",
+    engine: (flag("engine") ?? "claude-cli") as "claude-cli" | "api" | "openai" | "off",
+    model: flag("model"),
+    openaiUrl: flag("openai-url"),
+    escalate: "off",
+    cache: !args.includes("--no-cache"),
+  });
+  engine = resolved.engine;
+  if (!engine) {
+    console.error(
+      "--generate needs a judge engine — it asks a model to write the lie and then asks one to catch it. " +
+        "Install the claude CLI, export ANTHROPIC_API_KEY, or point --engine openai --model <m> at a local server.",
+    );
+    process.exit(2);
+  }
+  judgedSettings = { ...settings, judgeMode: "auto", engine, findings: false };
+}
 
 async function findReports(root: string): Promise<string[]> {
   const found: string[] = [];
@@ -222,8 +291,8 @@ for (const report of reports) {
     headRef: report.headRef,
     ...range,
   };
-  const analyse = (notes: string) =>
-    analyzeRelease({ ...base, notes, warnings: [] }, context, null, settings);
+  const analyse = (notes: string, s: CheckSettings = settings) =>
+    analyzeRelease({ ...base, notes, warnings: [] }, context, null, s);
 
   let control: Report;
   try {
@@ -389,6 +458,63 @@ for (const report of reports) {
     }
   }
 
+  // ---- inverted-claim (generated, opt-in) --------------------------------
+  // The class nobody invented: a model writes the lie. The input is a claim
+  // the control run VERIFIED against this diff, so the diff demonstrably does
+  // X and the replacement asserts that it did the opposite — both cannot hold
+  // of one diff. What no other class has to assume is that the model really
+  // inverted the sentence instead of rewording it, which is why a survivor
+  // here is a lead to read by hand and why this class never joins the frozen
+  // reference.
+  if (engine) {
+    // The richest verified claim, not the first: a longer assertion gives the
+    // model something to actually flip. Auto-generated PR-list entries are
+    // deliberately IN — inverting one breaks the title/subject match that made
+    // it generated, and what catches it afterwards is the lexical route, which
+    // is precisely the "similar enough = supported" reading this class exists
+    // to probe. Excluding them cost every applicable case on the first run.
+    const verified = control.results
+      .filter(
+        (r: ClaimResult) =>
+          r.claim.kind === "change" &&
+          r.verdict === "verified" &&
+          // Bump claims have two classes of their own, with a stronger
+          // expectation than "not verified".
+          !r.claim.bump &&
+          tokenize(r.claim.text).length >= 4,
+      )
+      .sort((a, b) => tokenize(b.claim.text).length - tokenize(a.claim.text).length)[0];
+    if (!verified) {
+      add("inverted-claim", false, undefined, "no verified handwritten claim to invert");
+    } else {
+      let inversion = null;
+      try {
+        inversion = parseInversion(
+          await engine.judge(buildInversionPrompt(verified.claim.section, verified.claim.text)),
+          verified.claim.text,
+        );
+      } catch (err) {
+        add("inverted-claim", false, undefined, `generating the lie failed: ${(err as Error).message.slice(0, 80)}`);
+      }
+      if (inversion) {
+        const swapped = claims.map((cl) =>
+          cl.id === verified.claim.id ? { ...cl, text: inversion!.line } : cl,
+        );
+        const mutant = await analyse(renderNotes(swapped), judgedSettings);
+        const landed = mutant.results.find((r: ClaimResult) => r.claim.text === inversion!.line);
+        add(
+          "inverted-claim",
+          true,
+          landed ? landed.verdict !== "verified" : undefined,
+          `"${verified.claim.text.slice(0, 60)}" → "${inversion.line.slice(0, 60)}"` +
+            `${inversion.inverted ? ` (flipped: ${inversion.inverted})` : ""} → ${landed?.verdict ?? "not parsed"}`,
+        );
+      } else if (!cases.some((c) => c.headRef === report.headRef && c.mutation === "inverted-claim")) {
+        add("inverted-claim", false, undefined, "the model returned no usable inversion");
+      }
+    }
+  }
+
   if (!asJson) console.error(`  checked ${label}`);
 }
 
@@ -416,7 +542,9 @@ if (args.includes("--freeze")) {
     releases: analysed,
     engine: "off (deterministic only)",
     classes: Object.fromEntries(
-      summary.map((s) => [s.mutation, { applicable: s.applicable, detected: s.detected }]),
+      summary
+        .filter((s) => FROZEN_CLASSES.includes(s.mutation))
+        .map((s) => [s.mutation, { applicable: s.applicable, detected: s.detected }]),
     ),
   };
   await writeFile(REFERENCE, `${JSON.stringify(frozen, null, 2)}\n`);
@@ -430,6 +558,10 @@ try {
     classes: Record<string, { applicable: number; detected: number }>;
   };
   for (const s of summary) {
+    // A generated class cannot regress against a frozen number: its rate
+    // moves when a model phrases the lie differently, which is weather, not
+    // a change in the detector.
+    if (!FROZEN_CLASSES.includes(s.mutation)) continue;
     const was = ref.classes[s.mutation];
     if (!was || !was.applicable || !s.applicable) continue;
     const before = was.detected / was.applicable;
@@ -461,12 +593,18 @@ if (asJson) {
   process.exit(regressed.length ? 1 : 0);
 }
 
-console.log(`\nadversarial notes — ${analysed} releases, judge off (deterministic stages only)\n`);
+console.log(
+  `\nadversarial notes — ${analysed} releases, judge off (deterministic stages only)` +
+    (engine ? `\ninverted-claim generated and judged by ${engine.name}` : "") +
+    "\n",
+);
 console.log("  class            applicable  detected  missed  n/a");
 for (const s of summary) {
+  if (!s.applicable && !s.skipped) continue;
   console.log(
     `  ${s.mutation.padEnd(17)}${String(s.applicable).padStart(10)}${String(s.detected).padStart(10)}` +
-      `${String(s.missed + s.inconclusive).padStart(8)}${String(s.skipped).padStart(5)}`,
+      `${String(s.missed + s.inconclusive).padStart(8)}${String(s.skipped).padStart(5)}` +
+      (FROZEN_CLASSES.includes(s.mutation) ? "" : "   generated — a lead, not a rate"),
   );
 }
 console.log(

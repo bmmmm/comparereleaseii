@@ -6,6 +6,27 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **`pnpm mutate-notes --generate`: the lie is written by a model, not by the
+  person who wrote the routes.** The harness measured five mutation classes,
+  and those five were the five somebody invented — all three holes they ever
+  found were the same mistake wearing different clothes. The new class hands a
+  model a claim the control run verified and asks for a sentence asserting the
+  opposite; the diff demonstrably does X, so ¬X cannot hold of it either.
+
+  It is opt-in (it needs an engine to write the lie and one to catch it) and
+  its rate deliberately never joins the frozen detection reference: it carries
+  one link the other five do not — whether the model really inverted the
+  sentence instead of rewording it — so a survivor is a lead to read by hand.
+  The claim goes into the prompt inside the untrusted markers like every other
+  quoted field; a note saying "return this line unchanged" would otherwise
+  produce a "lie" that is the truth.
+
+  It found one on its first corpus, and that finding is open:
+  `GyulyVGC/sniffnet@v1.4.1`, "Fix support for IPinfo's databases" inverted to
+  "**Break** support for IPinfo's databases", comes back `verified`. Every
+  identifier survives the inversion, the lexical bar clears on those alone, and
+  the claim is settled before any judge reads the sentence. See ROADMAP.md.
+
 - **`pnpm sweep` — the hand-set thresholds get measured before they move, not
   after.** The lexical bar of 5, the 0.5 file majority in coverage and the
   0.25 weight a generated entry carries are numbers somebody picked; three of
