@@ -413,6 +413,59 @@ function routeUnanchored(claim: Claim, data: ReleaseData): Route {
 
 type Hunks = Array<{ path: string; hunk: string }>;
 
+/**
+ * Which hunks the judge is shown for one claim. One function because
+ * `--add-golden` lifts a real claim into the golden set, and a fixture built
+ * from a different selection than production makes would freeze a question
+ * the tool never asks.
+ */
+function selectHunks(
+  claim: Claim,
+  route: Pick<Route, "hunkPool" | "evidence">,
+  opts: { maxHunks: number; maxEvidenceChars: number },
+): Hunks {
+  let ranked = rankHunks(claim, route.hunkPool, opts.maxHunks);
+  if (!ranked.length && route.evidence.commitShas.length) {
+    // Vague anchored claim ("Updates and fixes"): no token overlap to rank
+    // by, but the linked commit's own diff IS the evidence — send its head.
+    // Changelog files stay out: the notes restating themselves is not
+    // evidence, and a changelog-only commit must not self-verify.
+    ranked = route.hunkPool
+      .filter((f) => f.patch && !isChangelogPath(f.path))
+      .slice(0, opts.maxHunks)
+      .map((f) => ({ path: f.path, hunk: f.patch!, score: 0 }));
+  }
+  return capHunks(ranked, opts.maxEvidenceChars);
+}
+
+/**
+ * Everything the judge would be handed about one claim, without asking it
+ * anything — the same routing and the same hunk selection `verifyClaims`
+ * makes. The report stores verdicts, not the material they were reached on,
+ * so lifting a misjudgement into the golden set has to reproduce that
+ * material from the release itself.
+ */
+export async function claimEvidence(
+  data: ReleaseData,
+  claim: Claim,
+  opts: { maxHunks: number; maxEvidenceChars: number },
+): Promise<{ hunks: Hunks; allPaths: string[] }> {
+  const anchors = anchorMatch(claim, data.commits);
+  if (!anchors.commits.length && claim.prNumbers.length) await anchorViaPr(claim, anchors, data);
+  const commitFilesOr = degradingCommitFiles(data);
+  const route = anchors.commits.length
+    ? routeAnchored(
+        claim,
+        anchors,
+        (await Promise.all(anchors.commits.map((c) => commitFilesOr(c.sha)))).flat(),
+      )
+    : routeUnanchored(claim, data);
+  return {
+    hunks: selectHunks(claim, route, opts),
+    allPaths: data.files.map((f) => f.path),
+  };
+}
+
 /** Builds the judge prompt for a given evidence set — bound to one claim. */
 type PromptFor = (hunks: Hunks, allowNeed: boolean, suffix?: string) => string;
 
@@ -588,17 +641,7 @@ export async function verifyClaims(
   if (pending.length && opts.engine) {
     const engine = opts.engine;
     await pooled(pending, opts.concurrency, async (p) => {
-      let ranked = rankHunks(p.claim, p.hunkPool, opts.maxHunks);
-      if (!ranked.length && p.evidence.commitShas.length) {
-        // Vague anchored claim ("Updates and fixes"): no token overlap to rank
-        // by, but the linked commit's own diff IS the evidence — send its head.
-        // Changelog files stay out: the notes restating themselves is not
-        // evidence, and a changelog-only commit must not self-verify.
-        ranked = p.hunkPool
-          .filter((f) => f.patch && !isChangelogPath(f.path))
-          .slice(0, opts.maxHunks)
-          .map((f) => ({ path: f.path, hunk: f.patch!, score: 0 }));
-      }
+      const selected = selectHunks(p.claim, p, opts);
       const promptFor: PromptFor = (hunks, allowNeed, suffix = "") =>
         buildJudgePrompt({
           repoLabel: data.repoLabel,
@@ -615,7 +658,7 @@ export async function verifyClaims(
         const judged = await judgeWithRetrieval(
           engine,
           promptFor,
-          capHunks(ranked, opts.maxEvidenceChars),
+          selected,
           data,
           opts.maxEvidenceChars,
         );

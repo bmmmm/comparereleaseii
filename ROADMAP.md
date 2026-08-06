@@ -200,6 +200,17 @@ alarm, not a score.
   noise; further model-ranking/golden-tuning work has poor marginal value.
   The golden-set gate was the one exception precisely because it *ends*
   the topic.
+
+  `--add-golden` (2026-08-06) does not reopen it, and is built so it cannot.
+  A lifted case lands in the `field` category, which `--calibrate` runs and
+  names but which is excluded from the gate's verdict — a case lifted this
+  morning must not be able to move a judge from "sole judge" to "not
+  recommended", and a set growing with unreviewed field cases would turn the
+  gate into noise. Promoting one into `core` or `security` is a hand-edit.
+  The distinction that keeps this closed: lifting a case is *regression
+  testing against something that happened*, never *tuning a set until a
+  number improves*. The moment a proposal is the latter, this entry applies
+  to it unchanged.
 - **`watch serve`: stays unbuilt** — the static, daemon-free index.html is
   a feature (scp-able, zero attack surface).
 - **Public scan-results: stays rejected** — honest-but-weak judges are

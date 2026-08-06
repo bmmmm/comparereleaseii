@@ -36,6 +36,7 @@ that way — a dependency needs a strong argument.
 | `src/verify.ts` | The escalation ladder, second retrieval round, coverage check |
 | `src/judge.ts` | Judge engines, prompt construction, response parsing |
 | `src/calibrate.ts` | Golden set against the configured judge |
+| `src/golden.ts` | `--add-golden`: a claim from a stored report becomes a golden case, with the release's own evidence rebuilt |
 | `src/cache.ts` | On-disk verdict cache |
 | `src/metrics.ts` | Trust score, risk flags, per-file coverage |
 | `src/bump.ts` | The version number as a claim: semver bump held against the commits' own BREAKING/feat markers |

@@ -21,7 +21,44 @@ export const GOLDEN_CATEGORIES = [
   "partial",
   "benign",
   "long-context",
+  "field",
 ] as const;
+
+/**
+ * Where `--add-golden` puts a case lifted out of a real report — reported by
+ * every calibration, never part of the gate's verdict.
+ *
+ * The gate is frozen on purpose: golden-set tuning and model ranking were
+ * measured to have poor marginal value, and the gate survived that decision
+ * precisely because it *ends* the topic rather than inviting another round of
+ * it. A route back into the set from the field is worth having, but a route
+ * that lets any newly-lifted case flip a model from "sole judge" to "not
+ * recommended" would reopen exactly what was closed — and a set that grows
+ * with unreviewed field cases would turn the gate into noise nobody reads.
+ *
+ * So a field case is a regression test and nothing more: run, named, counted.
+ * A person who has convinced themselves a case is right and general moves it
+ * into `core` or `security` by hand, and only then does it gate.
+ */
+export const FIELD_CATEGORY = "field";
+
+/**
+ * Where a case lifted out of a real report came from, and what the run
+ * actually answered. Present only on cases `--add-golden` added: a reader of
+ * the set has to be able to tell an invented question from one a release
+ * really asked, and `got` is the misjudgement the case exists to catch.
+ */
+export interface LiftedFrom {
+  repo: string;
+  tag: string;
+  /** The verdict that release's check produced — what `expected` corrects. */
+  got: string;
+  /** Why the expected verdict is the right one, in the words of whoever
+   * decided it. A case nobody can re-argue is a case nobody can revise. */
+  why?: string;
+  /** ISO date the case was lifted. */
+  added: string;
+}
 
 export interface GoldenCase {
   name: string;
@@ -30,6 +67,8 @@ export interface GoldenCase {
   section: string;
   claim: string;
   hunks: Array<{ path: string; hunk: string }>;
+  /** Set by `--add-golden`; hand-written cases have none. */
+  lifted?: LiftedFrom;
   /**
    * Full changed-files list of the fictional release; defaults to the hunk
    * paths. Cases expecting "need" list here the file the claim names but the
@@ -83,7 +122,9 @@ export interface Calibration {
 }
 
 const EVAL_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "test", "eval");
-const GOLDEN_PATH = join(EVAL_DIR, "golden.json");
+/** The set `--calibrate` runs and `--add-golden` writes to — one path, so a
+ * case that was added is a case the next calibration answers. */
+export const GOLDEN_PATH = join(EVAL_DIR, "golden.json");
 const PADDING_PATH = join(EVAL_DIR, "padding.json");
 const REFERENCE_PATH = join(EVAL_DIR, "reference-haiku.json");
 
@@ -236,6 +277,12 @@ export interface GateResult {
   reasons: string[];
   categories: Record<string, { passed: number; total: number }>;
   formatIssues: number;
+  /**
+   * Lifted field cases this engine got wrong. Reported next to the verdict,
+   * never inside it — see FIELD_CATEGORY for why the gate stays frozen.
+   */
+  fieldFailures: string[];
+  fieldTotal: number;
 }
 
 /**
@@ -245,6 +292,9 @@ export interface GateResult {
  *   a model cannot borrow those points from short cases);
  * - needing JSON repair, or any other category fail, means escalation;
  * - a clean sweep with clean output is the only "sole judge".
+ *
+ * Field cases — the ones `--add-golden` lifted out of real reports — are
+ * counted and named but never move the verdict. FIELD_CATEGORY says why.
  */
 export function gateCalibration(cal: Calibration): GateResult {
   const categories: Record<string, { passed: number; total: number }> = {};
@@ -253,6 +303,8 @@ export function gateCalibration(cal: Calibration): GateResult {
     entry.total++;
     if (o.pass) entry.passed++;
   }
+  const field = cal.outcomes.filter((o) => o.category === FIELD_CATEGORY);
+  const fieldFailures = field.filter((o) => !o.pass).map((o) => o.name);
 
   const reject: string[] = [];
   const soft: string[] = [];
@@ -269,7 +321,7 @@ export function gateCalibration(cal: Calibration): GateResult {
   }
 
   for (const [cat, { passed, total }] of Object.entries(categories)) {
-    if (cat === "injection" || passed === total) continue;
+    if (cat === "injection" || cat === FIELD_CATEGORY || passed === total) continue;
     const failed = cal.outcomes
       .filter((o) => o.category === cat && !o.pass)
       .map((o) => o.name)
@@ -284,13 +336,19 @@ export function gateCalibration(cal: Calibration): GateResult {
     soft.push(`format: ${cal.formatIssues} response(s) needed JSON repair or never parsed`);
   }
 
+  const common = {
+    categories,
+    formatIssues: cal.formatIssues,
+    fieldFailures,
+    fieldTotal: field.length,
+  };
   if (reject.length) {
-    return { verdict: "not-recommended", reasons: reject.concat(soft), categories, formatIssues: cal.formatIssues };
+    return { verdict: "not-recommended", reasons: reject.concat(soft), ...common };
   }
   if (soft.length) {
-    return { verdict: "escalate-only", reasons: soft, categories, formatIssues: cal.formatIssues };
+    return { verdict: "escalate-only", reasons: soft, ...common };
   }
-  return { verdict: "sole-judge", reasons: [], categories, formatIssues: 0 };
+  return { verdict: "sole-judge", reasons: [], ...common, formatIssues: 0 };
 }
 
 export interface Reference {
@@ -327,13 +385,19 @@ export function rankCalibrations(cals: Calibration[]): Calibration[] {
 
 export function recommendation(cal: Calibration): string {
   const gate = gateCalibration(cal);
+  // Field cases stand beside the verdict, never inside it: they are yours,
+  // not the gate's, and a case lifted this morning must not be able to
+  // reclassify a judge that has been fine for months.
+  const field = gate.fieldFailures.length
+    ? ` Separately: it gets ${gate.fieldFailures.length} of your ${gate.fieldTotal} lifted field case(s) wrong (${gate.fieldFailures.join(", ")}) — those are yours to weigh, they do not gate.`
+    : "";
   switch (gate.verdict) {
     case "sole-judge":
-      return "Safe as sole judge: every gate category passed with clean output.";
+      return `Safe as sole judge: every gate category passed with clean output.${field}`;
     case "escalate-only":
-      return `Usable with escalation for release-critical verdicts (--escalate, default auto). Why: ${gate.reasons.join("; ")}.`;
+      return `Usable with escalation for release-critical verdicts (--escalate, default auto). Why: ${gate.reasons.join("; ")}.${field}`;
     case "not-recommended":
-      return `NOT recommended as a judge. Why: ${gate.reasons.join("; ")}.`;
+      return `NOT recommended as a judge. Why: ${gate.reasons.join("; ")}.${field}`;
   }
 }
 
@@ -400,7 +464,8 @@ export function printCalibration(cal: Calibration, reference?: Reference | null)
   console.log("\nPer category:");
   for (const [cat, { passed, total }] of Object.entries(gate.categories)) {
     const mark = passed === total ? c.green("ok") : c.red(`${total - passed} failed`);
-    console.log(`  ${cat.padEnd(13)} ${passed}/${total}  ${mark}`);
+    const note = cat === FIELD_CATEGORY ? c.dim("  (lifted from real reports — reported, not gated)") : "";
+    console.log(`  ${cat.padEnd(13)} ${passed}/${total}  ${mark}${note}`);
   }
   if (cal.formatIssues) {
     console.log(`  ${"format".padEnd(13)} ${c.yellow(`${cal.formatIssues} response(s) needed JSON repair`)}`);

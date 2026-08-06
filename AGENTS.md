@@ -34,6 +34,7 @@ not add a dependency, a build step, or a framework.
 | `src/verify.ts` | Escalation ladder, second retrieval round, coverage |
 | `src/judge.ts` | Engines, prompt construction, response parsing |
 | `src/calibrate.ts` | Golden set against the configured judge |
+| `src/golden.ts` | `--add-golden`: a claim from a stored report becomes a golden case, with the release's own evidence rebuilt |
 | `src/cache.ts` | Verdict cache |
 | `src/paths.ts` | Build version, the private cache directory and its vetting, path-segment sanitizer |
 | `src/metrics.ts` | Score, risk flags, per-file coverage |

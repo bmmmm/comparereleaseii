@@ -15,6 +15,7 @@ import {
   gateCalibration,
   loadReference,
 } from "./calibrate.ts";
+import { addGoldenCase } from "./golden.ts";
 import { commandExists } from "./util.ts";
 import { printEstimate } from "./estimate.ts";
 import { printTerminal, toMarkdown, exitCode } from "./report.ts";
@@ -86,6 +87,21 @@ Options:
                       engine that reviews release-critical verdicts when the
                       primary judge is a local model (default: auto)
   --escalate-model <m> Model for the escalation engine
+  --add-golden <report.json> <claim-id> <verdict> [why]
+                      Lift a claim out of a stored --json report into the
+                      golden set with the verdict it SHOULD have had, so a
+                      misjudgement you noticed becomes a regression test the
+                      next --calibrate answers. The release is reloaded and
+                      the evidence rebuilt through the same selection the
+                      check makes. verdict: verified | partial | no-evidence
+                      | contradicted. The case lands in the "field" category:
+                      --calibrate runs it and names it when a judge gets it
+                      wrong, but it never moves the fitness verdict — that
+                      gate is frozen, and promoting a case into it is a
+                      deliberate hand-edit (--category <c> does it at lift
+                      time). --golden-file <path> picks the target set, and
+                      --local <path> names the clone for a report that was
+                      checked locally
   --calibrate         Run the golden set against the configured judge and
                       report whether YOUR model is good enough (no repo needed).
                       With --engine openai and no --model, ALL models on the
@@ -272,6 +288,9 @@ async function main(): Promise<number> {
       escalate: { type: "string", default: "auto" },
       "escalate-model": { type: "string" },
       calibrate: { type: "boolean", default: false },
+      "add-golden": { type: "string" },
+      category: { type: "string" },
+      "golden-file": { type: "string" },
       md: { type: "string" },
       json: { type: "string" },
       html: { type: "string" },
@@ -304,10 +323,25 @@ async function main(): Promise<number> {
 
   if (
     values.help ||
-    (!positionals.length && !values.local && !values["repo-url"] && !values.calibrate)
+    (!positionals.length &&
+      !values.local &&
+      !values["repo-url"] &&
+      !values.calibrate &&
+      !values["add-golden"])
   ) {
     console.log(USAGE);
     return values.help ? 0 : 2;
+  }
+
+  // Before every source and engine decision below: this reads a report that
+  // already exists and asks no judge anything. It takes over main() the way
+  // --calibrate does.
+  if (values["add-golden"]) {
+    return runAddGolden(values["add-golden"], positionals, {
+      category: values.category,
+      goldenFile: values["golden-file"],
+      local: values.local,
+    });
   }
   if (values.local && values["repo-url"]) {
     throw new Error("--local and --repo-url both name the repository — pass one.");
@@ -526,6 +560,57 @@ async function main(): Promise<number> {
   printTerminal(report);
   await writeReports(report, values);
   return exitCode(report, failOn, minCoverage);
+}
+
+/**
+ * `--add-golden <report.json> <claim-id> <verdict> [why]`. The three
+ * positionals are the human's judgement, and the command exists to record
+ * exactly that: what the tool answered is in the report, what it should have
+ * answered is what only a person can supply.
+ */
+async function runAddGolden(
+  reportPath: string,
+  positionals: string[],
+  opts: { category?: string; goldenFile?: string; local?: string },
+): Promise<number> {
+  const [rawId, verdict, ...rest] = positionals;
+  if (rawId === undefined || verdict === undefined) {
+    throw new Error(
+      `--add-golden needs the claim and the verdict it should have had: ` +
+        `${PROG} --add-golden <report.json> <claim-id> <verdict> [why]. ` +
+        `The claim id is the "id" field of the entry in the report's results array.`,
+    );
+  }
+  const claimId = intFlag("add-golden claim id", rawId, 0);
+  const added = await addGoldenCase({
+    reportPath,
+    claimId,
+    verdict,
+    why: rest.length ? rest.join(" ") : undefined,
+    category: opts.category,
+    goldenFile: opts.goldenFile,
+    local: opts.local,
+  });
+  const gc = added.case;
+  console.error(
+    `Added ${gc.name} to ${added.path} (${added.total} cases).\n` +
+      `  claim:     ${gc.claim.slice(0, 100)}\n` +
+      `  it said:   ${gc.lifted!.got}\n` +
+      `  you say:   ${gc.expected.join(" | ")}\n` +
+      `  category:  ${gc.category}\n` +
+      `  evidence:  ${gc.hunks.length} hunk(s) from ${new Set(gc.hunks.map((h) => h.path)).size} file(s)\n` +
+      (gc.category === "field"
+        ? `--calibrate now runs this case and names it when a judge gets it wrong, but a field case never\n` +
+          `moves the fitness verdict: the gate is frozen, and one case lifted this morning must not be able\n` +
+          `to reclassify a judge that has been fine for months. Once you are sure the case is right AND\n` +
+          `general, move its "category" to core or security by hand — then it gates.\n` +
+          (added.securityLooking
+            ? `This one reads like security material, which is the one category the gate treats as disqualifying.\n`
+            : "")
+        : `Category ${gc.category} gates: from now on a judge that gets this wrong is downgraded.\n`) +
+      `Run ${PROG} --calibrate to see whether your judge gets it right now.`,
+  );
+  return 0;
 }
 
 async function runWatchCli(argv: string[]): Promise<number> {

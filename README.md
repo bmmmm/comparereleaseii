@@ -462,6 +462,21 @@ Bug reports, dialects that misparse and wrong verdicts are all welcome — the
 for the evidence each kind needs, and a wrong-verdict report that carries a
 `test/eval/golden.json` entry arrives as a ready-made regression test.
 
+`--add-golden` writes that entry for you: point it at the `--json` report and
+say what the verdict should have been, and the release is reloaded and the
+evidence rebuilt through the same selection the check makes.
+
+```console
+$ comparerelease --add-golden report.json 12 no-evidence "the diff only renames a field"
+```
+
+The case lands in the `field` category, which `--calibrate` runs and names but
+which never moves the fitness verdict. That is deliberate: the fitness gate is
+frozen, model-ranking and golden-tuning were measured to have poor marginal
+value, and a case lifted this morning must not be able to reclassify a judge
+that has been fine for months. Promoting one into `core` or `security` — where
+it does gate — is a hand-edit somebody makes on purpose.
+
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow and the stable contracts;
 [AGENTS.md](AGENTS.md) is the condensed version for coding agents. Pull requests
 state their claims and let this tool check them against their own diff.

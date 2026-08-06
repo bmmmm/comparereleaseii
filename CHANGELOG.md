@@ -6,6 +6,25 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **`--add-golden` — a wrong verdict you noticed has a route back into the
+  tool.** Every golden case used to be invented by hand, and a misjudgement
+  spotted in the field ended at a human: the issue template is where it
+  stopped. Point the flag at a stored `--json` report, name the claim and the
+  verdict it should have had, and the release is reloaded and the evidence
+  rebuilt through the same selection a real check makes — a fixture assembled
+  any other way would freeze a question the tool never asks. The case records
+  what the run actually answered and, optionally, why you disagree.
+
+  The case lands in a new `field` category that `--calibrate` runs and names
+  but that never moves the fitness verdict. The gate stays frozen on purpose:
+  golden-tuning and model ranking were measured to have poor marginal value,
+  and the gate survived that decision because it ends the topic rather than
+  inviting another round of it. One case lifted this morning must not be able
+  to reclassify a judge that has been fine for months, and a set growing with
+  unreviewed field cases would turn the gate into noise nobody reads.
+  Promoting a case into `core` or `security`, where it does gate, is a
+  deliberate hand-edit.
+
 - **A judge that quietly stops answering is now an alarm, not a run of good
   scores.** 22 of 101 checked releases in the corpus carried
   `judge-unavailable`: the engine was asked, could not answer, and the claim
