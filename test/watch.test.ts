@@ -8,6 +8,8 @@ import {
   sanitizeTag,
   validateWatchConfig,
   writeReportFiles,
+  announceBackfill,
+  type BackfillPlan,
 } from "../src/watch.ts";
 import { computeScores } from "../src/metrics.ts";
 import { toWatchIndexHtml, toWatchAtomFeed } from "../src/watch-index.ts";
@@ -1184,4 +1186,68 @@ test("a label that tries to climb out of the reports directory cannot", async ()
     resolve(evil.jsonPath).startsWith(resolve(reportsDir) + sep),
     `the tag escaped: ${resolve(evil.jsonPath)}`,
   );
+});
+
+// The cost statement has to precede the first paid check — a backfill can be
+// an hour of judge calls, and the run asks for confirmation right after this.
+// Nothing held it: the whole per-repo announcement could be dropped and the
+// confirmation prompt would still appear, now with nothing to confirm about.
+test("a backfill states its cost before it asks to be started", () => {
+  const plan = (tags: string[]): ReleaseInfo[] =>
+    tags.map((t, i) => rel(t, `2026-0${i + 1}-01T00:00:00Z`));
+  const plans: BackfillPlan[] = [
+    { rc: { repo: "o/busy" }, key: "o/busy", plan: plan(["v1", "v2", "v3"]), gh: null, forge: null },
+    { rc: { repo: "o/quiet" }, key: "o/quiet", plan: [], gh: null, forge: null },
+  ];
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "o/busy": {
+        lastPublishedAt: null,
+        lastTag: null,
+        history: [{ tag: "v0", checkedAt: "2026-01-01T00:00:00Z", score: 90 } as CheckedRelease],
+      },
+    },
+  };
+
+  const said: string[] = [];
+  const orig = console.error;
+  console.error = (...args: unknown[]) => {
+    said.push(args.join(" "));
+  };
+  let total: number;
+  let quiet: number;
+  try {
+    total = announceBackfill(plans, [{ repo: "o/busy", judge: "auto" }], 2, state);
+    // Judge off is a different order of cost, and must be said differently.
+    quiet = announceBackfill(plans, [{ repo: "o/busy", judge: "off" }], 99, state);
+  } finally {
+    console.error = orig;
+  }
+  const out = said.join("\n");
+
+  assert.equal(total, 3, "the count that gets confirmed");
+  assert.equal(quiet, 3);
+  // Which repo, how many, and the span — not just a number.
+  assert.match(out, /o\/busy: 3 release\(s\) to check — v1 … v3/);
+  // A repo with nothing to do stays silent.
+  assert.doesNotMatch(out, /o\/quiet: /);
+  // 1 kept check + 3 planned against historyLimit 2: the run says what it drops.
+  assert.match(out, /historyLimit 2 keeps only the newest 2 of 4 checks/);
+  assert.match(out, /~6 min judge time/);
+  assert.match(out, /deterministic only \(judge off\), seconds per release/);
+
+  // Nothing planned, nothing announced, and the caller learns to stop.
+  const none: string[] = [];
+  console.error = (...args: unknown[]) => {
+    none.push(args.join(" "));
+  };
+  let empty: number;
+  try {
+    empty = announceBackfill([plans[1]], [{ repo: "o/quiet" }], 10, state);
+  } finally {
+    console.error = orig;
+  }
+  assert.equal(empty, 0);
+  assert.equal(none.length, 0, `announced something for an empty plan: ${none.join("\n")}`);
 });

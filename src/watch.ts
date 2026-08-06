@@ -565,25 +565,37 @@ async function listRepoReleases(
 }
 
 /**
- * What to print for a repo with nothing new. "Up to date" must not paper over
- * a pattern that matches nothing — a typo'd tagPattern looks exactly like a
- * quiet repo otherwise.
+ * The warning for a tagPattern that matches none of the repo's releases, or
+ * null when the pattern is doing its job. A typo'd pattern looks exactly like
+ * a quiet repo — nothing matches, nothing is new — and both watch and backfill
+ * have to tell the two apart the same way, or one of them lies.
  */
+function deadTagPatternWarning(
+  key: string,
+  rc: WatchRepoConfig,
+  releases: ReleaseInfo[],
+): string | null {
+  const matchesNothing =
+    rc.tagPattern != null &&
+    releases.length > 0 &&
+    !releases.some((r) =>
+      eligibleRelease(r, { includePrerelease: rc.includePrerelease, tagPattern: rc.tagPattern }),
+    );
+  return matchesNothing
+    ? `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`
+    : null;
+}
+
+/** What to print for a watched repo with nothing new. */
 export function nothingNewMessage(
   key: string,
   rc: WatchRepoConfig,
   releases: ReleaseInfo[],
   lastTag: string | null,
 ): string {
-  const patternMatchesNothing =
-    rc.tagPattern != null &&
-    releases.length > 0 &&
-    !releases.some((r) =>
-      eligibleRelease(r, { includePrerelease: rc.includePrerelease, tagPattern: rc.tagPattern }),
-    );
-  return patternMatchesNothing
-    ? `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`
-    : `${key}: up to date (${lastTag ?? "no releases"})`;
+  return (
+    deadTagPatternWarning(key, rc, releases) ?? `${key}: up to date (${lastTag ?? "no releases"})`
+  );
 }
 
 async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<number> {
@@ -897,64 +909,59 @@ export async function runBackfill(config: WatchConfig, opts: BackfillOptions): P
   }
 }
 
-async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promise<number> {
-  resetJudgeStats();
-  const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
-  const historyLimit = config.historyLimit ?? DEFAULT_HISTORY_LIMIT;
-  const state = await loadState(statePath);
-  const engines = makeEngineResolver();
-  const configured = configuredEntries(config);
-  const writeIndex = () => writeIndexFiles(reportsDir, state, configured);
+export interface BackfillPlan {
+  rc: WatchRepoConfig;
+  key: string;
+  plan: ReleaseInfo[];
+  gh: GhRelease[] | null;
+  forge: ForgeListing | null;
+}
 
-  const entries = config.repos
-    .map((entry) => ({ ...config.defaults, ...entry }) as WatchRepoConfig)
-    .filter((rc) => !opts.only.length || opts.only.some((sel) => selects(rc, sel)));
-
+/**
+ * What a backfill would check, per repo, before it checks anything: the cost
+ * statement has to precede the first paid check, and it cannot be stated
+ * without doing the listing work first.
+ *
+ * A repo whose listing fails contributes an exit code and drops out; the run
+ * still plans and checks the rest.
+ */
+async function planBackfill(
+  entries: WatchRepoConfig[],
+  state: WatchState,
+  scope: (rc: WatchRepoConfig) => Parameters<typeof pickBackfillReleases>[2],
+): Promise<{ plans: BackfillPlan[]; codes: number[] }> {
+  const plans: BackfillPlan[] = [];
   const codes: number[] = [];
-  const scope = (rc: WatchRepoConfig) => ({
-    releases: opts.releases,
-    since: opts.since,
-    includePrerelease: rc.includePrerelease,
-    tagPattern: rc.tagPattern,
-  });
-
-  // Plan first — the cost statement must precede the first paid check.
-  const plans: Array<{
-    rc: WatchRepoConfig;
-    key: string;
-    plan: ReleaseInfo[];
-    gh: GhRelease[] | null;
-    forge: ForgeListing | null;
-  }> = [];
   for (const rc of entries) {
     const key = entryKey(rc);
     try {
       const listing = await listReleasesDeep(rc, scope(rc));
       const repoState = state.repos[key] ?? { lastPublishedAt: null, lastTag: null, history: [] };
       const plan = pickBackfillReleases(listing.releases, repoState, scope(rc));
-      if (
-        !plan.length &&
-        rc.tagPattern != null &&
-        listing.releases.length > 0 &&
-        !listing.releases.some((r) => eligibleRelease(r, scope(rc)))
-      ) {
-        console.error(
-          `${key}: no release tag matches tagPattern ${JSON.stringify(rc.tagPattern)} — check the pattern against the repo's tags`,
-        );
-      }
+      const deadPattern = !plan.length && deadTagPatternWarning(key, rc, listing.releases);
+      if (deadPattern) console.error(deadPattern);
       plans.push({ rc, key, plan, gh: listing.gh, forge: listing.forge });
     } catch (err) {
       console.error(`${key}: listing releases failed — ${(err as Error).message}`);
       codes.push(2);
     }
   }
+  return { plans, codes };
+}
+
+/**
+ * The cost statement, printed before anything is paid for: what each repo will
+ * check, what history the limit will drop, and roughly how long a judged run
+ * takes. Returns the total so the caller can stop when there is nothing to do.
+ */
+export function announceBackfill(
+  plans: BackfillPlan[],
+  entries: WatchRepoConfig[],
+  historyLimit: number,
+  state: WatchState,
+): number {
   const total = plans.reduce((s, p) => s + p.plan.length, 0);
-  if (!total) {
-    console.error(
-      "backfill: nothing to do — every release in scope is already checked or on the skipped record.",
-    );
-    return worstExit(codes);
-  }
+  if (!total) return 0;
   for (const { key, plan } of plans) {
     if (!plan.length) continue;
     console.error(
@@ -975,6 +982,38 @@ async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promi
         : "deterministic only (judge off), seconds per release"
     }. Checked releases never re-check; state saves after every one, so an interrupted run resumes.`,
   );
+  return total;
+}
+
+async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promise<number> {
+  resetJudgeStats();
+  const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
+  const historyLimit = config.historyLimit ?? DEFAULT_HISTORY_LIMIT;
+  const state = await loadState(statePath);
+  const engines = makeEngineResolver();
+  const configured = configuredEntries(config);
+  const writeIndex = () => writeIndexFiles(reportsDir, state, configured);
+
+  const entries = config.repos
+    .map((entry) => ({ ...config.defaults, ...entry }) as WatchRepoConfig)
+    .filter((rc) => !opts.only.length || opts.only.some((sel) => selects(rc, sel)));
+
+  const scope = (rc: WatchRepoConfig) => ({
+    releases: opts.releases,
+    since: opts.since,
+    includePrerelease: rc.includePrerelease,
+    tagPattern: rc.tagPattern,
+  });
+
+  // Plan first — the cost statement must precede the first paid check.
+  const { plans, codes } = await planBackfill(entries, state, scope);
+  const total = announceBackfill(plans, entries, historyLimit, state);
+  if (!total) {
+    console.error(
+      "backfill: nothing to do — every release in scope is already checked or on the skipped record.",
+    );
+    return worstExit(codes);
+  }
   if (!opts.yes) {
     const ok = await (opts.confirm ?? promptYesNo)(`Check ${total} release(s) now?`);
     if (!ok) {
