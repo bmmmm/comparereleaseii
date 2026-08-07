@@ -912,6 +912,29 @@ export async function computeCoverage(
     // before — a repair that counts a documented bump as undocumented is not
     // a repair. Whatever closes v7.3.0 has to tell "this commit is a bump"
     // from "this commit contains a bump", and churn share cannot.
+    //
+    // A fifth candidate, measured and rejected 2026-08-07 — and it rules out
+    // more than itself. The idea was to read paths instead of size: a commit
+    // that *is* a bump of X carries X's own tree (`vendor/…/opa/**`), so X's
+    // name is in the file paths and not only in the manifest line, while a pin
+    // dragged along transitively has no tree in that commit. Requiring the
+    // named pin to appear in some non-manifest path moves nothing at all:
+    //
+    //   pin name must appear in a changed path   opencloud omission 8/9,
+    //                                            completeness 51 — both unmoved
+    //   this route disabled entirely             omission 9/9, completeness 35
+    //
+    // The second line is the useful one. Switching the route off closes the
+    // miss and costs the same 16 points of completeness the churn-share
+    // candidate cost, which means that candidate was a disguised way of
+    // turning the route off rather than a rule about bumps. And the first line
+    // says the miss is not the commit this file has been naming: 04a924f7
+    // carries 36 files under `open-policy-agent/opa` and zero under
+    // `rogpeppe/go-internal`, so a path rule does separate those two claims —
+    // it just does not touch whatever is actually covering the missed commit.
+    // Whoever reopens this identifies that commit FIRST (`--json`, the case's
+    // `detail`), because four of the five candidates so far were aimed from
+    // this comment rather than from a measurement.
     if (bumpClaims.length && files.length) {
       const pins = pinBumps(files);
       if (

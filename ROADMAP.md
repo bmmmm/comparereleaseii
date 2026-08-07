@@ -98,6 +98,35 @@ What that leaves for whoever reopens it: churn share cannot tell "this commit
 A signal that can would have to read the pin move against the rest of the
 commit's *substance* rather than its size — and it has to survive v7.1.0.
 
+**A fifth candidate, and a correction to this entry (2026-08-07).** The
+substance signal this entry asked for was built: require the pin a claim names
+to appear in one of the commit's non-manifest *paths*, so that a commit which
+*is* a bump of X (carrying `vendor/…/X/**`) is separated from one that merely
+dragged X's manifest line along. Measured on `opencloud-eu/opencloud`:
+
+    pin name must appear in a changed path    omission 8/9, completeness 51
+                                              — neither number moves
+    this route disabled entirely              omission 9/9, completeness 35
+
+Two things follow, and the second matters more than the candidate.
+
+The churn-share candidate above cost exactly the same 16 points of
+completeness as switching the route off, which is what it effectively was — a
+disguised off-switch, not a rule about bumps. Read the four rejections that way
+and they are not four ideas, they are one: every candidate so far bought the
+detection by removing the route for the honest cases too.
+
+And **this entry has been aiming at the wrong commit.** `04a924f7` carries 36
+changed files under `open-policy-agent/opa` and *zero* under
+`rogpeppe/go-internal` — a path rule does separate the covering claim from the
+covered commit there, and it still moves nothing. So whatever holds the
+remaining miss is not that commit, and the diagnosis above ("held by the bump
+pin join", the 29,027 lines) is a description of something that is no longer
+the failure. Whoever reopens this identifies the missed commit **first**, from
+`pnpm mutate-notes <dir> --repo <r> --json` and the case's own `detail` string.
+Four of the five candidates so far were aimed from this comment instead of from
+a measurement, and all four missed.
+
 ### 2. `inverted-claim` — built, and it found one on the first corpus
 
 Built 2026-08-06 as `pnpm mutate-notes --generate`. A model rewrites a claim
