@@ -1,18 +1,21 @@
 # Roadmap
 
-> **Status 2026-08-06:** v0.10.1 is out and the gh extension's pin follows
+> **Status 2026-08-07:** v0.10.1 is out and the gh extension's pin follows
 > it, so the state lock, the backtick rule, the pin-join fixes and the
 > unreadable-commit repair are what the hourly job now runs. Next release is
 > 0.11.0.
 >
 > **Unreleased on `main`:** the bump-claim coverage fix (a scoring change), a
-> cleanup round that left behaviour bit-identical, and the whole
-> "running it teaches it" block below except the two entries this file still
-> carries — the scoring-generation marker, `--add-golden`, the judge bill by
-> claim class, `pnpm sweep`, the `inverted-claim` generator and the
-> silent-softening watchdog all landed 2026-08-06. What they measured lives
-> where it belongs: CHANGELOG (what shipped), SCORING.md (score semantics and
-> the generation rule), docs/corpus.md (the bill and the sweep),
+> cleanup round that left behaviour bit-identical, the whole "running it
+> teaches it" block — the scoring-generation marker, `--add-golden`, the judge
+> bill by claim class, `pnpm sweep`, the `inverted-claim` generator and the
+> silent-softening watchdog, all landed 2026-08-06 — and the two repairs that
+> closed `inverted-claim` on 2026-08-07: overlap-only claims buy a judge call
+> instead of settling, and a `verified` on that evidence is reviewed rather
+> than taken on one vote. Both change what reaches a judge, so the next
+> release's calibration run costs more than the last one. What they measured
+> lives where it belongs: CHANGELOG (what shipped), SCORING.md (score
+> semantics and the generation rule), docs/corpus.md (the bill and the sweep),
 > docs/watchdog.md (alerting), AGENTS.md (commands).
 >
 > Everything before that is on `main` too — the three original phases
@@ -25,11 +28,13 @@
 > carries only what is open; the landed plans and their dated landed notes
 > live in this file's git history (up to `039460a`).
 
-## Open (2026-08-06): what the instruments found and nobody has closed
+## Open (2026-08-07): what the instruments found and nobody has closed
 
 The "running it teaches it" block is built. Six of its seven entries landed on
-2026-08-06; the two below are what those instruments then found, and neither
-has a repair that survives measurement yet.
+2026-08-06, and what those instruments then found was two things. One of them —
+`inverted-claim` — was closed on 2026-08-07 and has moved to **Settled** below.
+The two entries here are what is left: the coverage miss nobody has landed a
+repair for, and a question the closing of the first one raised.
 
 **The line that block did not cross, and this one does not either.** What
 running the tool teaches is *where it is wrong* and *where it wastes work*. It
@@ -127,80 +132,75 @@ the failure. Whoever reopens this identifies the missed commit **first**, from
 Four of the five candidates so far were aimed from this comment instead of from
 a measurement, and all four missed.
 
-### 2. `inverted-claim` — built, and it found one on the first corpus
+### 2. The judge argues from commit subjects, and nothing stops it
 
-Built 2026-08-06 as `pnpm mutate-notes --generate`. A model rewrites a claim
-the control run VERIFIED so that it asserts the opposite; the diff
-demonstrably does X, so ¬X cannot hold of it either. Opt-in (it needs an
-engine to write the lie and one to catch it), and deliberately outside the
-frozen reference: its expectation carries one link the other five do not —
-whether the model really inverted the sentence rather than rewording it — so
-a survivor is a lead to read by hand, not a rate.
+Found 2026-08-07 while closing `inverted-claim`, and deliberately not fixed in
+the same breath: it moves every verdict, so it needs its own measurement.
 
-**The survivor it found.** `GyulyVGC/sniffnet@v1.4.1`: *"Fix support for
-IPinfo's databases"* inverted to *"**Break** support for IPinfo's databases"*
-comes back `verified`. The inversion keeps every identifier, the lexical bar
-clears on those identifiers alone, and the claim is settled before any judge
-reads the sentence — `judgeMode: auto` never asks about a claim the
-deterministic pass already called verified. It is the same mistake the other
-three holes were, found by a class nobody would have written.
+Reading the judge's own reasoning on the caught inversions, the first thing it
+reaches for is not the diff:
 
-**Closed 2026-08-07, and it took two repairs, neither of them the one this
-entry proposed.** `pnpm mutate-notes --generate --no-cache` now reads
-`inverted-claim 1/1`.
+> "The **commit message** for 2a0103c05c states 'fix support for IPinfo's
+> databases', directly contradicting the claim that support is being 'broken'."
 
-The first repair is the routing one: a `verified` resting on identifier
-overlap alone is no longer settled deterministically, it buys the claim a judge
-call (`identifierOnly` in `src/verify.ts`). Overlap cannot see negation, so it
-was never entitled to end the question. Measured on the 108-release corpus: 61
-claims of 5013 take that branch newly.
+It lands on the right verdict here, which is exactly why it is easy to miss.
+But a release note and a commit message come from the same hand, and the
+settled entry below — *only the diff is evidence* — is the founding thesis of
+this tool. The reverse direction is already enforced: no claim may reach
+`verified` because it agrees with a commit subject, and the retired coverage
+rescue was removed for comparing claim text to subjects. Nothing enforces this
+direction. `buildJudgePrompt` (`src/judge.ts`) puts a `COMMITS` block with full
+subjects in front of the model, and the rules list says nothing about what that
+block may be used for — while it *does* spell out that a changelog hunk
+restating the claim is not evidence.
 
-**That alone did not catch it, and what it exposed is the more useful half.**
-With the claim finally in front of a model, the model kept answering
-`verified` — until the run was repeated. Four runs of the same prompt and the
-same engine on `sniffnet@v1.4.1`:
+Three things to settle before touching it, because this is a prompt change and
+those move everything:
 
-    contradicted · contradicted · contradicted · verified
+- **Is the block load-bearing?** It is orientation for unanchored claims
+  (`relatedCommits`). Removing it and measuring `pnpm eval` plus the five
+  detection classes says whether it buys anything the diff does not.
+- **A rule line is the cheaper probe than removal** — "commit subjects orient
+  you; they are written by the same author as the claim and are never evidence
+  for or against it" — and it costs no calls.
+- **Whatever changes here re-measures the README validation table.** A prompt
+  edit also invalidates every cache entry by construction, so the next full
+  corpus run pays for itself again.
 
-The judge could read the sentence. It just did not have to be right the first
-time, because a lone `verified` was never reviewed — `needsSecondLook` asked
-for more votes on severe verdicts and on sensitive paths, and an overlap-only
-claim has neither. One lucky pass ended the question. So the second repair
-gives that class the second look: three votes and the median, exactly where the
-deterministic pass knew nothing beyond "the words appear somewhere". Re-measured
-after it, three runs, first vote shown:
-
-    [verified, contradicted, contradicted] → contradicted
-    [verified, contradicted, contradicted] → contradicted
-    [contradicted, verified, contradicted] → contradicted
-
-Twice the first vote was the one that used to settle it.
-
-Two things this cost, both worth stating. It buys up to two extra calls per
-overlap-only `verified` — an upper bound of roughly 8 % on top of 1924 judged
-if every one of the 61 comes back verified, not separately measured. And the
-prompt is untouched, so the entry this replaces was wrong about where to look:
-it priced the repair off `anchored-strong` (5.6 % of the bill), while the
-sniffnet claim names no commit and is `unanchored-lexical` (2.7 %) — and the
-answer was in neither class but in the review policy.
-
-**A trap this left behind.** Measuring a ladder fix with `--generate` needs
-`--no-cache`. The model writes the same inversion for the same claim, so the
-prompt and the cache key are identical between runs, while a change to routing
-or to the second look changes neither — the pre-fix `verified` came straight
-back out of the cache and the repaired ladder read as still broken. Same run
-with `--no-cache`: 1/1. The note now sits at the top of `scripts/mutate-notes.ts`.
-
-**Still open, and separate.** The judge's own reasoning in the caught runs
-leans on the linked commit's subject ("the commit message states 'fix
-support'…") rather than on the diff. It reaches the right verdict here, but a
-note and a commit message come from the same hand — the settled entry below
-says only the diff is evidence, and `buildJudgePrompt` carries a `COMMITS`
-block with no rule against using it that way. Worth its own measurement.
+Start at `TRUST_PREAMBLE` and the rules list in `src/judge.ts:496-523`.
 
 ---
 
 ## Settled — do not reopen without new facts
+
+- **`inverted-claim`: closed 2026-08-07, and a single model vote is not a
+  verdict.** `pnpm mutate-notes --generate --no-cache` reads `1/1`. The
+  survivor (`sniffnet@v1.4.1`, *"Fix support for IPinfo's databases"* flipped
+  to *"**Break** support…"*) needed two repairs, and neither was the one the
+  open entry had proposed. First: a `verified` resting on identifier overlap
+  alone is no longer settled deterministically — overlap cannot see negation,
+  so it buys a judge call instead (`identifierOnly`, `src/verify.ts`); 61 of
+  5013 corpus claims take that branch. Second, and the part worth keeping:
+  routing it to a model was **not enough**. Four runs of the same prompt and
+  engine answered `contradicted · contradicted · contradicted · verified`, and
+  only the `verified` ended the question, because `needsSecondLook` reviewed
+  severe verdicts and sensitive paths but not this. One lucky pass settled it.
+  That class now gets three votes and the median.
+
+  The generalisation, which is what binds future work: **where the
+  deterministic pass knows nothing, one model vote is a coin flip, not an
+  answer.** Any future route that settles a claim on a single call needs to
+  say why that class is different. Cost: up to two extra calls per
+  overlap-only `verified`, an upper bound of ~8 % on 1924 judged. The judge
+  prompt was not touched — see open entry 2 for what reading those runs
+  surfaced instead.
+
+  The trap it left: measuring a ladder fix with `--generate` needs
+  `--no-cache`. The model writes the same inversion for the same claim, so the
+  prompt and the cache key are identical between runs while a routing or
+  review change alters neither — the pre-fix `verified` came back out of the
+  cache and the repaired ladder read as still broken. Noted at the top of
+  `scripts/mutate-notes.ts`.
 
 - **A repair that counts a documented bump as undocumented is not a repair**
   (2026-08-06, closing the coverage-union block). Three candidates were built
