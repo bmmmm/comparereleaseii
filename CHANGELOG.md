@@ -6,6 +6,35 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Added
 
+- **`surface.hosts` — which hosts a release starts and stops talking to.**
+  The deterministic surface now carries a host delta: hostnames from
+  `http(s)://` literals in changed source lines, moved lines cancelled, test
+  paths and vendored trees excluded, schema/licence hosts filtered, and only
+  languages that can actually dial out are read — `fileCategory`'s fallback
+  bucket is "source", and without that gate a `.all-contributorsrc` ships its
+  contributor-profile URLs as the release's new traffic. Measured before it
+  was built: raw request call sites (`fetch(`, `http.Get(`) yield zero across
+  five release ranges because real codebases wrap HTTP, while host literals
+  yield 0–2 per release and land on the hits that matter — nextcloud desktop
+  v34 adding `api.github.com` inside its Sparkle updater, sniffnet v1.5.1
+  moving its own domain. Renders in all three report formats, informational,
+  never scored.
+
+- **Watch rules — "tell me when this area moves".** A watch entry (or the
+  defaults) can now subscribe to areas of a repo: directory globs, surface
+  layers (`migrations`, `apiRoutes`, `hosts`, `envVar:NAME`) and finding
+  kinds. A release that moves a subscribed area is flagged on its own — the
+  fourth alert reason beside the score, the sliding level and the softened
+  judge — with the hits recorded on the check, shown on the index and the
+  history page, and carried to the `--notify` hook. A hit resting on finding
+  kinds alone is marked judge-based wherever it renders. Directory globs are
+  the only path granularity offered, and that is a measurement, not a taste:
+  across the corpus, depth-2 directories recur in 74–98% of later releases
+  while exact files recur in 22–60% and symbols in at most 27% — a
+  subscription that goes quiet because change moved to a sibling file would
+  read as calm. A rule whose globs match nothing across ten recorded checks
+  gets a staleness note instead of silence.
+
 - **`pnpm mutate-notes --generate`: the lie is written by a model, not by the
   person who wrote the routes.** The harness measured five mutation classes,
   and those five were the five somebody invented — all three holes they ever
