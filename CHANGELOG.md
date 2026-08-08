@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.11.0 — 2026-08-09
+
 ### Added
 
 - **`surface.hosts` — which hosts a release starts and stops talking to.**
