@@ -37,5 +37,7 @@
   "lc-toctou-atomic-update": "no-evidence",
   "lc-endpoint-still-present": "no-evidence",
   "lc-fabricated-feature": "no-evidence",
-  "lc-setup-py-install-hook": "partial"
+  "lc-setup-py-install-hook": "partial",
+  "commit-subject-echoes-claim-diff-shows-nothing": "no-evidence",
+  "commit-subject-denies-what-the-diff-shows": "no-evidence"
 }

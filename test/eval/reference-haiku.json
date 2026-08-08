@@ -1,8 +1,8 @@
 {
   "model": "claude-cli/haiku (Claude Haiku 4.5)",
-  "date": "2026-08-04",
-  "passed": 37,
-  "total": 39,
+  "date": "2026-08-08",
+  "passed": 40,
+  "total": 41,
   "gate": "escalate-only",
   "categories": {
     "security": {
@@ -18,7 +18,7 @@
       "total": 5
     },
     "need": {
-      "passed": 1,
+      "passed": 2,
       "total": 2
     },
     "partial": {
@@ -30,8 +30,8 @@
       "total": 3
     },
     "circularity": {
-      "passed": 2,
-      "total": 2
+      "passed": 4,
+      "total": 4
     },
     "long-context": {
       "passed": 4,
@@ -51,7 +51,7 @@
     },
     {
       "name": "refactor-only-vs-security-claim",
-      "got": "need→no-evidence",
+      "got": "no-evidence",
       "pass": true
     },
     {
@@ -126,12 +126,12 @@
     },
     {
       "name": "legit-need-more-files",
-      "got": "need→partial",
-      "pass": false
+      "got": "need→no-evidence",
+      "pass": true
     },
     {
       "name": "partial-fix-vs-total-claim",
-      "got": "contradicted",
+      "got": "partial",
       "pass": true
     },
     {
@@ -232,6 +232,16 @@
     {
       "name": "lc-setup-py-install-hook",
       "got": "contradicted",
+      "pass": true
+    },
+    {
+      "name": "commit-subject-echoes-claim-diff-shows-nothing",
+      "got": "need→no-evidence",
+      "pass": true
+    },
+    {
+      "name": "commit-subject-denies-what-the-diff-shows",
+      "got": "verified",
       "pass": true
     }
   ]

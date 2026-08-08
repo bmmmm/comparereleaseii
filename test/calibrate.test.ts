@@ -32,6 +32,41 @@ test("calibration timing ignores failed calls", async () => {
   assert.equal(cal.formatIssues, 0);
 });
 
+// A commit subject is written by the same hand as the claim, so a model
+// arguing from it is the circularity this tool refuses — and until 2026-08-08
+// the set could not ask about it: every case was prompted with `commits: []`,
+// so `circularity` read 2/2 while testing only the changelog half. Cases that
+// carry commits must get them in front of the model, or the category is
+// measuring an empty block.
+test("a golden case's linked commits reach the prompt", async () => {
+  const prompts: string[] = [];
+  const engine = {
+    name: "recording",
+    async judge(prompt: string): Promise<string> {
+      prompts.push(prompt);
+      return '{"verdict":"no_evidence","confidence":1,"files":[],"reasoning":"x"}';
+    },
+  };
+  await runCalibration(engine, 8);
+
+  const cases = await loadGoldenCases();
+  const withCommits = cases.filter((gc) => gc.commits?.length);
+  assert.ok(withCommits.length >= 2, `set carries ${withCommits.length} commit-bearing cases`);
+  for (const gc of withCommits) {
+    const subject = gc.commits![0].subject;
+    const mine = prompts.filter((p) => p.includes(gc.claim));
+    assert.ok(mine.length, `no prompt built for ${gc.name}`);
+    assert.ok(
+      mine.some((p) => p.includes(subject)),
+      `${gc.name}: the linked commit subject never reached the prompt`,
+    );
+  }
+  // And a case without commits still shows the empty marker, not a stray one.
+  const bare = cases.find((gc) => !gc.commits?.length)!;
+  const barePrompt = prompts.find((p) => p.includes(bare.claim))!;
+  assert.match(barePrompt, /\(none linked\)/);
+});
+
 test("golden set: every case categorized, long-context stubs expand deterministically", async () => {
   const cases = await loadGoldenCases();
   assert.ok(cases.length >= 35, `set shrank to ${cases.length} cases`);

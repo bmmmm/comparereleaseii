@@ -154,20 +154,35 @@ subjects in front of the model, and the rules list says nothing about what that
 block may be used for — while it *does* spell out that a changelog hunk
 restating the claim is not evidence.
 
-Three things to settle before touching it, because this is a prompt change and
-those move everything:
+**First measurement, 2026-08-08: the gate could not see this at all, and now
+that it can, the model passes.** Every golden case was prompted with
+`commits: []` — `calibrate.ts` hard-coded it and no case carried any — so
+`circularity` read 2/2 while testing only the changelog half of the axis. A
+model that argued from commit subjects would never have been caught by the
+gate. The set can now carry linked commits (`commits?` on `GoldenCase`), and
+two cases spell out both directions:
 
-- **Is the block load-bearing?** It is orientation for unanchored claims
-  (`relatedCommits`). Removing it and measuring `pnpm eval` plus the five
-  detection classes says whether it buys anything the diff does not.
-- **A rule line is the cheaper probe than removal** — "commit subjects orient
-  you; they are written by the same author as the claim and are never evidence
-  for or against it" — and it costs no calls.
-- **Whatever changes here re-measures the README validation table.** A prompt
-  edit also invalidates every cache entry by construction, so the next full
-  corpus run pays for itself again.
+    commit-subject-echoes-claim-diff-shows-nothing   subject confirms the claim,
+                                                     diff shows nothing  → no-evidence
+    commit-subject-denies-what-the-diff-shows        subject denies it,
+                                                     diff proves it      → verified
 
-Start at `TRUST_PREAMBLE` and the rules list in `src/judge.ts:496-523`.
+Two independent `--no-cache` runs, identical both times: `need→no-evidence`
+and `verified`. `circularity` 4/4. The model neither rubber-stamps on a
+friendly subject nor lets a hostile one override the diff — on these two
+shapes.
+
+So the prompt change is **not** justified yet, and that is the finding. What
+remains open is narrower than this entry began: the reasoning text still
+*cites* commit subjects (the sniffnet runs), and citing is not the same as
+being swayed by one. Whoever continues decides whether that is worth a rule
+line at all, and the honest next step is more shapes rather than an edit —
+a subject that supplies a detail the diff omits, and one that names a CVE the
+diff never mentions, are the two the current pair does not cover.
+
+If a prompt change ever does get made: it invalidates every cache entry by
+construction and re-measures the README validation table. Start at
+`TRUST_PREAMBLE` and the rules list in `src/judge.ts:496-523`.
 
 ---
 
