@@ -207,8 +207,10 @@ decided the design, and two of them killed ideas that read as obvious:
 Add `hosts: ConfigDelta` to `ReleaseSurface`: hostnames from `https?://`
 literals in changed source lines, extracted in `src/substance.ts` the way
 `envVars` already is — moved lines cancelled per release, vendor and lockfile
-paths excluded, test-path hits carried but marked, a boring-list for
-schema/licence hosts. Deterministic, informational, never scored. It renders
+paths excluded, test paths excluded rather than carried and marked (a mock
+host is not product traffic, and a `ConfigDelta` value stays a plain
+hostname), a boring-list for schema/licence hosts. Deterministic,
+informational, never scored. It renders
 through `configSurfaceEntries` (`src/report.ts`), so all three renderers
 inherit it in one move, and the "all three renderers" test extends to it.
 Definition of done as AGENTS.md has it: failing test first, a mutate guard

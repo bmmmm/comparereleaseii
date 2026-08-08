@@ -93,6 +93,54 @@ const TEST_FILE = df(
   4,
 );
 
+// A release that starts talking to a new host is a supply-chain fact its
+// notes rarely mention. The noise that signal has to survive is licence and
+// schema URIs in comments, vendored trees, and mock hosts in test doubles.
+const GO_UPDATER = df(
+  "services/updater/check.go",
+  `@@ -10,4 +10,6 @@ func (u *Updater) Check(ctx context.Context) error {
+-	req, _ := http.NewRequest("GET", "https://releases.oldvendor.io/appcast.xml", nil)
++	req, _ := http.NewRequest("GET", "https://api.github.com/repos/o/r/releases", nil)
++	// date format per https://www.w3.org/TR/xmlschema-2/
++	// staging only: https://api.acme.example/v1
+`,
+  20,
+);
+
+const VENDORED_CLIENT = df(
+  "vendor/github.com/foo/bar/client.go",
+  `@@ -1,2 +1,3 @@ func New() *Client {
++	return &Client{base: "https://telemetry.foo.io/v1"}
+`,
+  3,
+);
+
+const MOCK_HANDLERS = df(
+  "web/src/mocks/handlers.ts",
+  `@@ -1,2 +1,3 @@
++  http.get("https://mock.msw.dev/api", () => HttpResponse.json({}));
+`,
+  3,
+);
+
+const GO_HOST_MOVED_OUT = df(
+  "services/a/client.go",
+  `@@ -1,3 +1,2 @@ func dialA() {
+-	_ = "https://cdn.shared.acme.io/assets"
+ }
+`,
+  2,
+);
+
+const GO_HOST_MOVED_IN = df(
+  "services/b/client.go",
+  `@@ -1,2 +1,3 @@ func dialB() {
++	_ = "https://cdn.shared.acme.io/assets"
+ }
+`,
+  2,
+);
+
 const MIGRATION = df("services/graph/migrations/0042_add_index.sql", undefined, 8);
 const ROUTES = df(
   "services/graph/routes/drives.go",
@@ -135,6 +183,32 @@ test("releaseSurface rolls up categories, symbols, config deltas, migrations and
 
   assert.deepEqual(s.migrations, ["services/graph/migrations/0042_add_index.sql"]);
   assert.deepEqual(s.apiRoutes, ["services/graph/routes/drives.go"]);
+});
+
+test("the host delta names the traffic this release starts and stops, nothing else", () => {
+  const s = releaseSurface([
+    GO_UPDATER,
+    VENDORED_CLIENT,
+    MOCK_HANDLERS,
+    GO_HOST_MOVED_OUT,
+    GO_HOST_MOVED_IN,
+    TEST_FILE,
+    VALUES_YAML,
+  ]);
+  assert.deepEqual(s.hosts, {
+    added: ["api.github.com"],
+    removed: ["releases.oldvendor.io"],
+  });
+  // Named individually so a widened filter says which case it broke.
+  for (const boring of ["www.w3.org", "api.acme.example"]) {
+    assert.ok(!s.hosts?.added.includes(boring), `${boring} is a comment, not traffic`);
+  }
+  assert.ok(!s.hosts?.added.includes("telemetry.foo.io"), "vendored trees carry foreign hosts");
+  assert.ok(!s.hosts?.added.includes("mock.msw.dev"), "a mock host is not product traffic");
+  assert.ok(!s.hosts?.added.includes("cdn.shared.acme.io"), "a host that moved files is not new");
+
+  assert.match(commitSurface([GO_UPDATER])!, /\+host api\.github\.com/);
+  assert.match(commitSurface([GO_UPDATER])!, /−host releases\.oldvendor\.io/);
 });
 
 test("a Go env struct tag lists every name it carries", () => {

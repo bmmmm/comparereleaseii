@@ -298,6 +298,14 @@ export interface ReleaseSurface {
   cliFlags: ConfigDelta;
   /** Keys in config-category files (yaml/toml/ini). */
   configKeys: ConfigDelta;
+  /**
+   * Hosts the source calls over http(s). A release that starts talking to a
+   * host nobody documented is a supply-chain fact; a call-site detector finds
+   * nothing, because real codebases wrap their HTTP behind a client. Absent
+   * in surfaces recorded before the field existed — an empty delta there
+   * would claim the release added no host, which nobody measured.
+   */
+  hosts?: ConfigDelta;
   /** Migration files touched. */
   migrations: string[];
   /** Route/handler/API-spec files touched. */

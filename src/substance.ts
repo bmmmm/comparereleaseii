@@ -58,6 +58,30 @@ function configKeys(line: string, path: string): string[] {
   return m ? [m[1]] : [];
 }
 
+/** Hostname out of an `http(s)://` literal. The lookahead is what ends a
+ * host inside real source: a path, a closing quote, a paren, a separator. */
+const URL_HOST = /https?:\/\/([a-z0-9.-]+\.[a-z]{2,})(?=[/"'`\s):,]|$)/gi;
+
+/** Schema, licence and placeholder hosts. They sit in headers, XML
+ * namespaces and doc comments of every codebase, so they fire on every
+ * release and discriminate nothing. RFC 2606/6761 reserves the last three. */
+const BORING_HOST =
+  /^(www\.)?(w3\.org|schemas?\..*|xmlns\..*|example\.(com|org)|localhost|apache\.org|gnu\.org|opensource\.org|creativecommons\.org|json-schema\.org|purl\.org|xml\.org|ns\.adobe\.com|specifications\.freedesktop\.org|schema\.org)$|\.(example|test|invalid)$/;
+
+/** A vendored tree is someone else's code — its hosts are not this release's. */
+const VENDORED_PATH = /(^|\/)(vendor|node_modules)\//;
+
+/** Test doubles that `fileCategory` still calls source: a mock host is not
+ * product traffic, and carrying it would put msw.dev in a release report. */
+const TEST_PATH =
+  /(^|\/)(test|tests|__tests__|spec|e2e|testdata|fixtures?|mocks?)(\/|\.)|_test\.go$|\.test\.|\.spec\./i;
+
+function urlHosts(line: string): string[] {
+  return [...line.matchAll(URL_HOST)]
+    .map((m) => m[1].toLowerCase())
+    .filter((h) => !BORING_HOST.test(h));
+}
+
 const API_ROUTE_FILE =
   /(^|\/)(routes?|routers?|handlers?|controllers?|endpoints?)(\/|\.[a-z0-9]+$)|(^|\/)urls\.py$|(^|\/)openapi\.(ya?ml|json)$|swagger/i;
 
@@ -76,6 +100,7 @@ interface Extracted {
   env: ConfigDelta;
   flags: ConfigDelta;
   keys: ConfigDelta;
+  hosts: ConfigDelta;
 }
 
 /** Config surface over a set of files, moved lines cancelled per release —
@@ -84,16 +109,20 @@ function configSurface(files: DiffFile[]): Extracted {
   const env = { minus: new Set<string>(), plus: new Set<string>() };
   const flags = { minus: new Set<string>(), plus: new Set<string>() };
   const keys = { minus: new Set<string>(), plus: new Set<string>() };
+  const hosts = { minus: new Set<string>(), plus: new Set<string>() };
   for (const f of files) {
     if (!f.patch) continue;
     const category = fileCategory(f.path);
     if (category !== "source" && category !== "config") continue;
+    const ownTraffic =
+      category === "source" && !VENDORED_PATH.test(f.path) && !TEST_PATH.test(f.path);
     for (const sign of ["-", "+"] as const) {
       const side = sign === "-" ? "minus" : "plus";
       for (const line of sideLines(f.patch, sign)) {
         if (category === "source") {
           for (const v of envReads(line)) env[side].add(v);
           if (!STYLE_FILE.test(f.path)) for (const v of flagLiterals(line)) flags[side].add(v);
+          if (ownTraffic) for (const h of urlHosts(line)) hosts[side].add(h);
         } else {
           for (const k of configKeys(line, f.path)) keys[side].add(k);
         }
@@ -104,6 +133,7 @@ function configSurface(files: DiffFile[]): Extracted {
     env: delta(env.minus, env.plus),
     flags: delta(flags.minus, flags.plus),
     keys: delta(keys.minus, keys.plus),
+    hosts: delta(hosts.minus, hosts.plus),
   };
 }
 
@@ -145,7 +175,7 @@ export function releaseSurface(files: DiffFile[]): ReleaseSurface {
     .sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions));
 
   const { symbols, more } = symbolDelta(files);
-  const { env, flags, keys } = configSurface(files);
+  const { env, flags, keys, hosts } = configSurface(files);
   const isRoute = (f: DiffFile): boolean =>
     API_ROUTE_FILE.test(f.path) && ["source", "config"].includes(fileCategory(f.path));
   return {
@@ -155,6 +185,7 @@ export function releaseSurface(files: DiffFile[]): ReleaseSurface {
     envVars: env,
     cliFlags: flags,
     configKeys: keys,
+    hosts,
     migrations: files.filter((f) => fileCategory(f.path) === "migrations").map((f) => f.path),
     apiRoutes: files.filter(isRoute).map((f) => f.path),
   };
@@ -190,6 +221,8 @@ export function surfaceLine(s: ReleaseSurface): string | undefined {
   for (const v of s.cliFlags.removed.slice(0, 2)) parts.push(`−flag ${v}`);
   for (const k of s.configKeys.added.slice(0, 2)) parts.push(`+key ${k}`);
   for (const k of s.configKeys.removed.slice(0, 2)) parts.push(`−key ${k}`);
+  for (const h of s.hosts?.added.slice(0, 2) ?? []) parts.push(`+host ${h}`);
+  for (const h of s.hosts?.removed.slice(0, 2) ?? []) parts.push(`−host ${h}`);
   if (s.migrations.length) parts.push(`migration${s.migrations.length > 1 ? "s" : ""}`);
   if (s.apiRoutes.length) parts.push("api routes");
   return parts.join(" · ") || undefined;

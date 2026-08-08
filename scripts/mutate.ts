@@ -387,6 +387,18 @@ const MUTANTS: Mutant[] = [
     replace: ".filter((f) => Boolean(f.patch))",
   },
   {
+    guard: "schema and licence hosts never read as traffic this release started",
+    file: "src/substance.ts",
+    find: "!BORING_HOST.test(h)",
+    replace: "true",
+  },
+  {
+    guard: "vendored trees and test doubles contribute no host — a mock is not product traffic",
+    file: "src/substance.ts",
+    find: 'category === "source" && !VENDORED_PATH.test(f.path) && !TEST_PATH.test(f.path);',
+    replace: 'category === "source";',
+  },
+  {
     guard: "component expansion stays one level deep — a child never expands its own pins",
     file: "src/check.ts",
     find: "expand: undefined,",

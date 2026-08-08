@@ -676,3 +676,41 @@ test("the scoring generation reaches all three renderers", () => {
     assert.doesNotMatch(text, /scoring generation/, `${label} invented a generation`);
   }
 });
+
+// The host delta is the surface field a reader most needs to see whole: a
+// release that starts talking to a host nobody documented is exactly what the
+// terminal, the file on disk and the page have to agree on. It renders through
+// configSurfaceEntries so that agreement is structural — this holds it there.
+test("a new outbound host reaches all three renderers", () => {
+  const r: Report = {
+    ...report(null),
+    surface: {
+      ...SURFACE,
+      hosts: { added: ["api.github.com"], removed: ["releases.oldvendor.io"] },
+    },
+  };
+  for (const [label, text] of [
+    ["terminal", terminalOf(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    assert.match(text, /\+host `?api\.github\.com/, `${label} drops the host this release adds`);
+    assert.match(
+      text,
+      /−host `?releases\.oldvendor\.io/,
+      `${label} drops the host this release stops calling`,
+    );
+  }
+
+  // A surface recorded before the field existed says nothing about hosts
+  // rather than inventing an empty delta.
+  const old = { ...report(null), surface: SURFACE };
+  assert.equal(SURFACE.hosts, undefined);
+  for (const [label, text] of [
+    ["terminal", terminalOf(old)],
+    ["markdown", toMarkdown(old)],
+    ["html", toHtml(old)],
+  ] as Array<[string, string]>) {
+    assert.doesNotMatch(text, /host /, `${label} invented a host entry`);
+  }
+});

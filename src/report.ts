@@ -80,8 +80,9 @@ export function findingTagger(report: Report): (f: Finding) => "claimed" | "undo
 
 /**
  * The config surface as one flat list, in the order every renderer shows it:
- * env vars, CLI flags, config keys, additions before removals. `wrap` is how
- * the target marks up a value (backticks in Markdown, nothing elsewhere).
+ * env vars, CLI flags, config keys, outbound hosts, additions before
+ * removals. `wrap` is how the target marks up a value (backticks in
+ * Markdown, nothing elsewhere).
  */
 export function configSurfaceEntries(
   s: ReleaseSurface,
@@ -94,6 +95,8 @@ export function configSurfaceEntries(
     ...s.cliFlags.removed.map((v) => `−flag ${wrap(v)}`),
     ...s.configKeys.added.map((v) => `+key ${wrap(v)}`),
     ...s.configKeys.removed.map((v) => `−key ${wrap(v)}`),
+    ...(s.hosts?.added ?? []).map((v) => `+host ${wrap(v)}`),
+    ...(s.hosts?.removed ?? []).map((v) => `−host ${wrap(v)}`),
   ];
 }
 
