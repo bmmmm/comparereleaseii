@@ -76,6 +76,12 @@ const VENDORED_PATH = /(^|\/)(vendor|node_modules)\//;
 const TEST_PATH =
   /(^|\/)(test|tests|__tests__|spec|e2e|testdata|fixtures?|mocks?)(\/|\.)|_test\.go$|\.test\.|\.spec\./i;
 
+/** Languages whose lines can dial out. `fileCategory`'s fallback bucket is
+ * "source", so without this a metadata dotfile (.all-contributorsrc) ships
+ * its contributor-profile URLs as the release's new traffic. */
+const DIALING_SOURCE =
+  /\.(ts|tsx|js|jsx|mjs|cjs|go|rs|py|swift|kt|java|rb|vue|c|cc|cpp|h|hpp|m|mm|cs|php|scala|ex|exs|zig|dart)$/i;
+
 function urlHosts(line: string): string[] {
   return [...line.matchAll(URL_HOST)]
     .map((m) => m[1].toLowerCase())
@@ -115,7 +121,10 @@ function configSurface(files: DiffFile[]): Extracted {
     const category = fileCategory(f.path);
     if (category !== "source" && category !== "config") continue;
     const ownTraffic =
-      category === "source" && !VENDORED_PATH.test(f.path) && !TEST_PATH.test(f.path);
+      category === "source" &&
+      DIALING_SOURCE.test(f.path) &&
+      !VENDORED_PATH.test(f.path) &&
+      !TEST_PATH.test(f.path);
     for (const sign of ["-", "+"] as const) {
       const side = sign === "-" ? "minus" : "plus";
       for (const line of sideLines(f.patch, sign)) {

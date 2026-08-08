@@ -413,8 +413,14 @@ const MUTANTS: Mutant[] = [
   {
     guard: "vendored trees and test doubles contribute no host — a mock is not product traffic",
     file: "src/substance.ts",
-    find: 'category === "source" && !VENDORED_PATH.test(f.path) && !TEST_PATH.test(f.path);',
-    replace: 'category === "source";',
+    find: 'DIALING_SOURCE.test(f.path) &&\n      !VENDORED_PATH.test(f.path) &&\n      !TEST_PATH.test(f.path);',
+    replace: "DIALING_SOURCE.test(f.path);",
+  },
+  {
+    guard: "only dialing-source languages ship hosts — a metadata dotfile's URLs are not traffic",
+    file: "src/substance.ts",
+    find: 'category === "source" &&\n      DIALING_SOURCE.test(f.path) &&',
+    replace: 'category === "source" &&',
   },
   {
     guard: "component expansion stays one level deep — a child never expands its own pins",

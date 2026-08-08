@@ -123,6 +123,17 @@ const MOCK_HANDLERS = df(
   3,
 );
 
+// fileCategory's fallback bucket is "source", so a metadata dotfile lands
+// there — but a contributor's profile URL is not traffic the code starts.
+const CONTRIBUTORS_RC = df(
+  ".all-contributorsrc",
+  `@@ -1,2 +1,4 @@
++      "login": "thambaru",
++      "profile": "https://thambaru.com",
+`,
+  4,
+);
+
 const GO_HOST_MOVED_OUT = df(
   "services/a/client.go",
   `@@ -1,3 +1,2 @@ func dialA() {
@@ -190,6 +201,7 @@ test("the host delta names the traffic this release starts and stops, nothing el
     GO_UPDATER,
     VENDORED_CLIENT,
     MOCK_HANDLERS,
+    CONTRIBUTORS_RC,
     GO_HOST_MOVED_OUT,
     GO_HOST_MOVED_IN,
     TEST_FILE,
@@ -205,6 +217,7 @@ test("the host delta names the traffic this release starts and stops, nothing el
   }
   assert.ok(!s.hosts?.added.includes("telemetry.foo.io"), "vendored trees carry foreign hosts");
   assert.ok(!s.hosts?.added.includes("mock.msw.dev"), "a mock host is not product traffic");
+  assert.ok(!s.hosts?.added.includes("thambaru.com"), "a metadata dotfile is not code that dials");
   assert.ok(!s.hosts?.added.includes("cdn.shared.acme.io"), "a host that moved files is not new");
 
   assert.match(commitSurface([GO_UPDATER])!, /\+host api\.github\.com/);
