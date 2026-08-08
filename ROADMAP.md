@@ -169,9 +169,92 @@ those move everything:
 
 Start at `TRUST_PREAMBLE` and the rules list in `src/judge.ts:496-523`.
 
+## Open (2026-08-08): subscriptions, and the host a release starts talking to
+
+The reports already draw a frame around a codebase — categories, symbols,
+config surface, findings. What a watcher cannot yet say is "only tell me when
+*this part* moves". Before planning the feature, its shape was measured
+against the corpus (109 stored reports, 38 with surface+findings;
+opencloud/opencloud-web complete) and the clone cache. Four measurements
+decided the design, and two of them killed ideas that read as obvious:
+
+- **Directory anchors hold; file and symbol anchors do not.** Chaining each
+  repo's reports (headRef→baseRef) and asking how often an anchor recurs
+  later: depth-2 directories recur at 74–98%. Exact file paths recur at
+  22–60% — half to four-fifths of paths touched early are never touched
+  again. Symbols recur at 0–27%, and the stored cap of 12 making that a
+  floor does not close the gap to the directories. Rules match directory
+  globs; file- and symbol-level subscriptions are not offered (Settled).
+- **The selective layers exist.** `migrations` fires on 8% of releases,
+  security findings on 29% (median 1). Patch releases fire almost nothing,
+  minors fire wide — the layers separate quiet from loud correctly.
+- **`cliFlags.added` is not a subscription layer.** It fires on 50% of
+  releases and the values are dominated by subprocess arguments (`--no-ff`,
+  `--force`, `--dissociate` — git invocations in source), not the product's
+  own flags. Entry 5.
+- **A call-site detector for "new outbound request" has zero yield; a host
+  detector has exactly the right yield.** `fetch(`/`http.Get(` patterns over
+  five release ranges in four cached clones: zero non-test hits — real
+  codebases wrap HTTP, so new traffic does not spell a new call site. New
+  *host literals* in added source lines (moved lines cancelled, test paths
+  tagged, schema/licence hosts filtered) yield 0–2 per release, and the hits
+  are the point: nextcloud desktop v34 adds `api.github.com` inside its
+  Sparkle updater. The prototype proved it can fire before its zeros were
+  believed.
+
+### 3. `surface.hosts` — the host delta as a surface field
+
+Add `hosts: ConfigDelta` to `ReleaseSurface`: hostnames from `https?://`
+literals in changed source lines, extracted in `src/substance.ts` the way
+`envVars` already is — moved lines cancelled per release, vendor and lockfile
+paths excluded, test-path hits carried but marked, a boring-list for
+schema/licence hosts. Deterministic, informational, never scored. It renders
+through `configSurfaceEntries` (`src/report.ts`), so all three renderers
+inherit it in one move, and the "all three renderers" test extends to it.
+Definition of done as AGENTS.md has it: failing test first, a mutate guard
+for the extractor, `--json` stays additive.
+
+### 4. Watch rules — "tell me when this area moves" as the fourth alert reason
+
+`rules` on `WatchRepoConfig`, inherited via the existing
+`{...defaults, ...entry}` merge — which means an entry's list *replaces* the
+defaults' list, and the config docs must say so. A rule names directory
+globs and/or surface layers (`migrations`, `apiRoutes`, `hosts`,
+`envVar:NAME`) and/or finding kinds. Evaluation is a pure function in
+`src/watch-state.ts` next to the state rules it joins, and `alertDecision()`
+gains its fourth reason; hits ride on `CheckedRelease` so the index and
+history page can show *why* a release was flagged, and the notify hook
+carries them for free. Two lines drawn in advance: deterministic layers
+trigger; finding-kind rules fire too, but the report must mark them as
+resting on judge output — the vote-variance record (`votes`) exists because
+that difference matters. And a rule whose globs matched nothing across many
+releases gets a staleness note: directory anchors *mostly* survive, and
+"mostly" is why the silent miss is a signal, not calm.
+
+### 5. `cliFlags` counts the subprocess's flags as the product's
+
+Measured 2026-08-08, found while replaying rules: half of all releases with a
+surface add "CLI flags", and the added values are the flags of the tools the
+code *calls* — git, bwrap, test runners — not the flags the program parses.
+The fix needs a discriminator between "flag this program defines" and "flag
+this program passes on", and whether a cheap one exists (argument-parser
+context? exclusion of call-expression arguments?) is the open question.
+Bounded: investigate against the corpus; if no clean discriminator survives
+measurement, this entry keeps the findings and the field keeps its noise —
+a wrong filter that eats real flags is worse than the noise.
+
 ---
 
 ## Settled — do not reopen without new facts
+
+- **File- and symbol-level subscription anchors: rejected by measurement
+  (2026-08-08).** Chained-report recurrence across the corpus: exact files
+  22–60%, symbols ≤27% (a floor under the stored cap of 12, but the gap to
+  directories' 74–98% is not a cap artifact). A subscription that goes quiet
+  because the change moved to a sibling file is worse than one that fires on
+  the directory — the silence reads as "nothing happened". The same numbers
+  close the "watch this button" idea in its semantic form. Reopen only with a
+  re-anchoring mechanism that survives a rename, and measure it the same way.
 
 - **`inverted-claim`: closed 2026-08-07, and a single model vote is not a
   verdict.** `pnpm mutate-notes --generate --no-cache` reads `1/1`. The
