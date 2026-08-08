@@ -18,6 +18,12 @@
 > semantics and the generation rule), docs/corpus.md (the bill and the sweep),
 > docs/watchdog.md (alerting), AGENTS.md (commands).
 >
+> Also unreleased, landed 2026-08-08: the subscription block — `surface.hosts`
+> (which hosts a release starts and stops talking to, in every renderer) and
+> watch `rules` (per-repo subscriptions on directory globs, surface layers and
+> finding kinds, the fourth alert reason). Score-neutral by construction;
+> docs/watchdog.md carries the operator side.
+>
 > Everything before that is on `main` too — the three original phases
 > (distribution, watchdog, judge trust), iterations 2–4, the 2026-07-27 block
 > series (bughunt follow-up, hardening backlog, forge watching, presentation
@@ -169,69 +175,18 @@ those move everything:
 
 Start at `TRUST_PREAMBLE` and the rules list in `src/judge.ts:496-523`.
 
-## Open (2026-08-08): subscriptions, and the host a release starts talking to
+## Open (2026-08-08): what the subscription block measured and left behind
 
-The reports already draw a frame around a codebase — categories, symbols,
-config surface, findings. What a watcher cannot yet say is "only tell me when
-*this part* moves". Before planning the feature, its shape was measured
-against the corpus (109 stored reports, 38 with surface+findings;
-opencloud/opencloud-web complete) and the clone cache. Four measurements
-decided the design, and two of them killed ideas that read as obvious:
-
-- **Directory anchors hold; file and symbol anchors do not.** Chaining each
-  repo's reports (headRef→baseRef) and asking how often an anchor recurs
-  later: depth-2 directories recur at 74–98%. Exact file paths recur at
-  22–60% — half to four-fifths of paths touched early are never touched
-  again. Symbols recur at 0–27%, and the stored cap of 12 making that a
-  floor does not close the gap to the directories. Rules match directory
-  globs; file- and symbol-level subscriptions are not offered (Settled).
-- **The selective layers exist.** `migrations` fires on 8% of releases,
-  security findings on 29% (median 1). Patch releases fire almost nothing,
-  minors fire wide — the layers separate quiet from loud correctly.
-- **`cliFlags.added` is not a subscription layer.** It fires on 50% of
-  releases and the values are dominated by subprocess arguments (`--no-ff`,
-  `--force`, `--dissociate` — git invocations in source), not the product's
-  own flags. Entry 5.
-- **A call-site detector for "new outbound request" has zero yield; a host
-  detector has exactly the right yield.** `fetch(`/`http.Get(` patterns over
-  five release ranges in four cached clones: zero non-test hits — real
-  codebases wrap HTTP, so new traffic does not spell a new call site. New
-  *host literals* in added source lines (moved lines cancelled, test paths
-  tagged, schema/licence hosts filtered) yield 0–2 per release, and the hits
-  are the point: nextcloud desktop v34 adds `api.github.com` inside its
-  Sparkle updater. The prototype proved it can fire before its zeros were
-  believed.
-
-### 3. `surface.hosts` — the host delta as a surface field
-
-Add `hosts: ConfigDelta` to `ReleaseSurface`: hostnames from `https?://`
-literals in changed source lines, extracted in `src/substance.ts` the way
-`envVars` already is — moved lines cancelled per release, vendor and lockfile
-paths excluded, test paths excluded rather than carried and marked (a mock
-host is not product traffic, and a `ConfigDelta` value stays a plain
-hostname), a boring-list for schema/licence hosts. Deterministic,
-informational, never scored. It renders
-through `configSurfaceEntries` (`src/report.ts`), so all three renderers
-inherit it in one move, and the "all three renderers" test extends to it.
-Definition of done as AGENTS.md has it: failing test first, a mutate guard
-for the extractor, `--json` stays additive.
-
-### 4. Watch rules — "tell me when this area moves" as the fourth alert reason
-
-`rules` on `WatchRepoConfig`, inherited via the existing
-`{...defaults, ...entry}` merge — which means an entry's list *replaces* the
-defaults' list, and the config docs must say so. A rule names directory
-globs and/or surface layers (`migrations`, `apiRoutes`, `hosts`,
-`envVar:NAME`) and/or finding kinds. Evaluation is a pure function in
-`src/watch-state.ts` next to the state rules it joins, and `alertDecision()`
-gains its fourth reason; hits ride on `CheckedRelease` so the index and
-history page can show *why* a release was flagged, and the notify hook
-carries them for free. Two lines drawn in advance: deterministic layers
-trigger; finding-kind rules fire too, but the report must mark them as
-resting on judge output — the vote-variance record (`votes`) exists because
-that difference matters. And a rule whose globs matched nothing across many
-releases gets a staleness note: directory anchors *mostly* survive, and
-"mostly" is why the silent miss is a signal, not calm.
+The subscription block landed the same day it was planned: `surface.hosts`
+(the host delta as a surface field, all three renderers, mutate-guarded) and
+watch `rules` (directory globs / surface layers / finding kinds as the
+fourth alert reason in `alertDecision`, hits on the record, staleness note,
+docs). The plans and their design measurements live in this file's git
+history (entries 3 and 4, commit `cbe5658`); the corpus numbers that decided
+them — directory anchors 74–98% recurrence vs. files 22–60% and symbols
+≤27%, host detector 0–2 per release vs. call-site detector zero — are
+summarized in the two Settled entries below. What stays open is what the
+work surfaced:
 
 ### 6. The category boundary, not the subprocess, is where `cliFlags` leaks
 
@@ -263,6 +218,20 @@ every match; regenerable from the clone cache with the entry's replica
 script). Whoever picks this up re-measures the 50% fire rate after each
 exclusion — the number that made entry 5 look like a subprocess problem was
 mostly this.
+
+### 7. `checkAndRecord` assembles the record nobody's test ever reads
+
+Found while wiring rules into the watch flow: the pure pieces are tested —
+`evaluateRules`, `alertDecision`, the ledgers — but the assembly line that
+folds a finished report into a `CheckedRelease` (components, authors,
+verdicts, and now `ruleHits`) runs under no test, because nothing in the
+suite exercises a full check flow; `runWatch` is only ever driven into its
+validation rejections. The `safeSegment` lesson says what an untested seam
+is worth: a guard there was removed and 458 tests stayed green. A stub
+harness for `checkAndRecord` (fabricated report in, recorded state out)
+would put the whole record shape under test at once — it was out of scope
+for the rules task, and this entry is so the gap does not stay an anecdote
+in an agent report.
 
 ---
 
