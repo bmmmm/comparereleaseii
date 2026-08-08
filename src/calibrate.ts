@@ -67,6 +67,15 @@ export interface GoldenCase {
   section: string;
   claim: string;
   hunks: Array<{ path: string; hunk: string }>;
+  /**
+   * Linked commits the prompt shows, if the case is about them. Default empty,
+   * which is what every case was until 2026-08-08 — and that was a hole: a
+   * commit subject is written by the same hand as the claim, so a model
+   * arguing from it is the circularity this tool exists to refuse, and the set
+   * could not ask about it at all. `circularity` read 2/2 while testing only
+   * the changelog half.
+   */
+  commits?: Array<{ sha: string; subject: string; author: string }>;
   /** Set by `--add-golden`; hand-written cases have none. */
   lifted?: LiftedFrom;
   /**
@@ -193,7 +202,7 @@ export async function runCalibration(engine: JudgeEngine, concurrency = 4): Prom
         section: gc.section,
         claimText: gc.claim,
         hunks: gc.hunks,
-        commits: [],
+        commits: gc.commits ?? [],
         // Production always offers the need protocol on the first round — a
         // calibration that hides it cannot measure need vs. need-misuse.
         allPaths: gc.allPaths ?? gc.hunks.map((h) => h.path),

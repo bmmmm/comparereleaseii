@@ -129,6 +129,22 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **The golden set can ask about commit subjects, which it never could.**
+  `runCalibration` hard-coded `commits: []`, so all 39 cases were graded on a
+  prompt whose `COMMITS` block was empty — and `circularity` reported 2/2
+  while covering only the changelog half of that axis. A judge that argued
+  from commit subjects (same author as the claim: the circularity this tool
+  exists to refuse) could not have been caught by the gate. Golden cases now
+  carry optional `commits`, and two cases cover both directions: a subject
+  that confirms the claim over a diff showing nothing must still be
+  `no-evidence`, and a subject that denies what the diff plainly does must
+  still be `verified`.
+
+  Measured twice with independent fresh caches, identical: `need→no-evidence`
+  and `verified`, `circularity` 4/4. The frozen reference is re-run at 40/41
+  (2026-08-08). The judge prompt is unchanged — the point of this was to be
+  able to ask the question, and the answer so far is that no change is needed.
+
 - **A `verified` that rests on identifier overlap alone now costs a judge
   call.** Both routes settled a claim outright once its identifiers scored 5
   against the diff, and `judgeMode: auto` never asks about a claim the

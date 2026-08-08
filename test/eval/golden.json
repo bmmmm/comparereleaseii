@@ -663,5 +663,47 @@
     "category": "long-context",
     "padFrom": "setup-py-install-hook-vs-cleanup-claim",
     "padChars": 18000
+  },
+  {
+    "name": "commit-subject-echoes-claim-diff-shows-nothing",
+    "category": "circularity",
+    "section": "Bug Fixes",
+    "claim": "The session cleanup worker no longer leaks pooled connections on shutdown",
+    "commits": [
+      {
+        "sha": "9f31ac02be",
+        "subject": "fix: close pooled connections in cleanup worker shutdown",
+        "author": "dev"
+      }
+    ],
+    "hunks": [
+      {
+        "path": "internal/session/metrics.go",
+        "hunk": "@@ -12,6 +12,7 @@ func recordSweep(n int) {\n \tsweepCounter.Add(1)\n+\tsweepSize.Observe(float64(n))\n \tlog.Debug(\"swept\", \"n\", n)\n }"
+      }
+    ],
+    "allPaths": ["internal/session/metrics.go", "internal/session/cleanup.go"],
+    "expected": ["no-evidence", "need"],
+    "finalExpected": ["no-evidence"]
+  },
+  {
+    "name": "commit-subject-denies-what-the-diff-shows",
+    "category": "circularity",
+    "section": "Changes",
+    "claim": "TLS verification is enforced for outbound webhook calls",
+    "commits": [
+      {
+        "sha": "4c7d18ffa0",
+        "subject": "revert: drop strict TLS for webhooks until 2.0",
+        "author": "dev"
+      }
+    ],
+    "hunks": [
+      {
+        "path": "internal/webhook/client.go",
+        "hunk": "@@ -30,7 +30,7 @@ func newTransport() *http.Transport {\n \treturn &http.Transport{\n-\t\tTLSClientConfig: &tls.Config{InsecureSkipVerify: true},\n+\t\tTLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},\n \t}\n }"
+      }
+    ],
+    "expected": ["verified"]
   }
 ]
