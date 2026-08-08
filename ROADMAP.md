@@ -233,21 +233,59 @@ that difference matters. And a rule whose globs matched nothing across many
 releases gets a staleness note: directory anchors *mostly* survive, and
 "mostly" is why the silent miss is a signal, not calm.
 
-### 5. `cliFlags` counts the subprocess's flags as the product's
+### 6. The category boundary, not the subprocess, is where `cliFlags` leaks
 
-Measured 2026-08-08, found while replaying rules: half of all releases with a
-surface add "CLI flags", and the added values are the flags of the tools the
-code *calls* — git, bwrap, test runners — not the flags the program parses.
-The fix needs a discriminator between "flag this program defines" and "flag
-this program passes on", and whether a cheap one exists (argument-parser
-context? exclusion of call-expression arguments?) is the open question.
-Bounded: investigate against the corpus; if no clean discriminator survives
-measurement, this entry keeps the findings and the field keeps its noise —
-a wrong filter that eats real flags is worse than the noise.
+What the entry-5 investigation actually found (its own question is Settled
+below): bucketing all 439 flag-literal occurrences across 11 corpus tag
+ranges by path, only **22.8%** sit in a file where "subprocess flag or
+product flag" is even the right question. The volume is elsewhere, and it is
+category-boundary gaps:
+
+- **46.7%** — `.vue` single-file components: CSS custom properties
+  (`--oc-button-color: …`) inside `<style>` blocks. `STYLE_FILE` excludes
+  `.css/.scss/.sass/.less/.styl` but not `.vue`, so Vue SFCs leak their CSS
+  variable surface into `cliFlags`.
+- **20.0%** — `vendor/` (vendored Go dependencies: docker client, ginkgo,
+  go-toml). `fileCategory` has no vendored-path exclusion, so a vendored test
+  runner's own flags read as the product's.
+- **6.8%** — misclassified CI/tooling config: `.woodpecker.star` at the repo
+  root misses `CI_BUILD`'s directory-shaped pattern; `.mcp.json` lands in no
+  config category.
+- **3.6%** — Jest/Vue snapshot files (`__snapshots__/*.snap`) not caught by
+  the test-file pattern.
+
+Unlike the discriminator candidates, excluding `vendor/` is unambiguously
+safe — vendored code is never the checked project's own CLI surface, so
+there is no recall to lose — and the `.vue` style-block case is the same
+class of fix as the existing `STYLE_FILE` exclusion. Raw data:
+`c-occurrences.json` from the 2026-08-08 investigation (file/line/side for
+every match; regenerable from the clone cache with the entry's replica
+script). Whoever picks this up re-measures the 50% fire rate after each
+exclusion — the number that made entry 5 look like a subprocess problem was
+mostly this.
 
 ---
 
 ## Settled — do not reopen without new facts
+
+- **`cliFlags` subprocess noise: no cheap discriminator exists — measured
+  and closed 2026-08-08.** Three candidates against 439 real occurrences
+  (11 corpus tag ranges, extractor replica verified byte-identical against a
+  stored report). Same-line exec-call exclusion: fires on exactly 0 lines —
+  idiomatic code names the binary (`exec.Command("git")`) and passes the flag
+  (`.arg("--no-verify")`) on different lines, a line-level rule structurally
+  cannot see the pair. Keep-only-definition-shaped-lines: wipes sniffnet's
+  real hand-rolled `--help`/`--version`/`--restore-default` parser to zero
+  while its two "survivors" are themselves noise (vendored ginkgo usage text;
+  clap's `.arg(` and `std::process`'s `.arg(` are textually identical with
+  opposite meanings). Known-binary-token exclusion: <3% reduction, hits
+  coincidental. The underlying fact: which binary a flag belongs to is a
+  multi-line, cross-file property, and the diff shows lines in isolation —
+  anything that answers it needs AST-level call resolution or a per-repo
+  allowlist, neither of which is "cheap". The field keeps its subprocess
+  noise; the *volume* problem turned out to live at the category boundary
+  instead (entry 6). Reopen only with a candidate that survives the sniffnet
+  hand-rolled-parser case.
 
 - **File- and symbol-level subscription anchors: rejected by measurement
   (2026-08-08).** Chained-report recurrence across the corpus: exact files
