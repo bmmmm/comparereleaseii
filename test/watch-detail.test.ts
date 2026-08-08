@@ -9,7 +9,14 @@ import {
 } from "../src/watch-detail.ts";
 import { scoreClass } from "../src/theme.ts";
 import { STALE_AFTER } from "../src/promises.ts";
-import { scoreBaseline, type CheckedRelease, type RepoState, type WatchedEntry } from "../src/watch-state.ts";
+import {
+  RULE_STALE_MIN,
+  scoreBaseline,
+  type CheckedRelease,
+  type RepoState,
+  type WatchRule,
+  type WatchedEntry,
+} from "../src/watch-state.ts";
 import type { PromiseCheck } from "../src/types.ts";
 
 const ENTRY: WatchedEntry = { key: "o/r", repo: "o/r" };
@@ -374,4 +381,64 @@ test("a backfilled check in the releases table says it never alerted", () => {
 test("the history page footer states what scores measure", () => {
   const html = toRepoDetailHtml(ENTRY, state([check("v1", 45)]), null, "2026-07-28T00:00:00Z");
   assert.ok(html.includes("not project quality, and never people"));
+});
+
+// The index says a rule fired; this page is where the operator finds out
+// what fired it. Matched entries are release-authored — paths, hosts,
+// finding sentences — so they are untrusted text, and a judge-based hit has
+// to admit what it rests on.
+test("the history page shows what moved a rule, escaped, and marks the judge-based hit", () => {
+  const history = [
+    check("v1", 90, {
+      ruleHits: [
+        { rule: "schema", matched: ["migration: db/<img src=x>.sql"], judgeBased: false },
+        { rule: "sec", matched: ["finding: security — auth moved"], judgeBased: true },
+      ],
+    }),
+    check("v2", 90, { ruleHits: [] }),
+  ];
+  const entry: WatchedEntry = {
+    ...ENTRY,
+    rules: [
+      { name: "schema", surface: ["migrations"] },
+      { name: "sec", findingKinds: ["security"] },
+    ],
+  };
+  const html = toRepoDetailHtml(entry, state(history), null, "t");
+  assert.match(html, /Watch rules/);
+  assert.match(html, /db\/&lt;img src=x&gt;\.sql/, "a matched path is escaped");
+  assert.doesNotMatch(html, /<img src=x/, "no raw payload");
+  assert.match(html, /judge-based/, "the finding-kind hit says what it rests on");
+  assert.equal(html.match(/judge-based/g)?.length, 1, "…and the deterministic one does not");
+
+  // A repo with no rules and no hits keeps the page it had.
+  assert.doesNotMatch(toRepoDetailHtml(ENTRY, state([check("v1", 90)]), null, "t"), /Watch rules/);
+});
+
+test("a rule silent across every check on record is reported as possibly stale", () => {
+  const rules: WatchRule[] = [
+    { name: "auth", paths: ["src/auth"] },
+    { name: "schema", surface: ["migrations"] },
+  ];
+  const entry: WatchedEntry = { ...ENTRY, rules };
+  const silent = Array.from({ length: RULE_STALE_MIN }, (_, i) =>
+    check(`v${i}`, 90, { ruleHits: [] }),
+  );
+  const html = toRepoDetailHtml(entry, state(silent), null, "t");
+  assert.match(html, /silent across every check on record: auth, schema/);
+  assert.match(html, /may have moved out from under it/);
+
+  // One hit clears that rule, and nine checks are not yet a silence.
+  const withHit = [
+    ...silent.slice(1),
+    check("vx", 90, { ruleHits: [{ rule: "auth", matched: ["src/auth/a.go"], judgeBased: false }] }),
+  ];
+  assert.match(
+    toRepoDetailHtml(entry, state(withHit), null, "t"),
+    /silent across every check on record: schema\./,
+  );
+  assert.doesNotMatch(
+    toRepoDetailHtml(entry, state(silent.slice(1)), null, "t"),
+    /silent across every check/,
+  );
 });

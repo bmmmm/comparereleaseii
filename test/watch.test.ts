@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  configuredEntries,
   nothingNewMessage,
   runWatch,
   runBackfill,
@@ -33,17 +34,23 @@ import {
   recordChecked,
   recordCheckFailure,
   recordSkip,
+  evaluateRules,
+  matchesPathGlob,
+  staleRules,
   BASELINE_WINDOW,
   DRIFT_WINDOW,
   MAX_AUTHOR_LEDGER,
   MAX_CHECK_ATTEMPTS,
   MAX_PROMISE_LEDGER,
+  MAX_RULE_MATCHES,
+  RULE_STALE_MIN,
   type ReleaseInfo,
   type WatchState,
   type CheckedRelease,
   type RepoState,
+  type WatchRule,
 } from "../src/watch-state.ts";
-import type { PromiseCheck, Report } from "../src/types.ts";
+import type { Finding, PromiseCheck, ReleaseSurface, Report } from "../src/types.ts";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -659,6 +666,212 @@ test("the alert decision: the release, the level under it, and the judge behind 
 test("an exact 20-point drop is the case the constant names", () => {
   assert.equal(isFlagged(71, 0, 0, 65, 91), true);
   assert.equal(isFlagged(72, 0, 0, 65, 91), false);
+});
+
+// A rule anchors a DIRECTORY. Matching a prefix of a segment would make
+// "src/au" a subscription to src/auth, and matching only whole paths would
+// make every anchor a file anchor — the shape the corpus measurement
+// rejected (exact paths recur at 22–60 %).
+test("a path glob anchors whole segments and everything under them", () => {
+  // Bare prefix: the anchor is a directory, not a file.
+  assert.equal(matchesPathGlob("src/auth", "src/auth/token.go"), true);
+  assert.equal(matchesPathGlob("src/auth", "src/auth"), true);
+  assert.equal(matchesPathGlob("src/auth", "src/auth/deep/er/token.go"), true);
+  assert.equal(matchesPathGlob("src/auth", "src/authz/token.go"), false, "whole segments");
+  assert.equal(matchesPathGlob("src/au", "src/auth/token.go"), false, "not a text prefix");
+  assert.equal(matchesPathGlob("auth", "src/auth/token.go"), false, "anchored at the root");
+
+  // ** spans any number of segments, zero included.
+  assert.equal(matchesPathGlob("**/auth", "auth/token.go"), true, "zero segments");
+  assert.equal(matchesPathGlob("**/auth", "a/b/auth/token.go"), true);
+  assert.equal(matchesPathGlob("**/auth", "a/authz/token.go"), false);
+  assert.equal(matchesPathGlob("**", "anything/at/all.go"), true);
+
+  // * is exactly one segment.
+  assert.equal(matchesPathGlob("services/*/pkg", "services/api/pkg/x.go"), true);
+  assert.equal(matchesPathGlob("services/*/pkg", "services/pkg/x.go"), false, "one, not zero");
+  assert.equal(matchesPathGlob("services/*/pkg", "services/a/b/pkg/x.go"), false, "one, not two");
+
+  // Spelling noise must not decide a subscription.
+  assert.equal(matchesPathGlob("./src/auth/", "src/auth/token.go"), true);
+  assert.equal(matchesPathGlob("", "src/auth/token.go"), false, "an empty pattern is not '*'");
+});
+
+test("evaluateRules reads each layer, and says which hits rest on the judge", () => {
+  const surface: ReleaseSurface = {
+    categories: [],
+    symbols: [],
+    moreSymbols: 0,
+    envVars: { added: ["OIDC_ISSUER", "LOG_LEVEL"], removed: [] },
+    cliFlags: { added: [], removed: [] },
+    configKeys: { added: [], removed: [] },
+    hosts: { added: ["api.github.com"], removed: ["old.example.com"] },
+    migrations: ["db/migrations/003_users.sql"],
+    apiRoutes: ["internal/api/routes.go"],
+  };
+  const findings: Finding[] = [
+    { kind: "security", audience: "everyone", text: "auth check moved", files: ["a.go"], subsystem: "auth" },
+    { kind: "feature", audience: "user", text: "new export", files: ["b.go"], subsystem: "cli" },
+  ];
+  const facts = { files: ["src/auth/token.go", "README.md"], surface, findings };
+
+  const hit = (rule: WatchRule) => evaluateRules([rule], facts);
+
+  assert.deepEqual(hit({ name: "auth", paths: ["src/auth"] }), [
+    { rule: "auth", matched: ["src/auth/token.go"], judgeBased: false },
+  ]);
+  assert.deepEqual(hit({ name: "schema", surface: ["migrations"] }), [
+    { rule: "schema", matched: ["migration: db/migrations/003_users.sql"], judgeBased: false },
+  ]);
+  assert.deepEqual(hit({ name: "api", surface: ["apiRoutes"] }), [
+    { rule: "api", matched: ["route: internal/api/routes.go"], judgeBased: false },
+  ]);
+  assert.deepEqual(hit({ name: "traffic", surface: ["hosts"] }), [
+    { rule: "traffic", matched: ["+host api.github.com", "-host old.example.com"], judgeBased: false },
+  ]);
+  // envVar names ONE variable — the bare layer would fire on every release
+  // that touches env vars at all.
+  assert.deepEqual(hit({ name: "oidc", surface: ["envVar:OIDC_ISSUER"] }), [
+    { rule: "oidc", matched: ["+env OIDC_ISSUER"], judgeBased: false },
+  ]);
+  assert.deepEqual(hit({ name: "other", surface: ["envVar:DATABASE_URL"] }), []);
+  // A finding-kind hit rests on model output and must carry that fact.
+  assert.deepEqual(hit({ name: "sec", findingKinds: ["security"] }), [
+    { rule: "sec", matched: ["finding: security — auth check moved"], judgeBased: true },
+  ]);
+  // …but not once a deterministic layer fired for the same rule.
+  const both = hit({ name: "sec", paths: ["src/auth"], findingKinds: ["security"] });
+  assert.equal(both[0].judgeBased, false);
+  assert.deepEqual(both[0].matched, ["finding: security — auth check moved", "src/auth/token.go"]);
+
+  // Nothing configured, nothing matched, nothing recorded.
+  assert.deepEqual(evaluateRules([{ name: "quiet", paths: ["docs"] }], facts), []);
+  assert.deepEqual(evaluateRules(undefined, facts), []);
+
+  // A surface written before `hosts` existed claims nothing about hosts.
+  const older: ReleaseSurface = { ...surface, hosts: undefined };
+  assert.deepEqual(evaluateRules([{ name: "traffic", surface: ["hosts"] }], { files: [], surface: older }), []);
+});
+
+test("a rule's matched list is deduped, sorted and cut out loud", () => {
+  const files = Array.from({ length: MAX_RULE_MATCHES + 3 }, (_, i) =>
+    `src/auth/f${String(i).padStart(2, "0")}.go`,
+  ).reverse();
+  const [hit] = evaluateRules([{ name: "auth", paths: ["src/auth", "src"] }], {
+    files: [...files, "src/auth/f00.go"],
+  });
+  assert.equal(hit.matched.length, MAX_RULE_MATCHES + 1, "the cut adds one line, it does not hide");
+  assert.equal(hit.matched[0], "src/auth/f00.go", "sorted, and the duplicate counted once");
+  assert.equal(hit.matched.at(-1), "… 3 more");
+});
+
+test("a rule hit is the fourth alert reason, on its own", () => {
+  const run = { checkedAt: "2026-08-01T00:00:00Z" };
+  const base = {
+    score: 92,
+    exitCode: 0,
+    criticalFlags: 0,
+    notifyBelow: 65,
+    past: [{ score: 90 }, { score: 91 }, { score: 89 }],
+    runs: [run],
+  };
+  const quiet = alertDecision(base);
+  assert.equal(quiet.flagged, false);
+
+  const hits = [{ rule: "schema", matched: ["migration: db/x.sql"], judgeBased: false }];
+  const fired = alertDecision({ ...base, ruleHits: hits });
+  assert.equal(fired.flagged, true, "a subscribed area moved — the score has no say in that");
+  assert.deepEqual(fired.ruleHits, hits);
+
+  // An entry WITH rules that none of fired decides exactly as before — the
+  // field only exists once there is something to report.
+  assert.deepEqual(alertDecision({ ...base, ruleHits: [] }), quiet);
+  assert.equal("ruleHits" in quiet, false);
+});
+
+test("a rule that has matched nothing across many checks is reported, not read as calm", () => {
+  const rules: WatchRule[] = [{ name: "auth", paths: ["src/auth"] }, { name: "schema", surface: ["migrations"] }];
+  const measured = (hits: string[]) => ({
+    ruleHits: hits.map((rule) => ({ rule, matched: ["x"], judgeBased: false })),
+  });
+  const ten = Array.from({ length: RULE_STALE_MIN }, () => measured([]));
+
+  assert.deepEqual(staleRules(rules, ten.slice(1)), [], "too few checks to call it silence");
+  assert.deepEqual(staleRules(rules, ten), ["auth", "schema"]);
+  assert.deepEqual(staleRules(rules, [...ten.slice(1), measured(["auth"])]), ["schema"]);
+  // Checks recorded before the rules existed carry no field and say nothing
+  // about them — counting those would report every fresh rule as stale.
+  assert.deepEqual(staleRules(rules, [...ten.slice(3), {}, {}, {}]), []);
+});
+
+test("validateWatchConfig rejects the rule shapes that would silently never fire", () => {
+  const ok = (rules: WatchRule[]) => validateWatchConfig({ repos: [{ repo: "owner/name", rules }] });
+  ok([{ name: "auth", paths: ["src/auth"] }]);
+  ok([{ name: "surface", surface: ["migrations", "apiRoutes", "hosts", "envVar:OIDC_ISSUER"] }]);
+  ok([{ name: "sec", findingKinds: ["security", "breaking"] }]);
+
+  assert.throws(() => ok([{ name: "x", surface: ["envVars"] }]), /unknown surface layer.*envVars/s);
+  assert.throws(() => ok([{ name: "x", surface: ["envVar:"] }]), /unknown surface layer/s);
+  assert.throws(() => ok([{ name: "x", findingKinds: ["typo" as never] }]), /unknown finding kind/s);
+  assert.throws(() => ok([{ name: "x" }]), /subscribes to nothing/s);
+  assert.throws(() => ok([{ name: "x", paths: [] }]), /subscribes to nothing/s);
+  assert.throws(() => ok([{ name: "x", paths: [" "] }]), /empty "paths" entry/s);
+  assert.throws(() => ok([{ name: "", paths: ["src"] }]), /non-empty "name"/s);
+  assert.throws(
+    () => ok([{ name: "dup", paths: ["a"] }, { name: "dup", paths: ["b"] }]),
+    /duplicate rule name "dup"/s,
+  );
+  // The defaults list is validated too, and names itself in the message.
+  assert.throws(
+    () =>
+      validateWatchConfig({
+        repos: [{ repo: "owner/name" }],
+        defaults: { rules: [{ name: "x", surface: ["nope"] }] },
+      }),
+    /\(defaults\).*unknown surface layer/s,
+  );
+});
+
+// Rules ride the ordinary defaults merge, and `{...defaults, ...entry}`
+// REPLACES a list, it does not extend it. The docs say so because an
+// operator who expects the union gets a subscription that quietly covers
+// less than they think.
+test("an entry's rules replace the defaults' list rather than extending it", () => {
+  const entries = configuredEntries({
+    defaults: { rules: [{ name: "schema", surface: ["migrations"] }] },
+    repos: [
+      { repo: "a/a" },
+      { repo: "b/b", rules: [{ name: "auth", paths: ["src/auth"] }] },
+      { repo: "c/c", rules: [] },
+    ],
+  });
+  assert.deepEqual(entries[0].rules, [{ name: "schema", surface: ["migrations"] }], "inherited");
+  assert.deepEqual(entries[1].rules, [{ name: "auth", paths: ["src/auth"] }], "replaced, not merged");
+  assert.equal(entries[2].rules, undefined, "an empty list is no subscription");
+});
+
+test("the index row says which rule moved, and marks a judge-based hit", () => {
+  const moved = checked("v9", 95, true);
+  moved.ruleHits = [
+    { rule: "schema", matched: ["migration: db/x.sql"], judgeBased: false },
+    { rule: "sec<x>", matched: ["finding: security — a"], judgeBased: true },
+  ];
+  const state: WatchState = {
+    version: 1,
+    repos: {
+      "o/r": { lastPublishedAt: "t", lastTag: "v9", latest: moved, history: [moved] },
+    },
+  };
+  const html = toWatchIndexHtml(state, "t");
+  assert.match(html, /class="rule"[^>]*>&#9873; schema, sec&lt;x&gt;\*</);
+  assert.match(html, /rests on judge output/);
+  assert.doesNotMatch(html, /sec<x>/, "a rule name is escaped like everything else");
+  // A repo without rules keeps the row it had.
+  const plain = checked("v9", 95, true);
+  assert.doesNotMatch(
+    toWatchIndexHtml({ version: 1, repos: { "o/r": { lastPublishedAt: "t", lastTag: "v9", latest: plain, history: [plain] } } }, "t"),
+    /class="rule"/,
+  );
 });
 
 // `--notify` runs a shell string on purpose. The report path handed to it is

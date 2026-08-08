@@ -15,8 +15,10 @@ import type { PromiseCheck } from "./types.ts";
 import {
   BASELINE_WINDOW,
   MAX_CHECK_ATTEMPTS,
+  RULE_STALE_MIN,
   SOFTENING_STREAK,
   judgeSofteningStreak,
+  staleRules,
   type AuthorRecord,
   type CheckedRelease,
   type RepoState,
@@ -351,6 +353,44 @@ function promisesSection(promises: PromiseCheck[]): string {
   return `<h2>Promise ledger <span class="note">— forward-looking notes tracked across releases; informational, never scored</span></h2>${entries}`;
 }
 
+/** The color a rule hit carries — its own, so a subscription is never read
+ * as a score problem. */
+const RULE_COLOR = "#8250df";
+
+/**
+ * What the repo's subscriptions have been doing: which release moved which
+ * rule and what exactly matched, plus the rules that have been silent long
+ * enough to suspect their anchors. Both halves are needed — the hits alone
+ * cannot report a rule that never fired, and that is the failure mode
+ * directory anchors have (74–98 % recurrence, so a miss is possible and
+ * reads as calm).
+ */
+function rulesSection(entry: WatchedEntry, history: CheckedRelease[]): string {
+  const withHits = [...history].reverse().filter((h) => h.ruleHits?.length);
+  if (!withHits.length && !entry.rules?.length) return "";
+  const entries = withHits
+    .flatMap((h) =>
+      h.ruleHits!.map((hit) => {
+        const judged = hit.judgeBased
+          ? ` <span class="notice" title="nothing but finding kinds fired this rule, and findings are what the judge engine read off the diff — this hit rests on model output, not on the deterministic pass">judge-based</span>`
+          : "";
+        return `<div class="flag" style="border-left-color:${RULE_COLOR}"><span class="chip" style="background:${RULE_COLOR}">${esc(hit.rule)}</span> <b>${esc(h.tag)}</b>${judged}<div class="files">${hit.matched.map((m) => esc(m)).join(" &middot; ")}</div></div>`;
+      }),
+    )
+    .join("");
+  const stale = staleRules(entry.rules, history);
+  const staleNote = stale.length
+    ? `<p class="note">&#9888; silent across every check on record: ${stale
+        .map((n) => esc(n))
+        .join(", ")}. Directory anchors mostly survive a repo's own moves — mostly, not always, so a rule that has matched nothing in ${RULE_STALE_MIN}+ checks is worth re-reading against the current tree; the area may have moved out from under it.</p>`
+    : "";
+  const configured = entry.rules?.length
+    ? `<p class="note">subscribed: ${entry.rules.map((r) => esc(r.name)).join(", ")}</p>`
+    : "";
+  return `<h2>Watch rules <span class="note">— areas this watch subscribes to; a hit flags the release on its own</span></h2>
+${configured}${staleNote}${entries || `<p class="note">no release on record moved one of these rules.</p>`}`;
+}
+
 /** Releases watch gave up on — shown so a skip is never silent: a gap in
  * the score series must be readable as "unchecked", not "fine". */
 function skippedSection(skipped: SkippedRelease[]): string {
@@ -480,6 +520,7 @@ ${verdictChart(history, root)}
 ${longviewSections(rs, root)}
 <h2>Checked releases</h2>
 ${releasesTable(history, root)}
+${rulesSection(entry, history)}
 ${rs.skipped?.length ? skippedSection(rs.skipped) : ""}
 ${rs.authors?.length ? authorsSection(rs.authors, rs.authorsEvicted ?? false) : ""}
 ${rs.promises?.length ? promisesSection(rs.promises) : ""}
