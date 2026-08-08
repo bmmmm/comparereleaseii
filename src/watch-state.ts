@@ -6,9 +6,60 @@
 // this module without depending on each other.
 import type { RepoLink } from "./check.ts";
 import type { CarriedPromise } from "./promises.ts";
-import type { Audience, AuthorActivity, PromiseCheck, UnverifiableKind } from "./types.ts";
+import type {
+  Audience,
+  AuthorActivity,
+  ConfigDelta,
+  Finding,
+  FindingKind,
+  PromiseCheck,
+  ReleaseSurface,
+  UnverifiableKind,
+} from "./types.ts";
 
 type FailOn = "none" | "contradicted" | "no-evidence";
+
+/**
+ * One subscription to part of a watched repo: "tell me when this area
+ * moves". Anchors are directory globs and surface layers, never file or
+ * symbol names — chaining the corpus's reports, depth-2 directories recur
+ * across a repo's later releases at 74–98 %, exact file paths at 22–60 %
+ * and symbols at ≤27 %. A file anchor therefore mostly goes quiet instead
+ * of firing, and a silent subscription reads as "nothing happened".
+ */
+export interface WatchRule {
+  /** Operator-chosen, unique within the list — it is what the alert names. */
+  name: string;
+  /** Directory globs: `*` is exactly one path segment, `**` any number
+   * including zero, and the pattern anchors a directory, so `src/auth`
+   * fires on `src/auth/token.go`. */
+  paths?: string[];
+  /** Surface layers: `migrations`, `apiRoutes`, `hosts`, or `envVar:NAME`
+   * for one named variable. A bare `envVars` layer is deliberately not
+   * offered — a release that touches env vars at all adds 66 of them at
+   * the corpus median, which is spam rather than a subscription. */
+  surface?: string[];
+  /** Finding kinds. These rest on judge output, so a hit with nothing else
+   * behind it is marked `judgeBased` and every renderer must say so. */
+  findingKinds?: FindingKind[];
+}
+
+/** Surface layers a rule can name as they stand. */
+export const RULE_SURFACE_LAYERS = ["migrations", "apiRoutes", "hosts"] as const;
+/** The one parameterized layer: `envVar:DATABASE_URL` names a variable. */
+export const RULE_ENV_PREFIX = "envVar:";
+
+// `FindingKind` is a type; a config file has to be checked against it at
+// runtime. Declared as a total Record so a new kind in types.ts fails to
+// compile here instead of becoming a value no rule could ever name.
+const FINDING_KIND_KNOWN: Record<FindingKind, true> = {
+  breaking: true,
+  security: true,
+  behavior: true,
+  feature: true,
+  internal: true,
+};
+export const FINDING_KINDS = Object.keys(FINDING_KIND_KNOWN) as FindingKind[];
 
 export interface WatchRepoConfig {
   /** owner/repo on GitHub. Exactly one of `repo` and `repoUrl` per entry. */
@@ -78,6 +129,14 @@ export interface WatchRepoConfig {
   audience?: Audience;
   /** `false` disables the LLM findings pass for this repo. */
   findings?: boolean;
+  /**
+   * Areas of this repo whose movement is worth an alert on its own — the
+   * fourth alert reason beside the score, the drift and the softening
+   * judge. Inherited through the ordinary `{...defaults, ...entry}` merge,
+   * which means an entry's list REPLACES the defaults' list rather than
+   * extending it (docs/watchdog.md says so out loud).
+   */
+  rules?: WatchRule[];
 }
 
 export interface WatchConfig {
@@ -179,6 +238,14 @@ export interface CheckedRelease {
    * skips these entries entirely: historical alerts are noise there too.
    */
   backfilled?: boolean;
+  /**
+   * Watch rules this release moved. Present — possibly empty — on every
+   * check made while the entry had rules, absent otherwise: the history
+   * page counts the checks that CARRY the field to decide whether a rule
+   * has been silent long enough to suspect its anchors, and a check made
+   * before the rule existed says nothing about that rule.
+   */
+  ruleHits?: RuleHit[];
 }
 
 /** One configured watch entry, for rendering the index: key = label ?? repo. */
@@ -188,6 +255,10 @@ export interface WatchedEntry {
   repo: string;
   /** The repo's web page on its forge — set for repoUrl entries. */
   url?: string;
+  /** The entry's rules after the defaults merge. The history page needs the
+   * configured list, not just the hits: a rule that never fired leaves no
+   * trace in any stored check, and that silence is the thing to report. */
+  rules?: WatchRule[];
 }
 
 /** One entry's state key and report directory — the single derivation both
@@ -675,6 +746,155 @@ export function hasDrifted(history: Array<{ score: number }>): boolean {
   return newer <= older - SCORE_DROP;
 }
 
+function pathSegments(p: string): string[] {
+  return p.split("/").filter((s) => s.length > 0 && s !== ".");
+}
+
+/**
+ * Directory-glob match, written out here because this repo has no runtime
+ * dependency and is not getting one. The pattern's segments must match a
+ * PREFIX of the path's, so an anchor names an area rather than a file:
+ * `src/auth` fires on `src/auth/token.go`. `*` stands for exactly one
+ * segment and `**` for any number including zero; a segment carrying
+ * neither is compared whole, so `src/au` is not `src/auth`.
+ */
+export function matchesPathGlob(pattern: string, path: string): boolean {
+  const pat = pathSegments(pattern);
+  const seg = pathSegments(path);
+  if (!pat.length) return false; // an empty pattern subscribes to nothing
+  const walk = (pi: number, si: number): boolean => {
+    if (pi === pat.length) return true;
+    if (pat[pi] === "**") {
+      for (let k = si; k <= seg.length; k++) if (walk(pi + 1, k)) return true;
+      return false;
+    }
+    if (si === seg.length) return false;
+    if (pat[pi] !== "*" && pat[pi] !== seg[si]) return false;
+    return walk(pi + 1, si + 1);
+  };
+  return walk(0, 0);
+}
+
+/** One rule that fired, and what fired it. */
+export interface RuleHit {
+  /** The configured rule name — operator-authored. */
+  rule: string;
+  /** What matched: paths, surface entries, finding lines. Release-authored
+   * and untrusted, capped and sorted so two runs over the same release
+   * produce the same list. */
+  matched: string[];
+  /** Nothing but finding kinds fired this hit, so it rests on judge output
+   * alone. The renderers say so — that difference is why `votes` exists. */
+  judgeBased: boolean;
+}
+
+/** Matched entries kept per hit; the cut is declared inside the list. */
+export const MAX_RULE_MATCHES = 12;
+/** How much of a finding's sentence a hit carries — the report has the rest. */
+const FINDING_TEXT_MAX = 120;
+
+/** What a release did, as the rules read it. */
+export interface ReleaseFacts {
+  /** Changed file paths (`report.metrics.files`). */
+  files: string[];
+  surface?: ReleaseSurface;
+  findings?: Finding[];
+}
+
+function deltaMatches(delta: ConfigDelta | undefined, label: string): string[] {
+  return [
+    ...(delta?.added ?? []).map((v) => `+${label} ${v}`),
+    ...(delta?.removed ?? []).map((v) => `-${label} ${v}`),
+  ];
+}
+
+function surfaceMatches(layer: string, surface: ReleaseSurface | undefined): string[] {
+  if (!surface) return [];
+  if (layer === "migrations") return surface.migrations.map((f) => `migration: ${f}`);
+  if (layer === "apiRoutes") return surface.apiRoutes.map((f) => `route: ${f}`);
+  // Absent in surfaces recorded before the field existed — no hit, rather
+  // than a claim that the release added no host.
+  if (layer === "hosts") return deltaMatches(surface.hosts, "host");
+  if (layer.startsWith(RULE_ENV_PREFIX)) {
+    const name = layer.slice(RULE_ENV_PREFIX.length);
+    return deltaMatches(surface.envVars, "env").filter((e) => e.endsWith(` ${name}`));
+  }
+  return [];
+}
+
+/** Sorted by code unit, never by locale — a deterministic stage. */
+function byCodeUnit(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function capMatches(entries: string[]): string[] {
+  const sorted = [...new Set(entries)].sort(byCodeUnit);
+  if (sorted.length <= MAX_RULE_MATCHES) return sorted;
+  return [
+    ...sorted.slice(0, MAX_RULE_MATCHES),
+    `… ${sorted.length - MAX_RULE_MATCHES} more`,
+  ];
+}
+
+function clipFinding(text: string): string {
+  const line = text.replace(/\s+/g, " ").trim();
+  return line.length > FINDING_TEXT_MAX ? `${line.slice(0, FINDING_TEXT_MAX - 1)}…` : line;
+}
+
+/**
+ * Which rules this release moved. Pure and deterministic: the layers it
+ * reads are all facts the deterministic pass produced, the one exception
+ * (finding kinds) is marked as such on the hit rather than mixed in
+ * silently, and the matched list is deduped, sorted and capped.
+ */
+export function evaluateRules(rules: WatchRule[] | undefined, facts: ReleaseFacts): RuleHit[] {
+  const hits: RuleHit[] = [];
+  for (const rule of rules ?? []) {
+    const deterministic: string[] = [];
+    for (const pattern of rule.paths ?? []) {
+      for (const path of facts.files) {
+        if (matchesPathGlob(pattern, path)) deterministic.push(path);
+      }
+    }
+    for (const layer of rule.surface ?? []) {
+      deterministic.push(...surfaceMatches(layer, facts.surface));
+    }
+    const judged = (facts.findings ?? [])
+      .filter((f) => (rule.findingKinds ?? []).includes(f.kind))
+      .map((f) => `finding: ${f.kind} — ${clipFinding(f.text)}`);
+    if (!deterministic.length && !judged.length) continue;
+    hits.push({
+      rule: rule.name,
+      matched: capMatches([...deterministic, ...judged]),
+      judgeBased: deterministic.length === 0,
+    });
+  }
+  return hits;
+}
+
+/**
+ * Checks that must carry the rule field before a rule's silence is worth
+ * reporting. Below this, "never fired" is the ordinary case of a quiet area.
+ */
+export const RULE_STALE_MIN = 10;
+
+/**
+ * Rules that have been silent across every check that could have shown
+ * them. Directory anchors *mostly* survive a repo's own refactors — 74–98 %
+ * recurrence, not 100 % — and "mostly" is why a long silence is a signal
+ * rather than calm: the area may have moved out from under the anchor.
+ */
+export function staleRules(
+  rules: WatchRule[] | undefined,
+  history: Array<{ ruleHits?: RuleHit[] }>,
+): string[] {
+  const measured = history.filter((h) => h.ruleHits !== undefined);
+  if (measured.length < RULE_STALE_MIN) return [];
+  return (rules ?? [])
+    .filter((r) => !measured.some((h) => h.ruleHits!.some((hit) => hit.rule === r.name)))
+    .map((r) => r.name);
+}
+
 export interface AlertDecision {
   /** Does this check reach the operator (`--notify`, the red row)? */
   flagged: boolean;
@@ -687,22 +907,27 @@ export interface AlertDecision {
   /** This repo's median before this check; stored on the record so a reader
    * of the row sees what the score was compared against. */
   scoreLevel: number | null;
+  /** Watch rules this release moved — absent when none fired, so a repo
+   * without rules decides exactly as it did before. */
+  ruleHits?: RuleHit[];
 }
 
 /**
  * Everything that decides whether a checked release reaches the operator.
- * Three reasons, answering three different questions, and none of them can
+ * Four reasons, answering four different questions, and none of them can
  * substitute for another:
  *
  * - the release itself — exit code, critical flags, or a score that dropped
  *   below what this repo normally does;
  * - the level it was measured against sliding out from under it;
  * - the watcher's judge having stopped answering, which makes every score
- *   since a milder reading than the evidence supports.
+ *   since a milder reading than the evidence supports;
+ * - a rule the operator subscribed to: this release moved an area they
+ *   asked to hear about, whatever the score says about the notes.
  *
- * They live here together because the last two are properties of the record,
- * not of the report, and because a decision assembled inline at the call site
- * is a decision nothing can test.
+ * They live here together because all but the first are properties of the
+ * record, not of the report, and because a decision assembled inline at the
+ * call site is a decision nothing can test.
  */
 export function alertDecision(args: {
   score: number;
@@ -721,19 +946,27 @@ export function alertDecision(args: {
    * judge being down during one is the same outage.
    */
   runs: Array<{ checkedAt: string; unjudged?: number }>;
+  /** What `evaluateRules` made of this release — empty when the entry has
+   * rules and none fired, absent when it has none. */
+  ruleHits?: RuleHit[];
 }): AlertDecision {
   const scoreLevel = baselineLevel(args.past);
   const drifted = hasDrifted([...args.past, { score: args.score }]);
   const streak = judgeSofteningStreak(args.runs);
   const softened = streak >= SOFTENING_STREAK;
+  // One hit is enough: a subscription is not a threshold. The operator
+  // named this area, so the release reaches them whatever the score did.
+  const fired = args.ruleHits ?? [];
   return {
     flagged:
       isFlagged(args.score, args.exitCode, args.criticalFlags, args.notifyBelow, scoreLevel) ||
       drifted ||
-      softened,
+      softened ||
+      fired.length > 0,
     drifted,
     softeningStreak: softened ? streak : 0,
     scoreLevel,
+    ...(fired.length ? { ruleHits: fired } : {}),
   };
 }
 

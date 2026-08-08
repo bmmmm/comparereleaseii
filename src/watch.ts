@@ -34,9 +34,12 @@ import { safeSegment } from "./paths.ts";
 import {
   DEFAULT_HISTORY_LIMIT,
   BASELINE_MIN_CHECKS,
+  FINDING_KINDS,
   MAX_AUTHOR_LEDGER,
   MAX_CHECK_ATTEMPTS,
   MAX_PROMISE_LEDGER,
+  RULE_ENV_PREFIX,
+  RULE_SURFACE_LAYERS,
   alertDecision,
   baselineLevel,
   capLedger,
@@ -44,6 +47,7 @@ import {
   countSkipped,
   eligibleRelease,
   entryKey,
+  evaluateRules,
   pickBackfillReleases,
   pickNewReleases,
   recordCheckFailure,
@@ -57,6 +61,7 @@ import {
   type RepoState,
   type WatchConfig,
   type WatchRepoConfig,
+  type WatchRule,
   type WatchState,
   type WatchedEntry,
 } from "./watch-state.ts";
@@ -178,6 +183,76 @@ export function validateWatchConfig(config: WatchConfig): void {
       );
     }
   }
+  validateWatchRules(config);
+}
+
+/**
+ * Rules decide what alerts, and every bad shape here fails the same way: the
+ * subscription is silently off. A layer this build does not know, a rule
+ * that names nothing, two rules under one name — none of them throws at
+ * check time, they just never fire, and an operator reading a quiet
+ * dashboard concludes the area did not move. So the config is rejected.
+ */
+function validateWatchRules(config: WatchConfig): void {
+  const lists: Array<readonly [string, WatchRule[] | undefined]> = [
+    ["defaults", config.defaults?.rules],
+    ...config.repos.map((r) => [r.repo ?? r.repoUrl ?? "?", r.rules] as const),
+  ];
+  const layers = [...RULE_SURFACE_LAYERS, `${RULE_ENV_PREFIX}NAME`].join(", ");
+  for (const [where, rules] of lists) {
+    if (rules === undefined) continue;
+    if (!Array.isArray(rules)) {
+      throw new Error(`Watch config: "rules" (${where}) must be an array of rule objects.`);
+    }
+    const seen = new Set<string>();
+    for (const rule of rules) {
+      const name = rule?.name;
+      if (typeof name !== "string" || !name.trim()) {
+        throw new Error(
+          `Watch config: every "rules" entry (${where}) needs a non-empty "name" — the alert says which rule fired.`,
+        );
+      }
+      if (seen.has(name)) {
+        throw new Error(
+          `Watch config: duplicate rule name ${JSON.stringify(name)} (${where}) — a hit is reported under its name, so names must be unique within the list.`,
+        );
+      }
+      seen.add(name);
+      const paths = rule.paths ?? [];
+      const surface = rule.surface ?? [];
+      const kinds = rule.findingKinds ?? [];
+      if (!paths.length && !surface.length && !kinds.length) {
+        throw new Error(
+          `Watch config: rule ${JSON.stringify(name)} (${where}) subscribes to nothing — give it "paths" (directory globs), "surface" (${layers}) or "findingKinds" (${FINDING_KINDS.join(", ")}).`,
+        );
+      }
+      for (const p of paths) {
+        if (typeof p !== "string" || !p.trim()) {
+          throw new Error(
+            `Watch config: rule ${JSON.stringify(name)} (${where}) has an empty "paths" entry — a path glob is a directory anchor like "src/auth" or "**/migrations".`,
+          );
+        }
+      }
+      for (const layer of surface) {
+        const named =
+          typeof layer === "string" &&
+          (RULE_SURFACE_LAYERS.includes(layer as (typeof RULE_SURFACE_LAYERS)[number]) ||
+            (layer.startsWith(RULE_ENV_PREFIX) && layer.length > RULE_ENV_PREFIX.length));
+        if (!named) {
+          throw new Error(
+            `Watch config: rule ${JSON.stringify(name)} (${where}) names an unknown surface layer ${JSON.stringify(layer)} — known layers are ${layers}.`,
+          );
+        }
+      }
+      for (const kind of kinds) {
+        if (!FINDING_KINDS.includes(kind)) {
+          throw new Error(
+            `Watch config: rule ${JSON.stringify(name)} (${where}) names an unknown finding kind ${JSON.stringify(kind)} — known kinds are ${FINDING_KINDS.join(", ")}.`,
+          );
+        }
+      }
+    }
+  }
 }
 
 /** CLI overrides resolve against the working directory, config-file paths
@@ -198,18 +273,25 @@ function resolveWatchPaths(
   return { configDir, reportsDir, statePath };
 }
 
-function configuredEntries(config: WatchConfig): WatchedEntry[] {
+/** The configured watchlist as the renderers see it. The rules ride along
+ * because they are config, not state: a rule that has never fired exists
+ * nowhere in the state file, and its silence is what the history page is
+ * supposed to report. Exported so that inheritance — an entry's list
+ * REPLACES the defaults' — is testable where it happens. */
+export function configuredEntries(config: WatchConfig): WatchedEntry[] {
   return config.repos.map((entry) => {
     const rc: WatchRepoConfig = { ...config.defaults, ...entry };
+    const rules = rc.rules?.length ? { rules: rc.rules } : {};
     if (rc.repoUrl) {
       const parsed = parseRepoUrl(rc.repoUrl);
       return {
         key: entryKey(rc),
         repo: parsed ? `${parsed.owner}/${parsed.repo}` : rc.repoUrl,
         ...(parsed ? { url: `${parsed.origin}/${parsed.owner}/${parsed.repo}` } : {}),
+        ...rules,
       };
     }
-    return { key: entryKey(rc), repo: rc.repo! };
+    return { key: entryKey(rc), repo: rc.repo!, ...rules };
   });
 }
 
@@ -431,6 +513,16 @@ async function checkAndRecord(args: {
   );
   const checkedAt = new Date().toISOString();
   const unjudged = unjudgedClaims(report.results);
+  // Evaluated for every check, backfilled ones included — the record says
+  // what moved. Whether that record NOTIFIES is the run loop's business,
+  // and backfill never notifies.
+  const ruleHits = rc.rules?.length
+    ? evaluateRules(rc.rules, {
+        files: report.metrics.files.map((f) => f.path),
+        surface: report.surface,
+        findings: report.findings?.findings,
+      })
+    : undefined;
   const { flagged, drifted, softeningStreak, scoreLevel } = alertDecision({
     score: report.metrics.scores.overall,
     exitCode: ec,
@@ -438,6 +530,7 @@ async function checkAndRecord(args: {
     notifyBelow: rc.notifyBelow,
     past,
     runs: [...repoState.history, { checkedAt, unjudged }],
+    ruleHits,
   });
   const verdicts = {
     verified: report.results.filter((r) => r.verdict === "verified").length,
@@ -496,6 +589,7 @@ async function checkAndRecord(args: {
       : {}),
     unverifiable: report.metrics.unverifiable?.kind,
     scoreLevel,
+    ...(ruleHits ? { ruleHits } : {}),
     report: `${dirKey}/${base}.html`,
     ...(releaseUrl ? { releaseUrl } : {}),
     ...(args.backfilled ? { backfilled: true } : {}),
@@ -703,6 +797,11 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
             (outcome.drifted ? " (this repo's own level has been sliding)" : "") +
             (outcome.softeningStreak
               ? ` (${outcome.softeningStreak} checks in a row fell back to the deterministic reading — the judge has not been answering, and that fallback is the milder one; these scores read better than the evidence supports)`
+              : "") +
+            (outcome.checked.ruleHits?.length
+              ? ` (rules moved: ${outcome.checked.ruleHits
+                  .map((h) => `${h.rule}${h.judgeBased ? " — from findings, i.e. judge output" : ""}`)
+                  .join(", ")})`
               : ""),
         );
         if (outcome.flagged) {

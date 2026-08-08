@@ -229,7 +229,8 @@ re-adding a present repo or removing an absent one is a no-op, exit 0.
 report directory is the URL's path-safe form (`https_gitea.com_gitea_tea`). Per-repo options: `judge`, `engine`, `model`, `openaiUrl`,
 `escalate`, `escalateModel`, `failOn`, `minCoverage`, `baseline`,
 `concurrency`, `includePrerelease`, `tagPattern`, `notifyBelow`,
-`notesFile`, `label`, `components`, `expand`, `audience`, `findings`.
+`notesFile`, `label`, `components`, `expand`, `audience`, `findings`,
+`rules`.
 Relative paths (`reportsDir`, `stateFile`, `notesFile`) resolve against the
 config file's directory.
 
@@ -279,6 +280,68 @@ every lens, and unset renders unfiltered. It is deliberately pure config —
 no heuristic guesses it, because a silently wrong lens hides the findings
 the real audience needed. `"findings": false` disables the pass; the CLI
 spellings are `--lens` and `--no-findings`.
+
+### Rules: "tell me when this area moves"
+
+A score answers "do these notes match this diff". `rules` answers a
+different question — "did the part I care about move at all?" — and a hit
+flags the release on its own, whatever the score says:
+
+```json
+{ "repo": "opencloud-eu/opencloud",
+  "rules": [
+    { "name": "auth", "paths": ["src/auth", "**/oidc"] },
+    { "name": "schema", "surface": ["migrations"] },
+    { "name": "new traffic", "surface": ["hosts", "envVar:OIDC_ISSUER"] },
+    { "name": "breaking", "findingKinds": ["breaking", "security"] }
+  ] }
+```
+
+Each rule needs a `name` (unique in the list — it is what the alert says)
+and at least one anchor:
+
+- **`paths`** — directory globs. `*` stands for exactly one path segment,
+  `**` for any number including zero, and a pattern anchors a *directory*:
+  `src/auth` fires on `src/auth/token.go`, and on nothing in `src/authz`
+  (segments are compared whole). Anchor directories, not files: chaining the
+  reports of a 109-release corpus, depth-2 directories recur across a repo's
+  later releases 74–98 % of the time while exact file paths recur 22–60 % —
+  a file anchor mostly stops firing instead of firing, and file- and
+  symbol-level anchors are deliberately not offered for that reason.
+- **`surface`** — a layer of the deterministic release surface:
+  `migrations`, `apiRoutes`, `hosts` (a hostname the changed source starts
+  or stops talking to), or `envVar:NAME` for one named variable. There is no
+  bare `envVars` layer on purpose: a release that touches environment
+  variables at all adds 66 of them at the corpus median, which is spam, not
+  a subscription.
+- **`findingKinds`** — `breaking`, `security`, `behavior`, `feature`,
+  `internal`. These come from the judge engine reading the diff, so a hit
+  that has nothing else behind it is marked **judge-based** everywhere it is
+  shown: the dashboard puts a `*` behind the rule name, the history page
+  spells it out. A path or surface hit rests on the deterministic pass and
+  carries no such mark.
+
+A rule that names an unknown layer, an unknown finding kind, no anchor at
+all, or a name a sibling rule already uses is rejected when the config
+loads. Every one of those shapes fails the same way if it is allowed
+through — the subscription is silently off, and a quiet dashboard reads as
+"the area did not move".
+
+`rules` inherits through the ordinary `defaults` merge, which means an
+entry's list **replaces** the defaults' list; it does not extend it. A repo
+that needs the shared rules plus one of its own repeats the shared ones in
+its own list.
+
+The dashboard row names the rules a release moved, and the repo's history
+page lists what matched — the paths, the migration files, the added host,
+the finding sentence. That page also watches the rules themselves: once ten
+or more checks have been recorded under a rule and it has matched nothing in
+any of them, it says so. Directory anchors *mostly* survive a repo's own
+moves, and "mostly" is why a long silence is worth re-reading against the
+current tree rather than taking as calm.
+
+Backfilled checks record their hits like any other check and never notify —
+the same rule the rest of backfill follows.
 
 The judge defaults shown above are the recommended watchdog setup: a local
 OpenAI-compatible model (Ollama/MLX/vLLM) does the bulk verification for
@@ -342,6 +405,11 @@ A release is flagged when any of these hold:
   count, and the Atom feed names it per check — a reader told only the score
   is told the flattering half. After fixing the engine, re-check with
   `--no-cache`.
+- a **rule** fired: the release moved an area this entry subscribes to
+  (`rules`, above). One hit is enough — a subscription is not a threshold,
+  and the score has no say in it. The row and the history page name the rule
+  and what matched, and a hit resting on finding kinds alone is marked as
+  judge-based wherever it appears.
 
 With `--notify <cmd>` (or `"notify"` in the config) every flagged release
 runs `<cmd> <path-to-json-report>` — composable with whatever you have:

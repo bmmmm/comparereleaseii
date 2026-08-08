@@ -8,7 +8,7 @@ import { SCORE_MINOR, SCORE_SOLID, scoreClass } from "./theme.ts";
 import { reportDirOf } from "./watch-detail.ts";
 import type { UnverifiableKind } from "./types.ts";
 import { judgeSofteningStreak, SOFTENING_STREAK } from "./watch-state.ts";
-import type { RepoState, WatchState, WatchedEntry } from "./watch-state.ts";
+import type { CheckedRelease, RepoState, WatchState, WatchedEntry } from "./watch-state.ts";
 
 /** Short enough for a table cell; the title carries the explanation. */
 const UNVERIFIABLE_TAG: Record<UnverifiableKind, string> = {
@@ -31,6 +31,24 @@ function softeningTag(rs: RepoState): string {
   const streak = judgeSofteningStreak(rs.history);
   if (streak < SOFTENING_STREAK) return "";
   return ` <span class="incomplete" title="the judge could not answer on the last ${streak} checks; every one fell back to the deterministic reading, which is the milder one — these scores are upper bounds">&#9888; ${streak} checks unjudged</span>`;
+}
+
+/**
+ * Which subscription this release moved. The row's score column cannot say
+ * it: a rule hit is a reason of its own, and a release that flags for one
+ * can carry a perfectly ordinary score. Names only — the history page
+ * carries what matched — and a hit resting on judge output alone is marked,
+ * because it does. Rule names are operator-authored, the escaping is not
+ * negotiable anyway.
+ */
+function ruleTag(l: CheckedRelease): string {
+  if (!l.ruleHits?.length) return "";
+  const names = l.ruleHits.map((h) => `${esc(h.rule)}${h.judgeBased ? "*" : ""}`).join(", ");
+  const judged = l.ruleHits.some((h) => h.judgeBased);
+  const title =
+    `this release moved: ${l.ruleHits.map((h) => h.rule).join(", ")}` +
+    (judged ? " — * marks a hit that rests on judge output (findings) alone" : "");
+  return ` <span class="rule" title="${esc(title)}">&#9873; ${names}</span>`;
 }
 
 /** Self-contained watch overview: one row per watched repo, red rows first,
@@ -200,7 +218,7 @@ ${feedRows}
         l.brokenPromises
           ? ` <span class="incomplete" title="an earlier release promised a change this release was due to ship">&#9888; ${l.brokenPromises} broken promise${l.brokenPromises > 1 ? "s" : ""}</span>`
           : ""
-      }${softeningTag(rs!)}</td>
+      }${ruleTag(l)}${softeningTag(rs!)}</td>
 <td class="comp">${comp}</td>
 <td>${v.verified}&#10004; ${v.partial}&#9680; ${v.noEvidence}? ${v.contradicted}&#10008;</td>
 <td>${l.criticalFlags ? `<b>${l.criticalFlags} critical</b>` : l.flagCount || ""}</td>
@@ -256,6 +274,7 @@ tr.pending td{color:#59636e}
 .tag{display:inline-block;border:1px solid #58a6ff;color:#58a6ff;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .drop{display:inline-block;border:1px solid #cf222e;color:#cf222e;border-radius:.6em;padding:0 .4em;font-size:.8em}
 .incomplete{display:inline-block;border:1px solid #9a6700;color:#9a6700;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
+.rule{display:inline-block;border:1px solid #8250df;color:#8250df;border-radius:.6em;padding:0 .4em;font-size:.8em;white-space:nowrap}
 .level{color:#8b949e;font-size:.8em}
 .score.good{background:#1a7f37}.score.mid{background:#9a6700}.score.bad{background:#cf222e}.score.unverified{background:#8250df}
 .comp{color:#59636e;white-space:nowrap}
@@ -263,7 +282,7 @@ tr.pending td{color:#59636e}
 .dot.good{background:#1a7f37}.dot.mid{background:#d4a72c}.dot.bad{background:#cf222e}.dot.unverified{background:#8250df}
 a{color:#0969da;text-decoration:none}a:hover{text-decoration:underline}
 a.repo{color:inherit}a.ext{font-size:.85em}
-@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}.incomplete{border-color:#d29922;color:#d29922}
+@media (prefers-color-scheme:dark){body{background:#0d1117;color:#e6edf3}th{color:#8d96a0}th,td{border-color:#30363d}tr.flagged{background:#3c1618}tr[data-href]:hover{background:#161b22}tr.flagged[data-href]:hover{background:#4a1c1f}tr.pending td{color:#8d96a0}.comp{color:#8d96a0}.incomplete{border-color:#d29922;color:#d29922}.rule{border-color:#a371f7;color:#a371f7}
 .cards{background:#161b22;border-color:#30363d}.cards .t,.sub,.note,.legend,.feed .when{color:#8d96a0}
 .dist .seg{border-color:#161b22}
 button{background:#161b22;color:#e6edf3;border-color:#30363d}button.active{background:#cf222e;border-color:#cf222e;color:#fff}

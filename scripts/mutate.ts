@@ -44,6 +44,24 @@ const MUTANTS: Mutant[] = [
     replace: "const softened = false;",
   },
   {
+    guard: "a watch rule's directory anchor matches whole segments, not text prefixes",
+    file: "src/watch-state.ts",
+    find: 'if (pat[pi] !== "*" && pat[pi] !== seg[si]) return false;',
+    replace: 'if (pat[pi] !== "*" && !seg[si].startsWith(pat[pi])) return false;',
+  },
+  {
+    guard: "a watch rule hit resting on judge output alone is marked as such",
+    file: "src/watch-state.ts",
+    find: "judgeBased: deterministic.length === 0,",
+    replace: "judgeBased: false,",
+  },
+  {
+    guard: "any watch rule hit reaches the operator",
+    file: "src/watch-state.ts",
+    find: "      softened ||\n      fired.length > 0,",
+    replace: "      softened,",
+  },
+  {
     guard: "a level shift across a scoring-generation boundary is not the repo's doing",
     file: "src/watch-longview.ts",
     find: "if (sameStick && Math.abs(medAhead - medCur) >= PHASE_SHIFT) {",
