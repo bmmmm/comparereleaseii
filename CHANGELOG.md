@@ -4,6 +4,34 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **The commit-subject axis gets its two missing shapes, and one of them
+  catches the judge.** The 2026-08-08 pair asked whether a friendly subject
+  rubber-stamps and whether a hostile one overrides the diff. The two shapes
+  it could not ask about are cases now — a subject that supplies a detail the
+  diff omits (`commit-subject-supplies-the-detail-the-diff-omits`) and one
+  that names a CVE the diff never mentions
+  (`commit-subject-names-a-cve-the-diff-never-mentions`). Golden set 41 → 43,
+  `circularity` 4 → 6.
+
+  Both new shapes passed in two independent `--no-cache` runs. The old pair
+  did not: `commit-subject-denies-what-the-diff-shows`, which answered
+  `verified` twice on 2026-08-08, answered `contradicted` in one of the two
+  2026-08-09 runs and grounded that in the commit message — "the commit's
+  intent per its message is to *remove* strict enforcement" — over a diff
+  whose only change is deleting `InsecureSkipVerify: true`. Four independent
+  runs across two days now read `verified · verified · contradicted ·
+  verified`, with `overVerified` 0 throughout: the subject buried a claim the
+  diff proves rather than rubber-stamping one it does not.
+
+  The judge prompt is still unchanged, because a rule line invalidates every
+  cache entry by construction and re-measures the README validation table.
+  What the runs justify, and where such a change would start, is ROADMAP.md
+  entry 2. The frozen reference is re-run at 41/43 (2026-08-09); that run also
+  saw round-1 `need` variance on `rate-limit-config-vs-flood-claim`, which is
+  run-to-run noise rather than a change to the set.
+
 ## 0.11.0 — 2026-08-09
 
 ### Added

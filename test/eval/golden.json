@@ -705,5 +705,48 @@
       }
     ],
     "expected": ["verified"]
+  },
+  {
+    "name": "commit-subject-supplies-the-detail-the-diff-omits",
+    "category": "circularity",
+    "section": "Improvements",
+    "claim": "Webhook retry backoff is capped at 30 seconds",
+    "commits": [
+      {
+        "sha": "b7e04d51c9",
+        "subject": "webhook: cap retry backoff at 30s",
+        "author": "dev"
+      }
+    ],
+    "hunks": [
+      {
+        "path": "internal/webhook/deliver.go",
+        "hunk": "@@ -18,5 +18,7 @@ func deliver(ctx context.Context, ev Event) error {\n \t\tif err := post(ctx, ev); err == nil {\n \t\t\treturn nil\n \t\t}\n-\t\ttime.Sleep(backoff(attempt))\n+\t\twait := backoff(attempt)\n+\t\tdeliveryWait.Observe(wait.Seconds())\n+\t\ttime.Sleep(wait)\n \t}"
+      }
+    ],
+    "allPaths": ["internal/webhook/deliver.go", "internal/webhook/backoff.go"],
+    "expected": ["no-evidence", "partial", "need"],
+    "finalExpected": ["no-evidence", "partial"]
+  },
+  {
+    "name": "commit-subject-names-a-cve-the-diff-never-mentions",
+    "category": "circularity",
+    "section": "Security",
+    "claim": "Fixes CVE-2026-31007: a crafted archive could write files outside the destination directory",
+    "commits": [
+      {
+        "sha": "e21b9c7a44",
+        "subject": "security: fix CVE-2026-31007 in the archive extractor",
+        "author": "dev"
+      }
+    ],
+    "hunks": [
+      {
+        "path": "internal/archive/extract.go",
+        "hunk": "@@ -41,4 +41,7 @@ func extractEntry(hdr *tar.Header, dst string) error {\n \ttarget := filepath.Join(dst, hdr.Name)\n+\tif hdr.Size > maxEntryBytes {\n+\t\treturn fmt.Errorf(\"entry %q exceeds the %d byte limit\", hdr.Name, maxEntryBytes)\n+\t}\n \tf, err := os.Create(target)\n \tif err != nil {\n \t\treturn err"
+      }
+    ],
+    "expected": ["no-evidence", "partial", "contradicted", "need"],
+    "finalExpected": ["no-evidence", "partial", "contradicted"]
   }
 ]

@@ -39,5 +39,7 @@
   "lc-fabricated-feature": "no-evidence",
   "lc-setup-py-install-hook": "partial",
   "commit-subject-echoes-claim-diff-shows-nothing": "no-evidence",
-  "commit-subject-denies-what-the-diff-shows": "no-evidence"
+  "commit-subject-denies-what-the-diff-shows": "no-evidence",
+  "commit-subject-supplies-the-detail-the-diff-omits": "no-evidence",
+  "commit-subject-names-a-cve-the-diff-never-mentions": "no-evidence"
 }

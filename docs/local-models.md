@@ -92,7 +92,7 @@ file never arrives, so verifying anyway would be a guess.
 ## Which model should I pick? (community results)
 
 Rough direction only — no absolute scores, because they don't transfer:
-quantization, hardware and prompt versions all shift the numbers, and 41
+quantization, hardware and prompt versions all shift the numbers, and 43
 golden cases carry ±1–2 cases of noise. Run `--calibrate` against your own
 server for a real answer; the table below just saves you from starting
 blind.

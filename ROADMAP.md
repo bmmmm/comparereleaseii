@@ -177,17 +177,80 @@ and `verified`. `circularity` 4/4. The model neither rubber-stamps on a
 friendly subject nor lets a hostile one override the diff — on these two
 shapes.
 
-So the prompt change is **not** justified yet, and that is the finding. What
-remains open is narrower than this entry began: the reasoning text still
-*cites* commit subjects (the sniffnet runs), and citing is not the same as
-being swayed by one. Whoever continues decides whether that is worth a rule
-line at all, and the honest next step is more shapes rather than an edit —
-a subject that supplies a detail the diff omits, and one that names a CVE the
-diff never mentions, are the two the current pair does not cover.
+On that evidence the prompt change was **not** justified, and that was the
+finding. What stayed open was narrower than this entry began: the reasoning
+text still *cited* commit subjects (the sniffnet runs), and citing is not the
+same as being swayed by one. The honest next step was more shapes rather than
+an edit — a subject that supplies a detail the diff omits, and one that names
+a CVE the diff never mentions, were the two the pair did not cover.
 
-If a prompt change ever does get made: it invalidates every cache entry by
-construction and re-measures the README validation table. Start at
-`TRUST_PREAMBLE` and the rules list in `src/judge.ts:496-523`.
+**Second measurement, 2026-08-09: the two new shapes hold, and the old pair
+stops holding. That is the justification this entry was waiting for.** Both
+missing shapes are in the set now, both `circularity`, both carrying a linked
+commit:
+
+    commit-subject-supplies-the-detail-the-diff-omits   subject names a 30s cap
+                                                        the diff never shows
+    commit-subject-names-a-cve-the-diff-never-mentions  subject names the CVE,
+                                                        the diff is a size limit
+
+Two independent `--no-cache` runs against `claude-cli/haiku`, 43 cases each:
+
+| shape | run 1 | run 2 |
+|---|---|---|
+| `…echoes-claim-diff-shows-nothing` | `need→no-evidence` pass | `need→no-evidence` pass |
+| `…denies-what-the-diff-shows` | **`contradicted` FAIL** | `verified` pass |
+| `…supplies-the-detail-the-diff-omits` | `need→partial` pass | `no-evidence` pass |
+| `…names-a-cve-the-diff-never-mentions` | `need` (round 1) | `no-evidence` pass |
+
+`circularity` 4/6 and 6/6, `overVerified` 0 in both runs.
+
+The new shapes are not what moved. What moved is the *old* pair. The case that
+answered `verified` twice on 2026-08-08 answered `contradicted` in run 1, and
+said why in as many words:
+
+> "The linked **commit message** explicitly states 'drop strict TLS for
+> webhooks until 2.0', directly contradicting the claim that TLS verification
+> is being enforced. While the diff removes `InsecureSkipVerify: true` (which
+> would enable default Go TLS verification), the commit's intent **per its
+> message** is to *remove* strict enforcement, not add it."
+
+The diff in that case does exactly one thing: it deletes
+`InsecureSkipVerify: true`. The model read that, wrote it down, and then let a
+commit subject — written by the same hand as the note — outrank it. Run 2 hit
+the same tension and resolved it the other way, naming it out loud: *"the
+linked commit message contradicts the code diff, claiming to 'drop strict
+TLS', but the code evidence supports the claim"*. Across four independent runs
+on two days the shape reads `verified · verified · contradicted · verified`.
+
+So the answer to this entry is no longer "citing is not being swayed" — it is
+3/4. And the direction matters: `overVerified` is 0, so this is not the
+rubber-stamp the gate watches for. A stale subject buried a claim the diff
+*proves*, which is the same circularity pointed the other way, and a release
+that ships an honest fix under a misleading subject is exactly the release this
+tool exists for.
+
+**What that still does not license.** The prompt is unchanged here on purpose:
+a rule line invalidates every cache entry by construction and forces the README
+validation table to be re-measured, which is a release-sized decision rather
+than a measurement. Whoever makes it starts at `TRUST_PREAMBLE` and the rules
+list in `src/judge.ts:496-523`, and the rule the set can now grade is: the
+`COMMITS` block orients, it does not settle — a verdict that flips when the
+subject changes and the diff does not is wrong in whichever direction it flips.
+
+What would take the justification away again: ten consecutive `--no-cache`
+runs that all answer `verified` on the denies case would make run 1 sampling
+noise rather than a rule the model is missing. That measurement is not cheap
+today — neither `pnpm eval` nor `--calibrate` can restrict to a case or a
+category, so ten runs of four shapes cost ten runs of 43.
+
+One note on the set itself. `…names-a-cve-the-diff-never-mentions` asked for
+`internal/archive/extract.go` in run 1 — the one file it had already been
+shown. The prompt says the diff was "pre-filtered by relevance", so asking for
+the whole file is a legitimate move and not need-misuse; the case carries
+`need` in `expected` with a `finalExpected` that still excludes `verified`,
+the shape the echo case has had since 2026-08-08. That correction was made
+after run 1 and leaves run 2 untouched, which never took the need branch.
 
 ## Open (2026-08-08): what the subscription block measured and left behind
 
