@@ -47,6 +47,7 @@ import {
 } from "./watchlist.ts";
 import { runWatchSetup } from "./setup.ts";
 import { loadGuidelines } from "./guidelines.ts";
+import { cacheBytes, pruneVerdictCache, verdictCacheStats } from "./cache.ts";
 import type { Report } from "./types.ts";
 
 // Wrappers (e.g. the gh extension) set this so help and errors show the
@@ -63,6 +64,7 @@ Usage:
   ${PROG} watch init|add|remove|list [--config <file>]
   ${PROG} watch setup
   ${PROG} guidelines [--full]
+  ${PROG} cache [stats|gc] [--all]
 
 Options:
   --tag <tag>         Release tag to check (default: latest release)
@@ -198,6 +200,13 @@ Guidelines (hand release-note writing rules to an LLM coding agent):
       --full   print the full writing-release-notes guide instead of the
                condensed agent checklist
 
+Verdict cache (the tool version is part of every key — an upgrade orphans the
+entries it wrote, and a check sweeps them once per build on its own):
+  ${PROG} cache stats    entries and bytes per build that wrote them
+  ${PROG} cache gc       remove what this build can no longer read
+      --all    remove this build's entries too — the next run re-judges
+               everything, which is what a changed parser wants to measure
+
 Examples:
   ${PROG} restic/restic --tag v0.19.1
   ${PROG} juanfont/headscale --estimate
@@ -271,6 +280,9 @@ async function main(): Promise<number> {
   }
   if (process.argv[2] === "guidelines") {
     return runGuidelinesCli(process.argv.slice(3));
+  }
+  if (process.argv[2] === "cache") {
+    return runCacheCli(process.argv.slice(3));
   }
   const { values, positionals } = parseArgs({
     allowPositionals: true,
@@ -743,6 +755,67 @@ async function runWatchListCli(
   return cmd === "add"
     ? runWatchAdd({ configPath, repo: positionals[0] })
     : runWatchRemove({ configPath, repo: positionals[0] });
+}
+
+/**
+ * The verdict cache from the outside: what it holds, and removing what this
+ * build can no longer read. A check sweeps once per build on its own, so this
+ * exists for the two things automation cannot do — showing the histogram
+ * before deciding, and `--all` when a re-judge from scratch is the point.
+ */
+async function runCacheCli(argv: string[]): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args: argv,
+    allowPositionals: true,
+    options: {
+      all: { type: "boolean", default: false },
+      help: { type: "boolean", short: "h", default: false },
+    },
+  });
+  if (values.help) {
+    console.log(USAGE);
+    return 0;
+  }
+  const cmd = positionals[0] ?? "stats";
+  if (cmd !== "stats" && cmd !== "gc") {
+    console.error(`error: unknown cache subcommand "${cmd}" — expected stats or gc.`);
+    return 2;
+  }
+  if (cmd === "gc") {
+    const result = await pruneVerdictCache({ all: values.all });
+    if (!result.scanned) {
+      console.error("error: no usable cache directory — nothing to collect.");
+      return 1;
+    }
+    console.log(
+      `Removed ${result.removed} entr${result.removed === 1 ? "y" : "ies"} (${cacheBytes(result.freed)}); ` +
+        `${result.kept} kept for this build (${VERSION}).`,
+    );
+    return 0;
+  }
+  const stats = await verdictCacheStats();
+  if (!stats.dir) {
+    console.error("error: no usable cache directory.");
+    return 1;
+  }
+  console.log(`verdict cache — ${stats.dir}`);
+  console.log(`  ${stats.entries} entries · ${cacheBytes(stats.bytes)}\n`);
+  for (const row of stats.byVersion) {
+    const label = row.version === null ? "unreadable" : row.version;
+    console.log(
+      `  ${label.padEnd(14)}${String(row.entries).padStart(7)}  ${cacheBytes(row.bytes).padStart(9)}` +
+        (row.version === VERSION ? "  ← this build" : ""),
+    );
+  }
+  const dead = stats.entries - (stats.byVersion.find((r) => r.version === VERSION)?.entries ?? 0);
+  if (dead) {
+    const pct = ((dead / stats.entries) * 100).toFixed(1);
+    console.log(
+      `\n  ${dead} entries (${pct} %) were written by other builds. The version is part of` +
+        `\n  every key, so nothing will read them again — \`${PROG} cache gc\` removes them.`,
+    );
+  }
+  return 0;
 }
 
 async function runGuidelinesCli(argv: string[]): Promise<number> {

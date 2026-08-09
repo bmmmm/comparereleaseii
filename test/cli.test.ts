@@ -3,7 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -77,6 +78,29 @@ test("mode flags reject unknown words and name the choices", async () => {
     assert.match(res.stderr ?? "", expected, `${flag} does not list its choices: ${res.stderr}`);
     assert.match(res.stderr ?? "", /got "nonsense"/, `${flag} does not echo the input`);
   }
+});
+
+// `cache` is a subcommand, so it never reaches the flag parser above: a typo
+// there used to be the repo argument of an ordinary check, which would then
+// go and talk to a forge about a repository called "gc".
+test("cache reports the directory it would collect, and rejects a subcommand it has not got", async (t) => {
+  const home = await mkdtemp(join(tmpdir(), "crii-cli-cache-"));
+  const env = { ...process.env, XDG_CACHE_HOME: home };
+  const { stdout } = await exec(process.execPath, [CLI, "cache", "stats"], { env });
+  assert.match(stdout, /verdict cache — .*verdicts/);
+  assert.match(stdout, /0 entries/);
+
+  const empty = await exec(process.execPath, [CLI, "cache", "gc"], { env });
+  assert.match(empty.stdout, /Removed 0 entries.*0 kept/);
+
+  const res = await exec(process.execPath, [CLI, "cache", "bogus"], { env }).then(
+    () => null,
+    (err: { code?: number; stderr?: string }) => err,
+  );
+  assert.ok(res, "an unknown cache subcommand exited 0");
+  assert.equal(res.code, 2, `exit ${res.code}`);
+  assert.match(res.stderr ?? "", /expected stats or gc/);
+  t.diagnostic(`cache home ${home}`);
 });
 
 test("--min-coverage rejects values above 100", async () => {
