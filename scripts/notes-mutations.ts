@@ -8,6 +8,7 @@
 // read `uncovered[].sha` — a field that does not exist — and therefore
 // reported every commit as covered and every omission as unmutatable, without
 // failing once.
+import { createHash } from "node:crypto";
 import { parseClaims } from "../src/claims.ts";
 import { extractJsonObject, untrustedBlock } from "../src/judge.ts";
 import { tokenize } from "../src/match.ts";
@@ -30,6 +31,37 @@ export function renderNotes(claims: Claim[]): string {
     lines.push(`* ${claim.text}`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * What a stored release result may be reused for — and only for that.
+ *
+ * Every input that can change the answer goes in: the release's identity, the
+ * range it covers, and the claims themselves, so a corpus refreshed from a
+ * watch home invalidates the releases whose reports actually moved and no
+ * others. What is deliberately NOT in here is the code, because that half of
+ * the key belongs to the caller: `pnpm sweep` patches a threshold in
+ * `src/verify.ts` between measurements, and a cache that survived that would
+ * report the previous point's numbers under the next point's name — a
+ * failure that looks like data instead of looking like a crash.
+ */
+export function resumeKey(report: {
+  repoLabel: string;
+  baseRef: string;
+  headRef: string;
+  results: Array<{ claim: Claim }>;
+}): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        report.repoLabel,
+        report.baseRef,
+        report.headRef,
+        report.results.map((r) => [r.claim.id, r.claim.section, r.claim.text, r.claim.kind]),
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /**

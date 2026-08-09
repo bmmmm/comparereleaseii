@@ -13,6 +13,11 @@ pnpm eval                        # golden-set eval; needs a judge engine
 pnpm mutate                      # mutation harness: every listed guard's test must kill its mutant
 pnpm sweep <reports dir>         # threshold sweep: Pareto front per hand-set bar. Reports, never writes
 pnpm mutate-notes <dir> --generate  # + the model-written inverted-claim class (needs an engine)
+#   --cases <n> bounds the releases (default 12; the whole corpus is ~111)
+#   --parallel <n> analyses n releases at once (default 4)
+#   finished releases are cached under tmp/mutate-notes-resume/<build>/, so an
+#   interrupted run resumes; --no-resume re-measures. The key covers src/ and
+#   the mutations, so a patched threshold never reuses another bar's numbers
 pnpm corpus-stats <reports dir>  # aggregate a watch home's reports; anonymous unless --named
 node src/cli.ts --help
 ```

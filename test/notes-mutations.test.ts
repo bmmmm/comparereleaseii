@@ -13,6 +13,7 @@ import {
   renderNotes,
   rendersAnyClaim,
   restateBumpTarget,
+  resumeKey,
   UNDERSHOOT_VERSION,
 } from "../scripts/notes-mutations.ts";
 import { parseClaims } from "../src/claims.ts";
@@ -171,6 +172,34 @@ test("the fabricated claim still lands in the diff, and no longer settles there"
   // backticks: padding that is an identifier on its own still scores 3 each.
   const shaped = fabricatedClaim(["retry_budget", "socket_timeout"]);
   assert.equal(lexicalMatch(shaped, files).score, 6);
+});
+
+test("a resumed release is keyed to the release AND to what its notes said", () => {
+  // Resuming an interrupted run must never hand back an answer to a different
+  // question. This half of the key covers the corpus side: a watch home
+  // refreshed between runs changes the claims of the releases that actually
+  // moved, and only those lose their stored result. (The other half is the
+  // source fingerprint, which lives in the runner — `pnpm sweep` patches a
+  // threshold between measurements, and reusing across that would report one
+  // bar's numbers under another bar's name.)
+  const report = {
+    repoLabel: "o/r",
+    baseRef: "v1.0.0",
+    headRef: "v1.1.0",
+    results: [{ claim: claim("Adds a bounded retry budget to the upload path") }],
+  };
+  assert.equal(resumeKey(report), resumeKey({ ...report }), "same release, same key");
+  assert.notEqual(resumeKey(report), resumeKey({ ...report, headRef: "v1.2.0" }));
+  assert.notEqual(resumeKey(report), resumeKey({ ...report, baseRef: "v0.9.0" }));
+  assert.notEqual(
+    resumeKey(report),
+    resumeKey({ ...report, results: [{ claim: claim("Adds something else entirely") }] }),
+    "re-fetched notes are a different question",
+  );
+  assert.notEqual(
+    resumeKey(report),
+    resumeKey({ ...report, results: [...report.results, { claim: claim("And one more line") }] }),
+  );
 });
 
 test("a mutation that would leave no notes at all is an n/a, not a measurement", () => {

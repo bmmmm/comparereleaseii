@@ -63,8 +63,9 @@
 // headings and bullet syntax; control and mutant are built the same way, so
 // that costs interpretability against the original markdown, not validity of
 // the comparison.
+import { createHash } from "node:crypto";
 import { writeSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { analyzeRelease, type CheckSettings } from "../src/check.ts";
 import { cloneDirFor } from "../src/paths.ts";
@@ -86,6 +87,7 @@ import {
   renderNotes,
   rendersAnyClaim,
   restateBumpTarget,
+  resumeKey,
   UNDERSHOOT_VERSION,
 } from "./notes-mutations.ts";
 import { resolveEngines, type JudgeEngine } from "../src/judge.ts";
@@ -104,6 +106,38 @@ const limit = Number(flag("cases") ?? "12");
 // quietly: a release skipped for size is not a release that passed.
 const maxCommits = Number(flag("max-commits") ?? "1200");
 const reportsDir = args.find((a) => !a.startsWith("--") && args[args.indexOf(a) - 1] !== "--repo" && args[args.indexOf(a) - 1] !== "--cases");
+
+/**
+ * The other half of a resume key: everything about this build that decides an
+ * answer. `src/` is the detector, `scripts/notes-mutations.ts` is the
+ * mutations themselves, and `--max-commits` moves which releases are in scope
+ * at all.
+ *
+ * This is what makes resuming safe under `pnpm sweep`, which patches a
+ * threshold in `src/verify.ts` between measurements: a patched source is a
+ * different fingerprint, so the previous point's results are not reachable
+ * from the next point's directory. Reusing them would report one bar's numbers
+ * under another bar's name — a failure that reads as data rather than as a
+ * crash, which is the one kind this harness must not have.
+ */
+async function buildFingerprint(): Promise<string> {
+  const h = createHash("sha256");
+  const files: string[] = [];
+  async function walk(dir: string): Promise<void> {
+    for (const e of (await readdir(dir, { withFileTypes: true })).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) await walk(p);
+      else if (e.name.endsWith(".ts")) files.push(p);
+    }
+  }
+  await walk("src");
+  files.push("scripts/notes-mutations.ts");
+  for (const f of files.sort()) h.update(f).update(await readFile(f, "utf8"));
+  h.update(`max-commits=${maxCommits}`);
+  return h.digest("hex").slice(0, 16);
+}
 
 const MUTATION_CLASSES = [
   "omission",
@@ -305,6 +339,45 @@ interface ReleaseOutcome {
  * core count rather than at it.
  */
 const releasesAtOnce = Number(flag("parallel") ?? "4");
+
+/**
+ * Finished releases, kept so an interrupted run resumes instead of restarting.
+ *
+ * A whole-corpus run is 12 minutes of work that three different failures threw
+ * away in one afternoon — a release that could not be mutated, a report
+ * truncated at the pipe buffer, and a stray second process. None of them was a
+ * reason to re-measure the 90 releases that had already answered.
+ *
+ * One file per release rather than one appended log: four analyses finish
+ * concurrently, and an append longer than a pipe buffer is not atomic. The
+ * generated class is excluded because a model writes its input, so its result
+ * is not a function of the code and the corpus alone.
+ */
+const resumeEnabled = !args.includes("--no-resume") && !generate;
+const fingerprint = await buildFingerprint();
+const resumeDir = join("tmp", "mutate-notes-resume", fingerprint);
+let resumed = 0;
+
+async function loadResumed(report: Report): Promise<ReleaseOutcome | null> {
+  if (!resumeEnabled) return null;
+  try {
+    return JSON.parse(
+      await readFile(join(resumeDir, `${resumeKey(report)}.json`), "utf8"),
+    ) as ReleaseOutcome;
+  } catch {
+    return null;
+  }
+}
+
+async function storeResumed(report: Report, out: ReleaseOutcome): Promise<void> {
+  if (!resumeEnabled) return;
+  try {
+    await mkdir(resumeDir, { recursive: true });
+    await writeFile(join(resumeDir, `${resumeKey(report)}.json`), JSON.stringify(out));
+  } catch {
+    // A run that cannot cache is slower, never wrong.
+  }
+}
 
 async function analyseOne(report: Report): Promise<ReleaseOutcome> {
   const out: ReleaseOutcome = {
@@ -633,6 +706,19 @@ async function analyseOne(report: Report): Promise<ReleaseOutcome> {
   return out;
 }
 
+/** The analysis with its resume cache around it — every outcome, skips included. */
+async function analyseOrReuse(report: Report): Promise<ReleaseOutcome> {
+  const cached = await loadResumed(report);
+  if (cached) {
+    resumed++;
+    if (!asJson) console.error(`  reused ${report.repoLabel}@${report.headRef}`);
+    return cached;
+  }
+  const out = await analyseOne(report);
+  await storeResumed(report, out);
+  return out;
+}
+
 /**
  * `--cases` bounds the releases that go INTO the analysis, and the cheap
  * checks that reject one — no clone, refs missing — run first so that bound
@@ -667,7 +753,7 @@ for (const report of reports) {
 // Merged in corpus order, never in completion order: `cases` and `skipped` are
 // the output, and an instrument whose output permutes between runs cannot be
 // diffed against its own previous answer.
-const outcomes = await pooled(reachable.slice(0, limit), releasesAtOnce, analyseOne);
+const outcomes = await pooled(reachable.slice(0, limit), releasesAtOnce, analyseOrReuse);
 for (const out of outcomes) {
   for (const s of out.skips) {
     skipped.push(`${s.label}: ${s.detail}`);
@@ -786,6 +872,8 @@ if (asJson) {
       cases,
       skipped,
       skipCauses: Object.fromEntries(skipCauses),
+      resumed,
+      fingerprint,
       drifted,
       regressed,
     },
@@ -811,6 +899,12 @@ if (asJson) {
 console.log(
   `\nadversarial notes — ${analysed} releases, judge off (deterministic stages only)` +
     (engine ? `\ninverted-claim generated and judged by ${engine.name}` : "") +
+    // A resumed run is not a fresh measurement of the releases it reused, and
+    // it must not read like one. The fingerprint is the source state those
+    // answers belong to: a patched threshold is a different one.
+    (resumed
+      ? `\n${resumed} of them reused from ${resumeDir} (build ${fingerprint}) — --no-resume re-measures`
+      : "") +
     "\n",
 );
 console.log("  class            applicable  detected  missed  n/a");

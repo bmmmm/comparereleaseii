@@ -681,6 +681,12 @@ const MUTANTS: Mutant[] = [
     replace: "if (!opts.all) {",
   },
   {
+    guard: "a resumed release is keyed to the claims its report carried",
+    file: "scripts/notes-mutations.ts",
+    find: "report.results.map((r) => [r.claim.id, r.claim.section, r.claim.text, r.claim.kind]),",
+    replace: "report.results.length,",
+  },
+  {
     guard: "a mutation leaving no parseable notes is an n/a, not a run-ending throw",
     file: "scripts/notes-mutations.ts",
     find: "return parseClaims(renderNotes(kept)).length > 0;",
