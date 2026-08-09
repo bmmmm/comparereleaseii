@@ -11,6 +11,7 @@ import {
   OVERSHOOT_VERSION,
   parseInversion,
   renderNotes,
+  rendersAnyClaim,
   restateBumpTarget,
   UNDERSHOOT_VERSION,
 } from "../scripts/notes-mutations.ts";
@@ -170,6 +171,30 @@ test("the fabricated claim still lands in the diff, and no longer settles there"
   // backticks: padding that is an identifier on its own still scores 3 each.
   const shaped = fabricatedClaim(["retry_budget", "socket_timeout"]);
   assert.equal(lexicalMatch(shaped, files).score, 6);
+});
+
+test("a mutation that would leave no notes at all is an n/a, not a measurement", () => {
+  // analyzeRelease refuses empty notes — there is nothing to fact-check — so
+  // the omission mutation has to ask before building one. The question is
+  // about the RENDERED notes: two stored claims can render as one line, which
+  // is how the old "fewer kept than total" check passed while the mutant
+  // parsed to nothing and threw. On a full corpus that throw took the run
+  // down (soundcloud/api@2026-07-19).
+  // soundcloud/api@2026-07-19, verbatim: two stored claims, one of which is
+  // the notes template's own HTML comment. Removing the real one leaves a
+  // claim list that is not empty and notes that are.
+  const real = claim(
+    "**GET /users/{user_urn}/tracks** and **GET /me/tracks** now accept an optional `sort` query parameter",
+    { section: "Sort parameter for user tracks" },
+  );
+  const boilerplate = claim("<!--- Remove everything below and start over --->", {
+    section: "Sort parameter for user tracks",
+    kind: "meta",
+  });
+  assert.equal(parseClaims(renderNotes([real, boilerplate])).length, 1, "the comment is not a claim");
+  assert.equal(rendersAnyClaim([real, boilerplate]), true);
+  assert.equal(rendersAnyClaim([boilerplate]), false, "the case that threw");
+  assert.equal(rendersAnyClaim([]), false);
 });
 
 test("the donor picker walks the line instead of giving up on the farthest sibling", () => {

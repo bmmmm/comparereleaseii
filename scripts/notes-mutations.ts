@@ -8,6 +8,7 @@
 // read `uncovered[].sha` — a field that does not exist — and therefore
 // reported every commit as covered and every omission as unmutatable, without
 // failing once.
+import { parseClaims } from "../src/claims.ts";
 import { extractJsonObject, untrustedBlock } from "../src/judge.ts";
 import { tokenize } from "../src/match.ts";
 import { sameName } from "../src/pins.ts";
@@ -29,6 +30,26 @@ export function renderNotes(claims: Claim[]): string {
     lines.push(`* ${claim.text}`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Is there still a release to check once these claims are all that is left?
+ *
+ * The omission mutation removes the claims covering a commit, and a release
+ * whose every note covers it therefore mutates into empty notes — which
+ * `analyzeRelease` refuses outright, correctly: there is nothing to fact-check
+ * against a diff. That is an n/a, not a detection and not a miss.
+ *
+ * Counting the claims the mutation KEEPS is not the same question, because a
+ * stored claim can vanish on its way back through the parser.
+ * `soundcloud/api@2026-07-19` stores two: the release's one real sentence, and
+ * the notes template's own HTML comment, which `parseClaims` rightly drops.
+ * Remove the real one and "1 of 2 kept" is satisfied while the rendered notes
+ * carry nothing checkable. That release took the whole run down with an
+ * uncaught throw the first time every clone was present to reach it.
+ */
+export function rendersAnyClaim(kept: Claim[]): boolean {
+  return parseClaims(renderNotes(kept)).length > 0;
 }
 
 /** The anchor half of coverage: does this claim point at this commit? */

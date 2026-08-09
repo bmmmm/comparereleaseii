@@ -83,6 +83,7 @@ import {
   OVERSHOOT_VERSION,
   parseInversion,
   renderNotes,
+  rendersAnyClaim,
   restateBumpTarget,
   UNDERSHOOT_VERSION,
 } from "./notes-mutations.ts";
@@ -323,6 +324,21 @@ for (const report of reports) {
   };
   const analyse = (notes: string, s: CheckSettings = settings) =>
     analyzeRelease({ ...base, notes, warnings: [] }, context, null, s);
+  /**
+   * A mutant that cannot be analysed at all is neither a detection nor a
+   * pass — and it must not be the end of the run either. One release out of
+   * 111 (`soundcloud/api@2026-07-19`, whose notes carry a single claim) took
+   * the whole harness down with an uncaught throw the first time the corpus
+   * was measured with every clone present, which is the shape a measurement
+   * that only ever ran on half its input has.
+   */
+  const analyseMutant = async (notes: string, s: CheckSettings = settings): Promise<Report | Error> => {
+    try {
+      return await analyse(notes, s);
+    } catch (err) {
+      return err as Error;
+    }
+  };
 
   let control: Report;
   try {
@@ -387,7 +403,10 @@ for (const report of reports) {
       // completeness 0 has no room to lose any — neither is a detector
       // failure, and counting them as one would flatter the harness in the
       // other direction.
-      if (churn > 0 && covering.length && covering.length < claims.length) {
+      //
+      // Whether a mutant remains is asked of the RENDERED notes — see
+      // `rendersAnyClaim`, which is where the reason lives.
+      if (churn > 0 && covering.length && rendersAnyClaim(claims.filter((cl) => !covering.includes(cl)))) {
         hidden = { churn, sha: c.sha, covering };
         break;
       }
@@ -401,15 +420,19 @@ for (const report of reports) {
       );
     } else {
       const kept = claims.filter((cl) => !hidden.covering.includes(cl));
-      const mutant = await analyse(renderNotes(kept));
-      const nowUncovered = mutant.uncovered?.some((u) => u.commit.sha === hidden.sha) ?? false;
-      add(
-        "omission",
-        true,
-        nowUncovered,
-        `${hidden.churn} lines hidden behind ${hidden.covering.length} claim(s); completeness ` +
-          `${control.metrics.scores.completeness} → ${mutant.metrics.scores.completeness}`,
-      );
+      const mutant = await analyseMutant(renderNotes(kept));
+      if (mutant instanceof Error) {
+        add("omission", true, undefined, `mutant could not be analysed — ${mutant.message.slice(0, 60)}`);
+      } else {
+        const nowUncovered = mutant.uncovered?.some((u) => u.commit.sha === hidden.sha) ?? false;
+        add(
+          "omission",
+          true,
+          nowUncovered,
+          `${hidden.churn} lines hidden behind ${hidden.covering.length} claim(s); completeness ` +
+            `${control.metrics.scores.completeness} → ${mutant.metrics.scores.completeness}`,
+        );
+      }
     }
   }
 
@@ -432,26 +455,32 @@ for (const report of reports) {
       add("bump-undershoot", false, undefined, "no bump claim the pins settled");
     } else {
       const target = settled.claim;
+      const targetBump = settled.claim.bump;
       const restate = async (version: string) => {
-        const text = restateBumpTarget(target.text, target.bump!.to, version);
-        const mutant = await analyse(
+        const text = restateBumpTarget(target.text, targetBump.to, version);
+        const mutant = await analyseMutant(
           renderNotes(claims.map((cl) => (cl.id === target.id ? { ...cl, text } : cl))),
         );
+        if (mutant instanceof Error) return mutant;
         return mutant.results.find((r: ClaimResult) => r.claim.text === text);
       };
       const over = await restate(OVERSHOOT_VERSION);
       add(
         "bump-overshoot",
         true,
-        over?.verdict === "contradicted",
-        `${target.bump.name} → ${OVERSHOOT_VERSION} (release lands short); verdict ${over?.verdict ?? "not parsed"}`,
+        over instanceof Error ? undefined : over?.verdict === "contradicted",
+        over instanceof Error
+          ? `mutant could not be analysed — ${over.message.slice(0, 60)}`
+          : `${targetBump.name} → ${OVERSHOOT_VERSION} (release lands short); verdict ${over?.verdict ?? "not parsed"}`,
       );
       const under = await restate(UNDERSHOOT_VERSION);
       add(
         "bump-undershoot",
         true,
-        under ? under.verdict !== "verified" : undefined,
-        `${target.bump.name} → ${UNDERSHOOT_VERSION} (a version the pin never held); verdict ${under?.verdict ?? "not parsed"}`,
+        under instanceof Error ? undefined : under ? under.verdict !== "verified" : undefined,
+        under instanceof Error
+          ? `mutant could not be analysed — ${under.message.slice(0, 60)}`
+          : `${targetBump.name} → ${UNDERSHOOT_VERSION} (a version the pin never held); verdict ${under?.verdict ?? "not parsed"}`,
       );
     }
   }
@@ -467,13 +496,18 @@ for (const report of reports) {
       add("foreign-claim", false, undefined, "no sibling release carries an eligible claim");
     } else {
       const planted: Claim = { ...picked.donor.claim, id: -1 };
-      const mutant = await analyse(renderNotes([...claims, planted]));
-      const landed = mutant.results.find((r: ClaimResult) => r.claim.text === planted.text);
+      const mutant = await analyseMutant(renderNotes([...claims, planted]));
+      const landed =
+        mutant instanceof Error
+          ? undefined
+          : mutant.results.find((r: ClaimResult) => r.claim.text === planted.text);
       add(
         "foreign-claim",
         true,
         landed ? landed.verdict !== "verified" : undefined,
-        `planted "${planted.text.slice(0, 48)}" from ${picked.from.headRef} → ${landed?.verdict ?? "not parsed"}`,
+        mutant instanceof Error
+          ? `mutant could not be analysed — ${mutant.message.slice(0, 60)}`
+          : `planted "${planted.text.slice(0, 48)}" from ${picked.from.headRef} → ${landed?.verdict ?? "not parsed"}`,
       );
     }
   }
@@ -488,13 +522,18 @@ for (const report of reports) {
       add("backtick-noise", false, undefined, "diff carries too few identifiers to pad with");
     } else {
       const planted = fabricatedClaim(picks);
-      const mutant = await analyse(renderNotes([...claims, planted]));
-      const landed = mutant.results.find((r: ClaimResult) => r.claim.text === planted.text);
+      const mutant = await analyseMutant(renderNotes([...claims, planted]));
+      const landed =
+        mutant instanceof Error
+          ? undefined
+          : mutant.results.find((r: ClaimResult) => r.claim.text === planted.text);
       add(
         "backtick-noise",
         true,
         landed ? landed.verdict !== "verified" : undefined,
-        `fabricated with \`${picks[0]}\`/\`${picks[1]}\` → ${landed?.verdict ?? "not parsed"}`,
+        mutant instanceof Error
+          ? `mutant could not be analysed — ${mutant.message.slice(0, 60)}`
+          : `fabricated with \`${picks[0]}\`/\`${picks[1]}\` → ${landed?.verdict ?? "not parsed"}`,
       );
     }
   }
@@ -541,14 +580,19 @@ for (const report of reports) {
         const swapped = claims.map((cl) =>
           cl.id === verified.claim.id ? { ...cl, text: inversion!.line } : cl,
         );
-        const mutant = await analyse(renderNotes(swapped), judgedSettings);
-        const landed = mutant.results.find((r: ClaimResult) => r.claim.text === inversion!.line);
+        const mutant = await analyseMutant(renderNotes(swapped), judgedSettings);
+        const landed =
+          mutant instanceof Error
+            ? undefined
+            : mutant.results.find((r: ClaimResult) => r.claim.text === inversion!.line);
         add(
           "inverted-claim",
           true,
           landed ? landed.verdict !== "verified" : undefined,
-          `"${verified.claim.text.slice(0, 60)}" → "${inversion.line.slice(0, 60)}"` +
-            `${inversion.inverted ? ` (flipped: ${inversion.inverted})` : ""} → ${landed?.verdict ?? "not parsed"}`,
+          mutant instanceof Error
+            ? `mutant could not be analysed — ${mutant.message.slice(0, 60)}`
+            : `"${verified.claim.text.slice(0, 60)}" → "${inversion.line.slice(0, 60)}"` +
+              `${inversion.inverted ? ` (flipped: ${inversion.inverted})` : ""} → ${landed?.verdict ?? "not parsed"}`,
         );
       } else if (!cases.some((c) => c.headRef === report.headRef && c.mutation === "inverted-claim")) {
         add("inverted-claim", false, undefined, "the model returned no usable inversion");
@@ -601,7 +645,16 @@ const regressed: string[] = [];
  * a corpus that gained releases SHOULD move it.
  */
 const drifted: string[] = [];
+/**
+ * The reference is a rate over the WHOLE corpus, so only a whole-corpus run
+ * may be held against it. `--repo one/repo` measured six releases and was
+ * duly reported as "worse than the reference" on every class it did not
+ * contain, exit 1 included — a red run that says nothing, which is the fastest
+ * way to teach someone to ignore a gate.
+ */
+const partialRun = onlyRepo !== undefined;
 try {
+  if (partialRun) throw new Error("subset run");
   const ref = JSON.parse(await readFile(REFERENCE, "utf8")) as {
     releases: number;
     classes: Record<string, { applicable: number; detected: number }>;
@@ -631,7 +684,8 @@ try {
     }
   }
 } catch {
-  // No reference yet — --freeze writes the first one.
+  // No reference yet — --freeze writes the first one — or a subset run, which
+  // has nothing to compare.
 }
 
 const medianScores = {
@@ -688,7 +742,12 @@ if (misses.length) {
     console.log(`  ${m.mutation.padEnd(16)} ${m.repoLabel}@${m.headRef} — ${m.detail}`);
   }
 }
-if (drifted.length) {
+if (partialRun) {
+  console.log(
+    `\n  --repo ${onlyRepo} measures a subset, so nothing here is held against` +
+      `\n  ${REFERENCE} — those rates are over the whole corpus.`,
+  );
+} else if (drifted.length) {
   console.log(
     `\napplicable moved against ${REFERENCE} — a rate over a different` +
       `\ndenominator is a different measurement, not a better one:`,

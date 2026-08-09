@@ -4,6 +4,39 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **The detection rates were measured on half a corpus, and now are not.** The
+  mutation harness skips a release whose refs the clone cache does not carry,
+  and it said so as a count plus eight example lines — so 52 skips out of 111
+  releases read like a footnote. With every clone present (the tool's own
+  `--filter=blob:none` clone, which cost 0.4 GB for nine repositories,
+  `zen-browser/desktop` included) the same detector reads `omission` 59/66
+  where it read 35/36, `foreign-claim` 109/110, `backtick-noise` 102/109.
+  Nothing about the detector changed; the missing half was flattering it by
+  eight points on `omission`. `test/eval/reference-detection.json` is re-frozen
+  at the full-corpus numbers and the README table with it — scores and rates
+  from before are not comparable, and the seven `omission` misses are now a
+  population to reason about instead of the single case the half-corpus
+  showed.
+
+- **A release the harness cannot mutate no longer ends the run.** Reaching the
+  full corpus for the first time reached `soundcloud/api@2026-07-19`, whose
+  notes carry one real sentence and the notes template's own HTML comment.
+  The omission mutation removes the real one, `parseClaims` drops the comment,
+  and `analyzeRelease` correctly refuses empty notes — with an uncaught throw
+  that took the whole 30-minute run with it. The mutation now asks whether the
+  *rendered* notes still parse to anything (`rendersAnyClaim`) and reports an
+  n/a where they do not, and every mutant analysis is fenced so one release
+  cannot cost the other 110. Also: `--repo <one/repo>` no longer compares its
+  subset against the whole-corpus reference, which had it exiting 1 with
+  "worse than the reference" on every class the subset did not contain.
+
+- **`pnpm check` covers `scripts/` now.** The tsconfig `include` listed `src`
+  and `test`, so the harness that produces the numbers in the README was
+  type-checked only where a test happened to import it. Adding it found two
+  real errors on the first run, both in the mutation harness's bump block.
+
 ### Added
 
 - **`comparerelease cache stats|gc`, and a check that sweeps once per build.**

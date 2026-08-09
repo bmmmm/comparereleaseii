@@ -416,15 +416,24 @@ against the clone cache, so it needs no key and no network: every expectation
 below is settled deterministically, and a miss here is a miss no model was
 involved in.
 
-Measured on 55 releases (`test/eval/reference-detection.json`, 2026-08-09):
+Measured on 111 releases (`test/eval/reference-detection.json`, 2026-08-09):
 
 | Mutation | What it does | Detected |
 |---|---|---:|
-| `omission` | drops the notes covering a documented high-churn commit | 35/36 |
+| `omission` | drops the notes covering a documented high-churn commit | 59/66 |
 | `bump-overshoot` | restates a settled bump as a version the release did not reach | 22/22 |
 | `bump-undershoot` | restates it as a version the pin never held | 22/22 |
-| `foreign-claim` | plants a claim from a different release of the same repo | 49/49 |
-| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | 50/55 |
+| `foreign-claim` | plants a claim from a different release of the same repo | 109/110 |
+| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | 102/109 |
+
+Those numbers are worse than the ones this table carried until 2026-08-09, and
+the detector did not change: the corpus did. Every earlier run measured the
+half of it whose repositories happened to be in the local clone cache — 52 of
+111 releases were skipped for missing refs, and the harness said so only as a
+truncated list of examples. With every clone present `omission` reads 59/66
+where the same code read 35/36, so the missing half was flattering it by eight
+points. A rate over half a corpus is not a smaller measurement of the same
+thing; it is a measurement of a different thing.
 
 The last two rows were the finding of the previous round, and both are now
 closed. `backtick-noise` read 2/51: two backticked words occurring anywhere in
@@ -462,8 +471,11 @@ corpus gained a report and one release lost its donor as a result; the rate is
 
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,
-not a side effect. `omission` is the open one at 35/36 — one commit, covered
-because most of its files are cited by other claims.
+not a side effect. Open on the full corpus: `omission` at 59/66 — seven
+commits kept documented by the claim-independent evidence union, five of them
+in one repository — and `backtick-noise` at 102/109, where the padding that
+gets through is a version literal or a word like `version` that the lexical
+bar still reads as an identifier.
 
 ### Releasing
 

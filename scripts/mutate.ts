@@ -681,6 +681,12 @@ const MUTANTS: Mutant[] = [
     replace: "if (!opts.all) {",
   },
   {
+    guard: "a mutation leaving no parseable notes is an n/a, not a run-ending throw",
+    file: "scripts/notes-mutations.ts",
+    find: "return parseClaims(renderNotes(kept)).length > 0;",
+    replace: "return kept.length > 0;",
+  },
+  {
     guard: "the foreign-claim donor walks past a sibling that has nothing to donate",
     file: "scripts/notes-mutations.ts",
     find: "for (const { report } of order) {",
