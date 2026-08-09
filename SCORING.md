@@ -48,8 +48,9 @@ versions cannot be ordered, nothing is settled and the claim takes the
 ordinary route.
 
 The version a bump note names it came **from** is a second statement, and it
-is read positionally rather than for equality. Measured over the 108-release
-corpus: of 216 bump claims naming a from-version, 76 have a pin the diff
+is read positionally rather than for equality. Measured over the corpus with
+`pnpm corpus-bump-origins`, which re-derives it: of 216 bump claims naming a
+from-version, 76 have a pin the diff
 moved — 40 name the pin's own starting point, 26 name a later hop of a move
 the release aggregated (`1.18.1 → 1.18.2` inside a `1.15.2 → 1.18.2` move,
 the documented-honest spelling), and 10 name a version the release neither

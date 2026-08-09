@@ -64,7 +64,6 @@
 // that costs interpretability against the original markdown, not validity of
 // the comparison.
 import { createHash } from "node:crypto";
-import { writeSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { analyzeRelease, type CheckSettings } from "../src/check.ts";
@@ -75,6 +74,7 @@ import { pinBumps } from "../src/pins.ts";
 import { pooled, run } from "../src/util.ts";
 import type { Claim, ClaimResult, DiffFile, Report, Verdict } from "../src/types.ts";
 import { dedupeReports, median } from "./corpus-aggregate.ts";
+import { writeStdoutSync } from "./stdout.ts";
 import {
   anchorsTo,
   buildInversionPrompt,
@@ -880,19 +880,11 @@ if (asJson) {
     null,
     2,
   );
-  // Written synchronously, then exit. Redirected to a file stdout is
-  // synchronous anyway and `console.log` + `process.exit` was safe; on a PIPE
-  // it is not, and the loss begins at the pipe buffer — which is why
-  // `pnpm sweep`, the one caller that reads this over a pipe, saw
-  // "Unterminated string in JSON at position 65184" on every point it
-  // measured. 64 KiB is about 25 releases' worth, so the whole-corpus run this
-  // file now defaults to could never reach the sweep at all.
-  //
-  // The obvious repair — write with a callback and exit from it — is worse
-  // than the bug: the callback fires after the drain, and everything below
-  // this block runs in the meantime, so the JSON came back with the human
-  // report appended to it.
-  writeSync(1, `${report}\n`);
+  // Every byte, then exit — see `writeStdoutSync`, which carries the three
+  // ways this went wrong before it. `pnpm sweep` is the caller that reads this
+  // over a pipe, and 64 KiB is about 25 releases, so a whole-corpus run could
+  // not reach it at all.
+  writeStdoutSync(`${report}\n`);
   process.exit(regressed.length ? 1 : 0);
 }
 

@@ -57,6 +57,9 @@
     "release:publish": "node scripts/release-publish.ts",
     "eval": "node scripts/eval.ts",
     "corpus-stats": "node scripts/corpus-stats.ts",
+    "corpus-clones": "node scripts/corpus-clones.ts",
+    "corpus-bump-origins": "node scripts/corpus-bump-origins.ts",
+    "diagnose-coverage": "node scripts/diagnose-coverage.ts",
     "start": "node src/cli.ts"
   },
   "devDependencies": {

@@ -177,9 +177,11 @@ All of the above settles a bump claim on its destination. The version a note
 says the pin came **from** was never read at all, so
 `opencloud-eu/opencloud@v7.3.0`'s "opa from 1.18.1 to 1.18.2" read `verified`
 against a range that moves the pin 1.15.2 → 1.18.2. Before writing a rule for
-that, the corpus was asked how its notes actually spell an origin — 108
-releases, 555 bump claims, 216 of them naming a from-version, and 76 of those
-with a pin the diff moved:
+that, the corpus was asked how its notes actually spell an origin —
+`pnpm corpus-bump-origins <reports dir>` re-derives this table on any watch
+home, and it read 555 bump claims, 216 of them naming a from-version, and 76
+of those with a pin the diff moved (unchanged between a 108- and a
+112-release corpus):
 
 | the note's from-version | n | what it is |
 |---|---|---|

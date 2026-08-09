@@ -19,6 +19,9 @@ pnpm mutate-notes <dir> --generate  # + the model-written inverted-claim class (
 #   interrupted run resumes; --no-resume re-measures. The key covers src/ and
 #   the mutations, so a patched threshold never reuses another bar's numbers
 pnpm corpus-stats <reports dir>  # aggregate a watch home's reports; anonymous unless --named
+pnpm corpus-clones <reports dir> # which releases the clone cache cannot answer, and clone them
+pnpm corpus-bump-origins <dir>   # the from-version distribution SCORING.md's pin rule rests on
+pnpm diagnose-coverage "o/r@tag" # which coverage route keeps a commit documented
 node src/cli.ts --help
 ```
 
@@ -113,6 +116,15 @@ not add a dependency, a build step, or a framework.
   a source file or running `pnpm test` during a mutation run therefore either
   loses the edit or fails a test against someone else's mutant. Let it finish;
   it takes about fifteen minutes for the full set.
+- **`pnpm sweep` owns `src/` the same way, for far longer.** The dial IS the
+  literal in the source, so a sweep holds a patched threshold for the whole of
+  each measurement — an hour or more over a full corpus. Two consequences, both
+  seen on 2026-08-09: a `pnpm test` during a sweep fails against the dial's
+  current value and looks like a broken suite, and `git add -A` commits that
+  value. Check `git diff src/` before staging anything while one runs, and
+  never stage `-A` blind. A sweep killed mid-run restores from its own snapshot
+  on SIGINT/SIGTERM; a sweep whose process is lost some other way leaves the
+  dial where it was — `git diff src/` says so, and `git checkout` fixes it.
 - **A/B against the forge: measure serially, and filter warnings.** Fanning
   parallel checks at one GitHub account trips the rate limit, and a run that
   loses commit diffs to it is not a data point — before 0.10.1 it scored
