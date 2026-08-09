@@ -45,9 +45,19 @@ test("multibyte content survives the boundary", () => {
   assert.equal(out, "üß—·".repeat(30_000) + "\n");
 });
 
-// What the fix replaced, kept as the reason it exists: the same content
-// through console.log + process.exit is cut at the pipe buffer.
-test("the shape this replaced does lose data — the test that proves the point", () => {
+// What the fix replaced, kept as the reason it exists — and darwin-only,
+// which is the more interesting half.
+//
+// On macOS a pipe stdout is non-blocking, so `console.log` hands off what fits
+// and `process.exit` drops the rest. On Linux the same fd blocks, the write
+// completes, and nothing is lost. That is why this bug cost two full sweep
+// runs on a developer machine while CI stayed green throughout: the harness
+// truncating its own report at 65184 bytes was not reproducible on the
+// platform that tests it. A green pipeline is not evidence that a measurement
+// taken elsewhere was whole.
+test("the shape this replaced does lose data — on the platform it was found on", {
+  skip: process.platform !== "darwin" ? "pipe stdout blocks outside darwin" : false,
+}, () => {
   const { out } = throughAPipe(`console.log("x".repeat(200_000)); process.exit(0);`);
   assert.ok(out.length < 200_000, `expected truncation, got ${out.length} bytes`);
 });
