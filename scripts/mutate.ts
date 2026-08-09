@@ -423,6 +423,30 @@ const MUTANTS: Mutant[] = [
     replace: 'category === "source" &&',
   },
   {
+    guard: "a vendored tree's flags are its own — a bundled test runner has no CLI surface here",
+    file: "src/substance.ts",
+    find: 'const ownFlags = category === "source" && !STYLE_FILE.test(f.path) && !VENDORED_PATH.test(f.path);',
+    replace: 'const ownFlags = category === "source" && !STYLE_FILE.test(f.path);',
+  },
+  {
+    guard: "a component that carries a stylesheet ships no flags — CSS custom properties spell alike",
+    file: "src/substance.ts",
+    find: "const STYLE_FILE = /\\.(css|scss|sass|less|styl|vue)$/i;",
+    replace: "const STYLE_FILE = /\\.(css|scss|sass|less|styl)$/i;",
+  },
+  {
+    guard: "a CI pipeline at the repo root is ci/build whichever way the forge spells it",
+    file: "src/metrics.ts",
+    find: "|Jenkinsfile|\\.woodpecker\\.(?:ya?ml|star))$",
+    replace: "|Jenkinsfile)$",
+  },
+  {
+    guard: "an agent's server list is tooling config, not the project's own source",
+    file: "src/metrics.ts",
+    find: "(^|\\/)(\\.env\\.[\\w.-]+|\\.mcp\\.json)$",
+    replace: "(^|\\/)\\.env\\.[\\w.-]+$",
+  },
+  {
     guard: "component expansion stays one level deep — a child never expands its own pins",
     file: "src/check.ts",
     find: "expand: undefined,",

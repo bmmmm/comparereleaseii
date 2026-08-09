@@ -33,9 +33,13 @@ function envReads(line: string): string[] {
 }
 
 /** `--flag` literals. CSS custom properties spell the same prefix, so style
- * files are excluded at the caller. */
+ * files are excluded at the caller. A Vue single-file component is one: all
+ * 233 corpus occurrences in `.vue` files were custom properties, none a flag.
+ * The cut is the extension and not the `<style>` block on purpose — a diff
+ * arrives as hunks and cannot see where the block starts, and 7 of those 233
+ * were outside it anyway (`:style` bindings, Tailwind arbitrary properties). */
 const FLAG_LITERAL = /(?<![\w-])--([a-z][a-z0-9]+(?:-[a-z0-9]+)*)\b/g;
-const STYLE_FILE = /\.(css|scss|sass|less|styl)$/i;
+const STYLE_FILE = /\.(css|scss|sass|less|styl|vue)$/i;
 
 function flagLiterals(line: string): string[] {
   return [...line.matchAll(FLAG_LITERAL)].map((m) => `--${m[1]}`);
@@ -125,12 +129,16 @@ function configSurface(files: DiffFile[]): Extracted {
       DIALING_SOURCE.test(f.path) &&
       !VENDORED_PATH.test(f.path) &&
       !TEST_PATH.test(f.path);
+    // The same authorship boundary, on the field that leaked hardest: a
+    // vendored test runner's `--headless` is not a flag this project's users
+    // can pass. 24.7% of all corpus flag occurrences sat under vendor/.
+    const ownFlags = category === "source" && !STYLE_FILE.test(f.path) && !VENDORED_PATH.test(f.path);
     for (const sign of ["-", "+"] as const) {
       const side = sign === "-" ? "minus" : "plus";
       for (const line of sideLines(f.patch, sign)) {
         if (category === "source") {
           for (const v of envReads(line)) env[side].add(v);
-          if (!STYLE_FILE.test(f.path)) for (const v of flagLiterals(line)) flags[side].add(v);
+          if (ownFlags) for (const v of flagLiterals(line)) flags[side].add(v);
           if (ownTraffic) for (const h of urlHosts(line)) hosts[side].add(h);
         } else {
           for (const k of configKeys(line, f.path)) keys[side].add(k);

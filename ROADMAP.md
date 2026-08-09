@@ -1,8 +1,9 @@
 # Roadmap
 
 > **Status 2026-08-09:** v0.11.0 is out (`55befd4`, tagged on both forges,
-> extension pin bumped, `check-release-notes` green on the tag) and nothing
-> sits unreleased on `main`. The hourly job now runs the subscription block
+> extension pin bumped, `check-release-notes` green on the tag); what sits
+> unreleased on `main` is the golden set's two new subject shapes and entry
+> 6's flag-surface exclusions. The hourly job now runs the subscription block
 > in production: `surface.hosts` in every report, and watch `rules` evaluated
 > against the live config — calibrated 2026-08-09 from a corpus replay
 > (defaults: `new hosts` + `security findings`; `migrations` for
@@ -23,15 +24,13 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** entry 6 (the `cliFlags` category-boundary
-> leak — `vendor/` exclusion is the measured-safe first move), forge issue #9
-> (verdict-cache GC: 97.5 % of entries are dead versions nothing evicts), or
-> entries 1–2 below, which need judge budget and patience. One operational
-> thread needs no code: the rules are live but have never seen a real
-> release — the first watched release that fires one is the feature's first
-> production datapoint, and `pnpm corpus-stats` at 0.11.0 (the class-bill
-> section is released now) against a refreshed `tmp/corpus` names the next
-> free deterministic rule.
+> **Where a fresh session starts:** forge issue #9 (verdict-cache GC:
+> 97.5 % of entries are dead versions nothing evicts), or entries 1–2 below,
+> which need judge budget and patience. One operational thread needs no code:
+> the rules are live but have never seen a real release — the first watched
+> release that fires one is the feature's first production datapoint, and
+> `pnpm corpus-stats` at 0.11.0 (the class-bill section is released now)
+> against a refreshed `tmp/corpus` names the next free deterministic rule.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 
@@ -340,6 +339,91 @@ every match; regenerable from the clone cache with the entry's replica
 script). Whoever picks this up re-measures the 50% fire rate after each
 exclusion — the number that made entry 5 look like a subprocess problem was
 mostly this.
+
+**Shipped 2026-08-09: three of the four, and the fourth was measured out.**
+Three exclusions landed, each re-measured on its own. The scope is 27 corpus
+tag ranges whose diff the clone cache reproduces byte-identical against the
+stored report; occurrences are counted per match on both diff sides.
+
+| after | occurrences | flags added | removed | ranges firing |
+|---|---|---|---|---|
+| — (baseline) | 805 | 137 | 94 | 14/27 (51.9%) |
+| `vendor/` | 606 (−24.7%) | 77 | 78 | 13/27 (48.1%) |
+| `.vue` | 373 (−53.7%) | 63 | 68 | 12/27 (44.4%) |
+| root CI/tooling config | 315 (−60.9%) | 53 | 54 | 10/27 (37.0%) |
+
+Corpus-wide the fire rate goes 19/38 → 15/38 (50.0% → 39.5%), the 11 reports
+the clone cache cannot reproduce assumed unchanged. The residual 315 is what
+entry 5 settled and nothing here touches: build and packaging scripts that
+call other binaries (`codesign --deep --options`, `git --no-verify`), plus
+sniffnet's genuine hand-rolled parser. The bucket the entry called
+"legitimately ambiguous" did not shrink by one occurrence — it went from 37%
+of the field to 95% of it.
+
+**Where each cut was made, and why not one level lower.** `vendor/` and
+`.vue` are gates on the flag field alone (`ownFlags`, `src/substance.ts`),
+not on `fileCategory`: a vendored Go file *is* source and a Vue SFC *is*
+source, and telling `fileCategory` otherwise would empty a
+vendored-dependency release's rollup. What those two paths violate is
+authorship and syntax, not file kind — which is the boundary the host gate
+already draws with the same `VENDORED_PATH`. The CI/tooling pair is the
+opposite case and goes in `fileCategory` proper (`src/metrics.ts`): a root
+`.woodpecker.star` really is `ci/build` (the pattern only knew the
+`.woodpecker/` directory form) and `.mcp.json` really is config. That fix
+therefore reaches every consumer — the rollup, `symbolDelta`, and through
+`sensitiveCategory` the escalation ladder and the risk flags. Intended: a
+root pipeline was being read as *less* sensitive than the one file over in
+`.woodpecker/`, and one release's rollup moves 128 additions out of `source`
+into `ci/build` where they belong.
+
+**`.vue`: the extension, not the `<style>` block.** All 233 corpus
+occurrences in `.vue` files were CSS custom properties and none was a product
+flag, so nothing argues for the finer cut on recall. Two things argue against
+it: a unified diff arrives as hunks and cannot see where a `<style>` block
+begins, and 7 of the 233 were outside one anyway — `:style` bindings in the
+template and Tailwind's `font-(family-name:--oc-font-family)` spell `--name`
+in the `<template>` half. A line-shape rule (`--x:` / `var(--x)`) would catch
+226 of 233 and is a heuristic where the file already answers cleanly.
+
+**Not shipped: `__snapshots__/*.snap` — measured, and it buys nothing.**
+After the three exclusions it is 16 of the 315 remaining occurrences: one
+file, one flag (`--oc-role-on-surface`), one release, and on *both* diff
+sides. Excluding it moves the fire rate not at all (10/27 → 10/27) and makes
+the reported surface one entry *larger* (removed 54 → 55), because the
+snapshot's copy of that property is currently cancelling a removal that is
+real. The categorisation gap is genuine — `TEST_FILE` has `__tests__` but not
+`__snapshots__`, and `X.spec.ts.snap` also slips its `$` anchor — so it is
+anchored as a TODO at the pattern; whoever fixes it justifies it from the
+category rollup, because the flag surface does not.
+
+**A correction to the numbers above.** The 439/11 and the four percentages
+are not reproducible verbatim today, and the raw file this entry pointed at
+was never committed — neither was the replica script, so both had to be
+rebuilt. What does reproduce exactly is the fire rate (19 of 38
+surface-carrying reports, 50.0%) and the extractor itself (27 ranges
+byte-identical against their stored reports). The scope is recoverable too:
+439 is exactly the `+`-side occurrence count over the 11 reports carrying the
+"loaded from a local partial clone" warning. But *that* scoping buckets
+31.0/35.3/5.9/1.8/26.0, not 46.7/20.0/6.8/3.6/22.8. The recorded distribution
+comes back only counted on both sides over an 11-range subset that excludes
+the two cross-major backfill ranges — 442 occurrences at
+46.8/19.9/7.5/3.6/22.2, every bucket within 1.1 points — so the 2026-08-08
+measurement was faithful to a corpus that has since grown. Today's baseline
+over all 27 ranges is 28.9/24.7/7.2/2.0/37.1. The lesson is the cheap one:
+an entry whose numbers rest on a file in `tmp/` and a script that was never
+written down cannot be checked, only re-derived.
+
+**What was verified rather than assumed.** `--judge off` stays deterministic:
+two runs over `opencloud-eu/web@v7.1.4…v7.2.0` are byte-identical in all four
+outputs (`--json`, `--md`, `--html`, terminal). The README validation table
+does not move — none of its five releases contains a `.woodpecker.*` file at
+all, and headscale's `.mcp.json` exists in the tree but not in the
+`v0.29.1...v0.29.2` diff, so it never reaches `fileCategory` there.
+`fileCategory` feeds neither matching nor coverage (only `src/findings.ts`
+and `src/substance.ts` import it), but `sensitiveCategory` does reach the
+ladder, so `pnpm mutate-notes tmp/corpus` was run on both sides of the
+change: identical — 8/8, 6/6, 6/6, 12/12, 12/12 over the 12 reproducible
+releases, judge cost 497/1513, median scores 56.5 · 68 · 45.
 
 ---
 

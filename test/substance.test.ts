@@ -93,6 +93,44 @@ const TEST_FILE = df(
   4,
 );
 
+// The paths that made two thirds of the corpus's flag surface. Each is a file
+// whose `--name` literals belong to somebody else: a vendored test runner, a
+// stylesheet inside a component, a CI pipeline, an agent's server list.
+const VENDORED_RUNNER = df(
+  "vendor/github.com/onsi/ginkgo/v2/types/config.go",
+  `@@ -1,2 +1,3 @@ func BuildRunCommandFlagSet() {
++	flags.Bool("--randomize-suites", false, "")
+`,
+  3,
+);
+
+const VUE_SFC = df(
+  "packages/design-system/src/components/OcButton/OcButton.vue",
+  `@@ -1,4 +1,6 @@
++  :style="{ '--oc-progress-pie-fill': fill }"
+ <style lang="scss">
+-  --oc-button-color: teal;
++  --oc-button-hover-color: navy;
+`,
+  4,
+);
+
+const WOODPECKER_STAR = df(
+  ".woodpecker.star",
+  `@@ -1,2 +1,3 @@ def e2e(ctx):
++	e2e_args = "--headless --total-parts %d" % params["totalParts"]
+`,
+  3,
+);
+
+const MCP_JSON = df(
+  ".mcp.json",
+  `@@ -1,3 +1,4 @@
++      "args": ["@playwright/mcp@latest", "--headless", "--isolated"],
+`,
+  3,
+);
+
 // A release that starts talking to a new host is a supply-chain fact its
 // notes rarely mention. The noise that signal has to survive is licence and
 // schema URIs in comments, vendored trees, and mock hosts in test doubles.
@@ -222,6 +260,28 @@ test("the host delta names the traffic this release starts and stops, nothing el
 
   assert.match(commitSurface([GO_UPDATER])!, /\+host api\.github\.com/);
   assert.match(commitSurface([GO_UPDATER])!, /−host releases\.oldvendor\.io/);
+});
+
+// Measured on 27 corpus tag ranges: of the 805 flag-literal occurrences that
+// reached the extractor, only 37% sat in a file where "is this the product's
+// flag?" was even the right question. The rest were these four
+// category-boundary gaps — so each one is named individually, and a widened
+// filter says which case it broke.
+test("the flag surface names this project's own flags, not the ones its tree carries", () => {
+  const s = releaseSurface([GO_UPLOAD, VENDORED_RUNNER, VUE_SFC, WOODPECKER_STAR, MCP_JSON, CSS]);
+  assert.deepEqual(s.cliFlags, { added: ["--async-uploads"], removed: [] });
+  const seen = [...s.cliFlags.added, ...s.cliFlags.removed];
+  assert.ok(!seen.includes("--randomize-suites"), "a vendored runner's flags are not the product's");
+  assert.ok(!seen.includes("--oc-button-color"), "a Vue SFC's CSS custom properties are not flags");
+  assert.ok(!seen.includes("--oc-progress-pie-fill"), "…nor is a :style binding outside <style>");
+  assert.ok(!seen.includes("--total-parts"), "a CI pipeline runs tools, it does not define flags");
+  assert.ok(!seen.includes("--isolated"), "an agent's server list is not the product's CLI");
+
+  // The two config cases are category fixes, so they hold for every field the
+  // rollup feeds — not just for flags.
+  assert.equal(fileCategory(WOODPECKER_STAR.path), "ci/build");
+  assert.equal(fileCategory(MCP_JSON.path), "config");
+  assert.ok(!s.symbols.includes("e2e"), "a CI pipeline's functions are not shipped symbols");
 });
 
 test("a Go env struct tag lists every name it carries", () => {

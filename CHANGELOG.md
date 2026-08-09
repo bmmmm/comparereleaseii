@@ -4,6 +4,35 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **`surface.cliFlags` stops reporting other people's flags.** Half of every
+  release with a surface used to "add CLI flags", and bucketing 805 real
+  flag-literal occurrences across 27 corpus tag ranges said why: only 37% of
+  them sat in a file where "is this the product's flag?" was even the right
+  question. Three exclusions ship, each re-measured on its own — a vendored
+  tree's flags are its own (805 → 606 occurrences), a Vue single-file
+  component's `--name` literals are CSS custom properties and not flags
+  (→ 373), and a root `.woodpecker.star` pipeline or an `.mcp.json` server
+  list is tooling config rather than source (→ 315). The reported surface
+  shrinks from 137 added / 94 removed flags to 53 / 54, and the share of
+  releases whose surface announces new flags goes from 50.0% to 39.5%.
+
+  What is left is exactly the noise the subprocess investigation settled as
+  irreducible: packaging scripts that call `codesign --deep` and `git
+  --no-verify`, plus one genuine hand-rolled parser. The first two exclusions
+  gate the flag field alone — a vendored Go file *is* source, and telling
+  `fileCategory` otherwise would empty a vendored-dependency release's
+  rollup — while the CI and tooling pair are category fixes proper, so a root
+  pipeline is no longer read as less sensitive than the one file next to it
+  in `.woodpecker/`. Determinism under `--judge off` is unchanged
+  (byte-identical `--json`/`--md`/`--html`/terminal across two runs), the
+  detection rates are unchanged (`mutate-notes` identical on both sides), and
+  the README validation table does not move — none of its five releases has a
+  `.woodpecker.*` file, and headscale's `.mcp.json` is not in its release
+  diff. A fourth candidate, Vitest snapshot files, was measured and dropped:
+  it moves no flag and makes the reported surface one entry larger.
+
 ### Added
 
 - **The commit-subject axis gets its two missing shapes, and one of them

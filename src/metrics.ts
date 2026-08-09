@@ -57,14 +57,25 @@ import {
  */
 export const SCORING_GENERATION = 1;
 
+// Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
+// `.woodpecker.star` (Starlark) or `.woodpecker.yml` at the root. Only the
+// directory form was here, so a root pipeline read as ordinary source and
+// shipped its test-runner arguments as the product's CLI surface — 53 of the
+// corpus's flag-literal occurrences came from one such file.
 const CI_BUILD =
-  /(^|\/)\.(github|gitlab|circleci|woodpecker)\/|(^|\/)(Dockerfile[^/]*|Makefile|justfile|build\.rs|setup\.py|\.pre-commit-config\.yaml|Jenkinsfile)$|\.(gradle|cmake)$/i;
+  /(^|\/)\.(github|gitlab|circleci|woodpecker)\/|(^|\/)(Dockerfile[^/]*|Makefile|justfile|build\.rs|setup\.py|\.pre-commit-config\.yaml|Jenkinsfile|\.woodpecker\.(?:ya?ml|star))$|\.(gradle|cmake)$/i;
 // `token(?!i[sz])` keeps token/tokens/token_store but not tokenize(r) —
 // every parser and LLM repo has tokenizer paths, and flagging them sensitive
 // fired escalation reviews for nothing.
 const AUTH_CRYPTO =
   /auth|crypto|token(?!i[sz])|password|passwd|secret|session|login|signin|permission|policy|acl|sanitiz|escape|csrf|ssrf|xss|jwt|oauth|sso|2fa|totp|webauthn|vault|key(chain|store)/i;
 const DOC_FILE = /\.(md|markdown|rst|txt|adoc|org)$/i;
+// TODO: `__snapshots__/` is missing from the directory list, so a Vitest/Jest
+// snapshot (`X.spec.ts.snap` — the `$` anchor misses that too) reads as
+// source. Measured for ROADMAP entry 6 and deliberately left: excluding it
+// changes no reported flag, because the snapshot's copy of a CSS custom
+// property cancels a removal instead of adding one. Whoever fixes it justifies
+// it from the category rollup, not from the flag surface.
 const TEST_FILE =
   /(^|\/)([\w-]*tests?|__tests__|spec|specs|testdata|fixtures)\/|_test\.[a-z0-9]+$|\.(test|spec)\.[a-z0-9]+$/i;
 // SVG is markup, not a picture: it carries <script> and event handlers, and a
@@ -204,7 +215,12 @@ export function classifyUnverifiable(
 
 const MIGRATION_FILE =
   /(^|\/)(migrations?|db\/migrate|alembic\/versions)\/|(^|\/)V\d+__[^/]+\.sql$/i;
-const CONFIG_FILE = /\.(ya?ml|toml|ini|conf|cfg|properties)$|(^|\/)\.env\.[\w.-]+$/i;
+// `.json` as a whole is not config — it is data, fixtures and manifests — so
+// the named tooling files that happen to use it are listed. `.mcp.json`
+// declares the servers a coding agent may start, arguments and all; as source
+// those arguments read as the project's own flags.
+const CONFIG_FILE =
+  /\.(ya?ml|toml|ini|conf|cfg|properties)$|(^|\/)(\.env\.[\w.-]+|\.mcp\.json)$/i;
 
 /**
  * Total classification for the substance rollup — every path lands in
