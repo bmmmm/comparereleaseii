@@ -54,6 +54,30 @@ All notable changes to comparereleaseii are documented here. The format follows 
   stays `[]` instead of vanishing. Four assembly steps were broken in turn to
   confirm the harness — and only the harness — catches each.
 
+### Fixed
+
+- **The omission mutation hid a commit and left the note documenting it
+  standing.** `pnpm mutate-notes` drops the claims covering the release's
+  highest-churn commit and requires the tool to then report that commit as
+  undocumented. It decided "covering" by the anchor and the lexical bar — the
+  routes `computeCoverage` granted the day that block was written. The pin
+  join joined coverage one day later and never joined the mutation, so a
+  release whose notes carry one bump claim for a dependency it bumped several
+  times kept that claim in the mutant, and the commit stayed documented by a
+  note the mutation never took away.
+
+  It read as a detector miss for three days, and five candidate repairs to the
+  coverage route were measured against it. `opencloud-eu/opencloud@v7.3.0`
+  bumps `open-policy-agent/opa` in three commits and notes the last hop only;
+  on the middle commit that note scores 4 against the lexical bar of 5,
+  precisely because the version it names is not the version that commit moves.
+  The mutation now strips the pin-join route as well (`bumpCovers`), and the
+  frozen reference is re-measured on the same 55-release corpus: `omission`
+  32/34 → **35/36**, every other class unchanged, and the corpus's median
+  correctness, completeness and overall scores identical to the digit — no
+  scoring number, threshold or bar was touched. See ROADMAP.md entry 1 for the
+  one `omission` case that remains, which is a real one.
+
 ## 0.11.0 — 2026-08-09
 
 ### Added
@@ -209,28 +233,6 @@ All notable changes to comparereleaseii are documented here. The format follows 
   not read it — see SCORING.md for the measurement that decided that.
 
 ### Fixed
-
-- **The omission mutation hid a commit and left the note documenting it
-  standing.** `pnpm mutate-notes` drops the claims covering the release's
-  highest-churn commit and requires the tool to then report that commit as
-  undocumented. It decided "covering" by the anchor and the lexical bar — the
-  routes `computeCoverage` granted the day that block was written. The pin
-  join joined coverage one day later and never joined the mutation, so a
-  release whose notes carry one bump claim for a dependency it bumped several
-  times kept that claim in the mutant, and the commit stayed documented by a
-  note the mutation never took away.
-
-  It read as a detector miss for three days, and five candidate repairs to the
-  coverage route were measured against it. `opencloud-eu/opencloud@v7.3.0`
-  bumps `open-policy-agent/opa` in three commits and notes the last hop only;
-  on the middle commit that note scores 4 against the lexical bar of 5,
-  precisely because the version it names is not the version that commit moves.
-  The mutation now strips the pin-join route as well (`bumpCovers`), and the
-  frozen reference is re-measured on the same 55-release corpus: `omission`
-  32/34 → **35/36**, every other class unchanged, and the corpus's median
-  correctness, completeness and overall scores identical to the digit — no
-  scoring number, threshold or bar was touched. See ROADMAP.md entry 1 for the
-  one `omission` case that remains, which is a real one.
 
 - **The golden set can ask about commit subjects, which it never could.**
   `runCalibration` hard-coded `commits: []`, so all 39 cases were graded on a
