@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.13.0 — 2026-08-09
+
 ### Changed
 
 - **Coverage's evidence union asks for every file of a commit, not half of
