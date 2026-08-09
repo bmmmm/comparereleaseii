@@ -2,8 +2,12 @@
 
 > **Status 2026-08-09:** v0.11.0 is out (`55befd4`, tagged on both forges,
 > extension pin bumped, `check-release-notes` green on the tag); what sits
-> unreleased on `main` is the golden set's two new subject shapes and entry
-> 6's flag-surface exclusions. The hourly job now runs the subscription block
+> unreleased on `main` is the golden set's two new subject shapes, entry
+> 6's flag-surface exclusions, and — the one that changes every judged run —
+> the commit-subject rule line in the judge prompt, with the reference
+> re-frozen and the README validation table re-measured behind it. That last
+> one invalidates every verdict-cache entry by construction, so the first
+> watch pass after release pays full price. The hourly job now runs the subscription block
 > in production: `surface.hosts` in every report, and watch `rules` evaluated
 > against the live config — calibrated 2026-08-09 from a corpus replay
 > (defaults: `new hosts` + `security findings`; `migrations` for
@@ -66,7 +70,7 @@ The instruments now on hand, and what each is for:
 | `pnpm mutate-notes <dir> --generate` | …and one the model writes, whose survivors are leads to read |
 | `comparerelease --add-golden` | a wrong verdict becomes a regression case, in the `field` category that never moves the frozen fitness gate |
 
-The precedent both entries below are measured against is the bump block. It
+The precedent the entry below is measured against is the bump block. It
 did not start as a plan; it started as a corpus count — 8 of 12 contradicted
 claims were dependency bumps — and ended as a deterministic rule that is
 *both* more accurate than the judge on that class and free.
@@ -198,14 +202,19 @@ mutant, which is what this entry had been asking for since 2026-08-07.
   tolerance rests on moved.
 
   **After: two independent 43-case `--no-cache` runs against
-  `claude-cli/haiku`** — 42/43 and 40/43, `overVerified` 0 in both. All four
-  commit-subject shapes pass in run 1. Run 2 loses
-  `…names-a-cve-the-diff-never-mentions` to a round-1 `need` for a file it had
-  already been shown — the same way that case failed *before* the change on
-  2026-08-09, and the same way `rate-limit-config-vs-flood-claim` failed in
-  that run. `denies-what-the-diff-shows`, the case the rule exists for, reads
-  `verified` in both. `bump-release-overtakes-its-own-note` fails in both, as
-  it does in the frozen reference. Nothing failed newly and reproducibly.
+  `claude-cli/haiku`** — 42/43 and 40/43, `overVerified` 0 in both. Run 1
+  fails exactly one case, `bump-release-overtakes-its-own-note`, which the
+  frozen reference fails too. Run 2 fails three: that same case, plus
+  `commit-subject-names-a-cve-the-diff-never-mentions` and
+  `rate-limit-config-vs-flood-claim`, both of them in *this after-run* and
+  both to a round-1 `need` for a file they had already been shown. Run 1's
+  failure set is a strict subset of run 2's, so there was no trade-off to
+  shop between the two. All four commit-subject shapes pass in run 1; the CVE
+  shape is the only one run 2 loses, and it failed that same way *before* the
+  change (the 2026-08-09 run 1 recorded in this entry's open version), so it
+  is the documented flicker rather than something the rule introduced.
+  `denies-what-the-diff-shows`, the case the rule exists for, reads
+  `verified` in both. Nothing failed newly and reproducibly.
   `test/eval/reference-haiku.json` is re-frozen from run 1 — not for its
   score but because it is the coherent run: its only failure is the
   documented reproducible class failure, and every flicker-prone case
@@ -217,20 +226,42 @@ mutant, which is what this entry had been asking for since 2026-08-07.
   re-judges every claim it reaches, at full price; this is a behaviour change
   for every judged run, not a prompt tidy-up.
 
-  **The README validation table, re-measured judged and serially.** headscale
-  v0.29.2 holds at 100 and restic v0.19.1 at 89; the fabricated negative
-  control holds at 5 with exit 1. git-cliff v2.13.0 reads 96 where the table
-  said 95, vaultwarden 1.37.0 reads 84 where it said 76 — and that drift is
-  not this rule's. Both were also run on the parent commit and both had moved
-  there already (git-cliff 96, vaultwarden 83). Each before/after pair
-  differs by one or two verdicts on two-part claims (*"standardize on yarn
-  and fix the invalid anchor link"* — the yarn half is shown, the anchor half
-  is not), which is the flicker this repo already documents: git-cliff read
-  90 and 96 on two after-side draws against 96 on the before-side, vaultwarden
-  87 and 84 against 83. The published numbers are the composition two of
-  three draws agree on. One run was dropped before any of this counted — it
-  lost two judge calls to the CLI and carried the `judge-unavailable` flag,
-  which is the load warning the A/B trap exists for.
+  **The README validation table, re-measured judged and serially.** The rule
+  the table now states about itself: a row whose score moves is drawn three
+  times **on the after side** and publishes the value two of the three agree
+  on. A before-side draw is attribution evidence — it answers whether the
+  drift predates this rule — and is never a vote, because it is cast by
+  different code.
+
+  headscale v0.29.2 holds at 100, restic v0.19.1 at 89 and the fabricated
+  negative control at 5 with exit 1; none moved, so none was redrawn.
+  git-cliff v2.13.0 drew 90 · 96 · 90 and publishes **90** where the table
+  said 95 — the two 90s are verdict-identical down to the same eight
+  uncovered commits, so 96 is the outlier and not the mode. Both values are
+  in the `solid` bucket, so no label moved.
+
+  What separates any two draws is one or two verdicts on two-part claims
+  (*"standardize on yarn and fix the invalid anchor link"* — the yarn half is
+  in the diff, the anchor half is not), which is the flicker this repo
+  already documents. On git-cliff that single claim also carries five
+  commits' coverage with it, which is why its spread is six points rather
+  than one. One run was dropped before anything counted: it lost two judge
+  calls to the CLI and carried the `judge-unavailable` flag, the load warning
+  the A/B trap exists for.
+
+  **vaultwarden 1.37.0 is unresolved and the row is not being decided on a
+  coin flip.** Three clean after-side draws read 87 · 84 · 85 — no two agree,
+  so the majority rule produces no number and nothing here invents a
+  tiebreak. What the draws do agree on is that the published 76 is stale by
+  roughly ten points, and the bucket splits 2:1 for `solid` (85, 87) against
+  `minor gaps` (84) across the `SCORE_SOLID` boundary that sits inside the
+  spread. Attribution for *that* row is settled even though its value is not:
+  the parent commit drew 83, so the drift away from 76 predates this rule.
+  git-cliff's attribution is weaker and is stated as such — one before-side
+  draw read 96, which is the value the after side produced as its outlier, so
+  a single before-side draw cannot separate "the rule cost git-cliff the
+  website claim" from the same flicker landing the other way. Whoever settles
+  either row draws the before side three times too.
 
   **What reopens it:** judge reasoning that grounds a verdict in a commit
   subject *despite* the rule — found the way this entry was found, by reading

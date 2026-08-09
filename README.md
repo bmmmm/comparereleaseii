@@ -345,10 +345,19 @@ across that spread, it'll hold up on yours:
 | Release | Notes style | Score (validation run, 2026-08-09) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
-| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 96 (solid) |
+| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 90 (solid) |
 | restic v0.19.1 | setext sections, issue anchors, cherry-picks | 89 (solid) |
-| vaultwarden 1.37.0 | generated PR list + handwritten security | 84 (minor gaps — vague notes hide real changes) |
+| vaultwarden 1.37.0 | generated PR list + handwritten security | 84–87 (three draws, no majority — vague notes hide real changes) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
+
+How to read that column: each row is a judged run against the default engine
+(`claude-cli/haiku`), measured serially with `--no-cache`, and any run whose
+report carries a load or `judge-unavailable` warning is dropped and redrawn. A
+judged score carries run-to-run flicker, so a row whose score moves is drawn
+three times and the table publishes the value two of the three agree on; a row
+that does not move is drawn once. Where three draws produce no majority the
+spread is printed rather than one of them picked — vaultwarden is currently
+that case. Re-measured 2026-08-09.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:

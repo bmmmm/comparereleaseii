@@ -200,10 +200,9 @@ const refOf = (outcomes: Array<{ got: string }>): Reference => ({
 // The provenance note tells a reader the frozen reference was graded before
 // calibration played out a served need. One bare "need" does not say that: a
 // case whose expected list forbids "need" stops there under today's grading
-// too, and the 2026-08-09 reference carries exactly one of those next to six
-// served rounds. Keying the note on any bare "need" made `--calibrate` print
-// that the reference predated a round it demonstrably ran.
-test("the round-1 provenance note fires only when nothing was ever served", async () => {
+// too. Keying the note on any bare "need" made `--calibrate` print that the
+// reference predated a round it demonstrably ran.
+test("the round-1 provenance note fires only when nothing was ever served", () => {
   const pure = printedWith(refOf([{ got: "verified" }, { got: "need" }]));
   assert.ok(pure.includes(PROVENANCE), "a reference with only bare needs must carry the note");
 
@@ -215,8 +214,30 @@ test("the round-1 provenance note fires only when nothing was ever served", asyn
 
   const none = printedWith(refOf([{ got: "verified" }]));
   assert.ok(!none.includes(PROVENANCE));
+});
 
-  // And the artifact this actually misfired on.
+/**
+ * The shape the note actually misfired on, lifted from the 2026-08-09
+ * reference as it stood *before* the commit-subject rule re-froze it: one
+ * bare "need" beside six served rounds. It lives here as a fixture because
+ * the checked-in reference no longer carries a bare "need" at all — a run
+ * with none cannot tell the two heuristics apart, so pointing this assertion
+ * at the file would leave the misfire unguarded the next time a reference is
+ * frozen.
+ */
+const MISFIRE_SHAPE = refOf([
+  { got: "need" },
+  ...Array.from({ length: 6 }, () => ({ got: "need→no-evidence" })),
+]);
+
+test("the provenance note stays suppressed on the shape it misfired on", async () => {
+  assert.ok(
+    !printedWith(MISFIRE_SHAPE).includes(PROVENANCE),
+    "a reference with served rounds is quoted as predating a round it demonstrably ran",
+  );
+
+  // The checked-in reference, for consistency rather than discrimination:
+  // it has no bare "need", so it passes under either heuristic.
   const frozen = await loadReference();
   assert.ok(frozen, "test/eval/reference-haiku.json is missing or unreadable");
   assert.ok(

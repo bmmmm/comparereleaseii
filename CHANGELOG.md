@@ -27,27 +27,42 @@ All notable changes to comparereleaseii are documented here. The format follows 
   carries the prompt, so every entry written before this release is
   unreachable and the next `watch` pass re-judges from scratch, at full
   price. Two 43-case `--no-cache` calibrations after the change read 42/43
-  and 40/43 with `overVerified` 0; the four commit-subject shapes all pass in
-  the first, and the second loses the CVE shape to a round-1 `need` for a
-  file it was already shown — the same flicker that case showed before the
-  change. `test/eval/reference-haiku.json` is re-frozen from the first run,
-  whose only failure is the reproducible `bump-release-overtakes-its-own-note`
-  class failure. The untrusted markers, the response contract and the
+  and 40/43 with `overVerified` 0. The first fails only
+  `bump-release-overtakes-its-own-note`, the class failure the frozen
+  reference carries as well; the second fails that plus
+  `commit-subject-names-a-cve-the-diff-never-mentions` and
+  `rate-limit-config-vs-flood-claim`, both to a round-1 `need` for a file
+  they had already been shown. The first run's failures are a strict subset
+  of the second's, so no trade-off existed to shop, and
+  `test/eval/reference-haiku.json` is re-frozen from it. All four
+  commit-subject shapes pass in the first run; the CVE shape failed the same
+  way before this change, so it is documented flicker rather than something
+  the rule introduced. The untrusted markers, the response contract and the
   hidden-thinking defaults are untouched.
 
-- **The README validation table is re-measured, and two rows had drifted
-  before this rule existed.** headscale v0.29.2 holds at 100, restic v0.19.1
-  at 89 and the fabricated negative control at 5 with exit 1. git-cliff
-  v2.13.0 reads 96 where the table said 95 and vaultwarden 1.37.0 reads 84
-  where it said 76 — but running both on the parent commit reads 96 and 83,
-  so the drift is the scoring and coverage work already on `main`, not the
-  prompt. What separates a before/after pair is one or two verdicts on
-  two-part claims ("standardize on yarn *and* fix the invalid anchor link"),
-  which is the documented flicker: three clean judged draws of git-cliff read
-  90 · 96 · 96 and of vaultwarden 83 · 87 · 84. The published number is the
-  composition two of three draws agree on. A fourth run was dropped before
-  anything was counted — it lost two judge calls to the CLI and carried the
+- **The README validation table is re-measured, and it now states its own
+  method.** A judged score carries run-to-run flicker, so a row whose score
+  moves is drawn three times on the current code and the table publishes the
+  value two of the three agree on; a row that does not move is drawn once,
+  and any run carrying a load or `judge-unavailable` warning is dropped and
+  redrawn. A draw taken on the parent commit is attribution evidence, never a
+  vote — it is cast by different code. headscale v0.29.2 holds at 100, restic
+  v0.19.1 at 89 and the fabricated negative control at 5 with exit 1.
+  git-cliff v2.13.0 drew 90 · 96 · 90 and publishes 90 where the table said
+  95; the two 90s are verdict-identical down to the same eight uncovered
+  commits, and both values sit in the `solid` bucket. What separates the
+  draws is one verdict on a two-part claim ("standardize on yarn *and* fix
+  the invalid anchor link"), which also carries five commits' coverage with
+  it — hence six points from one claim. A fourth run was dropped before
+  anything counted: it lost two judge calls to the CLI and carried the
   `judge-unavailable` flag.
+
+  **vaultwarden 1.37.0 is left unresolved on purpose.** Its three clean draws
+  read 87 · 84 · 85, no two agree, and the majority rule therefore yields no
+  number — inventing a tiebreak is how a published table starts lying. The
+  draws do agree that the standing 76 is about ten points stale, and that the
+  `solid` boundary at 85 sits inside the spread. That drift is not this rule's:
+  the parent commit drew 83.
 
 - **`surface.cliFlags` stops reporting other people's flags.** Half of every
   release with a surface used to "add CLI flags", and bucketing 805 real
