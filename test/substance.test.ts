@@ -104,9 +104,15 @@ const VENDORED_RUNNER = df(
   3,
 );
 
+// Both halves of a single-file component in one diff: a `<script>` block that
+// really does build an argv, and the `<style>`/template spellings of a CSS
+// custom property. Excluding the extension drops the first one too — that is
+// the recall the measurement accepted (0 of 233 corpus occurrences), and it
+// is asserted rather than described so it cannot be widened by accident.
 const VUE_SFC = df(
   "packages/design-system/src/components/OcButton/OcButton.vue",
-  `@@ -1,4 +1,6 @@
+  `@@ -1,6 +1,9 @@ function buildPrinterArgs(opts) {
++  return ["--print-mode", opts.mode]
 +  :style="{ '--oc-progress-pie-fill': fill }"
  <style lang="scss">
 -  --oc-button-color: teal;
@@ -276,12 +282,17 @@ test("the flag surface names this project's own flags, not the ones its tree car
   assert.ok(!seen.includes("--oc-progress-pie-fill"), "…nor is a :style binding outside <style>");
   assert.ok(!seen.includes("--total-parts"), "a CI pipeline runs tools, it does not define flags");
   assert.ok(!seen.includes("--isolated"), "an agent's server list is not the product's CLI");
+  // The price of cutting at the extension, paid deliberately: a flag a
+  // component's <script> block really does build goes with the stylesheet.
+  assert.ok(!seen.includes("--print-mode"), "a .vue <script> flag is the accepted recall loss");
 
   // The two config cases are category fixes, so they hold for every field the
-  // rollup feeds — not just for flags.
+  // rollup feeds — not just for flags. `.vue` is not: it stays source, and
+  // dropping its flags must not cost the component its symbols too.
   assert.equal(fileCategory(WOODPECKER_STAR.path), "ci/build");
   assert.equal(fileCategory(MCP_JSON.path), "config");
   assert.ok(!s.symbols.includes("e2e"), "a CI pipeline's functions are not shipped symbols");
+  assert.ok(s.symbols.includes("buildPrinterArgs"), "a Vue SFC still ships its changed symbols");
 });
 
 test("a Go env struct tag lists every name it carries", () => {

@@ -54,14 +54,25 @@ import {
  * including the bump-claim coverage fix (a bump claim documents the commits
  * that move the pin it names). A record without the field predates the
  * marker; `GENERATION_UNRECORDED` is how the long view spells that.
+ *
+ * 2 — a `.woodpecker.*` pipeline file became `ci/build` instead of source
+ * (`CI_BUILD` only knew the directory spelling). That reaches
+ * `sensitiveCategory`, so a release that changes one without documenting it
+ * now takes the `undocumented-sensitive` warn: risk −10, overall −3 for input
+ * that did not change, judge off. Small, deterministic, and enough — a bucket
+ * boundary sits inside that distance.
  */
-export const SCORING_GENERATION = 1;
+export const SCORING_GENERATION = 2;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
-// `.woodpecker.star` (Starlark) or `.woodpecker.yml` at the root. Only the
-// directory form was here, so a root pipeline read as ordinary source and
-// shipped its test-runner arguments as the product's CLI surface — 53 of the
-// corpus's flag-literal occurrences came from one such file.
+// `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form
+// was here, and the two spellings landed differently: `.woodpecker.star` fell
+// through to source and shipped its test-runner arguments as the product's
+// CLI surface (53 corpus flag occurrences from one file), while
+// `.woodpecker.yml` matched CONFIG_FILE and was merely `config` — it never
+// contributed flags, it contributed YAML keys, and it stops doing that here
+// exactly as `.github/workflows/*.yml` already does. Not anchored to the repo
+// root: a monorepo's per-package pipeline is CI wherever it sits.
 const CI_BUILD =
   /(^|\/)\.(github|gitlab|circleci|woodpecker)\/|(^|\/)(Dockerfile[^/]*|Makefile|justfile|build\.rs|setup\.py|\.pre-commit-config\.yaml|Jenkinsfile|\.woodpecker\.(?:ya?ml|star))$|\.(gradle|cmake)$/i;
 // `token(?!i[sz])` keeps token/tokens/token_store but not tokenize(r) —

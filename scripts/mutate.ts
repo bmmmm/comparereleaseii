@@ -435,7 +435,7 @@ const MUTANTS: Mutant[] = [
     replace: "const STYLE_FILE = /\\.(css|scss|sass|less|styl)$/i;",
   },
   {
-    guard: "a CI pipeline at the repo root is ci/build whichever way the forge spells it",
+    guard: "a single-file CI pipeline is ci/build whichever way the forge spells it",
     file: "src/metrics.ts",
     find: "|Jenkinsfile|\\.woodpecker\\.(?:ya?ml|star))$",
     replace: "|Jenkinsfile)$",

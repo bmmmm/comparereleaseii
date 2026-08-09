@@ -13,27 +13,52 @@ All notable changes to comparereleaseii are documented here. The format follows 
   question. Three exclusions ship, each re-measured on its own — a vendored
   tree's flags are its own (805 → 606 occurrences), a Vue single-file
   component's `--name` literals are CSS custom properties and not flags
-  (→ 373), and a root `.woodpecker.star` pipeline or an `.mcp.json` server
-  list is tooling config rather than source (→ 315). The reported surface
-  shrinks from 137 added / 94 removed flags to 53 / 54, and the share of
-  releases whose surface announces new flags goes from 50.0% to 39.5%.
+  (→ 373), and a `.woodpecker.*` pipeline or an `.mcp.json` server list is
+  tooling config rather than source (→ 315). The reported surface shrinks
+  from 137 added / 94 removed flags to 53 / 54, and the share of releases
+  whose surface announces new flags goes from 50.0% to 39.5%.
 
   What is left is exactly the noise the subprocess investigation settled as
   irreducible: packaging scripts that call `codesign --deep` and `git
   --no-verify`, plus one genuine hand-rolled parser. The first two exclusions
   gate the flag field alone — a vendored Go file *is* source, and telling
-  `fileCategory` otherwise would empty a vendored-dependency release's
-  rollup — while the CI and tooling pair are category fixes proper, so a root
-  pipeline is no longer read as less sensitive than the one file next to it
-  in `.woodpecker/`. Determinism under `--judge off` is unchanged
-  (byte-identical `--json`/`--md`/`--html`/terminal across two runs), the
-  detection rates are unchanged (`mutate-notes` identical on both sides), and
-  the README validation table does not move — none of its five releases has a
-  `.woodpecker.*` file, and headscale's `.mcp.json` is not in its release
-  diff. A fourth candidate, Vitest snapshot files, was measured and dropped:
-  it moves no flag and makes the reported surface one entry larger.
+  `fileCategory` otherwise would empty a vendored-dependency release's rollup
+  and cost a Vue component its symbols — while the CI and tooling pair are
+  category fixes proper, at any depth rather than at the repo root, because a
+  monorepo's per-package pipeline is CI wherever it sits. The two Woodpecker
+  spellings arrived from different places: `.woodpecker.star` was read as
+  source and shipped its test-runner arguments as flags, while
+  `.woodpecker.yml` was already `config` and never contributed a flag — what
+  it loses is its `configKeys` contribution, exactly as
+  `.github/workflows/*.yml` already behaves. A fourth candidate, Vitest
+  snapshot files, was measured and dropped: it moves no flag and makes the
+  reported surface one entry larger.
+
+- **`SCORING_GENERATION` 1 → 2.** Only the `ci/build` half of the above
+  reaches `sensitiveCategory` (`CONFIG_FILE` is never consulted there, so
+  `.mcp.json` does not) — and it is meant to: a `.woodpecker.*` pipeline was
+  being read as *less* sensitive than the one file over in `.woodpecker/`.
+  The consequence is that a release changing one without documenting it now
+  takes the `undocumented-sensitive` warn, which is risk −10 and overall −3
+  for input that did not change, judge off. Records either side of this are
+  measured with different sticks and the long view is told so. The README
+  validation table does not move: none of its five releases carries a
+  `.woodpecker.*`, `.mcp.json`, `.vue` or vendored path in its diff at all.
+  Determinism under `--judge off` is unchanged (byte-identical
+  `--json`/`--md`/`--html`/terminal across two runs) and the deterministic
+  detection floor is unchanged (`mutate-notes` identical on both sides).
 
 ### Added
+
+- **`scripts/flag-probe.ts` — the harness behind the numbers above is
+  tracked now.** Point it at a reports directory and it rebuilds each stored
+  release's diff from the clone cache, buckets the raw `--flag` occurrences
+  by path shape, compares what the field reports against the stored report
+  per range, and prints the fire rate. It duplicates none of the extractor's
+  rules: what the field says comes from `releaseSurface` itself. Twice now
+  this measurement had to be reconstructed from prose because the script
+  lived in an ignored directory; the numbers stay a property of the corpus
+  and clone cache it is pointed at, and it prints that scope with them.
 
 - **The commit-subject axis gets its two missing shapes, and one of them
   catches the judge.** The 2026-08-08 pair asked whether a friendly subject
