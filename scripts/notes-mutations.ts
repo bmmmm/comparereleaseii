@@ -10,7 +10,8 @@
 // failing once.
 import { extractJsonObject, untrustedBlock } from "../src/judge.ts";
 import { tokenize } from "../src/match.ts";
-import type { Claim, DiffFile } from "../src/types.ts";
+import { sameName } from "../src/pins.ts";
+import type { Claim, DiffFile, PinBump } from "../src/types.ts";
 
 /**
  * Release notes rebuilt from parsed claims. Section headings and bullet syntax
@@ -34,6 +35,28 @@ export function renderNotes(claims: Claim[]): string {
 export function anchorsTo(claim: Claim, sha: string, prNumbers: number[]): boolean {
   if (claim.shas.some((s) => sha.startsWith(s))) return true;
   return claim.prNumbers.some((n) => prNumbers.includes(n));
+}
+
+/**
+ * The pin-join half of coverage: does this claim name a dependency the commit
+ * moves? `computeCoverage` grants a bump claim every commit that moves its
+ * pin and deliberately does not require the versions to agree, so a release
+ * carrying three hops of one dependency documents all three from the note for
+ * the last hop.
+ *
+ * The omission class has to know that or it removes the wrong lines. Measured
+ * on `opencloud-eu/opencloud@v7.3.0` (2026-08-09): the release bumps
+ * `open-policy-agent/opa` in three commits — 1.15.2→1.17.1, 1.17.1→1.18.1,
+ * 1.18.1→1.18.2 — and the notes carry one bump claim, for the last hop. On the
+ * 1.17.1→1.18.1 commit that claim scores 4 against the lexical bar of 5,
+ * precisely because the version it names is not the one that commit moves, so
+ * anchor-plus-lexical left it in the notes and the pin join went on covering
+ * the commit from it. The mutant still documented what the mutation was
+ * supposed to have hidden.
+ */
+export function bumpCovers(claim: Claim, pins: PinBump[]): boolean {
+  if (claim.bump === undefined || claim.kind !== "change") return false;
+  return pins.some((p) => sameName(claim.bump!.name, p.name));
 }
 
 /**

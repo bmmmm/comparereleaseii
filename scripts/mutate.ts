@@ -632,6 +632,12 @@ const MUTANTS: Mutant[] = [
     find: 'if (typeof m.churnCoveredRatio === "number") coverage.push(m.churnCoveredRatio);',
     replace: "coverage.push(m.churnCoveredRatio ?? 0);",
   },
+  {
+    guard: "the omission mutation strips a bump note naming a hop it did not move",
+    file: "scripts/notes-mutations.ts",
+    find: "return pins.some((p) => sameName(claim.bump!.name, p.name));",
+    replace: "return pins.some((p) => sameName(claim.bump!.name, p.name) && p.to === claim.bump!.to);",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

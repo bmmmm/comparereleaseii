@@ -895,46 +895,42 @@ export async function computeCoverage(
     // commits are still the work that note describes.
     //
     // This route is deliberately blind to how much ELSE the commit does, and
-    // that is one of the two remaining `omission` misses: opencloud@v7.3.0
-    // hides a 29,027-line commit across 50 files behind a bump claim, because
-    // four of those files also move a pin some note names. Requiring the pin
-    // files to carry at least half the commit's churn closes it — and is
-    // rejected, measured 2026-08-06:
+    // opencloud@v7.3.0 — a 29,027-line commit across 50 files, covered by a
+    // bump claim — was read as the price of that for three days. Two
+    // candidates tried to give the route eyes, both measured and rejected:
     //
-    //   pin churn >= 0.5 of commit churn   opencloud omission 8/9 → 9/9,
-    //                                      median completeness 51 → 35,
-    //                                      and v7.1.0 falls 98 → 6
+    //   pin churn >= 0.5 of commit churn        opencloud omission 8/9 → 9/9,
+    //   (2026-08-06)                            median completeness 51 → 35,
+    //                                           and v7.1.0 falls 98 → 6
+    //   pin name must appear in a changed       omission 8/9, completeness 51
+    //   non-manifest path (2026-08-07)          — neither number moves
+    //   this route disabled entirely            omission 9/9, completeness 35
     //
     // v7.1.0 is the canary the file-type variant died on (96 → 1) and it dies
-    // here the same way: a vendored dependency update moves go.mod and go.sum
-    // while the vendor tree carries the churn, so the most cleanly documented
-    // dependency work in the corpus reads as undocumented. Same rule as
-    // before — a repair that counts a documented bump as undocumented is not
-    // a repair. Whatever closes v7.3.0 has to tell "this commit is a bump"
-    // from "this commit contains a bump", and churn share cannot.
+    // under churn share the same way: a vendored dependency update moves
+    // go.mod and go.sum while the vendor tree carries the churn, so the most
+    // cleanly documented dependency work in the corpus reads as undocumented.
+    // The 16 points that candidate cost are exactly what switching the route
+    // off costs, which is what it was — a disguised off-switch, not a rule
+    // about bumps.
     //
-    // A fifth candidate, measured and rejected 2026-08-07 — and it rules out
-    // more than itself. The idea was to read paths instead of size: a commit
-    // that *is* a bump of X carries X's own tree (`vendor/…/opa/**`), so X's
-    // name is in the file paths and not only in the manifest line, while a pin
-    // dragged along transitively has no tree in that commit. Requiring the
-    // named pin to appear in some non-manifest path moves nothing at all:
-    //
-    //   pin name must appear in a changed path   opencloud omission 8/9,
-    //                                            completeness 51 — both unmoved
-    //   this route disabled entirely             omission 9/9, completeness 35
-    //
-    // The second line is the useful one. Switching the route off closes the
-    // miss and costs the same 16 points of completeness the churn-share
-    // candidate cost, which means that candidate was a disguised way of
-    // turning the route off rather than a rule about bumps. And the first line
-    // says the miss is not the commit this file has been naming: 04a924f7
-    // carries 36 files under `open-policy-agent/opa` and zero under
-    // `rogpeppe/go-internal`, so a path rule does separate those two claims —
-    // it just does not touch whatever is actually covering the missed commit.
-    // Whoever reopens this identifies that commit FIRST (`--json`, the case's
-    // `detail`), because four of the five candidates so far were aimed from
-    // this comment rather than from a measurement.
+    // There was nothing here to repair (measured 2026-08-09, from
+    // `mutate-notes --repo opencloud-eu/opencloud --json` plus per-route
+    // instrumentation of the mutant). v7.3.0 bumps `open-policy-agent/opa` in
+    // three commits — 1.15.2→1.17.1, 1.17.1→1.18.1 (that is 04a924f7),
+    // 1.18.1→1.18.2 — and its notes carry one opa claim, for the last hop.
+    // This route covers all three from it, which is the paragraph above
+    // working as specified. What reported an omission was the harness: it
+    // removed the claims covering the commit by anchor and by the lexical bar,
+    // and the opa claim clears neither — it scores 4 against a bar of 5
+    // exactly because the version it names is not the one that commit moves —
+    // so the mutant still carried the note that documents the commit. The
+    // path candidate moved nothing for the same reason: it was aimed at a
+    // `rogpeppe/go-internal` claim that never held the commit, while opa's own
+    // tree is in 36 of those 50 paths. Repaired in the harness
+    // (`bumpCovers`, scripts/notes-mutations.ts), no scoring number touched.
+    // A sixth candidate for this route needs a case where the notes do NOT
+    // name the dependency at all.
     if (bumpClaims.length && files.length) {
       const pins = pinBumps(files);
       if (
@@ -948,10 +944,12 @@ export async function computeCoverage(
     // A commit mostly touching files already cited as evidence counts as
     // covered. The route is claim-independent — the union grows with the
     // number of claims — and that cost 4 of 34 `omission` mutations until the
-    // bump claims left it (above). Two of those four are still open
-    // (`opencloud@v7.3.0`, `opencloud-eu/web@v7.0.0`), and the two repairs
-    // this comment used to propose are both measured and rejected, on the
-    // 55-release corpus, 2026-08-06:
+    // bump claims left it (above). One of those four is still open and it is
+    // the only `omission` miss left: `opencloud-eu/web@v7.0.0`, commit
+    // `86fff671` (*tiptap integration*, 5,567 lines across 72 files), 57 of
+    // whose files other claims cite as evidence — 0.79, and no claim of its
+    // own. The two repairs this comment used to propose are both measured and
+    // rejected, on the 55-release corpus, 2026-08-06:
     //
     //   majority inside ONE claim's evidence   omission 30/34, completeness −8
     //   discount files many commits touch      omission 30/34, completeness +9
@@ -959,7 +957,7 @@ export async function computeCoverage(
     //
     // The third "works" by counting honestly documented dependency commits as
     // undocumented — opencloud@v7.1.0 falls 96 → 1, and every commit it newly
-    // condemns is a bump whose note names it. Whatever closes the last two has
+    // condemns is a bump whose note names it. Whatever closes the last one has
     // to keep that in view, and it is not a bigger number here: raising 0.5
     // was measured and rejected before any of these.
     if (files.length) {

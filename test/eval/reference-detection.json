@@ -1,11 +1,11 @@
 {
-  "date": "2026-08-06",
+  "date": "2026-08-09",
   "releases": 55,
   "engine": "off (deterministic only)",
   "classes": {
     "omission": {
-      "applicable": 34,
-      "detected": 32
+      "applicable": 36,
+      "detected": 35
     },
     "bump-overshoot": {
       "applicable": 22,
@@ -16,8 +16,8 @@
       "detected": 22
     },
     "foreign-claim": {
-      "applicable": 50,
-      "detected": 50
+      "applicable": 49,
+      "detected": 49
     },
     "backtick-noise": {
       "applicable": 55,

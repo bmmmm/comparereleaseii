@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   anchorsTo,
   buildInversionPrompt,
+  bumpCovers,
   fabricatedClaim,
   noiseTokens,
   OVERSHOOT_VERSION,
@@ -14,6 +15,7 @@ import {
 } from "../scripts/notes-mutations.ts";
 import { parseClaims } from "../src/claims.ts";
 import { lexicalMatch } from "../src/match.ts";
+import { pinBumps } from "../src/pins.ts";
 import type { Claim, DiffFile } from "../src/types.ts";
 
 function claim(text: string, over: Partial<Claim> = {}): Claim {
@@ -56,6 +58,48 @@ test("anchorsTo matches on an abbreviated sha or a shared PR number", () => {
   assert.equal(anchorsTo(claim("x", { prNumbers: [7] }), sha, [7, 9]), true);
   assert.equal(anchorsTo(claim("x", { prNumbers: [8] }), sha, [7, 9]), false);
   assert.equal(anchorsTo(claim("x"), sha, [7]), false);
+});
+
+test("a bump note covers the hops it does not name, and the omission mutation strips it", () => {
+  // The shape that made `opencloud-eu/opencloud@v7.3.0` read as an omission
+  // miss for three days. The release bumps `open-policy-agent/opa` in three
+  // commits and the notes carry one claim, for the last hop. On the middle
+  // commit that claim clears neither of the two routes the mutation used to
+  // consult — no shared PR number, and the lexical bar comes up one short
+  // *because* the version it names is not the version this commit moves — so
+  // the mutation kept it and `computeCoverage` went on covering the commit
+  // from it. The mutant still documented what it was supposed to have hidden.
+  const gomod: DiffFile = {
+    path: "go.mod",
+    status: "modified",
+    additions: 1,
+    deletions: 1,
+    patch:
+      "@@ -10,3 +10,3 @@\n-\tgithub.com/open-policy-agent/opa v1.17.1\n" +
+      "+\tgithub.com/open-policy-agent/opa v1.18.1\n \tgithub.com/stretchr/testify v1.9.0\n",
+  };
+  const note = claim("build(deps): bump github.com/open-policy-agent/opa from 1.18.1 to 1.18.2 #3061", {
+    prNumbers: [3061],
+    bump: { name: "github.com/open-policy-agent/opa", from: "1.18.1", to: "1.18.2" },
+  });
+  assert.equal(anchorsTo(note, "04a924f71693b04dd696398a06658955e1eb3e8f", []), false);
+  assert.ok(lexicalMatch(note, [gomod]).score < 5);
+  assert.equal(bumpCovers(note, pinBumps([gomod])), true);
+
+  // Same rule as coverage: a claim that asserts nothing about this release
+  // documents no commit, and a claim about another dependency documents this
+  // one no more than any other note does.
+  assert.equal(bumpCovers({ ...note, kind: "meta" }, pinBumps([gomod])), false);
+  assert.equal(bumpCovers(claim("Fix icon rendering"), pinBumps([gomod])), false);
+  assert.equal(
+    bumpCovers(
+      claim("bump github.com/rogpeppe/go-internal from 1.14.1 to 1.15.0", {
+        bump: { name: "github.com/rogpeppe/go-internal", from: "1.14.1", to: "1.15.0" },
+      }),
+      pinBumps([gomod]),
+    ),
+    false,
+  );
 });
 
 test("noiseTokens picks diff identifiers no real claim already names", () => {

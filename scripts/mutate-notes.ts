@@ -69,12 +69,14 @@ import { analyzeRelease, type CheckSettings } from "../src/check.ts";
 import { cloneDirFor } from "../src/paths.ts";
 import { loadLocalRange, localRepoContext } from "../src/sources/local.ts";
 import { lexicalMatch, tokenize } from "../src/match.ts";
+import { pinBumps } from "../src/pins.ts";
 import { run } from "../src/util.ts";
 import type { Claim, ClaimResult, DiffFile, Report } from "../src/types.ts";
 import { dedupeReports, median } from "./corpus-aggregate.ts";
 import {
   anchorsTo,
   buildInversionPrompt,
+  bumpCovers,
   fabricatedClaim,
   noiseTokens,
   OVERSHOOT_VERSION,
@@ -329,9 +331,15 @@ for (const report of reports) {
   // ---- omission ---------------------------------------------------------
   // The whole point of the completeness component: hide the biggest thing
   // that shipped and the tool has to say so. Which claims are hiding it has
-  // to be decided by the same two routes coverage itself grants — the anchor
-  // and the lexical bar — or the mutation removes the wrong lines and the
-  // commit stays covered for a reason that has nothing to do with the notes.
+  // to be decided by the same claim-specific routes coverage itself grants —
+  // the anchor, the lexical bar and the pin join — or the mutation removes the
+  // wrong lines and the commit stays covered for a reason that has nothing to
+  // do with the notes. The pin join was added to coverage a day after this
+  // block was written and not to this list, and the omission the harness kept
+  // reporting for `opencloud-eu/opencloud@v7.3.0` was that gap, not a
+  // detector miss: see `bumpCovers`. The union route is deliberately absent —
+  // it is claim-independent, so "the claims covering via it" is every claim
+  // in the release.
   {
     const uncovered = new Set((control.uncovered ?? []).map((u) => u.commit.sha));
     const ranked = (
@@ -344,8 +352,12 @@ for (const report of reports) {
     let hidden: { churn: number; sha: string; covering: Claim[] } | null = null;
     for (const { c, churn } of ranked.slice(0, 8)) {
       const files = await range.commitFiles(c.sha).catch(() => [] as DiffFile[]);
+      const pins = pinBumps(files);
       const covering = claims.filter(
-        (cl) => anchorsTo(cl, c.sha, c.prNumbers) || lexicalMatch(cl, files).score >= 5,
+        (cl) =>
+          anchorsTo(cl, c.sha, c.prNumbers) ||
+          lexicalMatch(cl, files).score >= 5 ||
+          bumpCovers(cl, pins),
       );
       // A zero-churn commit hides nothing, and a release already at
       // completeness 0 has no room to lose any — neither is a detector

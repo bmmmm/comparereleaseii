@@ -62,6 +62,30 @@ test("the detection reference covers exactly the harness's mutation classes", as
   );
 });
 
+test("the omission mutation strips every claim-specific coverage route", async () => {
+  // The drift this guards against has already happened once. The pin join
+  // joined `computeCoverage` on 2026-08-06, a day after the omission block was
+  // written against the anchor and the lexical bar alone, and for three days
+  // the harness reported an `omission` miss on
+  // `opencloud-eu/opencloud@v7.3.0` that was its own gap: it removed two
+  // routes' worth of notes and left the bump claim that covered the commit
+  // standing. A route added to coverage and not to this filter does not read
+  // as a harness bug — it reads as a detector miss, which is worse than no
+  // measurement at all.
+  //
+  // The union route is deliberately not in the list: it is claim-independent,
+  // so "the claims covering via it" is every claim in the release.
+  const source = await readFile(join(ROOT, "scripts/mutate-notes.ts"), "utf8");
+  const filter = source.slice(
+    source.indexOf("const covering = claims.filter("),
+    source.indexOf("// A zero-churn commit hides nothing"),
+  );
+  assert.ok(filter.length, "could not read the omission block's covering filter");
+  for (const route of ["anchorsTo", "lexicalMatch", "bumpCovers"]) {
+    assert.ok(filter.includes(route), `the omission mutation does not strip the ${route} route`);
+  }
+});
+
 test("the frozen rates are a measurement, not an aspiration", async () => {
   // The reference records open holes as such on purpose: freezing 100 %
   // everywhere would turn the yardstick into a wish and hide the very

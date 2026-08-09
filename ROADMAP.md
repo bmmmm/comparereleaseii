@@ -49,6 +49,13 @@ drifts by itself makes every score incomparable with every other and turns the
 frozen references into decoration. Nothing here adjusts a number to improve a
 score.
 
+The counterpart, learned on 2026-08-09 (entry 1): an instrument can be the
+thing that is wrong, and a frozen rate that moves because the instrument was
+corrected is not the drift this paragraph forbids — provided the correction is
+argued from the instrument's own contract and not from the number it produces.
+The test is whether the change touches scoring at all. That one did not, and
+the release it had been condemning was documented all along.
+
 The instruments now on hand, and what each is for:
 
 | Command | Answers |
@@ -64,78 +71,97 @@ did not start as a plan; it started as a corpus count — 8 of 12 contradicted
 claims were dependency bumps — and ended as a deterministic rule that is
 *both* more accurate than the judge on that class and free.
 
-### 1. `omission` 32/34 — coverage's fourth route, two cases left
+### 1. `omission` 35/36 — coverage's fourth route, one case left
 
 Mostly closed 2026-08-06. The union was never the whole story: what covered
 the commits it should not was *bump-claim evidence*, which is `go.mod` and
 `go.sum` by construction and therefore no fingerprint at all. Bump claims now
-document the commits that move the pin they name, and the corpus reads
-`omission` 32/34 with completeness up 29 points net. Three candidate repairs
-were measured and rejected on the way — the two this file used to propose move
-no rate whatsoever, and the file-type variant reaches 33/34 only by condemning
-honestly documented dependency work (`opencloud@v7.1.0` 96 → 1). Their numbers
-live in the comment at the route in `src/verify.ts`.
+document the commits that move the pin they name, and the corpus read
+`omission` 32/34 with completeness up 29 points net. Five candidate repairs
+were measured and rejected on the way — three move no rate whatsoever, the
+file-type variant reaches 33/34 only by condemning honestly documented
+dependency work (`opencloud@v7.1.0` 96 → 1), and the churn-share variant costs
+exactly what switching the route off costs, which is what it was. Their
+numbers live in the comment at the route in `src/verify.ts`, and the rule they
+all broke is in **Settled** below: a repair that counts a documented bump as
+undocumented is not a repair.
 
-What is left is two cases — `opencloud@v7.3.0` and `opencloud-eu/web@v7.0.0` —
-and no candidate that does not cost more than it buys. Whoever reopens this
-starts from the rejected three, and from the rule they all broke: a repair
-that counts a documented bump as undocumented is not a repair.
+**One of the two remaining cases was never a detector miss (2026-08-09).**
+Identified the way this entry has demanded since 2026-08-07 — from
+`pnpm mutate-notes tmp/corpus --repo opencloud-eu/opencloud --json`, then by
+instrumenting the mutant per route rather than reading this file:
 
-**Diagnosed 2026-08-06: the two are not one problem.** Both were re-measured
-and instrumented per route, and they sit on different ones:
+- the missed commit is `04a924f7` after all — *bump
+  `github.com/open-policy-agent/opa` from 1.17.1 to 1.18.1*, 29,027 lines
+  across 50 files — and the route holding it is the **bump pin join**,
+  measured and not assumed: anchors 0, claim evidence 0, evidence-file
+  majority **0/50**, lexical substance 0, pin join **1**.
+- the claim holding it is not the one this entry was chasing. v7.3.0 bumps opa
+  in three commits — `42987b03` 1.15.2→1.17.1 (41,505 lines), `04a924f7`
+  1.17.1→1.18.1, `bce52eec` 1.18.1→1.18.2 — the range moves the pin 1.15.2 →
+  1.18.2, and the notes carry **one** opa claim, for the last hop. The pin
+  join covers all three commits from it, versions deliberately not having to
+  agree. That is the rule that closed this class doing exactly what it says.
+- so the 2026-08-06 diagnosis was right and the 2026-08-07 correction was
+  wrong: the entry was aiming at the wrong **claim**, not the wrong commit.
+  The fifth candidate broke the link to a `rogpeppe/go-internal` claim that
+  never held the commit, while opa's own tree sits in 36 of those 50 paths and
+  kept the claim that did. "Moves nothing" was an accurate measurement of the
+  wrong hypothesis.
+- and the `omission` was the harness's, not the detector's. The mutation
+  removes the claims covering the commit by anchor and by the lexical bar —
+  the routes coverage granted when that block was written on **2026-08-05**.
+  The pin join joined coverage on **2026-08-06** and never joined the
+  mutation, so the opa claim stayed in the mutant notes: against that commit's
+  diff it scores **4** on a bar of 5, one short *because* the version it names
+  is not the version that commit moves. The tool was reading a note that was
+  still there, and saying so.
 
-- `opencloud@v7.3.0` — commit `04a924f7`, **29,027 lines across 50 files**,
-  held by the **bump pin join**. Not by the union: 0 of its 50 files are cited
-  as evidence, and no claim clears the lexical bar on it. Four of the 50 files
-  move a pin some note names, and that route is blind to everything else the
-  commit does. The rule that closed this class is what now hides the largest
-  commit in the release.
-- `opencloud-eu/web@v7.0.0` — commit `86fff671`, 5,567 lines across 72 files,
-  held by the **evidence-file majority** at 57/72 = 0.79. This one is the
-  union route the original diagnosis named.
+**Repaired in the harness, and no product code was touched.** `bumpCovers`
+(`scripts/notes-mutations.ts`) is the pin-join half of coverage, and the
+omission mutation now strips all three claim-specific routes; the union route
+stays out, because it is claim-independent and "the claims covering via it" is
+every claim in the release. `pnpm mutate-notes tmp/corpus --cases 80`, before
+and after, judge off, 55 releases:
 
-**A fourth candidate, measured and rejected.** Requiring the pin files to
-carry at least half the commit's churn before a bump claim documents it:
-`opencloud` omission 8/9 → **9/9**, median completeness 51 → 35, and
-`opencloud@v7.1.0` falls from **98 to 6**. That is the canary the file-type
-variant died on (96 → 1), dying the same way — a vendored dependency update
-moves `go.mod` and `go.sum` while the vendor tree carries the churn, so the
-most cleanly documented dependency work in the corpus reads as undocumented.
-The numbers live in the comment at the route.
+    omission                     32/34 → 35/36   (applicable rose: two traefik
+                                                  releases had no mutatable
+                                                  commit before)
+    bump-overshoot               22/22 → 22/22
+    bump-undershoot              22/22 → 22/22
+    foreign-claim                49/49 → 49/49
+    backtick-noise               50/55 → 50/55
+    median correctness           50    → 50
+    median completeness          38.5  → 38.5
+    median overall               45    → 45
+    per repo, omission           opencloud 8/9 → 9/9 · web 7/8 → 7/8
+                                 traefik n/a → 2/2 · four others unmoved
 
-What that leaves for whoever reopens it: churn share cannot tell "this commit
-*is* a bump" from "this commit *contains* a bump", and neither can file type.
-A signal that can would have to read the pin move against the rest of the
-commit's *substance* rather than its size — and it has to survive v7.1.0.
+The canary is not a measurement here, it is a construction. `src/verify.ts`
+keeps every scoring number, threshold and bar, so `opencloud@v7.1.0` cannot
+move — and it does not: control completeness **98 before and after**. That is
+what separates this from the five rejected candidates. Each of those bought
+detection with 16 points of median completeness because each was the route's
+off-switch in disguise; this one costs zero because it stopped mutating a
+release into a lie the notes still told the truth about. What v7.1.0's case
+now hides is 58,365 lines behind two claims instead of 211 behind one, and it
+is still detected.
 
-**A fifth candidate, and a correction to this entry (2026-08-07).** The
-substance signal this entry asked for was built: require the pin a claim names
-to appear in one of the commit's non-manifest *paths*, so that a commit which
-*is* a bump of X (carrying `vendor/…/X/**`) is separated from one that merely
-dragged X's manifest line along. Measured on `opencloud-eu/opencloud`:
+**What is left is one case, and it is the union route.**
+`opencloud-eu/web@v7.0.0`, commit `86fff671` (*feat: tiptap integration*),
+5,567 lines across 72 files, held by the **evidence-file majority** at
+**57/72 = 0.79** — re-confirmed 2026-08-09 with the same instrumentation: it
+moves no pin, so nothing above touches it, and no claim of its own clears any
+bar. Its 57 files are cited as evidence by *other* claims. That is the
+claim-independent union this whole block started from, and the three repairs
+measured against it on 2026-08-06 are all rejected (numbers at the route).
+Whoever reopens it needs a rule that tells "these files are already spoken
+for" from "this commit is spoken for" — and it still has to survive v7.1.0.
 
-    pin name must appear in a changed path    omission 8/9, completeness 51
-                                              — neither number moves
-    this route disabled entirely              omission 9/9, completeness 35
-
-Two things follow, and the second matters more than the candidate.
-
-The churn-share candidate above cost exactly the same 16 points of
-completeness as switching the route off, which is what it effectively was — a
-disguised off-switch, not a rule about bumps. Read the four rejections that way
-and they are not four ideas, they are one: every candidate so far bought the
-detection by removing the route for the honest cases too.
-
-And **this entry has been aiming at the wrong commit.** `04a924f7` carries 36
-changed files under `open-policy-agent/opa` and *zero* under
-`rogpeppe/go-internal` — a path rule does separate the covering claim from the
-covered commit there, and it still moves nothing. So whatever holds the
-remaining miss is not that commit, and the diagnosis above ("held by the bump
-pin join", the 29,027 lines) is a description of something that is no longer
-the failure. Whoever reopens this identifies the missed commit **first**, from
-`pnpm mutate-notes <dir> --repo <r> --json` and the case's own `detail` string.
-Four of the five candidates so far were aimed from this comment instead of from
-a measurement, and all four missed.
+The method is the finding as much as the result: five of six candidates were
+aimed from a comment instead of from a measurement, and all five missed. The
+one that landed was aimed at the case's own `detail` string and a per-route
+dump of the mutant.
 
 ### 2. The judge argues from commit subjects, and nothing stops it
 
