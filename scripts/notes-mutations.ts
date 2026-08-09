@@ -11,7 +11,7 @@
 import { extractJsonObject, untrustedBlock } from "../src/judge.ts";
 import { tokenize } from "../src/match.ts";
 import { sameName } from "../src/pins.ts";
-import type { Claim, DiffFile, PinBump, Verdict } from "../src/types.ts";
+import type { Claim, ClaimResult, DiffFile, PinBump, Report, Verdict } from "../src/types.ts";
 
 /**
  * Release notes rebuilt from parsed claims. Section headings and bullet syntax
@@ -67,6 +67,40 @@ export function bumpCovers(claim: Claim, verdict: Verdict | undefined, pins: Pin
   if (claim.bump === undefined || claim.kind !== "change") return false;
   if (verdict !== "verified" && verdict !== "partial") return false;
   return pins.some((p) => sameName(claim.bump!.name, p.name));
+}
+
+/**
+ * Which sibling release donates the foreign claim, and which of its claims.
+ *
+ * Farthest sibling first: the neighbouring release plausibly touches the same
+ * code, which would make a miss indistinguishable from an honest match. What
+ * the old one-shot pivot could not do is keep going when that sibling carries
+ * no eligible claim — the release then dropped out of the class's applicable
+ * count with a per-case detail string as its only trace, and an applicable
+ * that shrinks as a repo gains releases is drift in the instrument rather than
+ * a measurement. Observed 2026-08-09: `opencloud-eu/opencloud`'s last stored
+ * report has no verified change claim at all, and six releases lost their case
+ * to it (foreign-claim 55 applicable → 49).
+ *
+ * The walk keeps the old first choice first, so a case that had a donor keeps
+ * the one it had; only the giving-up changes.
+ */
+export function foreignDonor(
+  line: Report[],
+  here: number,
+): { from: Report; donor: ClaimResult } | undefined {
+  const order = line
+    .map((report, index) => ({ report, index }))
+    .filter((c) => c.index !== here)
+    .sort((a, b) => Math.abs(b.index - here) - Math.abs(a.index - here) || a.index - b.index);
+  for (const { report } of order) {
+    const donor = report.results
+      .filter((x) => x.claim.kind === "change" && x.verdict === "verified")
+      .filter((x) => tokenize(x.claim.text).length >= 4)
+      .at(0);
+    if (donor) return { from: report, donor };
+  }
+  return undefined;
 }
 
 /**

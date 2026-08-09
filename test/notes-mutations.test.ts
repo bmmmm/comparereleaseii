@@ -6,6 +6,7 @@ import {
   buildInversionPrompt,
   bumpCovers,
   fabricatedClaim,
+  foreignDonor,
   noiseTokens,
   OVERSHOOT_VERSION,
   parseInversion,
@@ -16,7 +17,7 @@ import {
 import { parseClaims } from "../src/claims.ts";
 import { lexicalMatch } from "../src/match.ts";
 import { pinBumps } from "../src/pins.ts";
-import type { Claim, DiffFile } from "../src/types.ts";
+import type { Claim, DiffFile, Report } from "../src/types.ts";
 
 function claim(text: string, over: Partial<Claim> = {}): Claim {
   return {
@@ -169,6 +170,52 @@ test("the fabricated claim still lands in the diff, and no longer settles there"
   // backticks: padding that is an identifier on its own still scores 3 each.
   const shaped = fabricatedClaim(["retry_budget", "socket_timeout"]);
   assert.equal(lexicalMatch(shaped, files).score, 6);
+});
+
+test("the donor picker walks the line instead of giving up on the farthest sibling", () => {
+  // A release list where only the middle release carries an eligible claim.
+  // The old pivot asked the farthest sibling once and dropped the case when it
+  // had none, which quietly took that release out of the class's applicable
+  // count — `opencloud-eu/opencloud`'s last stored report carries no verified
+  // change claim, and six releases went missing behind a rate that still read
+  // 100 %.
+  const release = (tag: string, results: Report["results"]): Report =>
+    ({ repoLabel: "o/r", headRef: tag, baseRef: "prev", results }) as Report;
+  const eligible = (text: string): Report["results"] => [
+    {
+      claim: claim(text),
+      verdict: "verified",
+      confidence: 1,
+      reasoning: "planted",
+      evidence: { commitShas: [], files: [], matchedTerms: [], methods: [] },
+      judged: false,
+      generated: false,
+    },
+  ];
+
+  const line = [
+    release("v1", []),
+    release("v2", eligible("Reject an unrecognised DATABASE_URL instead of falling back")),
+    release("v3", []),
+  ];
+  assert.equal(foreignDonor(line, 0)?.from.headRef, "v2");
+  assert.equal(foreignDonor(line, 2)?.from.headRef, "v2");
+
+  // Where the farthest sibling does have one, it is still the one taken —
+  // a neighbour plausibly touches the same code, and this walk must not have
+  // quietly moved the donor of the cases that already had one.
+  const both = [
+    release("v1", eligible("Reject an unrecognised DATABASE_URL instead of falling back")),
+    release("v2", eligible("Fix icon rendering on HiDPI displays across sessions")),
+    release("v3", eligible("Retry a failed upload with a bounded backoff budget")),
+  ];
+  assert.equal(foreignDonor(both, 0)?.from.headRef, "v3");
+  assert.equal(foreignDonor(both, 2)?.from.headRef, "v1");
+
+  // Nothing to donate anywhere, and a release that is its own only sibling:
+  // still skipped, and skipping stays a stated n/a rather than a detection.
+  assert.equal(foreignDonor([release("v1", []), release("v2", [])], 0), undefined);
+  assert.equal(foreignDonor([release("v1", eligible("A claim of its own here"))], 0), undefined);
 });
 
 test("restateBumpTarget moves only the target, never the origin", () => {

@@ -78,6 +78,7 @@ import {
   buildInversionPrompt,
   bumpCovers,
   fabricatedClaim,
+  foreignDonor,
   noiseTokens,
   OVERSHOOT_VERSION,
   parseInversion,
@@ -258,6 +259,17 @@ function wouldReachJudge(r: ClaimResult): boolean {
 
 const cases: Case[] = [];
 const skipped: string[] = [];
+/**
+ * Why releases dropped out, counted by cause. The per-release lines are
+ * truncated in the terminal output, and a corpus where half the releases have
+ * no local clone reads exactly like a corpus that was fully measured unless
+ * the causes are summed up somewhere.
+ */
+const skipCauses = new Map<string, number>();
+function skip(label: string, cause: string, detail = cause): void {
+  skipped.push(`${label}: ${detail}`);
+  skipCauses.set(cause, (skipCauses.get(cause) ?? 0) + 1);
+}
 let analysed = 0;
 const cost = { claims: 0, wouldJudge: 0 };
 /**
@@ -277,8 +289,9 @@ for (const report of reports) {
   if (analysed >= limit) break;
   const cloneUrl = report.linkBase ?? `https://github.com/${report.repoLabel}`;
   const clone = await cloneDirFor(cloneUrl);
+  const label = `${report.repoLabel}@${report.headRef}`;
   if (!clone) {
-    skipped.push(`${report.repoLabel}@${report.headRef}: no cache directory`);
+    skip(label, "no cache directory");
     continue;
   }
   // A clone that does not carry both ends of the range answers nothing, and a
@@ -287,14 +300,16 @@ for (const report of reports) {
     await run("git", ["-C", clone, "rev-parse", "--verify", `${report.baseRef}^{commit}`]);
     await run("git", ["-C", clone, "rev-parse", "--verify", `${report.headRef}^{commit}`]);
   } catch {
-    skipped.push(`${report.repoLabel}@${report.headRef}: refs not in the local clone`);
+    skip(label, "refs not in the local clone");
     continue;
   }
 
   const range = await loadLocalRange(clone, report.baseRef, report.headRef);
   if (range.commits.length > maxCommits) {
-    skipped.push(
-      `${report.repoLabel}@${report.headRef}: ${range.commits.length} commits over the --max-commits ${maxCommits} bound`,
+    skip(
+      label,
+      "over the --max-commits bound",
+      `${range.commits.length} commits over the --max-commits ${maxCommits} bound`,
     );
     continue;
   }
@@ -313,7 +328,7 @@ for (const report of reports) {
   try {
     control = await analyse(renderNotes(claims));
   } catch (err) {
-    skipped.push(`${report.repoLabel}@${report.headRef}: ${(err as Error).message.slice(0, 80)}`);
+    skip(label, "the control run failed", `control run failed — ${(err as Error).message.slice(0, 80)}`);
     continue;
   }
   analysed++;
@@ -324,7 +339,6 @@ for (const report of reports) {
   if (control.metrics.scores.completeness !== null) {
     controlScores.completeness.push(control.metrics.scores.completeness);
   }
-  const label = `${report.repoLabel}@${report.headRef}`;
   const add = (mutation: MutationClass, applicable: boolean, detected: boolean | undefined, detail: string) =>
     cases.push({ repoLabel: report.repoLabel, headRef: report.headRef, mutation, applicable, detected, detail });
 
@@ -443,31 +457,23 @@ for (const report of reports) {
   }
 
   // ---- foreign-claim ----------------------------------------------------
-  // Someone else's true statement is still false here. The donor is taken
-  // from the most distant release of the same repo, because the neighbouring
-  // one plausibly touches the same code and would make this a coin flip.
+  // Someone else's true statement is still false here. Which sibling donates
+  // is `foreignDonor`'s decision — farthest first, then inwards, and the
+  // reasons for both halves of that are with it.
   {
     const line = byRepo.get(report.repoLabel) ?? [];
-    const here = line.indexOf(report);
-    // Farthest sibling in the repo's own release order: the neighbouring
-    // release plausibly touches the same code, which would make a miss
-    // indistinguishable from an honest match.
-    const farthest = here * 2 >= line.length ? line[0] : line[line.length - 1];
-    const donor = (farthest === report ? undefined : farthest)?.results
-      .filter((x) => x.claim.kind === "change" && x.verdict === "verified")
-      .filter((x) => tokenize(x.claim.text).length >= 4)
-      .at(0);
-    if (!donor) {
-      add("foreign-claim", false, undefined, "no donor claim in a sibling release");
+    const picked = foreignDonor(line, line.indexOf(report));
+    if (!picked) {
+      add("foreign-claim", false, undefined, "no sibling release carries an eligible claim");
     } else {
-      const planted: Claim = { ...donor.claim, id: -1 };
+      const planted: Claim = { ...picked.donor.claim, id: -1 };
       const mutant = await analyse(renderNotes([...claims, planted]));
       const landed = mutant.results.find((r: ClaimResult) => r.claim.text === planted.text);
       add(
         "foreign-claim",
         true,
         landed ? landed.verdict !== "verified" : undefined,
-        `planted "${planted.text.slice(0, 48)}" → ${landed?.verdict ?? "not parsed"}`,
+        `planted "${planted.text.slice(0, 48)}" from ${picked.from.headRef} → ${landed?.verdict ?? "not parsed"}`,
       );
     }
   }
@@ -587,11 +593,28 @@ if (args.includes("--freeze")) {
 }
 
 const regressed: string[] = [];
+/**
+ * The denominator moving is not a regression, and it is not nothing either: a
+ * rate measured over a different applicable count is a different measurement,
+ * and a shrinking one can hide a real miss behind a stable-looking ratio (a
+ * donor picker that gave up used to do exactly that). Reported, never fatal —
+ * a corpus that gained releases SHOULD move it.
+ */
+const drifted: string[] = [];
 try {
   const ref = JSON.parse(await readFile(REFERENCE, "utf8")) as {
     releases: number;
     classes: Record<string, { applicable: number; detected: number }>;
   };
+  if (ref.releases !== analysed) {
+    drifted.push(`releases: ${analysed} analysed now, ${ref.releases} frozen`);
+  }
+  for (const s of summary) {
+    const was = ref.classes[s.mutation];
+    if (was && was.applicable !== s.applicable) {
+      drifted.push(`${s.mutation}: ${s.applicable} applicable now, ${was.applicable} frozen`);
+    }
+  }
   for (const s of summary) {
     // A generated class cannot regress against a frozen number: its rate
     // moves when a model phrases the lie differently, which is weather, not
@@ -620,7 +643,17 @@ const medianScores = {
 if (asJson) {
   console.log(
     JSON.stringify(
-      { releases: analysed, summary, cost, scores: medianScores, cases, skipped, regressed },
+      {
+        releases: analysed,
+        summary,
+        cost,
+        scores: medianScores,
+        cases,
+        skipped,
+        skipCauses: Object.fromEntries(skipCauses),
+        drifted,
+        regressed,
+      },
       null,
       2,
     ),
@@ -655,8 +688,19 @@ if (misses.length) {
     console.log(`  ${m.mutation.padEnd(16)} ${m.repoLabel}@${m.headRef} — ${m.detail}`);
   }
 }
+if (drifted.length) {
+  console.log(
+    `\napplicable moved against ${REFERENCE} — a rate over a different` +
+      `\ndenominator is a different measurement, not a better one:`,
+  );
+  for (const d of drifted) console.log(`  ${d}`);
+}
 if (skipped.length) {
-  console.log(`\n${skipped.length} release(s) skipped:`);
+  const causes = [...skipCauses]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cause, n]) => `${n} ${cause}`)
+    .join(" · ");
+  console.log(`\n${skipped.length} release(s) skipped: ${causes}`);
   for (const s of skipped.slice(0, 8)) console.log(`  ${s}`);
   if (skipped.length > 8) console.log(`  … and ${skipped.length - 8} more (--json lists all)`);
 }
