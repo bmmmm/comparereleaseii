@@ -63,6 +63,7 @@
 // headings and bullet syntax; control and mutant are built the same way, so
 // that costs interpretability against the original markdown, not validity of
 // the comparison.
+import { writeSync } from "node:fs";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { analyzeRelease, type CheckSettings } from "../src/check.ts";
@@ -70,7 +71,7 @@ import { cloneDirFor } from "../src/paths.ts";
 import { loadLocalRange, localRepoContext } from "../src/sources/local.ts";
 import { lexicalMatch, tokenize } from "../src/match.ts";
 import { pinBumps } from "../src/pins.ts";
-import { run } from "../src/util.ts";
+import { pooled, run } from "../src/util.ts";
 import type { Claim, ClaimResult, DiffFile, Report, Verdict } from "../src/types.ts";
 import { dedupeReports, median } from "./corpus-aggregate.ts";
 import {
@@ -267,10 +268,6 @@ const skipped: string[] = [];
  * the causes are summed up somewhere.
  */
 const skipCauses = new Map<string, number>();
-function skip(label: string, cause: string, detail = cause): void {
-  skipped.push(`${label}: ${detail}`);
-  skipCauses.set(cause, (skipCauses.get(cause) ?? 0) + 1);
-}
 let analysed = 0;
 const cost = { claims: 0, wouldJudge: 0 };
 /**
@@ -286,33 +283,62 @@ const controlScores: { correctness: number[]; completeness: number[]; overall: n
   overall: [],
 };
 
-for (const report of reports) {
-  if (analysed >= limit) break;
+/** Everything one release contributes — collected locally, merged in corpus order. */
+interface ReleaseOutcome {
+  cases: Case[];
+  skips: Array<{ label: string; cause: string; detail: string }>;
+  analysed: boolean;
+  claims: number;
+  wouldJudge: number;
+  scores: { correctness: number; completeness: number | null; overall: number } | null;
+}
+
+/**
+ * Releases analysed at once. They share nothing: each reads its own range out
+ * of the clone cache with read-only git calls and analyses it judge-free, so
+ * the only contention is the machine. AGENTS.md's "measure serially" trap is
+ * about fanning parallel checks at ONE GitHub account and tripping its rate
+ * limit — this harness never touches the network.
+ *
+ * Each release already runs its own pooled(6) over commit diffs, so four at a
+ * time is up to two dozen git processes; the default is deliberately below the
+ * core count rather than at it.
+ */
+const releasesAtOnce = Number(flag("parallel") ?? "4");
+
+async function analyseOne(report: Report): Promise<ReleaseOutcome> {
+  const out: ReleaseOutcome = {
+    cases: [],
+    skips: [],
+    analysed: false,
+    claims: 0,
+    wouldJudge: 0,
+    scores: null,
+  };
+  const skip = (label: string, cause: string, detail = cause): ReleaseOutcome => {
+    out.skips.push({ label, cause, detail });
+    return out;
+  };
   const cloneUrl = report.linkBase ?? `https://github.com/${report.repoLabel}`;
   const clone = await cloneDirFor(cloneUrl);
   const label = `${report.repoLabel}@${report.headRef}`;
-  if (!clone) {
-    skip(label, "no cache directory");
-    continue;
-  }
+  if (!clone) return skip(label, "no cache directory");
   // A clone that does not carry both ends of the range answers nothing, and a
   // fetch here would make the harness depend on a network it must not need.
   try {
     await run("git", ["-C", clone, "rev-parse", "--verify", `${report.baseRef}^{commit}`]);
     await run("git", ["-C", clone, "rev-parse", "--verify", `${report.headRef}^{commit}`]);
   } catch {
-    skip(label, "refs not in the local clone");
-    continue;
+    return skip(label, "refs not in the local clone");
   }
 
   const range = await loadLocalRange(clone, report.baseRef, report.headRef);
   if (range.commits.length > maxCommits) {
-    skip(
+    return skip(
       label,
       "over the --max-commits bound",
       `${range.commits.length} commits over the --max-commits ${maxCommits} bound`,
     );
-    continue;
   }
   const context = await localRepoContext(clone, report.headRef);
   const claims = report.results.map((r) => r.claim);
@@ -344,19 +370,22 @@ for (const report of reports) {
   try {
     control = await analyse(renderNotes(claims));
   } catch (err) {
-    skip(label, "the control run failed", `control run failed — ${(err as Error).message.slice(0, 80)}`);
-    continue;
+    return skip(
+      label,
+      "the control run failed",
+      `control run failed — ${(err as Error).message.slice(0, 80)}`,
+    );
   }
-  analysed++;
-  cost.claims += control.results.length;
-  cost.wouldJudge += control.results.filter(wouldReachJudge).length;
-  controlScores.correctness.push(control.metrics.scores.correctness);
-  controlScores.overall.push(control.metrics.scores.overall);
-  if (control.metrics.scores.completeness !== null) {
-    controlScores.completeness.push(control.metrics.scores.completeness);
-  }
+  out.analysed = true;
+  out.claims = control.results.length;
+  out.wouldJudge = control.results.filter(wouldReachJudge).length;
+  out.scores = {
+    correctness: control.metrics.scores.correctness,
+    completeness: control.metrics.scores.completeness,
+    overall: control.metrics.scores.overall,
+  };
   const add = (mutation: MutationClass, applicable: boolean, detected: boolean | undefined, detail: string) =>
-    cases.push({ repoLabel: report.repoLabel, headRef: report.headRef, mutation, applicable, detected, detail });
+    out.cases.push({ repoLabel: report.repoLabel, headRef: report.headRef, mutation, applicable, detected, detail });
 
   // ---- omission ---------------------------------------------------------
   // The whole point of the completeness component: hide the biggest thing
@@ -594,13 +623,66 @@ for (const report of reports) {
             : `"${verified.claim.text.slice(0, 60)}" → "${inversion.line.slice(0, 60)}"` +
               `${inversion.inverted ? ` (flipped: ${inversion.inverted})` : ""} → ${landed?.verdict ?? "not parsed"}`,
         );
-      } else if (!cases.some((c) => c.headRef === report.headRef && c.mutation === "inverted-claim")) {
+      } else if (!out.cases.some((c) => c.mutation === "inverted-claim")) {
         add("inverted-claim", false, undefined, "the model returned no usable inversion");
       }
     }
   }
 
   if (!asJson) console.error(`  checked ${label}`);
+  return out;
+}
+
+/**
+ * `--cases` bounds the releases that go INTO the analysis, and the cheap
+ * checks that reject one — no clone, refs missing — run first so that bound
+ * lands on releases that can actually be measured. A release rejected later
+ * (over `--max-commits`, or a control run that throws) does spend one, which
+ * the serial version did not: with the whole corpus as the default that is a
+ * difference nobody can observe, and the alternative is deciding how many
+ * releases to analyse by racing them.
+ */
+const reachable: Report[] = [];
+for (const report of reports) {
+  const clone = await cloneDirFor(report.linkBase ?? `https://github.com/${report.repoLabel}`);
+  const label = `${report.repoLabel}@${report.headRef}`;
+  if (!clone) {
+    skipped.push(`${label}: no cache directory`);
+    skipCauses.set("no cache directory", (skipCauses.get("no cache directory") ?? 0) + 1);
+    continue;
+  }
+  try {
+    await run("git", ["-C", clone, "rev-parse", "--verify", `${report.baseRef}^{commit}`]);
+    await run("git", ["-C", clone, "rev-parse", "--verify", `${report.headRef}^{commit}`]);
+    reachable.push(report);
+  } catch {
+    skipped.push(`${label}: refs not in the local clone`);
+    skipCauses.set(
+      "refs not in the local clone",
+      (skipCauses.get("refs not in the local clone") ?? 0) + 1,
+    );
+  }
+}
+
+// Merged in corpus order, never in completion order: `cases` and `skipped` are
+// the output, and an instrument whose output permutes between runs cannot be
+// diffed against its own previous answer.
+const outcomes = await pooled(reachable.slice(0, limit), releasesAtOnce, analyseOne);
+for (const out of outcomes) {
+  for (const s of out.skips) {
+    skipped.push(`${s.label}: ${s.detail}`);
+    skipCauses.set(s.cause, (skipCauses.get(s.cause) ?? 0) + 1);
+  }
+  cases.push(...out.cases);
+  if (!out.analysed) continue;
+  analysed++;
+  cost.claims += out.claims;
+  cost.wouldJudge += out.wouldJudge;
+  if (out.scores) {
+    controlScores.correctness.push(out.scores.correctness);
+    controlScores.overall.push(out.scores.overall);
+    if (out.scores.completeness !== null) controlScores.completeness.push(out.scores.completeness);
+  }
 }
 
 const summary = MUTATION_CLASSES.map((mutation) => {
@@ -695,23 +777,34 @@ const medianScores = {
 };
 
 if (asJson) {
-  console.log(
-    JSON.stringify(
-      {
-        releases: analysed,
-        summary,
-        cost,
-        scores: medianScores,
-        cases,
-        skipped,
-        skipCauses: Object.fromEntries(skipCauses),
-        drifted,
-        regressed,
-      },
-      null,
-      2,
-    ),
+  const report = JSON.stringify(
+    {
+      releases: analysed,
+      summary,
+      cost,
+      scores: medianScores,
+      cases,
+      skipped,
+      skipCauses: Object.fromEntries(skipCauses),
+      drifted,
+      regressed,
+    },
+    null,
+    2,
   );
+  // Written synchronously, then exit. Redirected to a file stdout is
+  // synchronous anyway and `console.log` + `process.exit` was safe; on a PIPE
+  // it is not, and the loss begins at the pipe buffer — which is why
+  // `pnpm sweep`, the one caller that reads this over a pipe, saw
+  // "Unterminated string in JSON at position 65184" on every point it
+  // measured. 64 KiB is about 25 releases' worth, so the whole-corpus run this
+  // file now defaults to could never reach the sweep at all.
+  //
+  // The obvious repair — write with a callback and exit from it — is worse
+  // than the bug: the callback fires after the drain, and everything below
+  // this block runs in the meantime, so the JSON came back with the human
+  // report appended to it.
+  writeSync(1, `${report}\n`);
   process.exit(regressed.length ? 1 : 0);
 }
 
@@ -766,5 +859,8 @@ if (skipped.length) {
 if (regressed.length) {
   console.log(`\nworse than ${REFERENCE}:`);
   for (const r of regressed) console.log(`  ${r}`);
-  process.exit(1);
+  // Nothing runs after this, so setting the code lets the buffered output
+  // drain on its own — `process.exit` here would truncate it down a pipe the
+  // same way the JSON branch above did.
+  process.exitCode = 1;
 }
