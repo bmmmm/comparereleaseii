@@ -1,38 +1,37 @@
 # Roadmap
 
-> **Status 2026-08-07:** v0.10.1 is out and the gh extension's pin follows
-> it, so the state lock, the backtick rule, the pin-join fixes and the
-> unreadable-commit repair are what the hourly job now runs. Next release is
-> 0.11.0.
+> **Status 2026-08-09:** v0.11.0 is out (`55befd4`, tagged on both forges,
+> extension pin bumped, `check-release-notes` green on the tag) and nothing
+> sits unreleased on `main`. The hourly job now runs the subscription block
+> in production: `surface.hosts` in every report, and watch `rules` evaluated
+> against the live config — calibrated 2026-08-09 from a corpus replay
+> (defaults: `new hosts` + `security findings`; `migrations` for
+> opencloud/vaultwarden/bitwarden; a `credentials` path rule for
+> nextcloud/desktop; auth-directory globs measured and rejected, they fired
+> on every minor). The config lives in the watch home with a dated backup
+> beside it; docs/watchdog.md carries the operator side.
 >
-> **Unreleased on `main`:** the bump-claim coverage fix (a scoring change), a
-> cleanup round that left behaviour bit-identical, the whole "running it
-> teaches it" block — the scoring-generation marker, `--add-golden`, the judge
-> bill by claim class, `pnpm sweep`, the `inverted-claim` generator and the
-> silent-softening watchdog, all landed 2026-08-06 — and the two repairs that
-> closed `inverted-claim` on 2026-08-07: overlap-only claims buy a judge call
-> instead of settling, and a `verified` on that evidence is reviewed rather
-> than taken on one vote. Both change what reaches a judge, so the next
-> release's calibration run costs more than the last one. What they measured
-> lives where it belongs: CHANGELOG (what shipped), SCORING.md (score
-> semantics and the generation rule), docs/corpus.md (the bill and the sweep),
-> docs/watchdog.md (alerting), AGENTS.md (commands).
+> The release's validation-table check set a precedent worth reusing: the
+> pinned gh extension IS the previous release, so the judge-off A/B needs no
+> second checkout — four cases came out bit-identical, the one that moved
+> (restic, through the circularity gate) was re-measured judged and landed on
+> the same 89. Details in the release commit.
 >
-> Also unreleased, landed 2026-08-08: the subscription block — `surface.hosts`
-> (which hosts a release starts and stops talking to, in every renderer) and
-> watch `rules` (per-repo subscriptions on directory globs, surface layers and
-> finding kinds, the fourth alert reason). Score-neutral by construction;
-> docs/watchdog.md carries the operator side.
+> Everything before that is on `main` too — the three original phases, the
+> 2026-07-27 block series, the long view, the second axis (shipped as v0.7.0),
+> the reconciliation layer, and the "running it teaches it" instruments block.
+> This file carries only what is open; the landed plans and their dated
+> landed notes live in this file's git history (up to `039460a`).
 >
-> Everything before that is on `main` too — the three original phases
-> (distribution, watchdog, judge trust), iterations 2–4, the 2026-07-27 block
-> series (bughunt follow-up, hardening backlog, forge watching, presentation
-> + author ledger), the long view (backfill, phases/events/heatmap), the
-> second axis (pins → substance → first-party expansion → findings/lenses →
-> substance coverage; shipped as v0.7.0 on 2026-08-03), and the
-> reconciliation layer (claims meet findings — landed 2026-08-03). This file
-> carries only what is open; the landed plans and their dated landed notes
-> live in this file's git history (up to `039460a`).
+> **Where a fresh session starts:** entry 6 (the `cliFlags` category-boundary
+> leak — `vendor/` exclusion is the measured-safe first move), entry 7 (a
+> stub harness for `checkAndRecord`), forge issue #9 (verdict-cache GC:
+> 97.5 % of entries are dead versions nothing evicts), or entries 1–2 below,
+> which need judge budget and patience. One operational thread needs no code:
+> the rules are live but have never seen a real release — the first watched
+> release that fires one is the feature's first production datapoint, and
+> `pnpm corpus-stats` at 0.11.0 (the class-bill section is released now)
+> against a refreshed `tmp/corpus` names the next free deterministic rule.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 
@@ -192,16 +191,16 @@ construction and re-measures the README validation table. Start at
 
 ## Open (2026-08-08): what the subscription block measured and left behind
 
-The subscription block landed the same day it was planned: `surface.hosts`
-(the host delta as a surface field, all three renderers, mutate-guarded) and
-watch `rules` (directory globs / surface layers / finding kinds as the
-fourth alert reason in `alertDecision`, hits on the record, staleness note,
-docs). The plans and their design measurements live in this file's git
-history (entries 3 and 4, commit `cbe5658`); the corpus numbers that decided
-them — directory anchors 74–98% recurrence vs. files 22–60% and symbols
-≤27%, host detector 0–2 per release vs. call-site detector zero — are
-summarized in the two Settled entries below. What stays open is what the
-work surfaced:
+The subscription block landed the day it was planned and shipped in v0.11.0
+the day after: `surface.hosts` (the host delta as a surface field, all three
+renderers, mutate-guarded) and watch `rules` (directory globs / surface
+layers / finding kinds as the fourth alert reason in `alertDecision`, hits
+on the record, staleness note, docs). The plans and their design
+measurements live in this file's git history (entries 3 and 4, commit
+`cbe5658`); the corpus numbers that decided them — directory anchors 74–98%
+recurrence vs. files 22–60% and symbols ≤27%, host detector 0–2 per release
+vs. call-site detector zero — are summarized in the two Settled entries
+below. What stays open is what the work surfaced:
 
 ### 6. The category boundary, not the subprocess, is where `cliFlags` leaks
 
