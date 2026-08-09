@@ -1,18 +1,35 @@
 # Roadmap
 
-> **Status 2026-08-09 (evening):** v0.12.0 is out (`bf637f3`, tagged) and
-> nothing sits unreleased on `main`. The release carries the commit-subject
-> rule line in the judge prompt — a behaviour change for every judged run,
-> with the reference re-frozen at 42/43 and the README validation table
-> re-measured under the three-draw majority protocol behind it. It
-> invalidates every verdict-cache entry by construction, so the first watch
-> pass under 0.12.0 pays full price and its records open scoring
-> generation 2 (undocumented single-file CI pipelines now count as
-> sensitive). Also in: the flag-surface exclusions (`vendor/`, `.vue`,
-> CI/tooling config — fire rate 50 % → 39.5 %) and the mutation harness's
-> pin-join repair (`omission` 35/36; the one case that was never a detector
-> miss). The hourly job runs the subscription block in production; the rules
-> config lives in the watch home, docs/watchdog.md carries the operator side.
+> **Status 2026-08-09 (night):** v0.13.0 is out (`3858243`, tagged on both
+> forges, CI green, extension pin bumped) and nothing sits unreleased on
+> `main` but the CI repair behind it (`b0bface`).
+>
+> **The release is mostly about the instruments, and that changes what every
+> earlier number means.** The mutation harness had been skipping 52 of 111
+> corpus releases for missing clones and reporting that as a truncated list,
+> so every detection rate this repo ever published came from half a corpus:
+> with all clones present the same detector reads `omission` 59/66 where it
+> had read 35/36. Reference and README table re-frozen on the full corpus.
+> Three instrument failures only the full basis could show — a release whose
+> mutation leaves no notes took the run down, the report was truncated at the
+> pipe buffer (`console.log` + `process.exit`, macOS-only, which is why CI
+> never saw it), and `pnpm check` did not cover `scripts/` at all.
+>
+> On that basis, one scoring change: coverage's evidence union asks for every
+> file of a commit rather than half, because on the full corpus that route was
+> the sole cause of all seven remaining `omission` misses. The sweep put its
+> only Pareto point at 1 — also the only value stating a rule rather than a
+> calibrated preference. **`SCORING_GENERATION` is 3**: 27 of 111 releases
+> move their completeness, so generation-2 records are not comparable.
+> Validation table redrawn; the redraw separates restic 89 → 86 (this change,
+> deterministic under `--judge off`) from git-cliff 90 → 87 and vaultwarden
+> 84–87 → 79–82 (bit-identical under `--judge off` — judged flicker).
+>
+> Issues #9, #10 and #11 closed in the same release. Tools that produce these
+> numbers are now tracked (`pnpm corpus-clones`, `corpus-bump-origins`,
+> `diagnose-coverage`) after one of them was lost with a removed worktree, and
+> the harness runs four releases at once and resumes from a build-keyed cache
+> beside the clones.
 >
 > Everything before that is on `main` too — the three original phases, the
 > 2026-07-27 block series, the long view, the second axis (shipped as v0.7.0),
@@ -20,26 +37,18 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> Forge issues #9, #10 and #11 were closed on 2026-08-09 and sit unreleased
-> on `main`: the verdict cache now sweeps the builds it orphaned (99.5 % of
-> the measured directory) and answers `cache stats|gc`; the pin join reads a
-> bump note's *from* version positionally, which the corpus decided — 26 of
-> 76 joinable from-versions name a later hop of an aggregated move and are
-> honest, 10 name a version the release never held and are not; and the
-> `foreign-claim` donor walks the release line instead of giving up on one
-> sibling, which put six releases back into its applicable count (49/49 →
-> 55/55, re-frozen). No score moved in any of it.
+> **Where a fresh session starts:** forge issue #12 (a version literal plus an
+> ordinary word hits the lexical bar exactly at 5 — the `lexical-bar` sweep
+> dial already exists and a sweep point is now minutes, not 25), issue #8's
+> remainder (two commits at share 1.00 that no threshold reaches; the
+> one-claim rule is the only candidate and its old measurement is void), or
+> issue #13. Entry 1 below still needs new facts more than budget.
 >
-> **Where a fresh session starts:** forge issue #8 (coverage's fourth route
-> belongs to no claim), or entry 1 below, which needs new facts more than
-> budget. Two measurement threads left over from the rule-line work: three
-> before-side draws would settle whether git-cliff's 96→90 belongs to the
-> rule or to flicker, and the first production release that fires a watch
-> rule is the subscription feature's first real datapoint — `pnpm
-> corpus-stats` against a refreshed `tmp/corpus` then names the next free
-> deterministic rule. One thing the harness now states that nobody has acted
-> on: 52 of the 108 corpus releases are skipped for refs missing from the
-> clone cache, so every rate it reports covers half the corpus.
+> One finding with no issue and no numbers yet: on two of four validation rows
+> the judged flicker is wider than the scoring change they were redrawn for
+> (git-cliff and vaultwarden moved while being bit-identical under
+> `--judge off`). That relativises every judged before/after comparison in
+> this project, and nobody has measured how wide the band actually is.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 
