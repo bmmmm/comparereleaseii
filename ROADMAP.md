@@ -1,26 +1,18 @@
 # Roadmap
 
-> **Status 2026-08-09:** v0.11.0 is out (`55befd4`, tagged on both forges,
-> extension pin bumped, `check-release-notes` green on the tag); what sits
-> unreleased on `main` is the golden set's two new subject shapes, entry
-> 6's flag-surface exclusions, and — the one that changes every judged run —
-> the commit-subject rule line in the judge prompt, with the reference
-> re-frozen and the README validation table re-measured behind it. That last
-> one invalidates every verdict-cache entry by construction, so the first
-> watch pass after release pays full price. The hourly job now runs the subscription block
-> in production: `surface.hosts` in every report, and watch `rules` evaluated
-> against the live config — calibrated 2026-08-09 from a corpus replay
-> (defaults: `new hosts` + `security findings`; `migrations` for
-> opencloud/vaultwarden/bitwarden; a `credentials` path rule for
-> nextcloud/desktop; auth-directory globs measured and rejected, they fired
-> on every minor). The config lives in the watch home with a dated backup
-> beside it; docs/watchdog.md carries the operator side.
->
-> The release's validation-table check set a precedent worth reusing: the
-> pinned gh extension IS the previous release, so the judge-off A/B needs no
-> second checkout — four cases came out bit-identical, the one that moved
-> (restic, through the circularity gate) was re-measured judged and landed on
-> the same 89. Details in the release commit.
+> **Status 2026-08-09 (evening):** v0.12.0 is out (`bf637f3`, tagged) and
+> nothing sits unreleased on `main`. The release carries the commit-subject
+> rule line in the judge prompt — a behaviour change for every judged run,
+> with the reference re-frozen at 42/43 and the README validation table
+> re-measured under the three-draw majority protocol behind it. It
+> invalidates every verdict-cache entry by construction, so the first watch
+> pass under 0.12.0 pays full price and its records open scoring
+> generation 2 (undocumented single-file CI pipelines now count as
+> sensitive). Also in: the flag-surface exclusions (`vendor/`, `.vue`,
+> CI/tooling config — fire rate 50 % → 39.5 %) and the mutation harness's
+> pin-join repair (`omission` 35/36; the one case that was never a detector
+> miss). The hourly job runs the subscription block in production; the rules
+> config lives in the watch home, docs/watchdog.md carries the operator side.
 >
 > Everything before that is on `main` too — the three original phases, the
 > 2026-07-27 block series, the long view, the second axis (shipped as v0.7.0),
@@ -28,13 +20,17 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** forge issue #9 (verdict-cache GC:
-> 97.5 % of entries are dead versions nothing evicts), or entry 1 below,
-> which needs judge budget and patience. One operational thread needs no code:
-> the rules are live but have never seen a real release — the first watched
-> release that fires one is the feature's first production datapoint, and
-> `pnpm corpus-stats` at 0.11.0 (the class-bill section is released now)
-> against a refreshed `tmp/corpus` names the next free deterministic rule.
+> **Where a fresh session starts:** forge issues #9 (verdict-cache GC:
+> 97.5 % of entries are dead versions nothing evicts), #10 (the pin join
+> never checks a bump claim's *from* version — measure the corpus's bump
+> claims before any rule, the last-hop pattern is documented-honest) and #11
+> (`foreign-claim`'s denominator shrinks silently as a repo's release list
+> grows); or entry 1 below, which needs new facts more than budget. Two
+> measurement threads left over from the rule-line work: three before-side
+> draws would settle whether git-cliff's 96→90 belongs to the rule or to
+> flicker, and the first production release that fires a watch rule is the
+> subscription feature's first real datapoint — `pnpm corpus-stats` against
+> a refreshed `tmp/corpus` then names the next free deterministic rule.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 
