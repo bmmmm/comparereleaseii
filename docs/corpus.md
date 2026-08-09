@@ -171,6 +171,38 @@ The 106 bump claims across the corpus are now counted apart by
 7.6 % of them contradicted against 0.14 % for every other claim, which is
 the ratio this whole line of work started from.
 
+### The number the join was not reading: where the pin came *from*
+
+All of the above settles a bump claim on its destination. The version a note
+says the pin came **from** was never read at all, so
+`opencloud-eu/opencloud@v7.3.0`'s "opa from 1.18.1 to 1.18.2" read `verified`
+against a range that moves the pin 1.15.2 → 1.18.2. Before writing a rule for
+that, the corpus was asked how its notes actually spell an origin — 108
+releases, 555 bump claims, 216 of them naming a from-version, and 76 of those
+with a pin the diff moved:
+
+| the note's from-version | n | what it is |
+|---|---|---|
+| the pin's own starting point | 40 | exact |
+| inside the move the pin made | 26 | one hop of an aggregated series |
+| below where the pin started, or past where it lands | 10 | a move this release does not make |
+
+The 26 are the reason the obvious rule is the wrong one. A release aggregates
+several bumps of one pin and Dependabot writes one line per hop, so
+`1.18.1 → 1.18.2` inside a `1.15.2 → 1.18.2` move is an honest note about its
+own pull request — the same shape as `overtaken` on the destination side, and
+requiring the origins to agree would have flagged the majority spelling of an
+honest release.
+
+So the reading is positional, and only the third row is a finding. Its four
+non-contradicted members (the other six are already contradicted on the
+destination) look like `fsnotify 1.8.0 → 1.10.1` where the release goes
+1.9.0 → 1.10.1: the bump happened, the verdict stands, but three releases'
+worth of change is credited to one, and risk is what a reader weighs a
+version distance by. That costs the reading confidence and earns it a line in
+the report — which is the part that was missing, because a `confirmed` bump
+printed no line at all.
+
 ## Where the judge bill goes
 
 The bump class was found by counting: it dominated one column, and the

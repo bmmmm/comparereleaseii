@@ -668,6 +668,24 @@ const MUTANTS: Mutant[] = [
     find: 'if (verdict !== "verified" && verdict !== "partial") return false;',
     replace: "if (verdict === undefined) return false;",
   },
+  {
+    guard: "a from-version below the pin's own start is a disagreement, not a hop",
+    file: "src/reconcile.ts",
+    find: 'if (vsFrom < 0) return "outside";',
+    replace: 'if (vsFrom < 0) return "later-hop";',
+  },
+  {
+    guard: "the verdict-cache sweep keeps the running build's own entries",
+    file: "src/cache.ts",
+    find: "if (!opts.all && entry.version === VERSION) {",
+    replace: "if (!opts.all) {",
+  },
+  {
+    guard: "the foreign-claim donor walks past a sibling that has nothing to donate",
+    file: "scripts/notes-mutations.ts",
+    find: "for (const { report } of order) {",
+    replace: "for (const { report } of order.slice(0, 1)) {",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

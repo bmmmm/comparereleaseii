@@ -125,7 +125,10 @@ first, an LLM judge only for what remains unclear:
    median; all verdicts land in an on-disk cache
    (`$XDG_CACHE_HOME/comparereleaseii`, else `~/.cache/comparereleaseii`,
    mode 0700, keyed by tool version) — re-runs on unchanged data are free and
-   bit-identical. `--no-cache` skips it.
+   bit-identical. `--no-cache` skips it. Because the version is part of the
+   key, an upgrade orphans everything the previous build wrote: a check
+   removes those entries once per build, and `comparerelease cache stats|gc`
+   shows what is there and clears it on demand.
 
 The reverse (completeness) check flags commits whose changes no claim
 covers — auto-generated `Title by @user in #N` entries carry only ¼ weight
@@ -160,6 +163,13 @@ dependency update but a release of the product itself entering as one
 changed line (OpenCloud ships its entire frontend this way), and the report
 links straight to the pinned release. Third-party bumps stay one quiet line
 each. Informational, never scored.
+
+The same delta answers the notes' own bump *claims*, deterministically and
+without a judge — both numbers, not just the destination. A note naming a
+from-version inside the move the release made describes one hop of an
+aggregated series and is read as honest; one naming a version the release
+neither held nor passed through describes a wider upgrade than the one that
+shipped, and gets a line of its own even when its destination checks out.
 
 A first-party bump whose repo is loadable goes one step further: the
 component's own `(from, to)` range gets a **depth-1 sub-check** — same

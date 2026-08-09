@@ -154,9 +154,10 @@ export function contextLine(report: Report): string | null {
 /** The sentence a bump line makes — kept here so the terminal and the Markdown
  * report cannot drift into describing the same mismatch two different ways. */
 export function bumpDetail(b: BumpLine): string {
-  return b.observed
+  const detail = b.observed
     ? `the note says ${b.claimed}, the diff moves it ${b.observed}`
     : `the note says ${b.claimed}`;
+  return b.fromOutside ? `${detail} — a starting point the release never held` : detail;
 }
 
 function evidenceLine(r: ClaimResult): string {
@@ -261,6 +262,8 @@ export interface BumpLine {
   file?: string;
   /** The move is in the named commit's diff, not in the release diff. */
   viaCommit?: boolean;
+  /** Set when the note's from-version is not on the path the pin took. */
+  fromOutside?: boolean;
 }
 
 const BUMP_LABEL: Record<BumpJoin, string> = {
@@ -273,7 +276,7 @@ const BUMP_LABEL: Record<BumpJoin, string> = {
 /** Bump claims as one class: the counts, and the lines worth reading. */
 export function bumpSummary(
   report: Report,
-): { total: number; counts: string; lines: BumpLine[] } | null {
+): { total: number; counts: string; note?: string; lines: BumpLine[] } | null {
   const bumps = report.reconciliation?.bumps;
   if (!bumps?.length) return null;
   const order: BumpJoin[] = ["confirmed", "overtaken", "contradicted", "unmatched"];
@@ -283,9 +286,12 @@ export function bumpSummary(
     .map(({ s, n }) => `${n} ${BUMP_LABEL[s]}`)
     .join(", ");
   // Confirmed lines say nothing a reader has to act on — the count carries
-  // them. Everything else is a difference between the note and the diff.
+  // them. Everything else is a difference between the note and the diff, and
+  // that includes a destination the diff agrees with reached from an origin it
+  // does not: `fsnotify 1.8.0 → 1.10.1` where the release goes 1.9.0 → 1.10.1
+  // is confirmed on the number that used to be the only one read.
   const lines = bumps
-    .filter((b) => b.status !== "confirmed")
+    .filter((b) => b.status !== "confirmed" || b.fromCheck === "outside")
     .map((b): BumpLine => ({
       status: b.status,
       name: b.claimed.name,
@@ -293,8 +299,18 @@ export function bumpSummary(
       observed: b.observed ? `${b.observed.from} → ${b.observed.to}` : undefined,
       file: b.observed?.file,
       viaCommit: b.observed?.viaCommit,
+      ...(b.fromCheck === "outside" ? { fromOutside: true } : {}),
     }));
-  return { total: bumps.length, counts, lines };
+  const outside = bumps.filter((b) => b.fromCheck === "outside").length;
+  return {
+    total: bumps.length,
+    counts,
+    note: outside
+      ? `${outside} name a from-version the release neither held nor passed through — ` +
+        "the upgrade they describe is not the size of the one that shipped."
+      : undefined,
+    lines,
+  };
 }
 
 /** Severity order shared by every renderer — breaking first, internal last. */
@@ -609,6 +625,7 @@ export function printTerminal(report: Report): void {
       c.bold("\nDependency bumps") +
         c.dim(` — ${bumps.total} claim(s) held against the diff's pins: ${bumps.counts}`),
     );
+    if (bumps.note) console.log(c.dim(`  ${bumps.note}`));
     for (const b of bumps.lines) {
       const mark =
         b.status === "contradicted" ? c.red("✘") : b.status === "overtaken" ? c.yellow("↗") : c.dim("·");
@@ -804,6 +821,7 @@ export function toMarkdown(report: Report): string {
   if (bumps) {
     lines.push("", "## Dependency bumps", "");
     lines.push(`${bumps.total} bump claim(s) held against the diff's own pins: ${bumps.counts}.`);
+    if (bumps.note) lines.push("", bumps.note);
     if (bumps.lines.length) lines.push("");
     for (const b of bumps.lines) {
       lines.push(

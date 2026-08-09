@@ -472,12 +472,15 @@ function bumpsHtml(report: Report): string {
   const rows = bumps.lines
     .map(
       (b) =>
-        `<tr><td>${esc(b.name)}</td><td><span class="chip" style="background:${color[b.status] ?? "#6e7681"}">${esc(b.status)}</span></td><td>${esc(b.claimed)}</td><td>${b.observed ? esc(b.observed) : "—"}</td><td>${b.file ? esc(b.file) : "—"}</td></tr>`,
+        `<tr><td>${esc(b.name)}</td><td><span class="chip" style="background:${color[b.status] ?? "#6e7681"}">${esc(b.status)}</span></td><td>${esc(b.claimed)}` +
+        (b.fromOutside ? `<span class="note"> — never on that path</span>` : "") +
+        `</td><td>${b.observed ? esc(b.observed) : "—"}</td><td>${b.file ? esc(b.file) : "—"}</td></tr>`,
     )
     .join("");
   return (
     `<h2>Dependency bumps <span class="note">— what the notes say a pin did, held against what the diff moved; deterministic, never scored</span></h2>` +
     `<p>${bumps.total} bump claim(s): ${esc(bumps.counts)}.</p>` +
+    (bumps.note ? `<p class="note">${esc(bumps.note)}</p>` : "") +
     (rows
       ? `<table><tr><th>pin</th><th></th><th>the note says</th><th>the diff moves</th><th>file</th></tr>${rows}</table>`
       : "")

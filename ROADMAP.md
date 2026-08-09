@@ -20,17 +20,26 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** forge issues #9 (verdict-cache GC:
-> 97.5 % of entries are dead versions nothing evicts), #10 (the pin join
-> never checks a bump claim's *from* version — measure the corpus's bump
-> claims before any rule, the last-hop pattern is documented-honest) and #11
-> (`foreign-claim`'s denominator shrinks silently as a repo's release list
-> grows); or entry 1 below, which needs new facts more than budget. Two
-> measurement threads left over from the rule-line work: three before-side
-> draws would settle whether git-cliff's 96→90 belongs to the rule or to
-> flicker, and the first production release that fires a watch rule is the
-> subscription feature's first real datapoint — `pnpm corpus-stats` against
-> a refreshed `tmp/corpus` then names the next free deterministic rule.
+> Forge issues #9, #10 and #11 were closed on 2026-08-09 and sit unreleased
+> on `main`: the verdict cache now sweeps the builds it orphaned (99.5 % of
+> the measured directory) and answers `cache stats|gc`; the pin join reads a
+> bump note's *from* version positionally, which the corpus decided — 26 of
+> 76 joinable from-versions name a later hop of an aggregated move and are
+> honest, 10 name a version the release never held and are not; and the
+> `foreign-claim` donor walks the release line instead of giving up on one
+> sibling, which put six releases back into its applicable count (49/49 →
+> 55/55, re-frozen). No score moved in any of it.
+>
+> **Where a fresh session starts:** forge issue #8 (coverage's fourth route
+> belongs to no claim), or entry 1 below, which needs new facts more than
+> budget. Two measurement threads left over from the rule-line work: three
+> before-side draws would settle whether git-cliff's 96→90 belongs to the
+> rule or to flicker, and the first production release that fires a watch
+> rule is the subscription feature's first real datapoint — `pnpm
+> corpus-stats` against a refreshed `tmp/corpus` then names the next free
+> deterministic rule. One thing the harness now states that nobody has acted
+> on: 52 of the 108 corpus releases are skipped for refs missing from the
+> clone cache, so every rate it reports covers half the corpus.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 

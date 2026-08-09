@@ -4,6 +4,70 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **`comparerelease cache stats|gc`, and a check that sweeps once per build.**
+  The tool version is part of every verdict-cache key and is repeated inside
+  the entry, which is deliberate stale-replay protection — and which orphans
+  every entry the moment the tool is upgraded. Nothing ever removed them:
+  measured on 2026-08-09 a two-month-old cache held 8292 entries / 34 MB, of
+  which 38 belonged to the running build. 99.5 % of the directory was
+  unreachable by construction. The first cached judge call of a build now
+  removes what earlier builds wrote and leaves a marker, so later runs of the
+  same build pay one `readFile` instead of a scan; `cache stats` prints the
+  histogram per build that wrote it, `cache gc` collects on demand, and
+  `cache gc --all` empties the cache when a changed response parser wants
+  everything re-judged. Sizes are disk usage rather than the sum of the
+  contents — 8292 entries are 4.8 MB of JSON in 34 MB of filesystem blocks,
+  and the second number is the one `du` shows. Nothing about the key scheme
+  changes; this only removes what that scheme already made dead.
+
+### Changed
+
+- **A bump note's *from* version is now read, and the corpus decided how.**
+  The pin join settled a bump claim on the pin's name and its destination
+  only, so `opencloud-eu/opencloud@v7.3.0`'s "opa from 1.18.1 to 1.18.2" read
+  `verified` against a range that moves the pin 1.15.2 → 1.18.2 — the
+  destination agreed, the origin did not, and nothing looked. Before writing
+  a rule the corpus was asked how notes actually spell an origin: of 555 bump
+  claims across 108 releases, 216 name a from-version and 76 of those have a
+  pin the diff moved. 40 name the pin's own starting point, **26 name a later
+  hop of a move the release aggregated**, and 10 name a version the release
+  neither held nor passed through. Equality would therefore have flagged the
+  26 — one line per hop is how an honest Dependabot release is written, the
+  same shape `overtaken` already recognises on the destination side. So the
+  reading is positional: inside the interval the pin traversed is a hop and
+  costs nothing but a sentence naming it, below where the pin started (or at
+  or past where it lands) is a move this release does not make. That last one
+  keeps its `verified` — the bump did happen — but loses 0.15 of its
+  confidence, says so in the reasoning, and now gets a line in the report
+  even when its destination was confirmed, which is the part that was missing
+  entirely: a `confirmed` bump printed no line in any renderer. On the corpus
+  it moves four claims, e.g. `x/image 0.38.0 → 0.41.0` in a release that goes
+  0.40.0 → 0.44.0, from 0.85 to 0.70. No score moves: the median correctness,
+  completeness and overall of 55 control runs are 50 / 38.5 / 45 before and
+  after, and confidence is not a score input.
+
+- **The `foreign-claim` denominator stopped shrinking as the corpus grows.**
+  The donor picker asked the farthest sibling release for a claim to plant
+  and gave up if it had none, so a repo whose last stored report carries no
+  verified change claim — `opencloud-eu/opencloud` — silently dropped six
+  releases out of the class's applicable count, with a per-case detail string
+  as the only trace. The rate read 100 % either way, which is exactly how a
+  shrinking denominator hides a real miss. The picker now walks the line
+  inwards from the farthest sibling and only gives up when no sibling has
+  anything to donate; the first choice is unchanged, so no case that had a
+  donor got a different one. Measured over the same 55 releases:
+  `foreign-claim` 49/49 applicable/detected → 55/55, every other class
+  unchanged, and `test/eval/reference-detection.json` is re-frozen at 55/55.
+  Two more things the harness now says out loud: how far each class's
+  applicable count has moved against the frozen reference (reported, never
+  fatal — a corpus that gained releases *should* move it), and why releases
+  were skipped, summed by cause rather than only as a truncated list. On the
+  current `tmp/corpus` that reads "53 release(s) skipped: 52 refs not in the
+  local clone · 1 over the --max-commits bound" — half the corpus, which the
+  old output left to be inferred from eight example lines.
+
 ## 0.12.0 — 2026-08-09
 
 ### Changed

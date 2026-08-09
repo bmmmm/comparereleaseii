@@ -309,9 +309,30 @@ function settleBump(claim: Claim, bump: BumpResolution, anchors: AnchorMatch): C
             confidence: 0.9,
             reasoning: `The note names ${claimed.to}, but ${where}.`,
           };
+  // The destination is settled; the origin the note names is a second
+  // statement, and until now nothing read it. It cannot overturn the verdict —
+  // the bump did happen — but a note that misstates where a dependency came
+  // FROM misstates the size and the risk of the upgrade, so it costs the
+  // reading its confidence and says so in as many words. `later-hop` is the
+  // opposite case and gets no penalty: one line per hop of an aggregated
+  // series is how honest notes in this corpus are written.
+  const origin =
+    bump.fromCheck === "outside"
+      ? ` The note says it came from ${claimed.from}, a version this release neither held nor` +
+        ` passed through — the move it describes is not the one the diff makes.`
+      : bump.fromCheck === "later-hop"
+        ? ` The note starts at ${claimed.from}, one hop of the wider move this release aggregates.`
+        : "";
   return {
     claim,
     ...settled,
+    // Only where the origin weakens the reading. A `contradicted` is not made
+    // less certain by the note being wrong about a second number as well.
+    confidence:
+      bump.fromCheck === "outside" && settled.verdict === "verified"
+        ? settled.confidence - 0.15
+        : settled.confidence,
+    reasoning: settled.reasoning + origin,
     evidence: {
       commitShas: anchors.commits.map((c) => c.sha),
       files: [observed.file],

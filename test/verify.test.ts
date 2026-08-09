@@ -1096,6 +1096,7 @@ function bumpAnchor(
   status: BumpJoin,
   claimed: ClaimBump,
   observed: Partial<BumpResolution["observed"]>,
+  fromCheck?: BumpResolution["fromCheck"],
 ): Map<number, BumpResolution> {
   return new Map([
     [
@@ -1104,6 +1105,7 @@ function bumpAnchor(
         claim: 0,
         status,
         claimed,
+        ...(fromCheck ? { fromCheck } : {}),
         observed: {
           from: "4.3.0",
           to: "5.0.5",
@@ -1155,6 +1157,48 @@ test("a bump claim the pins settle is answered off the diff, never by a judge", 
   });
   assert.equal(wrong.verdict, "contradicted");
   assert.match(wrong.reasoning, /5\.0\.2/);
+});
+
+test("a bump whose destination agrees but whose origin does not says so, and reads less certain", async () => {
+  // The gap issue #10 named: the pin join settled `verified` on the
+  // destination alone, so a note claiming three major-range hops for a patch
+  // hop was indistinguishable from an exact one. The bump did happen — the
+  // verdict stands — but the size of it, which is what a reader weighs risk
+  // by, is the note's second statement and now gets read too.
+  const data = releaseData([{ path: "go.mod", patch: "@@ -1 +1 @@\n-a\n+b\n" }]);
+  const opts = {
+    judgeMode: "all" as const,
+    engine: forbiddenEngine(),
+    concurrency: 1,
+    maxHunks: 4,
+    maxEvidenceChars: 4000,
+  };
+  const claimed: ClaimBump = { name: "actions/cache", from: "5.0.3", to: "5.0.4" };
+
+  const [exact] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    ...opts,
+    bumps: bumpAnchor("confirmed", claimed, { from: "5.0.3", to: "5.0.4" }, "exact"),
+  });
+
+  const [outside] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    ...opts,
+    bumps: bumpAnchor("confirmed", claimed, { from: "5.0.35", to: "5.0.4" }, "outside"),
+  });
+  assert.equal(outside.verdict, "verified", "the bump itself is still evidence");
+  assert.ok(outside.confidence < exact.confidence, "but not as good a reading as an exact one");
+  assert.match(outside.reasoning, /5\.0\.3/, "the origin the note names is quoted");
+  assert.match(outside.reasoning, /neither held nor passed through/);
+
+  // The honest majority spelling: one line per hop of a move the release
+  // aggregated. Named, never penalised — 26 of the corpus's 76 joinable
+  // from-versions look like this.
+  const [hop] = await verifyClaims(data as never, [claim(BUMP_TEXT, [9668])], {
+    ...opts,
+    bumps: bumpAnchor("confirmed", claimed, { from: "4.3.0", to: "5.0.4" }, "later-hop"),
+  });
+  assert.equal(hop.verdict, "verified");
+  assert.equal(hop.confidence, exact.confidence);
+  assert.match(hop.reasoning, /one hop of the wider move/);
 });
 
 test("an unresolved bump claim still takes the ordinary route", async () => {

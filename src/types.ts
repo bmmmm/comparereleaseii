@@ -384,6 +384,23 @@ export interface BumpResolution {
   /** What the note said — the claim's own trait, repeated so a reader of
    * this list alone sees both numbers. */
   claimed: ClaimBump;
+  /**
+   * Where the note says the pin came FROM, against where the diff moves it
+   * from. Absent when the note names no from-version, or when no pin matched.
+   *
+   * `exact` — the same starting point.
+   * `later-hop` — inside the interval the pin traversed. The release
+   * aggregates several bumps of this pin and the note describes one of them,
+   * which is the documented-honest pattern: 26 of the 76 joinable
+   * from-versions in the 108-release corpus, against 40 exact ones. Reading it
+   * as a disagreement would flag the majority spelling of an honest note.
+   * `outside` — a starting point this release neither held nor passed
+   * through. The note states a move the diff does not make: a wider hop
+   * (`fsnotify 1.8.0 → 1.10.1` where the release goes 1.9.0 → 1.10.1) or one
+   * belonging to another release entirely. Rare — 10 of those 76, and 6 of
+   * them are already contradicted on the destination alone.
+   */
+  fromCheck?: "exact" | "later-hop" | "outside";
   /** What the diff moved. Absent when unmatched. */
   observed?: {
     from: string;

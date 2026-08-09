@@ -489,6 +489,55 @@ test("bump claims read as one class, and an overtaken line shows both numbers", 
 /** Capture what printTerminal writes, so the terminal can be asserted on
  * next to the Markdown and HTML built from the same report. */
 function terminalOf(r: Report): string {
+  return terminalCapture(r);
+}
+
+test("a bump confirmed on its destination is still shown when its origin was never on the path", () => {
+  // The one shape the section used to drop entirely: `confirmed` printed no
+  // line, and the destination is the only number that decides `confirmed`. A
+  // note claiming 1.8.0 → 1.10.1 of a release that goes 1.9.0 → 1.10.1
+  // therefore left no trace anywhere in the report.
+  // No `pins` here: the pin delta lists every bump the diff makes whatever the
+  // notes say, so leaving it out is what makes "this line came from the join"
+  // the only reading of the assertions below.
+  const r: Report = {
+    ...report(null),
+    reconciliation: {
+      confirmed: [],
+      undocumented: [],
+      unsupported: [],
+      bumps: [
+        {
+          claim: 0,
+          status: "confirmed",
+          claimed: { name: "actions/checkout", from: "5.0.0", to: "6.0.3" },
+          fromCheck: "outside",
+          observed: { from: "6.0.2", to: "6.0.3", file: ".github/workflows/build.yml" },
+        },
+        {
+          claim: 1,
+          status: "confirmed",
+          claimed: { name: "actions/cache", from: "5.0.3", to: "5.0.5" },
+          fromCheck: "later-hop",
+          observed: { from: "4.3.0", to: "5.0.5", file: ".github/workflows/build.yml" },
+        },
+      ],
+    },
+  };
+  for (const [label, text] of [
+    ["terminal", terminalCapture(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    assert.match(text, /actions\/checkout/, `${label} dropped the disagreeing bump`);
+    assert.match(text, /neither held nor passed through/, `${label} does not say why`);
+    // A hop of an aggregated move is the honest majority spelling and stays
+    // carried by the count — flagging it would flag 26 of the corpus's 76.
+    assert.doesNotMatch(text, /actions\/cache/, `${label} flagged an honest hop`);
+  }
+});
+
+function terminalCapture(r: Report): string {
   const lines: string[] = [];
   const orig = console.log;
   console.log = (...args: unknown[]) => {

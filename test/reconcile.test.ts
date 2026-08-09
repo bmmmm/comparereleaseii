@@ -284,9 +284,61 @@ test("a bump claim the diff lands on is confirmed", () => {
       claim: 0,
       status: "confirmed",
       claimed: c.bump,
+      fromCheck: "exact",
       observed: { from: "5.0.3", to: "5.0.4", file: ".github/workflows/build.yml" },
     },
   ]);
+});
+
+// ---------- the from-version the note names ----------
+//
+// Measured over the 108-release corpus before any rule shipped: 555 bump
+// claims, 216 naming a from-version, 76 of those with a pin the diff moved.
+// 40 agree exactly, 26 name a later hop of an aggregated move, 10 name a
+// version the release never held. That distribution is the rule: equality
+// would flag the 26 honest ones, so only the 10 are a finding.
+
+test("a from-version inside the move the pin made is one hop of it, not a disagreement", () => {
+  // opencloud v7.3.0, verbatim: the release moves opa 1.15.2 → 1.18.2 and the
+  // note describes the last hop, 1.18.1 → 1.18.2. The destination agrees.
+  const c = bumpClaim("bump github.com/open-policy-agent/opa from 1.18.1 to 1.18.2", {
+    name: "github.com/open-policy-agent/opa",
+    from: "1.18.1",
+    to: "1.18.2",
+  });
+  const resolved = resolveBumpClaims([c], [
+    pin({ name: "github.com/open-policy-agent/opa", from: "v1.15.2", to: "v1.18.2" }),
+  ]);
+  assert.equal(resolved[0].status, "confirmed");
+  assert.equal(resolved[0].fromCheck, "later-hop");
+});
+
+test("a from-version below where the pin started overstates the hop", () => {
+  // opencloud v7.3.0 again, the other direction: the note says fsnotify came
+  // from 1.8.0, the release starts at 1.9.0. Destination confirmed, origin
+  // never on the path — three releases' worth of change credited to one.
+  const c = bumpClaim("bump github.com/fsnotify/fsnotify from 1.8.0 to 1.10.1", {
+    name: "github.com/fsnotify/fsnotify",
+    from: "1.8.0",
+    to: "1.10.1",
+  });
+  const resolved = resolveBumpClaims([c], [
+    pin({ name: "github.com/fsnotify/fsnotify", from: "v1.9.0", to: "v1.10.1" }),
+  ]);
+  assert.equal(resolved[0].status, "confirmed");
+  assert.equal(resolved[0].fromCheck, "outside");
+});
+
+test("a note that names no from-version is not held to one", () => {
+  const c = bumpClaim("Bump github.com/DataDog/dd-trace-go/v2 to 5.0.4", {
+    name: "github.com/DataDog/dd-trace-go/v2",
+    to: "5.0.4",
+  });
+  const resolved = resolveBumpClaims([c], [
+    pin({ name: "github.com/DataDog/dd-trace-go/v2", from: "4.1.0", to: "5.0.4" }),
+  ]);
+  assert.equal(resolved[0].status, "confirmed");
+  assert.equal(resolved[0].fromCheck, undefined);
 });
 
 test("a release aggregating several bumps overtakes its own note — never a contradiction", () => {

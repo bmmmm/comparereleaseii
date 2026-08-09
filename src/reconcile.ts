@@ -80,6 +80,35 @@ export function compareVersions(a: string, b: string): number | null {
 
 
 /**
+ * The other half of a bump claim: where it says the pin came from.
+ *
+ * The join used to read the name and the destination only, so a note could
+ * misstate the origin — and with it the size and the risk of the upgrade —
+ * and still settle as `verified` on its destination. What the corpus then said
+ * about the obvious rule (origins must agree) is that it would be wrong far
+ * more often than right: a release aggregates several bumps of one pin and the
+ * notes carry one line per hop, so `1.18.1 → 1.18.2` inside a `1.15.2 →
+ * 1.18.2` move is an honest note, not a false one.
+ *
+ * So the reading is positional, not equality: inside the interval the pin
+ * actually traversed the note describes a hop of it; below where the pin
+ * started (or at/past where it arrives) it describes a move this release does
+ * not make.
+ */
+function checkFrom(
+  from: string | undefined,
+  pin: { from: string; to: string },
+): BumpResolution["fromCheck"] {
+  if (from === undefined) return undefined;
+  const vsFrom = compareVersions(from, pin.from);
+  if (vsFrom === null) return undefined;
+  if (vsFrom === 0) return "exact";
+  if (vsFrom < 0) return "outside";
+  const vsTo = compareVersions(from, pin.to);
+  return vsTo !== null && vsTo < 0 ? "later-hop" : "outside";
+}
+
+/**
  * Hold every bump claim against the pin delta of the same diff. Both sides
  * are deterministic reads of material the release published, so this join
  * is too: same input, same answer, no LLM and no I/O.
@@ -134,10 +163,12 @@ export function resolveBumpClaims(
       }
       status = inside > 0 ? "overtaken" : "contradicted";
     }
+    const fromCheck = checkFrom(claimed.from, best);
     out.push({
       claim: index,
       status,
       claimed,
+      ...(fromCheck ? { fromCheck } : {}),
       observed: {
         from: best.from,
         to: best.to,
