@@ -746,7 +746,6 @@
         "hunk": "@@ -41,4 +41,7 @@ func extractEntry(hdr *tar.Header, dst string) error {\n \ttarget := filepath.Join(dst, hdr.Name)\n+\tif hdr.Size > maxEntryBytes {\n+\t\treturn fmt.Errorf(\"entry %q exceeds the %d byte limit\", hdr.Name, maxEntryBytes)\n+\t}\n \tf, err := os.Create(target)\n \tif err != nil {\n \t\treturn err"
       }
     ],
-    "expected": ["no-evidence", "partial", "contradicted", "need"],
-    "finalExpected": ["no-evidence", "partial", "contradicted"]
+    "expected": ["no-evidence", "partial", "contradicted"]
   }
 ]

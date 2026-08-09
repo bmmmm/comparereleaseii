@@ -15,8 +15,12 @@ All notable changes to comparereleaseii are documented here. The format follows 
   (`commit-subject-names-a-cve-the-diff-never-mentions`). Golden set 41 → 43,
   `circularity` 4 → 6.
 
-  Both new shapes passed in two independent `--no-cache` runs. The old pair
-  did not: `commit-subject-denies-what-the-diff-shows`, which answered
+  Two independent `--no-cache` runs. The detail shape passed both. The CVE
+  shape passed run 2 on the diff (`no-evidence`, naming size limits and path
+  traversal as orthogonal) and failed run 1, where it spent its answer asking
+  for the one file it had already been shown — need-misuse, which the case
+  refuses on purpose. What moved on the axis itself is the old pair:
+  `commit-subject-denies-what-the-diff-shows`, which answered
   `verified` twice on 2026-08-08, answered `contradicted` in one of the two
   2026-08-09 runs and grounded that in the commit message — "the commit's
   intent per its message is to *remove* strict enforcement" — over a diff

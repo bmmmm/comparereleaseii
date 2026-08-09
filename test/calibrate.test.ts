@@ -7,10 +7,12 @@ import {
   loadGoldenCases,
   loadReference,
   gateCalibration,
+  printCalibration,
   GOLDEN_CATEGORIES,
   type Calibration,
   type CalibrationOutcome,
   type GoldenCase,
+  type Reference,
 } from "../src/calibrate.ts";
 
 // avgMs feeds the model ranking's speed column. An engine that errors slowly
@@ -167,6 +169,59 @@ test("the frozen reference covers exactly the current golden set", async () => {
     Object.fromEntries(Object.entries(reference.categories).map(([k, v]) => [k, v.total])),
     dist,
     "per-category totals drifted between the reference and the set",
+  );
+});
+
+const PROVENANCE = "graded before the served-need round existed";
+
+/** What `--calibrate` prints underneath a run, with the reference quoted. */
+function printedWith(reference: Reference): string {
+  const lines: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => void lines.push(args.join(" "));
+  try {
+    printCalibration(calOf([{}]), reference);
+  } finally {
+    console.log = original;
+  }
+  return lines.join("\n");
+}
+
+const refOf = (outcomes: Array<{ got: string }>): Reference => ({
+  model: "test-model",
+  date: "2026-01-01",
+  passed: outcomes.length,
+  total: outcomes.length,
+  gate: "escalate-only",
+  categories: { core: { passed: outcomes.length, total: outcomes.length } },
+  outcomes: outcomes.map((o, i) => ({ name: `case-${i}`, got: o.got, pass: true })),
+});
+
+// The provenance note tells a reader the frozen reference was graded before
+// calibration played out a served need. One bare "need" does not say that: a
+// case whose expected list forbids "need" stops there under today's grading
+// too, and the 2026-08-09 reference carries exactly one of those next to six
+// served rounds. Keying the note on any bare "need" made `--calibrate` print
+// that the reference predated a round it demonstrably ran.
+test("the round-1 provenance note fires only when nothing was ever served", async () => {
+  const pure = printedWith(refOf([{ got: "verified" }, { got: "need" }]));
+  assert.ok(pure.includes(PROVENANCE), "a reference with only bare needs must carry the note");
+
+  const mixed = printedWith(refOf([{ got: "need" }, { got: "need→no-evidence" }]));
+  assert.ok(
+    !mixed.includes(PROVENANCE),
+    "a reference that served a need was graded under today's rules — the note is false",
+  );
+
+  const none = printedWith(refOf([{ got: "verified" }]));
+  assert.ok(!none.includes(PROVENANCE));
+
+  // And the artifact this actually misfired on.
+  const frozen = await loadReference();
+  assert.ok(frozen, "test/eval/reference-haiku.json is missing or unreadable");
+  assert.ok(
+    !printedWith(frozen).includes(PROVENANCE),
+    "the checked-in reference is quoted as predating the served-need round",
   );
 });
 

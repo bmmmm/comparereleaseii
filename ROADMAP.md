@@ -184,10 +184,10 @@ same as being swayed by one. The honest next step was more shapes rather than
 an edit — a subject that supplies a detail the diff omits, and one that names
 a CVE the diff never mentions, were the two the pair did not cover.
 
-**Second measurement, 2026-08-09: the two new shapes hold, and the old pair
-stops holding. That is the justification this entry was waiting for.** Both
-missing shapes are in the set now, both `circularity`, both carrying a linked
-commit:
+**Second measurement, 2026-08-09: the two new shapes hold, and one half of the
+old pair stops holding. That is the justification this entry was waiting for.**
+Both missing shapes are in the set now, both `circularity`, both carrying a
+linked commit:
 
     commit-subject-supplies-the-detail-the-diff-omits   subject names a 30s cap
                                                         the diff never shows
@@ -201,13 +201,24 @@ Two independent `--no-cache` runs against `claude-cli/haiku`, 43 cases each:
 | `…echoes-claim-diff-shows-nothing` | `need→no-evidence` pass | `need→no-evidence` pass |
 | `…denies-what-the-diff-shows` | **`contradicted` FAIL** | `verified` pass |
 | `…supplies-the-detail-the-diff-omits` | `need→partial` pass | `no-evidence` pass |
-| `…names-a-cve-the-diff-never-mentions` | `need` (round 1) | `no-evidence` pass |
+| `…names-a-cve-the-diff-never-mentions` | **`need` FAIL** (round-1 need-misuse) | `no-evidence` pass |
 
 `circularity` 4/6 and 6/6, `overVerified` 0 in both runs.
 
-The new shapes are not what moved. What moved is the *old* pair. The case that
-answered `verified` twice on 2026-08-08 answered `contradicted` in run 1, and
-said why in as many words:
+The CVE case takes no `need`: its whole release is one file and that file is
+shown, unsanitised `filepath.Join(dst, hdr.Name)` sitting in the hunk as
+unchanged context, so the evidence settles the claim where it stands. Its
+`expected` is the three verdicts that decline the subject's word —
+`no-evidence`, `partial`, `contradicted` — which mechanically means two ways
+to fail it: answer `verified`, or spend round 1 asking for a file you were
+already given, the way `evidence-suffices-need-is-wrong` is failed. Run 1
+found the second one. Widening the list afterwards to make that pass would be
+the collapse AGENTS.md forbids, run backwards.
+
+The new shapes are not what moved. What moved is one half of the *old* pair —
+the echoes case passed both runs, and `commit-subject-denies-what-the-diff-shows`,
+which answered `verified` twice on 2026-08-08, answered `contradicted` in run
+1 and said why in as many words:
 
 > "The linked **commit message** explicitly states 'drop strict TLS for
 > webhooks until 2.0', directly contradicting the claim that TLS verification
@@ -238,19 +249,22 @@ list in `src/judge.ts:496-523`, and the rule the set can now grade is: the
 `COMMITS` block orients, it does not settle — a verdict that flips when the
 subject changes and the diff does not is wrong in whichever direction it flips.
 
-What would take the justification away again: ten consecutive `--no-cache`
-runs that all answer `verified` on the denies case would make run 1 sampling
-noise rather than a rule the model is missing. That measurement is not cheap
-today — neither `pnpm eval` nor `--calibrate` can restrict to a case or a
-category, so ten runs of four shapes cost ten runs of 43.
+**This entry closes two ways, and only two.** Either the rule line ships — by
+construction that invalidates every cache entry and re-measures the README
+validation table, and the entry closes with it — or ten consecutive
+`--no-cache` runs all answer `verified` on the denies case, which makes run 1
+sampling noise rather than a rule the model is missing and retracts the
+justification above. The second measurement is not cheap today: neither
+`pnpm eval` nor `--calibrate` can restrict to a case or a category, so ten
+runs of four shapes cost ten runs of 43. Building that filter is not part of
+this entry — it may be mooted by the first exit.
 
-One note on the set itself. `…names-a-cve-the-diff-never-mentions` asked for
-`internal/archive/extract.go` in run 1 — the one file it had already been
-shown. The prompt says the diff was "pre-filtered by relevance", so asking for
-the whole file is a legitimate move and not need-misuse; the case carries
-`need` in `expected` with a `finalExpected` that still excludes `verified`,
-the shape the echo case has had since 2026-08-08. That correction was made
-after run 1 and leaves run 2 untouched, which never took the need branch.
+**Decided 2026-08-09: `…names-a-cve-the-diff-never-mentions` stays in
+`circularity`, not `security`.** It is security material and an over-verify on
+it would therefore not disqualify a judge, which reads like an under-strict
+filing. Moving it changes what the frozen gate means for every judge that ever
+ran against it, and nothing here forces that — the case exists to measure the
+subject axis, and the axis is `circularity`.
 
 ## Open (2026-08-08): what the subscription block measured and left behind
 

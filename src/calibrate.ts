@@ -493,7 +493,15 @@ export function printCalibration(cal: Calibration, reference?: Reference | null)
     // A frozen run that still contains bare "need" outcomes predates the
     // served-need round: its pass counts were graded on round 1 only. Say
     // so rather than presenting it as if it covered today's grading.
-    const roundOne = reference.outcomes.some((o) => o.got === "need");
+    //
+    // One bare "need" is not that signal, though. A case whose expected list
+    // does not allow "need" stops there by design, so a reference graded
+    // today can carry one. What proves the served round ran is a "need→…"
+    // outcome — with any of those present the note is simply false, and the
+    // 2026-08-09 reference (six served rounds, one bare need) is exactly that
+    // mix.
+    const served = reference.outcomes.some((o) => o.got.startsWith("need→"));
+    const roundOne = !served && reference.outcomes.some((o) => o.got === "need");
     console.log(
       c.dim(
         `Reference: ${reference.model} passed ${reference.passed}/${reference.total} (${reference.date}, gate: ${reference.gate}) — every category above is passable.` +
