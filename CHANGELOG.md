@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.12.0 — 2026-08-09
+
 ### Changed
 
 - **A commit subject is no longer evidence, and the judge is told so.** The
