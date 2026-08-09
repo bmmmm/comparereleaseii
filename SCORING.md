@@ -47,6 +47,19 @@ same deterministic evidence. Where no pin of that name moved, or the two
 versions cannot be ordered, nothing is settled and the claim takes the
 ordinary route.
 
+Completeness has a fourth route, and it is the one that had to be tightened:
+a commit counts as documented when the claims' pooled evidence already cites
+**every** file it touches. That share was half until 2026-08-09, when the full
+corpus showed it was the sole cause of every remaining `omission` miss. The
+`file-majority` sweep priced the alternatives over 111 releases — 0.5 catches
+59/66, 0.67 catches 60/65, 0.8 catches 62/65, 1 catches 63/65, and judge
+fidelity does not move at any of them — and 1 is both the only point on the
+Pareto front and the only one that states a rule instead of a preference. The
+cost is completeness alone: 27 releases move, 5 reach 0, and those are either
+tiny (one claim and three commits, where a single commit is worth 87 points)
+or already low. Two misses survive and no share can reach them: their commits
+sit at 1.00, every file cited by some other claim and none of their own.
+
 The version a bump note names it came **from** is a second statement, and it
 is read positionally rather than for equality. Measured over the corpus with
 `pnpm corpus-bump-origins`, which re-derives it: of 216 bump claims naming a

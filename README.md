@@ -352,12 +352,12 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-08-09) |
+| Release | Notes style | Score (validation run, 2026-08-09, generation 3) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
-| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 90 (solid) |
-| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 89 (solid) |
-| vaultwarden 1.37.0 | generated PR list + handwritten security | 84–87 (three draws, no majority — vague notes hide real changes) |
+| git-cliff v2.13.0 | Keep a Changelog, conventional commits | 87 (solid) |
+| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 86 (solid) |
+| vaultwarden 1.37.0 | generated PR list + handwritten security | 79–82 (three draws, no majority — vague notes hide real changes) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 
 How to read that column: each row is a judged run against the default engine
@@ -367,7 +367,18 @@ judged score carries run-to-run flicker, so a row whose score moves is drawn
 three times and the table publishes the value two of the three agree on; a row
 that does not move is drawn once. Where three draws produce no majority the
 spread is printed rather than one of them picked — vaultwarden is currently
-that case. Re-measured 2026-08-09.
+that case.
+
+Re-measured 2026-08-09 for `SCORING_GENERATION` 3, and the redraw separates
+two things that look identical in this column. **restic 89 → 86 is the rule**:
+the evidence-union route now needs every file of a commit, and restic's
+completeness falls 67 → 56 with the judge off entirely, so the change is
+deterministic and reproducible. **git-cliff 90 → 87 and vaultwarden 84–87 →
+79–82 are not**: both are bit-identical under `--judge off` before and after,
+so what moved them is the same judged flicker the three-draw protocol exists
+for. Worth stating plainly, because it is the uncomfortable half of the
+measurement — on two of four rows the flicker is wider than the scoring change
+this table was redrawn for.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:
@@ -420,7 +431,7 @@ Measured on 111 releases (`test/eval/reference-detection.json`, 2026-08-09):
 
 | Mutation | What it does | Detected |
 |---|---|---:|
-| `omission` | drops the notes covering a documented high-churn commit | 59/66 |
+| `omission` | drops the notes covering a documented high-churn commit | 63/65 |
 | `bump-overshoot` | restates a settled bump as a version the release did not reach | 22/22 |
 | `bump-undershoot` | restates it as a version the pin never held | 22/22 |
 | `foreign-claim` | plants a claim from a different release of the same repo | 109/110 |
@@ -469,13 +480,22 @@ grew. `foreign-claim` reads 49 rather than 50 applicable cases because the
 corpus gained a report and one release lost its donor as a result; the rate is
 100 % either way.
 
+`omission` moved 59/66 → 63/65 on 2026-08-09 by a scoring change, not by a
+harness fix: the evidence union now asks for *every* file of a commit rather
+than half of them. All seven misses on the full corpus were that route and no
+other, and the sweep over the share (0.5 / 0.67 / 0.8 / 1) put its only
+Pareto point at 1 — which is also the only value that states a rule rather
+than a calibrated preference. Judge fidelity did not move at any value.
+Completeness did: 27 releases, median 54.5 → 51.5, so scores from before and
+after are not comparable and `SCORING_GENERATION` is 3.
+
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,
-not a side effect. Open on the full corpus: `omission` at 59/66 — seven
-commits kept documented by the claim-independent evidence union, five of them
-in one repository — and `backtick-noise` at 102/109, where the padding that
-gets through is a version literal or a word like `version` that the lexical
-bar still reads as an identifier.
+not a side effect. Open on the full corpus: `omission` at 63/65 — two commits
+whose every file is cited by some other claim and none of their own, which no
+share can reach — and `backtick-noise` at 102/109, where the padding that gets
+through is a version literal or a word like `version` that the lexical bar
+still reads as an identifier.
 
 ### Releasing
 

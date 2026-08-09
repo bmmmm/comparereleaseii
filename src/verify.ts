@@ -966,28 +966,46 @@ export async function computeCoverage(
         return;
       }
     }
-    // A commit mostly touching files already cited as evidence counts as
+    // A commit whose files are ALL cited as evidence by other claims counts as
     // covered. The route is claim-independent — the union grows with the
-    // number of claims — and that cost 4 of 34 `omission` mutations until the
-    // bump claims left it (above). One of those four is still open and it is
-    // the only `omission` miss left: `opencloud-eu/web@v7.0.0`, commit
-    // `86fff671` (*tiptap integration*, 5,567 lines across 72 files), 57 of
-    // whose files other claims cite as evidence — 0.79, and no claim of its
-    // own. The two repairs this comment used to propose are both measured and
-    // rejected, on the 55-release corpus, 2026-08-06:
+    // number of claims — which is what made it the last source of `omission`
+    // misses once bump claims left it (above).
     //
-    //   majority inside ONE claim's evidence   omission 30/34, completeness −8
-    //   discount files many commits touch      omission 30/34, completeness +9
-    //   the same by file type, incl. vendor/   omission 33/34, completeness −139
+    // The share was 0.5 until 2026-08-09, when the full corpus finally
+    // measured it: every one of the seven remaining misses was this route and
+    // no other (`pnpm diagnose-coverage`), at shares from 0.60 to 1.00. The
+    // `file-majority` sweep over 111 releases then priced the alternatives:
     //
-    // The third "works" by counting honestly documented dependency commits as
-    // undocumented — opencloud@v7.1.0 falls 96 → 1, and every commit it newly
-    // condemns is a bump whose note names it. Whatever closes the last one has
-    // to keep that in view, and it is not a bigger number here: raising 0.5
-    // was measured and rejected before any of these.
+    //   0.5   omission 59/66   median completeness 54.5   nothing moves
+    //   0.67  omission 60/65   51.5                       22 releases move
+    //   0.8   omission 62/65   51.5                       26 move
+    //   1     omission 63/65   51.5                       27 move
+    //
+    // 1 is the only point on the Pareto front, and it is the only one that is
+    // not a calibrated number: "every file of this commit is cited by another
+    // claim" states a rule, where 0.8 states a preference that the next corpus
+    // is free to contradict. Judge fidelity does not move across the dial
+    // (golden 21/43, 0 rubber stamps at every value), so this buys detection
+    // with completeness alone.
+    //
+    // What it costs, in the tail rather than the median: 27 releases move, 5
+    // reach completeness 0. Those are either tiny — `p0deje/Maccy@2.4.1` is
+    // one claim, three commits, 35 lines, where a single commit is worth 87
+    // points — or already low (traefik@v3.7.8 at 17, zen-browser@1.21.7b at
+    // 5). The case earlier candidates died on, `opencloud@v7.1.0`, loses two
+    // points here (98 → 96); the 2026-08-06 rejections (majority inside ONE
+    // claim, discounting files many commits touch, the same by file type) were
+    // all measured on the half corpus AND before the bump split, so their
+    // numbers are void rather than evidence.
+    //
+    // Two misses survive, and no share can reach them: their commits sit at
+    // 1.00 — every file cited by some other claim, no claim of their own
+    // (`jundot/omlx@v0.5.0`, 2/2 files; `@v0.5.4rc1`, 4/4). Closing those
+    // needs a different question than "how much of the commit", and the
+    // one-claim rule is the only known candidate. Tracked in forge issue #8.
     if (files.length) {
       const hit = files.filter((f) => evidenceFiles.has(f.path)).length;
-      if (hit / files.length >= 0.5) {
+      if (hit / files.length >= 1) {
         covered.add(commit.sha);
         return;
       }

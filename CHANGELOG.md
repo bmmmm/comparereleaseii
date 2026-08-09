@@ -6,6 +6,35 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Changed
 
+- **Coverage's evidence union asks for every file of a commit, not half of
+  them — `SCORING_GENERATION` is 3.** A commit counted as documented when the
+  claims' pooled evidence cited most of its files, which is claim-independent:
+  the union grows with the number of claims, so a release that says a lot
+  documents things nobody wrote about. On the full corpus that route was the
+  sole cause of all seven remaining `omission` misses — no anchor, no pin
+  join, no substance bar (`pnpm diagnose-coverage`) — at shares from 0.60 to
+  1.00. The `file-majority` sweep over 111 releases priced the alternatives:
+  0.5 catches 59/66, 0.67 catches 60/65, 0.8 catches 62/65, 1 catches 63/65,
+  and judge fidelity (golden 21/43, 0 rubber stamps) does not move at any of
+  them. 1 is the only point on the Pareto front and the only one that states a
+  rule rather than a calibrated preference — "every file of this commit is
+  cited by another claim" survives a corpus it was not measured on.
+
+  **Scores from before and after are not comparable.** 27 of 111 releases move
+  their completeness, median 54.5 → 51.5, and 5 reach 0 — those are either
+  tiny (`p0deje/Maccy@2.4.1` is one claim, three commits, 35 lines, where a
+  single commit is worth 87 points) or already low. The case earlier
+  candidates died on, `opencloud@v7.1.0`, loses two points. The README
+  validation table is redrawn for generation 3, and the redraw separates two
+  things: restic 89 → 86 is this change (its completeness falls 67 → 56 with
+  the judge off), while git-cliff 90 → 87 and vaultwarden 84–87 → 79–82 are
+  bit-identical under `--judge off` and moved by judged flicker alone.
+
+  Two `omission` misses survive and no share can reach them: their commits sit
+  at 1.00, every file cited by some other claim and none of their own
+  (`jundot/omlx@v0.5.0`, 2/2 files; `@v0.5.4rc1`, 4/4). Forge issue #8 stays
+  open for those, with the one-claim rule as the only known candidate.
+
 - **The detection rates were measured on half a corpus, and now are not.** The
   mutation harness skips a release whose refs the clone cache does not carry,
   and it said so as a count plus eight example lines — so 52 skips out of 111

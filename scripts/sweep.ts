@@ -83,7 +83,7 @@ export const DIALS: Dial[] = [
     what:
       "the share of a commit's files that must already be cited as evidence " +
       "before the commit counts as documented",
-    current: "0.5",
+    current: "1",
     values: ["0.34", "0.5", "0.67", "0.8", "1"],
     sites: [{ file: "src/verify.ts", pattern: "hit / files.length >= %" }],
   },

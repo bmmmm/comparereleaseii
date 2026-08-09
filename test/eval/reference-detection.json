@@ -4,8 +4,8 @@
   "engine": "off (deterministic only)",
   "classes": {
     "omission": {
-      "applicable": 66,
-      "detected": 59
+      "applicable": 65,
+      "detected": 63
     },
     "bump-overshoot": {
       "applicable": 22,

@@ -681,6 +681,12 @@ const MUTANTS: Mutant[] = [
     replace: "if (!opts.all) {",
   },
   {
+    guard: "the evidence union needs every file of a commit, not half of them",
+    file: "src/verify.ts",
+    find: "if (hit / files.length >= 1) {",
+    replace: "if (hit / files.length >= 0.5) {",
+  },
+  {
     guard: "a resumed release is keyed to the claims its report carried",
     file: "scripts/notes-mutations.ts",
     find: "report.results.map((r) => [r.claim.id, r.claim.section, r.claim.text, r.claim.kind]),",

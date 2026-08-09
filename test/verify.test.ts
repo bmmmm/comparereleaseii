@@ -755,6 +755,58 @@ test("standing text documents nothing, so it earns no coverage", async () => {
   assert.equal(withFresh.uncovered.length, 0);
 });
 
+test("the evidence union covers a commit only when it cites EVERY file of it", async () => {
+  // The route that produced every remaining `omission` miss until 2026-08-09,
+  // and the one nothing in the suite was watching: the share sat at 0.5 for
+  // months and moving it to 1 left 531 tests green. It is claim-independent —
+  // the union grows with the number of claims — so at half a commit's files it
+  // reads "somebody mentioned files like these" as "somebody documented this".
+  //
+  // Two commits, one claim. The documented commit touches the file the claim
+  // cites; the other touches that file AND one nothing describes.
+  const documented: Commit = {
+    sha: "aaaa111122", subject: "Rework the retry budget", body: "", author: "dev", prNumbers: [],
+  };
+  const undocumented: Commit = {
+    sha: "bbbb333344", subject: "Unrelated work nobody wrote down", body: "", author: "dev", prNumbers: [],
+  };
+  const cited = {
+    path: "src/retry.ts", status: "modified", additions: 20, deletions: 1,
+    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoff = retryBudget * 2;\n",
+  };
+  const uncited = {
+    path: "src/telemetry.ts", status: "modified", additions: 30, deletions: 0,
+    patch: "@@ -1,1 +1,31 @@\n+export function emitBeacon() {}\n",
+  };
+  // The second commit touches the cited PATH too, but in a hunk that carries
+  // none of the claim's identifiers — otherwise the substance route covers it
+  // and this test would be watching that instead.
+  const citedElsewhere = {
+    path: "src/retry.ts", status: "modified", additions: 2, deletions: 0,
+    patch: "@@ -80,1 +80,3 @@\n+// unrelated housekeeping\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [documented, undocumented],
+    files: [cited, uncited],
+    commitFiles: async (sha: string) =>
+      sha === documented.sha ? [cited] : [citedElsewhere, uncited],
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const note = claim("Rework the `retryBudget` and its `backoff`");
+  note.codeSpans = ["retryBudget", "backoff"];
+  const results = await verifyClaims(data, [note], opts);
+  assert.equal(results[0].verdict, "verified", "the claim itself is settled off the diff");
+
+  const coverage = await computeCoverage(data, [note], results);
+  const stillOpen = coverage.uncovered.map((u) => u.commit.sha);
+  // At 0.5 this commit was documented: one of its two files is cited, and half
+  // was the bar. Nothing about it is described by any note.
+  assert.deepEqual(stillOpen, [undocumented.sha], "half a commit's files is not a description of it");
+});
+
 test("subject resemblance alone no longer buys coverage — the diff must carry the claim", async () => {
   // The retired shortcut marked a commit covered when its SUBJECT resembled
   // a claim — claims describing claims. A fabricated note that echoes an

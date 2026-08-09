@@ -61,8 +61,14 @@ import {
  * now takes the `undocumented-sensitive` warn: risk −10, overall −3 for input
  * that did not change, judge off. Small, deterministic, and enough — a bucket
  * boundary sits inside that distance.
+ *
+ * 3 — coverage's evidence-union route asks for every file of a commit rather
+ * than half of them (`computeCoverage`, where the measurement is). This is the
+ * largest of the three by far: 27 of 111 corpus releases move their
+ * completeness and 5 reach 0, so a generation-2 completeness and a
+ * generation-3 completeness are not the same measurement of the same release.
  */
-export const SCORING_GENERATION = 2;
+export const SCORING_GENERATION = 3;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form
