@@ -517,6 +517,9 @@ Rules:
 - A changelog or release-notes hunk restating the claim is NOT evidence —
   notes cannot prove themselves. A claim about code behavior needs code
   changes as support; docs hunks only support claims about documentation.
+- A commit subject is NOT evidence either — it comes from the same hand as the
+  notes. The COMMITS block only orients you in the diff: a subject can neither
+  support a claim the code does not show nor override one the code does show.
 ${INJECTION_RULE}
 ${needBlock}
 Respond with ONLY this JSON object, no markdown fences, no extra prose:

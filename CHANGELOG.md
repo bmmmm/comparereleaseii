@@ -6,6 +6,49 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Changed
 
+- **A commit subject is no longer evidence, and the judge is told so.** The
+  prompt handed the model a `COMMITS` block with full subjects and said
+  nothing about what it was for, while the rule beside it spelled out that a
+  changelog hunk restating the claim proves nothing. Both come from the same
+  hand. One rule line closes that asymmetry — *"A commit subject is NOT
+  evidence either … the COMMITS block only orients you in the diff: a subject
+  can neither support a claim the code does not show nor override one the
+  code does show"* — and it names both directions, because only one of them
+  was ever enforced anywhere: no claim may reach `verified` for agreeing with
+  a subject, but nothing stopped a subject from burying a claim the diff
+  proves. That is what the measurement found. Over four independent
+  `--no-cache` runs on two days, the golden case whose subject denies what
+  its diff shows read `verified · verified · contradicted · verified`, and
+  the outlier grounded itself in the commit message over a diff whose only
+  change is deleting `InsecureSkipVerify: true`. `overVerified` was 0
+  throughout, so this was never the rubber-stamp direction.
+
+  **This is a behaviour change for every judged run.** The verdict cache key
+  carries the prompt, so every entry written before this release is
+  unreachable and the next `watch` pass re-judges from scratch, at full
+  price. Two 43-case `--no-cache` calibrations after the change read 42/43
+  and 40/43 with `overVerified` 0; the four commit-subject shapes all pass in
+  the first, and the second loses the CVE shape to a round-1 `need` for a
+  file it was already shown — the same flicker that case showed before the
+  change. `test/eval/reference-haiku.json` is re-frozen from the first run,
+  whose only failure is the reproducible `bump-release-overtakes-its-own-note`
+  class failure. The untrusted markers, the response contract and the
+  hidden-thinking defaults are untouched.
+
+- **The README validation table is re-measured, and two rows had drifted
+  before this rule existed.** headscale v0.29.2 holds at 100, restic v0.19.1
+  at 89 and the fabricated negative control at 5 with exit 1. git-cliff
+  v2.13.0 reads 96 where the table said 95 and vaultwarden 1.37.0 reads 84
+  where it said 76 — but running both on the parent commit reads 96 and 83,
+  so the drift is the scoring and coverage work already on `main`, not the
+  prompt. What separates a before/after pair is one or two verdicts on
+  two-part claims ("standardize on yarn *and* fix the invalid anchor link"),
+  which is the documented flicker: three clean judged draws of git-cliff read
+  90 · 96 · 96 and of vaultwarden 83 · 87 · 84. The published number is the
+  composition two of three draws agree on. A fourth run was dropped before
+  anything was counted — it lost two judge calls to the CLI and carried the
+  `judge-unavailable` flag.
+
 - **`surface.cliFlags` stops reporting other people's flags.** Half of every
   release with a surface used to "add CLI flags", and bucketing 805 real
   flag-literal occurrences across 27 corpus tag ranges said why: only 37% of
@@ -83,12 +126,9 @@ All notable changes to comparereleaseii are documented here. The format follows 
   verified`, with `overVerified` 0 throughout: the subject buried a claim the
   diff proves rather than rubber-stamping one it does not.
 
-  The judge prompt is still unchanged, because a rule line invalidates every
-  cache entry by construction and re-measures the README validation table.
-  What the runs justify, and where such a change would start, is ROADMAP.md
-  entry 2. The frozen reference is re-run at 41/43 (2026-08-09); that run also
-  saw round-1 `need` variance on `rate-limit-config-vs-flood-claim`, which is
-  run-to-run noise rather than a change to the set.
+  These runs are what justified the prompt rule above, which shipped later
+  the same day and re-froze the reference again; the numbers here are the
+  before-measurement it was argued from.
 
 - **`checkAndRecord`'s assembly loses its untested status.** `evaluateRules`,
   `alertDecision` and the ledgers were already tested in isolation, but the

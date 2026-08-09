@@ -25,8 +25,8 @@
 > landed notes live in this file's git history (up to `039460a`).
 >
 > **Where a fresh session starts:** forge issue #9 (verdict-cache GC:
-> 97.5 % of entries are dead versions nothing evicts), or entries 1–2 below,
-> which need judge budget and patience. One operational thread needs no code:
+> 97.5 % of entries are dead versions nothing evicts), or entry 1 below,
+> which needs judge budget and patience. One operational thread needs no code:
 > the rules are live but have never seen a real release — the first watched
 > release that fires one is the feature's first production datapoint, and
 > `pnpm corpus-stats` at 0.11.0 (the class-bill section is released now)
@@ -36,9 +36,10 @@
 
 The "running it teaches it" block is built. Six of its seven entries landed on
 2026-08-06, and what those instruments then found was two things. One of them —
-`inverted-claim` — was closed on 2026-08-07 and has moved to **Settled** below.
-The two entries here are what is left: the coverage miss nobody has landed a
-repair for, and a question the closing of the first one raised.
+`inverted-claim` — was closed on 2026-08-07; the question its closing raised,
+the judge arguing from commit subjects, was closed on 2026-08-09 when the rule
+line shipped. Both have moved to **Settled** below. What is left here is one
+entry: the coverage miss nobody has landed a repair for.
 
 **The line that block did not cross, and this one does not either.** What
 running the tool teaches is *where it is wrong* and *where it wastes work*. It
@@ -167,138 +168,75 @@ missed. What closed the case was not a sixth candidate — no product code
 changed — but the case's own `detail` string and a per-route dump of the
 mutant, which is what this entry had been asking for since 2026-08-07.
 
-### 2. The judge argues from commit subjects, and nothing stops it
-
-Found 2026-08-07 while closing `inverted-claim`, and deliberately not fixed in
-the same breath: it moves every verdict, so it needs its own measurement.
-
-Reading the judge's own reasoning on the caught inversions, the first thing it
-reaches for is not the diff:
-
-> "The **commit message** for 2a0103c05c states 'fix support for IPinfo's
-> databases', directly contradicting the claim that support is being 'broken'."
-
-It lands on the right verdict here, which is exactly why it is easy to miss.
-But a release note and a commit message come from the same hand, and the
-settled entry below — *only the diff is evidence* — is the founding thesis of
-this tool. The reverse direction is already enforced: no claim may reach
-`verified` because it agrees with a commit subject, and the retired coverage
-rescue was removed for comparing claim text to subjects. Nothing enforces this
-direction. `buildJudgePrompt` (`src/judge.ts`) puts a `COMMITS` block with full
-subjects in front of the model, and the rules list says nothing about what that
-block may be used for — while it *does* spell out that a changelog hunk
-restating the claim is not evidence.
-
-**First measurement, 2026-08-08: the gate could not see this at all, and now
-that it can, the model passes.** Every golden case was prompted with
-`commits: []` — `calibrate.ts` hard-coded it and no case carried any — so
-`circularity` read 2/2 while testing only the changelog half of the axis. A
-model that argued from commit subjects would never have been caught by the
-gate. The set can now carry linked commits (`commits?` on `GoldenCase`), and
-two cases spell out both directions:
-
-    commit-subject-echoes-claim-diff-shows-nothing   subject confirms the claim,
-                                                     diff shows nothing  → no-evidence
-    commit-subject-denies-what-the-diff-shows        subject denies it,
-                                                     diff proves it      → verified
-
-Two independent `--no-cache` runs, identical both times: `need→no-evidence`
-and `verified`. `circularity` 4/4. The model neither rubber-stamps on a
-friendly subject nor lets a hostile one override the diff — on these two
-shapes.
-
-On that evidence the prompt change was **not** justified, and that was the
-finding. What stayed open was narrower than this entry began: the reasoning
-text still *cited* commit subjects (the sniffnet runs), and citing is not the
-same as being swayed by one. The honest next step was more shapes rather than
-an edit — a subject that supplies a detail the diff omits, and one that names
-a CVE the diff never mentions, were the two the pair did not cover.
-
-**Second measurement, 2026-08-09: the two new shapes hold, and one half of the
-old pair stops holding. That is the justification this entry was waiting for.**
-Both missing shapes are in the set now, both `circularity`, both carrying a
-linked commit:
-
-    commit-subject-supplies-the-detail-the-diff-omits   subject names a 30s cap
-                                                        the diff never shows
-    commit-subject-names-a-cve-the-diff-never-mentions  subject names the CVE,
-                                                        the diff is a size limit
-
-Two independent `--no-cache` runs against `claude-cli/haiku`, 43 cases each:
-
-| shape | run 1 | run 2 |
-|---|---|---|
-| `…echoes-claim-diff-shows-nothing` | `need→no-evidence` pass | `need→no-evidence` pass |
-| `…denies-what-the-diff-shows` | **`contradicted` FAIL** | `verified` pass |
-| `…supplies-the-detail-the-diff-omits` | `need→partial` pass | `no-evidence` pass |
-| `…names-a-cve-the-diff-never-mentions` | **`need` FAIL** (round-1 need-misuse) | `no-evidence` pass |
-
-`circularity` 4/6 and 6/6, `overVerified` 0 in both runs.
-
-The CVE case takes no `need`: its whole release is one file and that file is
-shown, unsanitised `filepath.Join(dst, hdr.Name)` sitting in the hunk as
-unchanged context, so the evidence settles the claim where it stands. Its
-`expected` is the three verdicts that decline the subject's word —
-`no-evidence`, `partial`, `contradicted` — which mechanically means two ways
-to fail it: answer `verified`, or spend round 1 asking for a file you were
-already given, the way `evidence-suffices-need-is-wrong` is failed. Run 1
-found the second one. Widening the list afterwards to make that pass would be
-the collapse AGENTS.md forbids, run backwards.
-
-The new shapes are not what moved. What moved is one half of the *old* pair —
-the echoes case passed both runs, and `commit-subject-denies-what-the-diff-shows`,
-which answered `verified` twice on 2026-08-08, answered `contradicted` in run
-1 and said why in as many words:
-
-> "The linked **commit message** explicitly states 'drop strict TLS for
-> webhooks until 2.0', directly contradicting the claim that TLS verification
-> is being enforced. While the diff removes `InsecureSkipVerify: true` (which
-> would enable default Go TLS verification), the commit's intent **per its
-> message** is to *remove* strict enforcement, not add it."
-
-The diff in that case does exactly one thing: it deletes
-`InsecureSkipVerify: true`. The model read that, wrote it down, and then let a
-commit subject — written by the same hand as the note — outrank it. Run 2 hit
-the same tension and resolved it the other way, naming it out loud: *"the
-linked commit message contradicts the code diff, claiming to 'drop strict
-TLS', but the code evidence supports the claim"*. Across four independent runs
-on two days the shape reads `verified · verified · contradicted · verified`.
-
-So the answer to this entry is no longer "citing is not being swayed" — it is
-3/4. And the direction matters: `overVerified` is 0, so this is not the
-rubber-stamp the gate watches for. A stale subject buried a claim the diff
-*proves*, which is the same circularity pointed the other way, and a release
-that ships an honest fix under a misleading subject is exactly the release this
-tool exists for.
-
-**What that still does not license.** The prompt is unchanged here on purpose:
-a rule line invalidates every cache entry by construction and forces the README
-validation table to be re-measured, which is a release-sized decision rather
-than a measurement. Whoever makes it starts at `TRUST_PREAMBLE` and the rules
-list in `src/judge.ts:496-523`, and the rule the set can now grade is: the
-`COMMITS` block orients, it does not settle — a verdict that flips when the
-subject changes and the diff does not is wrong in whichever direction it flips.
-
-**This entry closes two ways, and only two.** Either the rule line ships — by
-construction that invalidates every cache entry and re-measures the README
-validation table, and the entry closes with it — or ten consecutive
-`--no-cache` runs all answer `verified` on the denies case, which makes run 1
-sampling noise rather than a rule the model is missing and retracts the
-justification above. The second measurement is not cheap today: neither
-`pnpm eval` nor `--calibrate` can restrict to a case or a category, so ten
-runs of four shapes cost ten runs of 43. Building that filter is not part of
-this entry — it may be mooted by the first exit.
-
-**Decided 2026-08-09: `…names-a-cve-the-diff-never-mentions` stays in
-`circularity`, not `security`.** It is security material and an over-verify on
-it would therefore not disqualify a judge, which reads like an under-strict
-filing. Moving it changes what the frozen gate means for every judge that ever
-ran against it, and nothing here forces that — the case exists to measure the
-subject axis, and the axis is `circularity`.
-
 ---
 
 ## Settled — do not reopen without new facts
+
+- **The judge argued from commit subjects, and a rule line now says it may
+  not — closed 2026-08-09.** The justification was 3/4. Across four
+  independent `--no-cache` runs on two days,
+  `commit-subject-denies-what-the-diff-shows` read `verified · verified ·
+  contradicted · verified`, and the one `contradicted` said why in as many
+  words — *"the commit's intent per its message is to remove strict
+  enforcement"* — over a diff whose only change is deleting
+  `InsecureSkipVerify: true`. `overVerified` was 0 throughout, so the failure
+  direction was never the rubber-stamp the gate watches for: a stale subject
+  buried a claim the diff *proves*, which is the same circularity pointed the
+  other way, and a release that ships an honest fix under a misleading
+  subject is exactly the release this tool exists for.
+
+  The line that shipped sits in `buildJudgePrompt`'s rules list, directly
+  after the changelog rule it generalises:
+
+      - A commit subject is NOT evidence either — it comes from the same hand as the
+        notes. The COMMITS block only orients you in the diff: a subject can neither
+        support a claim the code does not show nor override one the code does show.
+
+  Both directions on purpose — the reverse one was already enforced in code
+  and unenforced in the prompt. The untrusted markers, the response contract
+  and the hidden-thinking defaults are untouched, so nothing the small-model
+  tolerance rests on moved.
+
+  **After: two independent 43-case `--no-cache` runs against
+  `claude-cli/haiku`** — 42/43 and 40/43, `overVerified` 0 in both. All four
+  commit-subject shapes pass in run 1. Run 2 loses
+  `…names-a-cve-the-diff-never-mentions` to a round-1 `need` for a file it had
+  already been shown — the same way that case failed *before* the change on
+  2026-08-09, and the same way `rate-limit-config-vs-flood-claim` failed in
+  that run. `denies-what-the-diff-shows`, the case the rule exists for, reads
+  `verified` in both. `bump-release-overtakes-its-own-note` fails in both, as
+  it does in the frozen reference. Nothing failed newly and reproducibly.
+  `test/eval/reference-haiku.json` is re-frozen from run 1 — not for its
+  score but because it is the coherent run: its only failure is the
+  documented reproducible class failure, and every flicker-prone case
+  settled on a verdict.
+
+  **Every cached verdict is invalidated by construction.** The key is
+  `sha256(version + engineName + prompt)` and the prompt changed, so no entry
+  written before this commit can be read again. The next `watch` pass
+  re-judges every claim it reaches, at full price; this is a behaviour change
+  for every judged run, not a prompt tidy-up.
+
+  **The README validation table, re-measured judged and serially.** headscale
+  v0.29.2 holds at 100 and restic v0.19.1 at 89; the fabricated negative
+  control holds at 5 with exit 1. git-cliff v2.13.0 reads 96 where the table
+  said 95, vaultwarden 1.37.0 reads 84 where it said 76 — and that drift is
+  not this rule's. Both were also run on the parent commit and both had moved
+  there already (git-cliff 96, vaultwarden 83). Each before/after pair
+  differs by one or two verdicts on two-part claims (*"standardize on yarn
+  and fix the invalid anchor link"* — the yarn half is shown, the anchor half
+  is not), which is the flicker this repo already documents: git-cliff read
+  90 and 96 on two after-side draws against 96 on the before-side, vaultwarden
+  87 and 84 against 83. The published numbers are the composition two of
+  three draws agree on. One run was dropped before any of this counted — it
+  lost two judge calls to the CLI and carried the `judge-unavailable` flag,
+  which is the load warning the A/B trap exists for.
+
+  **What reopens it:** judge reasoning that grounds a verdict in a commit
+  subject *despite* the rule — found the way this entry was found, by reading
+  the runs rather than the scores. A verdict that flips when the subject
+  changes and the diff does not is still wrong in whichever direction it
+  flips.
 
 - **`checkAndRecord`'s assembly loses its untested status — closed
   2026-08-09.** The pure pieces it calls (`evaluateRules`, `alertDecision`,
@@ -498,8 +436,8 @@ subject axis, and the axis is `circularity`.
   answer.** Any future route that settles a claim on a single call needs to
   say why that class is different. Cost: up to two extra calls per
   overlap-only `verified`, an upper bound of ~8 % on 1924 judged. The judge
-  prompt was not touched — see open entry 2 for what reading those runs
-  surfaced instead.
+  prompt was not touched here — what reading those runs surfaced instead is
+  the commit-subject rule, settled above on 2026-08-09.
 
   The trap it left: measuring a ladder fix with `--generate` needs
   `--no-cache`. The model writes the same inversion for the same claim, so the
