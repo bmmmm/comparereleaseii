@@ -84,22 +84,37 @@ test("a bump note covers the hops it does not name, and the omission mutation st
   });
   assert.equal(anchorsTo(note, "04a924f71693b04dd696398a06658955e1eb3e8f", []), false);
   assert.ok(lexicalMatch(note, [gomod]).score < 5);
-  assert.equal(bumpCovers(note, pinBumps([gomod])), true);
+  assert.equal(bumpCovers(note, "verified", pinBumps([gomod])), true);
+  assert.equal(bumpCovers(note, "partial", pinBumps([gomod])), true);
 
   // Same rule as coverage: a claim that asserts nothing about this release
   // documents no commit, and a claim about another dependency documents this
   // one no more than any other note does.
-  assert.equal(bumpCovers({ ...note, kind: "meta" }, pinBumps([gomod])), false);
-  assert.equal(bumpCovers(claim("Fix icon rendering"), pinBumps([gomod])), false);
+  assert.equal(bumpCovers({ ...note, kind: "meta" }, "verified", pinBumps([gomod])), false);
+  assert.equal(bumpCovers(claim("Fix icon rendering"), "verified", pinBumps([gomod])), false);
   assert.equal(
     bumpCovers(
       claim("bump github.com/rogpeppe/go-internal from 1.14.1 to 1.15.0", {
         bump: { name: "github.com/rogpeppe/go-internal", from: "1.14.1", to: "1.15.0" },
       }),
+      "verified",
       pinBumps([gomod]),
     ),
     false,
   );
+
+  // The verdict gate, and it is not decoration. `computeCoverage` joins pins
+  // only for a bump claim its run settled `verified` or `partial`; a replica
+  // without that condition strips notes production would never have covered
+  // from, which manufactures detection in the one direction nobody would
+  // question. v7.3.0 alone carries 31 bump claims left at `no-evidence`.
+  for (const verdict of ["no-evidence", "contradicted", "skipped", undefined] as const) {
+    assert.equal(
+      bumpCovers(note, verdict, pinBumps([gomod])),
+      false,
+      `a ${verdict ?? "missing"} bump claim documents no commit`,
+    );
+  }
 });
 
 test("noiseTokens picks diff identifiers no real claim already names", () => {

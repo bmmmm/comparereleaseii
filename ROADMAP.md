@@ -94,8 +94,9 @@ instrumenting the mutant per route rather than reading this file:
 - the missed commit is `04a924f7` after all — *bump
   `github.com/open-policy-agent/opa` from 1.17.1 to 1.18.1*, 29,027 lines
   across 50 files — and the route holding it is the **bump pin join**,
-  measured and not assumed: anchors 0, claim evidence 0, evidence-file
-  majority **0/50**, lexical substance 0, pin join **1**.
+  measured in the mutant and not assumed: anchors 0, claim evidence 0,
+  evidence-file majority **0/50**, lexical substance 0, pin join **1** (in the
+  control it is 2 — see below).
 - the claim holding it is not the one this entry was chasing. v7.3.0 bumps opa
   in three commits — `42987b03` 1.15.2→1.17.1 (41,505 lines), `04a924f7`
   1.17.1→1.18.1, `bce52eec` 1.18.1→1.18.2 — the range moves the pin 1.15.2 →
@@ -104,10 +105,13 @@ instrumenting the mutant per route rather than reading this file:
   agree. That is the rule that closed this class doing exactly what it says.
 - so the 2026-08-06 diagnosis was right and the 2026-08-07 correction was
   wrong: the entry was aiming at the wrong **claim**, not the wrong commit.
-  The fifth candidate broke the link to a `rogpeppe/go-internal` claim that
-  never held the commit, while opa's own tree sits in 36 of those 50 paths and
-  kept the claim that did. "Moves nothing" was an accurate measurement of the
-  wrong hypothesis.
+  In the control this route covers `04a924f7` from *two* bump claims — opa's
+  and `rogpeppe/go-internal`'s, since the commit moves that pin as well — and
+  the path rule severs only the second, go-internal having no tree in the
+  commit while opa's sits in 30 of its 50 paths. The mutation had already
+  removed the go-internal claim (it scores 6 on the lexical bar), so in the
+  mutant there was nothing left for the rule to sever. "Moves nothing" was an
+  accurate measurement of the wrong hypothesis.
 - and the `omission` was the harness's, not the detector's. The mutation
   removes the claims covering the commit by anchor and by the lexical bar —
   the routes coverage granted when that block was written on **2026-08-05**.
@@ -158,10 +162,11 @@ measured against it on 2026-08-06 are all rejected (numbers at the route).
 Whoever reopens it needs a rule that tells "these files are already spoken
 for" from "this commit is spoken for" — and it still has to survive v7.1.0.
 
-The method is the finding as much as the result: five of six candidates were
-aimed from a comment instead of from a measurement, and all five missed. The
-one that landed was aimed at the case's own `detail` string and a per-route
-dump of the mutant.
+The method is the finding as much as the result: all five candidates for this
+route were aimed from a comment instead of from a measurement, and all five
+missed. What closed the case was not a sixth candidate — no product code
+changed — but the case's own `detail` string and a per-route dump of the
+mutant, which is what this entry had been asking for since 2026-08-07.
 
 ### 2. The judge argues from commit subjects, and nothing stops it
 

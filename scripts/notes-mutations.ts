@@ -11,7 +11,7 @@
 import { extractJsonObject, untrustedBlock } from "../src/judge.ts";
 import { tokenize } from "../src/match.ts";
 import { sameName } from "../src/pins.ts";
-import type { Claim, DiffFile, PinBump } from "../src/types.ts";
+import type { Claim, DiffFile, PinBump, Verdict } from "../src/types.ts";
 
 /**
  * Release notes rebuilt from parsed claims. Section headings and bullet syntax
@@ -53,9 +53,19 @@ export function anchorsTo(claim: Claim, sha: string, prNumbers: number[]): boole
  * anchor-plus-lexical left it in the notes and the pin join went on covering
  * the commit from it. The mutant still documented what the mutation was
  * supposed to have hidden.
+ *
+ * The verdict is part of the route, not decoration: coverage joins pins only
+ * for a bump claim the run settled `verified` or `partial`. A replica without
+ * that gate strips notes production would never have covered from, which
+ * flatters detection in the one direction nobody would question — and it was
+ * not hypothetical. Ungated, `opencloud-eu/opencloud@v7.2.0` had 7 claims
+ * removed from its omission mutant instead of 1; the other six were
+ * `contradicted` bump claims. No rate moved, which is exactly why the gate
+ * belongs in the code rather than in a note saying it does not matter yet.
  */
-export function bumpCovers(claim: Claim, pins: PinBump[]): boolean {
+export function bumpCovers(claim: Claim, verdict: Verdict | undefined, pins: PinBump[]): boolean {
   if (claim.bump === undefined || claim.kind !== "change") return false;
+  if (verdict !== "verified" && verdict !== "partial") return false;
   return pins.some((p) => sameName(claim.bump!.name, p.name));
 }
 

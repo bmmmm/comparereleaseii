@@ -925,12 +925,16 @@ export async function computeCoverage(
     // and the opa claim clears neither — it scores 4 against a bar of 5
     // exactly because the version it names is not the one that commit moves —
     // so the mutant still carried the note that documents the commit. The
-    // path candidate moved nothing for the same reason: it was aimed at a
-    // `rogpeppe/go-internal` claim that never held the commit, while opa's own
-    // tree is in 36 of those 50 paths. Repaired in the harness
-    // (`bumpCovers`, scripts/notes-mutations.ts), no scoring number touched.
-    // A sixth candidate for this route needs a case where the notes do NOT
-    // name the dependency at all.
+    // path candidate was aimed one claim to the side: this route covers
+    // 04a924f7 from two bump claims, opa's and `rogpeppe/go-internal`'s (the
+    // commit moves that pin too), and the path rule severs only the second —
+    // go-internal has no tree in the commit while opa's is in 30 of its 50
+    // paths. But the mutation had already removed the go-internal claim, so in
+    // the mutant there was nothing left for the rule to sever. Hence "moves
+    // nothing". Repaired in the harness (`bumpCovers`,
+    // scripts/notes-mutations.ts), no scoring number touched. A candidate for
+    // this route needs a case where the notes do NOT name the dependency at
+    // all.
     if (bumpClaims.length && files.length) {
       const pins = pinBumps(files);
       if (

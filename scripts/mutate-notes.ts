@@ -71,7 +71,7 @@ import { loadLocalRange, localRepoContext } from "../src/sources/local.ts";
 import { lexicalMatch, tokenize } from "../src/match.ts";
 import { pinBumps } from "../src/pins.ts";
 import { run } from "../src/util.ts";
-import type { Claim, ClaimResult, DiffFile, Report } from "../src/types.ts";
+import type { Claim, ClaimResult, DiffFile, Report, Verdict } from "../src/types.ts";
 import { dedupeReports, median } from "./corpus-aggregate.ts";
 import {
   anchorsTo,
@@ -342,6 +342,16 @@ for (const report of reports) {
   // in the release.
   {
     const uncovered = new Set((control.uncovered ?? []).map((u) => u.commit.sha));
+    // The pin join is granted per verdict, so the mutation needs the control
+    // run's own. Its results are re-parsed from the rendered notes rather than
+    // being these claim objects, and `renderNotes` writes the text verbatim,
+    // so the text is the join; where one text occurs twice the covering
+    // verdict wins, because that is the one that would have covered.
+    const controlVerdict = new Map<string, Verdict>();
+    for (const r of control.results) {
+      const covers = r.verdict === "verified" || r.verdict === "partial";
+      if (covers || !controlVerdict.has(r.claim.text)) controlVerdict.set(r.claim.text, r.verdict);
+    }
     const ranked = (
       await Promise.all(
         range.commits
@@ -357,7 +367,7 @@ for (const report of reports) {
         (cl) =>
           anchorsTo(cl, c.sha, c.prNumbers) ||
           lexicalMatch(cl, files).score >= 5 ||
-          bumpCovers(cl, pins),
+          bumpCovers(cl, controlVerdict.get(cl.text), pins),
       );
       // A zero-churn commit hides nothing, and a release already at
       // completeness 0 has no room to lose any — neither is a detector

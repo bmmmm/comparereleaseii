@@ -220,7 +220,7 @@ All notable changes to comparereleaseii are documented here. The format follows 
   times kept that claim in the mutant, and the commit stayed documented by a
   note the mutation never took away.
 
-  It read as a detector miss for three days, and four candidate repairs to the
+  It read as a detector miss for three days, and five candidate repairs to the
   coverage route were measured against it. `opencloud-eu/opencloud@v7.3.0`
   bumps `open-policy-agent/opa` in three commits and notes the last hop only;
   on the middle commit that note scores 4 against the lexical bar of 5,

@@ -638,6 +638,12 @@ const MUTANTS: Mutant[] = [
     find: "return pins.some((p) => sameName(claim.bump!.name, p.name));",
     replace: "return pins.some((p) => sameName(claim.bump!.name, p.name) && p.to === claim.bump!.to);",
   },
+  {
+    guard: "the omission mutation keeps a bump note the run never settled",
+    file: "scripts/notes-mutations.ts",
+    find: 'if (verdict !== "verified" && verdict !== "partial") return false;',
+    replace: "if (verdict === undefined) return false;",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

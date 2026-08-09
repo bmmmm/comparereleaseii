@@ -438,7 +438,8 @@ noting one hop of a dependency it bumped three times kept that note in the
 mutant — and the commit it hid stayed documented, correctly. Fixing the
 mutation also made two more releases mutatable, which is why the denominator
 grew. `foreign-claim` reads 49 rather than 50 applicable cases because the
-corpus moved on, not the class.
+corpus gained a report and one release lost its donor as a result; the rate is
+100 % either way.
 
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,
