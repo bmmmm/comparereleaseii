@@ -24,14 +24,14 @@
 > landed notes live in this file's git history (up to `039460a`).
 >
 > **Where a fresh session starts:** entry 6 (the `cliFlags` category-boundary
-> leak — `vendor/` exclusion is the measured-safe first move), entry 7 (a
-> stub harness for `checkAndRecord`), forge issue #9 (verdict-cache GC:
-> 97.5 % of entries are dead versions nothing evicts), or entries 1–2 below,
-> which need judge budget and patience. One operational thread needs no code:
-> the rules are live but have never seen a real release — the first watched
-> release that fires one is the feature's first production datapoint, and
-> `pnpm corpus-stats` at 0.11.0 (the class-bill section is released now)
-> against a refreshed `tmp/corpus` names the next free deterministic rule.
+> leak — `vendor/` exclusion is the measured-safe first move), forge issue #9
+> (verdict-cache GC: 97.5 % of entries are dead versions nothing evicts), or
+> entries 1–2 below, which need judge budget and patience. One operational
+> thread needs no code: the rules are live but have never seen a real
+> release — the first watched release that fires one is the feature's first
+> production datapoint, and `pnpm corpus-stats` at 0.11.0 (the class-bill
+> section is released now) against a refreshed `tmp/corpus` names the next
+> free deterministic rule.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 
@@ -310,23 +310,47 @@ script). Whoever picks this up re-measures the 50% fire rate after each
 exclusion — the number that made entry 5 look like a subprocess problem was
 mostly this.
 
-### 7. `checkAndRecord` assembles the record nobody's test ever reads
-
-Found while wiring rules into the watch flow: the pure pieces are tested —
-`evaluateRules`, `alertDecision`, the ledgers — but the assembly line that
-folds a finished report into a `CheckedRelease` (components, authors,
-verdicts, and now `ruleHits`) runs under no test, because nothing in the
-suite exercises a full check flow; `runWatch` is only ever driven into its
-validation rejections. The `safeSegment` lesson says what an untested seam
-is worth: a guard there was removed and 458 tests stayed green. A stub
-harness for `checkAndRecord` (fabricated report in, recorded state out)
-would put the whole record shape under test at once — it was out of scope
-for the rules task, and this entry is so the gap does not stay an anecdote
-in an agent report.
-
 ---
 
 ## Settled — do not reopen without new facts
+
+- **`checkAndRecord`'s assembly loses its untested status — closed
+  2026-08-09.** The pure pieces it calls (`evaluateRules`, `alertDecision`,
+  the ledgers) were already tested; the fold that builds a `CheckedRelease`
+  from a finished `Report` — components, authors, verdicts, `ruleHits`,
+  warnings, broken-promise and judge-fallback counts, `scoreLevel`,
+  `releaseUrl`, the `backfilled` flag, and the `recordChecked` write into
+  `RepoState` — was not, because nothing in the suite drove a full check
+  flow; `runWatch` was only ever pushed into its validation rejections. A new
+  seam, `loadAndAnalyze` on `checkAndRecord`'s own args (`src/watch.ts`),
+  replaces the network load and `analyzeRelease` pass with a fabricated
+  `{ report, link }`; every production caller (`runWatch`, `runBackfill`)
+  leaves it undefined, which falls back to the extracted
+  `loadAndAnalyzeRelease` — the same inlined code that ran before, unchanged,
+  so the 505 pre-existing tests and `pnpm check` are the proof nothing about
+  a live run moved. `checkAndRecord` itself went from module-private to
+  exported for the same reason `writeReportFiles` already is.
+
+  Four cases in `test/watch.test.ts` drive it: a rich release exercising
+  every conditional field at once (contradicted verdict, critical flag,
+  judge fallback, broken promise, author ledger, `backfilled`), a release
+  that fires three rule shapes at once (path, surface, finding-kind) and
+  gets `flagged` from the rule alone, an empty/clean release proving every
+  optional field — `warnings`, `scoringGeneration`, `brokenPromises`,
+  `unjudged`, `authors`, `ruleHits`, `backfilled` — is truly *absent*, not
+  just falsy, and a rule that matches nothing proving `ruleHits` stays `[]`
+  rather than disappearing (the field `staleRules` depends on). Four
+  distinct assembly steps were broken in turn (a duplicated verdict filter,
+  swapped `correctness`/`risk` in `components`, `ruleHits?.length` instead
+  of `ruleHits` truthiness, and dropping the author-ledger write) and
+  restored; each broke exactly the case that covers it and nothing else,
+  which is the `safeSegment` proof this entry existed to get.
+
+  What the harness does not reach: `loadAndAnalyzeRelease` itself (the real
+  network/`gh`/clone loaders and `analyzeRelease`'s own pipeline) and the
+  outer loop (`runWatch`/`runBackfill`'s retry, lock and promise-ledger
+  storage) — both stay exactly as tested (or untested) as before. This
+  closes the assembly gap the entry named, not the loaders around it.
 
 - **`cliFlags` subprocess noise: no cheap discriminator exists — measured
   and closed 2026-08-08.** Three candidates against 439 real occurrences

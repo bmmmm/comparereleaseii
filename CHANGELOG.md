@@ -36,6 +36,24 @@ All notable changes to comparereleaseii are documented here. The format follows 
   saw round-1 `need` variance on `rate-limit-config-vs-flood-claim`, which is
   run-to-run noise rather than a change to the set.
 
+- **`checkAndRecord`'s assembly loses its untested status.** `evaluateRules`,
+  `alertDecision` and the ledgers were already tested in isolation, but the
+  fold that turns a finished `Report` into a `CheckedRelease` — components,
+  authors, verdicts, `ruleHits`, warnings, broken-promise and judge-fallback
+  counts, `scoreLevel`, `releaseUrl`, the `backfilled` flag, the write into
+  `RepoState` — ran under no test at all, because nothing drove a full check
+  flow; `runWatch` was only ever exercised through its validation rejections.
+  `test/watch.test.ts` now drives the real `checkAndRecord` against a
+  fabricated `Report` — no network, no `gh`/git subprocess, no judge — through
+  a new `loadAndAnalyze` seam that every production caller leaves unset
+  (`src/watch.ts`; the pre-existing test suite is the proof a live run is
+  unchanged). Four cases: a release exercising every conditional field at
+  once, one that fires three rule shapes together and gets flagged from the
+  rule alone, an empty release proving each optional field is truly absent
+  rather than just falsy, and a rule that matches nothing proving `ruleHits`
+  stays `[]` instead of vanishing. Four assembly steps were broken in turn to
+  confirm the harness — and only the harness — catches each.
+
 ## 0.11.0 — 2026-08-09
 
 ### Added

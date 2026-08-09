@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import {
   configuredEntries,
@@ -10,7 +10,9 @@ import {
   validateWatchConfig,
   writeReportFiles,
   announceBackfill,
+  checkAndRecord,
   type BackfillPlan,
+  type CheckOutcome,
 } from "../src/watch.ts";
 import { computeScores } from "../src/metrics.ts";
 import { toWatchIndexHtml, toWatchAtomFeed } from "../src/watch-index.ts";
@@ -49,8 +51,9 @@ import {
   type CheckedRelease,
   type RepoState,
   type WatchRule,
+  type WatchRepoConfig,
 } from "../src/watch-state.ts";
-import type { Finding, PromiseCheck, ReleaseSurface, Report } from "../src/types.ts";
+import type { ClaimResult, Finding, PromiseCheck, ReleaseSurface, Report, Verdict } from "../src/types.ts";
 import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -1591,4 +1594,312 @@ test("a backfill states its cost before it asks to be started", () => {
   }
   assert.equal(empty, 0);
   assert.equal(none.length, 0, `announced something for an empty plan: ${none.join("\n")}`);
+});
+
+// checkAndRecord folds a finished Report into a CheckedRelease and the repo's
+// state — `evaluateRules`, `alertDecision` and the ledgers are each tested
+// pure above, but nothing exercised the assembly that calls them and builds
+// the record a real watch run writes to disk. The `safeSegment` guard removed
+// from `writeReportFiles` earlier in this file and still passing every test
+// is what that gap is worth: an untested fold can be deleted and nothing
+// notices. `loadAndAnalyze` is the seam that makes this drivable without a
+// network call, a `gh`/git subprocess or a judge — every production caller
+// (`runWatch`, `runBackfill`) leaves it undefined, which falls back to the
+// real `loadAndAnalyzeRelease`, so nothing below changes what a live run does.
+
+const GITHUB_LINK = { base: "https://github.com/o/r", style: "github" } as const;
+const FIXED_NOW = "2026-08-09T12:00:00.000Z";
+
+/** A minimal, valid ClaimResult — only the fields checkAndRecord's verdict
+ * tally and unjudged count actually read vary per case; the rest is the
+ * smallest valid filler. */
+function claimResult(verdict: Verdict, overrides: Partial<ClaimResult> = {}): ClaimResult {
+  return {
+    claim: {
+      id: 1,
+      section: "Changes",
+      text: "does a thing",
+      kind: "change",
+      prNumbers: [],
+      shas: [],
+      advisories: [],
+      codeSpans: [],
+    },
+    verdict,
+    confidence: 1,
+    evidence: { commitShas: [], files: [], matchedTerms: [], methods: [] },
+    reasoning: "",
+    judged: true,
+    generated: false,
+    ...overrides,
+  };
+}
+
+/** A minimal, valid Report — the shape checkAndRecord folds into a
+ * CheckedRelease. Every field a case cares about is set explicitly; the rest
+ * is the smallest filler that satisfies the type and the renderers
+ * `writeReportFiles` still calls for real. */
+function fabricatedReport(overrides: Partial<Report> = {}): Report {
+  return {
+    repoLabel: "o/r",
+    baseRef: "v1.0.0",
+    headRef: "v2.0.0",
+    stats: { commits: 3, files: 2, additions: 40, deletions: 5 },
+    results: [],
+    uncovered: [],
+    reverseChecked: true,
+    metrics: {
+      scores: { correctness: 90, completeness: 80, risk: 85, overall: 88, label: "solid" },
+      flags: [],
+      files: [],
+      churnCoveredRatio: 1,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      unverifiable: null,
+      baseline: null,
+    },
+    warnings: [],
+    truncated: false,
+    engine: "off",
+    ...overrides,
+  };
+}
+
+/**
+ * Drives the real `checkAndRecord` against a fabricated report — no network,
+ * no `gh`/git subprocess, no judge (`judge: "off"` by default, and the fake
+ * `engines` resolver never even reaches `resolveEngines`). `checkedAt` is
+ * pinned via `mock.timers` so the recorded state is byte-comparable, not just
+ * shape-comparable.
+ */
+async function check(opts: {
+  report: Report;
+  rc?: Partial<WatchRepoConfig>;
+  rel?: Partial<ReleaseInfo>;
+  repoState?: RepoState;
+  backfilled?: boolean;
+}): Promise<{ outcome: CheckOutcome; repoState: RepoState }> {
+  const rc: WatchRepoConfig = { repo: "o/r", judge: "off", ...opts.rc };
+  const rel: ReleaseInfo = {
+    tag: "v2.0.0",
+    publishedAt: "2026-06-01T00:00:00Z",
+    prerelease: false,
+    draft: false,
+    ...opts.rel,
+  };
+  const repoState: RepoState = opts.repoState ?? { lastPublishedAt: null, lastTag: null, history: [] };
+  const reportsDir = await mkdtemp(join(tmpdir(), "crii-checkAndRecord-"));
+  mock.timers.enable({ apis: ["Date"], now: new Date(FIXED_NOW) });
+  try {
+    const outcome = await checkAndRecord({
+      key: "o/r",
+      rc,
+      rel,
+      repoState,
+      target: undefined,
+      carried: [],
+      configDir: reportsDir,
+      reportsDir,
+      engines: async () => ({ engine: null, escalate: null }),
+      cache: false,
+      historyLimit: 20,
+      backfilled: opts.backfilled,
+      loadAndAnalyze: async () => ({ report: opts.report, link: GITHUB_LINK }),
+    });
+    return { outcome, repoState };
+  } finally {
+    mock.timers.reset();
+  }
+}
+
+test("checkAndRecord assembles the full CheckedRelease shape from a fabricated report", async () => {
+  const report = fabricatedReport({
+    results: [
+      claimResult("verified", { judgeFailed: true }),
+      claimResult("verified"),
+      claimResult("partial"),
+      claimResult("no-evidence"),
+      claimResult("contradicted"),
+      claimResult("skipped"),
+    ],
+    metrics: {
+      scores: { correctness: 91, completeness: 77, risk: 65, overall: 84, label: "solid" },
+      flags: [
+        { severity: "critical", kind: "secret", message: "a secret leaked", files: ["a.go"], commitShas: [] },
+        { severity: "warn", kind: "noisy", message: "loud diff", files: ["b.go"], commitShas: [] },
+      ],
+      files: [],
+      churnCoveredRatio: 1,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      unverifiable: null,
+      baseline: null,
+    },
+    warnings: ["diff truncated"],
+    scoringGeneration: 3,
+    authors: [
+      { key: "alice@x", name: "Alice", commits: 5, sensitiveCommits: 0, binaryCommits: 0 },
+      { key: "bob@x", name: "Bob", commits: 2, sensitiveCommits: 1, binaryCommits: 0 },
+    ],
+    promises: [
+      { text: "remove X", from: "v1.0.0", kind: "removal", status: "broken", files: [], note: "" },
+      { text: "add Y", from: "v1.5.0", kind: "addition", status: "still-open", files: [], note: "" },
+    ],
+  });
+
+  const { outcome, repoState } = await check({ report, backfilled: true });
+  const c = outcome.checked;
+
+  assert.equal(c.tag, "v2.0.0");
+  assert.equal(c.publishedAt, "2026-06-01T00:00:00Z");
+  assert.equal(c.checkedAt, FIXED_NOW, "checkedAt is 'now' — pinned so the record is byte-comparable");
+  assert.equal(c.score, 84);
+  assert.equal(c.scoreLabel, "solid");
+  assert.deepEqual(c.components, { correctness: 91, completeness: 77, risk: 65 });
+  assert.equal(c.scoringGeneration, 3);
+  assert.equal(c.exitCode, 1, "a contradicted verdict fails the default fail-on gate");
+  assert.equal(c.criticalFlags, 1);
+  assert.equal(c.flagCount, 2);
+  assert.equal(c.flagged, true);
+  assert.deepEqual(c.warnings, ["diff truncated"]);
+  assert.equal(c.brokenPromises, 1, "only the broken entry counts, the still-open one does not");
+  assert.equal(c.engine, "off");
+  assert.equal(c.unjudged, 1, "the one judgeFailed result — the skipped verdict is not a fallback");
+  assert.deepEqual(
+    c.verdicts,
+    { verified: 2, partial: 1, noEvidence: 1, contradicted: 1 },
+    "6 results, one skipped — counted by verdict, not by length",
+  );
+  assert.deepEqual(c.authors, { total: 2, new: 2, top1Share: 0.71, top1Name: "Alice" });
+  assert.equal(c.unverifiable, undefined);
+  assert.ok(
+    Object.hasOwn(c, "unverifiable"),
+    "the key exists even when its value is undefined — a plain property, not a conditional spread",
+  );
+  assert.equal(c.scoreLevel, null, "fewer than three past checks — no level to compare against yet");
+  assert.equal("ruleHits" in c, false, "no rules configured — nothing to fold");
+  assert.equal(c.report, "o_r/v2.0.0.html");
+  assert.equal(c.releaseUrl, "https://github.com/o/r/releases/tag/v2.0.0");
+  assert.equal(c.backfilled, true);
+
+  // The state the run loop and the dashboard read afterwards.
+  assert.equal(repoState.history.length, 1);
+  assert.equal(repoState.history[0], c, "recordChecked folds the exact object checkAndRecord returned");
+  assert.equal(repoState.latest, c);
+  assert.equal(repoState.lastTag, "v2.0.0");
+  assert.equal(repoState.lastPublishedAt, "2026-06-01T00:00:00Z");
+  assert.equal(repoState.authors?.length, 2, "the author ledger folded both identities");
+  assert.equal(repoState.authors?.find((a) => a.key === "alice@x")?.firstSeen, "v2.0.0");
+});
+
+test("a watch rule fires and its hit rides the CheckedRelease", async () => {
+  const surface: ReleaseSurface = {
+    categories: [],
+    symbols: [],
+    moreSymbols: 0,
+    envVars: { added: [], removed: [] },
+    cliFlags: { added: [], removed: [] },
+    configKeys: { added: [], removed: [] },
+    hosts: { added: [], removed: [] },
+    migrations: ["db/migrations/010_add_sessions.sql"],
+    apiRoutes: [],
+  };
+  const findings: Finding[] = [
+    {
+      kind: "security",
+      audience: "everyone",
+      text: "auth bypass patched",
+      files: ["src/auth/mw.go"],
+      subsystem: "auth",
+    },
+  ];
+  const report = fabricatedReport({
+    metrics: {
+      scores: { correctness: 95, completeness: 90, risk: 92, overall: 93, label: "solid" },
+      flags: [],
+      files: [{ path: "src/auth/token.go", churn: 5, sensitive: null, coverage: "covered" }],
+      churnCoveredRatio: 1,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      unverifiable: null,
+      baseline: null,
+    },
+    surface,
+    findings: {
+      findings,
+      budget: { maxChars: 1000, usedChars: 10, subsystemsRead: 1, subsystemsTotal: 1, filesRead: 1, filesTotal: 1 },
+    },
+  });
+
+  const { outcome } = await check({
+    report,
+    rc: {
+      rules: [
+        { name: "auth", paths: ["src/auth"] },
+        { name: "schema", surface: ["migrations"] },
+        { name: "sec", findingKinds: ["security"] },
+      ],
+    },
+  });
+  const c = outcome.checked;
+  assert.ok(c.ruleHits, "the field is present once the entry has rules");
+  assert.deepEqual(c.ruleHits!.map((h) => h.rule).sort(), ["auth", "schema", "sec"]);
+  const auth = c.ruleHits!.find((h) => h.rule === "auth")!;
+  assert.deepEqual(auth.matched, ["src/auth/token.go"]);
+  assert.equal(auth.judgeBased, false);
+  const schema = c.ruleHits!.find((h) => h.rule === "schema")!;
+  assert.deepEqual(schema.matched, ["migration: db/migrations/010_add_sessions.sql"]);
+  const sec = c.ruleHits!.find((h) => h.rule === "sec")!;
+  assert.equal(sec.judgeBased, true, "a finding-kind-only hit rests on judge output");
+  // A high score, no exit code, no critical flags — the rule alone flags it.
+  assert.equal(c.flagged, true, "a subscribed area moved — the score has no say in that");
+  assert.equal(c.exitCode, 0);
+  assert.equal(c.criticalFlags, 0);
+});
+
+test("an empty, clean check leaves every conditional field off the record", async () => {
+  const report = fabricatedReport(); // no results, no warnings, no authors, no promises, no rules
+  const { outcome } = await check({ report });
+  const c = outcome.checked;
+  assert.deepEqual(c.verdicts, { verified: 0, partial: 0, noEvidence: 0, contradicted: 0 });
+  assert.equal("warnings" in c, false);
+  assert.equal("scoringGeneration" in c, false);
+  assert.equal("brokenPromises" in c, false);
+  assert.equal("unjudged" in c, false);
+  assert.equal("authors" in c, false);
+  assert.equal("ruleHits" in c, false);
+  assert.equal("backfilled" in c, false);
+  assert.equal(c.exitCode, 0);
+  assert.equal(c.flagged, false, "a solid score with nothing else wrong stays quiet");
+});
+
+test("a rule that matched nothing still carries an empty ruleHits — not an absent one", async () => {
+  const history = [
+    at("v1", 90, "2026-05-01T00:00:00Z"),
+    at("v2", 91, "2026-05-02T00:00:00Z"),
+    at("v3", 89, "2026-05-03T00:00:00Z"),
+  ];
+  const repoState: RepoState = {
+    lastPublishedAt: "2026-05-03T00:00:00Z",
+    lastTag: "v3",
+    history,
+  };
+  const report = fabricatedReport({
+    metrics: {
+      scores: { correctness: 90, completeness: 85, risk: 88, overall: 90, label: "solid" },
+      flags: [],
+      files: [{ path: "README.md", churn: 1, sensitive: null, coverage: "covered" }],
+      churnCoveredRatio: 1,
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+      unverifiable: null,
+      baseline: null,
+    },
+  });
+  const { outcome } = await check({
+    report,
+    rc: { rules: [{ name: "auth", paths: ["src/auth"] }] },
+    repoState,
+    rel: { tag: "v4", publishedAt: "2026-06-01T00:00:00Z" },
+  });
+  const c = outcome.checked;
+  assert.deepEqual(c.ruleHits, [], "rules are configured, none fired — the field stays, it does not vanish");
+  assert.equal(c.flagged, false, "an empty ruleHits is not a hit");
+  assert.equal(c.scoreLevel, 90, "three past checks — the level now compares");
 });

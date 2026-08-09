@@ -354,7 +354,7 @@ function storePromiseLedger(
   repoState.promises = capLedger(ledger);
 }
 
-interface CheckOutcome {
+export interface CheckOutcome {
   checked: CheckedRelease;
   /** The full promise ledger this check produced — the caller decides
    * whether it becomes the state's (backfill only stores the thread that
@@ -436,12 +436,43 @@ export async function writeReportFiles(args: {
 }
 
 /**
+ * The network load and pipeline pass for one release: which loader runs
+ * depends on whether the entry is a forge clone or a GitHub repo, and both
+ * feed the same `analyzeRelease`. Pulled out of `checkAndRecord` on its own
+ * so a test can swap it for a fabricated `{ report, link }` — the assembly
+ * below, `checkAndRecord`'s own job, does not care where the report came
+ * from.
+ */
+async function loadAndAnalyzeRelease(args: {
+  rc: WatchRepoConfig;
+  rel: ReleaseInfo;
+  target: ForgeTarget | undefined;
+  base?: string;
+  notesFile?: string;
+  settings: CheckSettings;
+}): Promise<{ report: Report; link: RepoLink | null }> {
+  const { rc, rel, target, base, notesFile, settings } = args;
+  let data;
+  let context;
+  let link: RepoLink | null;
+  if (target) {
+    ({ data, context } = await loadForgeRelease(target, { head: rel.tag, base, notesFile }));
+    link = target.link;
+  } else {
+    ({ data, context } = await loadGithubReleaseData(rc.repo!, { tag: rel.tag, base, notesFile }));
+    link = { base: `https://github.com/${rc.repo}`, style: "github" };
+  }
+  const report = await analyzeRelease(data, context, link, settings);
+  return { report, link };
+}
+
+/**
  * Check one release and fold the result into the repo's state — the one
  * code path both the watch loop and backfill run. Report files land in the
  * reports directory; state persistence and the index rewrite stay with the
  * caller (they decide when to flush).
  */
-async function checkAndRecord(args: {
+export async function checkAndRecord(args: {
   key: string;
   rc: WatchRepoConfig;
   rel: ReleaseInfo;
@@ -458,6 +489,14 @@ async function checkAndRecord(args: {
   historyLimit: number;
   /** Marks the CheckedRelease as a backfill result (recorded, never alerted). */
   backfilled?: boolean;
+  /**
+   * Test seam: replaces the network load and pipeline pass with a fabricated
+   * `{ report, link }`. Every production caller leaves this undefined, which
+   * falls back to `loadAndAnalyzeRelease` — so nothing here changes what a
+   * real run does. Exists so the assembly below can be driven with no
+   * network, no `gh`/git subprocess and no judge; see test/watch.test.ts.
+   */
+  loadAndAnalyze?: typeof loadAndAnalyzeRelease;
 }): Promise<CheckOutcome> {
   const { key, rc, rel, repoState, target } = args;
   const settings = await settingsFor(rc, {
@@ -467,25 +506,14 @@ async function checkAndRecord(args: {
     target,
   });
   const notesFile = rc.notesFile ? resolve(args.configDir, rc.notesFile) : undefined;
-  let data;
-  let context;
-  let link: RepoLink | null;
-  if (target) {
-    ({ data, context } = await loadForgeRelease(target, {
-      head: rel.tag,
-      base: args.base,
-      notesFile,
-    }));
-    link = target.link;
-  } else {
-    ({ data, context } = await loadGithubReleaseData(rc.repo!, {
-      tag: rel.tag,
-      base: args.base,
-      notesFile,
-    }));
-    link = { base: `https://github.com/${rc.repo}`, style: "github" };
-  }
-  const report = await analyzeRelease(data, context, link, settings);
+  const { report, link } = await (args.loadAndAnalyze ?? loadAndAnalyzeRelease)({
+    rc,
+    rel,
+    target,
+    base: args.base,
+    notesFile,
+    settings,
+  });
   // A labeled entry is not the repo's own release (e.g. a fabricated
   // negative control, or draft notes) — say so in the report header
   // instead of pinning the result on the innocent upstream repo.
