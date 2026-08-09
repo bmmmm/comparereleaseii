@@ -15,9 +15,10 @@ pnpm sweep <reports dir>         # threshold sweep: Pareto front per hand-set ba
 pnpm mutate-notes <dir> --generate  # + the model-written inverted-claim class (needs an engine)
 #   --cases <n> bounds the releases (default 12; the whole corpus is ~111)
 #   --parallel <n> analyses n releases at once (default 4)
-#   finished releases are cached under tmp/mutate-notes-resume/<build>/, so an
-#   interrupted run resumes; --no-resume re-measures. The key covers src/ and
-#   the mutations, so a patched threshold never reuses another bar's numbers
+#   finished releases are cached beside the clones (XDG cache, NOT the
+#   checkout — a removed worktree would take 12 minutes of work with it), so
+#   an interrupted run resumes; --no-resume re-measures. The key covers src/
+#   and the mutations, so a patched threshold never reuses another bar's numbers
 pnpm corpus-stats <reports dir>  # aggregate a watch home's reports; anonymous unless --named
 pnpm corpus-clones <reports dir> # which releases the clone cache cannot answer, and clone them
 pnpm corpus-bump-origins <dir>   # the from-version distribution SCORING.md's pin rule rests on

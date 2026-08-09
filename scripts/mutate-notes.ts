@@ -67,7 +67,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { analyzeRelease, type CheckSettings } from "../src/check.ts";
-import { cloneDirFor } from "../src/paths.ts";
+import { cacheDir, cloneDirFor } from "../src/paths.ts";
 import { loadLocalRange, localRepoContext } from "../src/sources/local.ts";
 import { lexicalMatch, tokenize } from "../src/match.ts";
 import { pinBumps } from "../src/pins.ts";
@@ -355,7 +355,11 @@ const releasesAtOnce = Number(flag("parallel") ?? "4");
  */
 const resumeEnabled = !args.includes("--no-resume") && !generate;
 const fingerprint = await buildFingerprint();
-const resumeDir = join("tmp", "mutate-notes-resume", fingerprint);
+// Next to the clone cache, not in the checkout's tmp/: this is derived data
+// that costs 12 minutes to rebuild, and a worktree removed after an afternoon's
+// work would take it with it. That has already happened once to a measurement
+// script; it does not need to happen to the measurements as well.
+const resumeDir = join((await cacheDir("mutate-notes")) ?? join("tmp", "mutate-notes-resume"), fingerprint);
 let resumed = 0;
 
 async function loadResumed(report: Report): Promise<ReleaseOutcome | null> {
