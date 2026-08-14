@@ -32,46 +32,10 @@ not add a dependency, a build step, or a framework.
 
 ## Module map
 
-| Path | Responsibility |
-|---|---|
-| `src/cli.ts` | Flags, orchestration, `--estimate` |
-| `src/estimate.ts` | `--estimate`: what a check would cost, measured by running the pipeline against a counting stub |
-| `src/check.ts` | One release end to end — shared by the CLI and watch mode |
-| `src/sources/github.ts` | Release data via `gh`, compare API, truncation fallback |
-| `src/sources/local.ts` | Local git ranges, CHANGELOG extraction, unified-diff parsing |
-| `src/sources/forge.ts` | Release lists from Forgejo/Gitea and GitLab — the only non-git surface `--repo-url` needs |
-| `src/claims.ts` | Notes → claims |
-| `src/match.ts` | Identifier extraction, lexical matching |
-| `src/verify.ts` | Escalation ladder, second retrieval round, coverage |
-| `src/judge.ts` | Engines, prompt construction, response parsing |
-| `src/calibrate.ts` | Golden set against the configured judge |
-| `src/golden.ts` | `--add-golden`: a claim from a stored report becomes a golden case, with the release's own evidence rebuilt |
-| `src/cache.ts` | Verdict cache |
-| `src/paths.ts` | Build version, the private cache directory and its vetting, path-segment sanitizer |
-| `src/metrics.ts` | Score, risk flags, per-file coverage |
-| `src/bump.ts` | Semver bump vs the commits' own BREAKING/feat markers |
-| `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
-| `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL/workflow-`uses:` bumps, first-party classification — and the claim side, `detectBumpClaim` |
-| `src/substance.ts` | What actually shipped: category rollup, changed symbols, config surface, migrations, routes |
-| `src/findings.ts` | Typed findings: the diff read per subsystem within a hard budget, blind to commit messages |
-| `src/reconcile.ts` | The late join of claims and findings: confirmed, undocumented, unsupported — plus the pin join that settles bump claims; deterministic, never scored |
-| `src/report.ts` | Terminal/markdown output, exit codes |
-| `src/html.ts` | HTML report |
-| `src/theme.ts` | Score buckets and their colors — the boundaries every renderer and the terminal share |
-| `src/history.ts` | Timeline, baseline |
-| `src/promises.ts` | Forward-looking notes from earlier releases checked against this diff |
-| `src/suggest.ts` | `--suggest` — draft a note line for undocumented commits |
-| `src/watch.ts` | Watch mode: state, per-repo runs, dashboard index, `--notify` |
-| `src/watch-state.ts` | What a check records and the rules that move the state — flagging, drift, ledgers. No I/O |
-| `src/watch-lock.ts` | One writer per state file: create-or-fail lock, liveness by pid, released on signals |
-| `src/watch-index.ts` | The dashboard across all watched repos and its Atom feed |
-| `src/watch-detail.ts` | Per-repo history page: score series, verdict composition, promise ledger |
-| `src/watch-longview.ts` | Long-view sections of the history page: phases, event log, yearly strips, calendar |
-| `src/watchlist.ts` | `watch init/add/remove/list` — repo list from your GitHub account |
-| `src/setup.ts` | `watch setup` — interactive home dir, judge + calibration gate, schedule file, notify |
-| `src/guidelines.ts` | `guidelines` — agent checklist extracted from `docs/` |
-| `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction, HTML escaping, the notify hook |
-| `src/types.ts` | Data model — read this first |
+Full path → responsibility table (38 modules): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Entry points: `src/types.ts` (data model, read first), `src/cli.ts` (flags,
+orchestration), `src/check.ts` (one release end to end, shared by the CLI and
+watch mode).
 
 ## Rules
 
@@ -104,11 +68,8 @@ not add a dependency, a build step, or a framework.
 - Comment only what the code cannot say — a constraint, a workaround, a
   surprising behaviour. The existing comments are the model: they explain *why*.
 - Match the surrounding style. No new abstraction layer for a single call site.
-- Push to `origin` (the private forge) as you go; push to the `github` remote
-  **only when cutting a release**. The public mirror is a record of releases,
-  not a live feed of work in progress — and every push to it is one more
-  chance for the pre-push leak gate to be the last line of defence rather
-  than a backstop. The gate is not a licence to push often.
+- Push policy inverts the global default here: `origin` only day to day,
+  `github` only when cutting a release — see CLAUDE.md's "Pushing" section.
 
 ## Traps
 
