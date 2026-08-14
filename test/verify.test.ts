@@ -755,12 +755,12 @@ test("standing text documents nothing, so it earns no coverage", async () => {
   assert.equal(withFresh.uncovered.length, 0);
 });
 
-test("the evidence union covers a commit only when it cites EVERY file of it", async () => {
+test("a claim covers a commit only when it reaches EVERY file of it", async () => {
   // The route that produced every remaining `omission` miss until 2026-08-09,
   // and the one nothing in the suite was watching: the share sat at 0.5 for
-  // months and moving it to 1 left 531 tests green. It is claim-independent —
-  // the union grows with the number of claims — so at half a commit's files it
-  // reads "somebody mentioned files like these" as "somebody documented this".
+  // months and moving it to 1 left 531 tests green. At half a commit's files
+  // it reads "somebody mentioned files like these" as "somebody documented
+  // this".
   //
   // Two commits, one claim. The documented commit touches the file the claim
   // cites; the other touches that file AND one nothing describes.
@@ -805,6 +805,129 @@ test("the evidence union covers a commit only when it cites EVERY file of it", a
   // At 0.5 this commit was documented: one of its two files is cited, and half
   // was the bar. Nothing about it is described by any note.
   assert.deepEqual(stillOpen, [undocumented.sha], "half a commit's files is not a description of it");
+});
+
+test("two claims covering a file each document neither the commit nor half of it", async () => {
+  // Issue #8's per-claim binding. Until 2026-08-14 the route asked its
+  // question of a UNION over every verified claim, so a commit was documented
+  // whenever its files were spread across the notes — the more a release said,
+  // the less the route distinguished. `jundot/omlx@v0.5.4rc1` is the corpus
+  // case: three of a benchmark commit's four files come from one claim, the
+  // fourth is `pyproject.toml` cited by an unrelated claim about a minimum
+  // dependency version.
+  const undocumented: Commit = {
+    sha: "cccc555566", subject: "Work nobody wrote down", body: "", author: "dev", prNumbers: [],
+  };
+  const parser = {
+    path: "src/parser.ts", status: "modified", additions: 20, deletions: 1,
+    patch: "@@ -1,1 +1,21 @@\n+const tokenStream = openStream();\n",
+  };
+  const cache = {
+    path: "src/cache.ts", status: "modified", additions: 12, deletions: 0,
+    patch: "@@ -1,1 +1,13 @@\n+export function cacheWarmup() {}\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [undocumented],
+    files: [parser, cache],
+    commitFiles: async () => [parser, cache],
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const spanned = (text: string, spans: string[]): Claim => {
+    const c = claim(text);
+    c.codeSpans = spans;
+    return c;
+  };
+  // One identifier each, so neither claim can clear the depth bar on its own
+  // (3 < 5) and this test watches the breadth route rather than that one.
+  const one = spanned("Reworked the `tokenStream`", ["tokenStream"]);
+  const two = spanned("Added a `cacheWarmup` hook", ["cacheWarmup"]);
+  const pair = await verifyClaims(data, [one, two], opts);
+  assert.deepEqual(
+    pair.map((r) => r.verdict),
+    ["partial", "partial"],
+    "both claims are settled, so both used to feed the union",
+  );
+  const pooled = await computeCoverage(data, [one, two], pair);
+  assert.deepEqual(
+    pooled.uncovered.map((u) => u.commit.sha),
+    [undocumented.sha],
+    "the sum of claims about other things is not a description of this commit",
+  );
+
+  // The recall direction, on the same fixture: ONE claim whose identifier
+  // reaches both files does document the commit — at a lexical score of 3,
+  // below the depth bar, which is the whole point of keeping a breadth route.
+  const wide = spanned("Renamed the `tokenStream` field", ["tokenStream"]);
+  const wideData = {
+    ...data,
+    files: [parser, { ...cache, patch: "@@ -1,1 +1,13 @@\n+export function warm(tokenStream) {}\n" }],
+    commitFiles: async () => [
+      parser,
+      { ...cache, patch: "@@ -1,1 +1,13 @@\n+export function warm(tokenStream) {}\n" },
+    ],
+  };
+  const wideResults = await verifyClaims(wideData, [wide], opts);
+  const covered = await computeCoverage(wideData, [wide], wideResults);
+  assert.equal(covered.uncovered.length, 0, "one claim reaching every file still documents the commit");
+});
+
+test("the breadth route reads the evidence a claim earned, not a match re-derived per commit", async () => {
+  // The candidate that looks like the deeper fix and measures worse. Binding
+  // by claim leaves one path-level hole open: `evidence.files` for an
+  // UNANCHORED claim is matched against the release diff, so a claim can cite
+  // `src/retry.ts` because another commit changed it that way. Re-running
+  // `lexicalMatch` per commit closes that — and opens a wider one, because
+  // `evidence.files` for an ANCHORED claim is matched against that claim's
+  // own anchor pool, and re-deriving throws the anchor binding away.
+  //
+  // That is what this fixture holds: an anchored claim, and a commit it is
+  // NOT anchored to whose diff repeats its identifiers. Re-derivation would
+  // cover the second commit off the first commit's note. Corpus, judge off:
+  // that candidate reads omission 63/66 where this one reads 64/65.
+  const anchored: Commit = {
+    sha: "aaaa111122", subject: "Rework the retry budget (#7)", body: "", author: "dev", prNumbers: [7],
+  };
+  const elsewhere: Commit = {
+    sha: "bbbb333344", subject: "Work nobody wrote down", body: "", author: "dev", prNumbers: [],
+  };
+  const owned = {
+    path: "src/retry.ts", status: "modified", additions: 20, deletions: 1,
+    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoff = retryBudget * 2;\n",
+  };
+  // One identifier only: two would clear the depth bar (3 + 3) and this test
+  // would be watching the substance route instead of the breadth one.
+  const echoes = {
+    path: "src/queue.ts", status: "modified", additions: 8, deletions: 0,
+    patch: "@@ -1,1 +1,9 @@\n+const spent = retryBudget;\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [anchored, elsewhere],
+    files: [owned, echoes],
+    commitFiles: async (sha: string) => (sha === anchored.sha ? [owned] : [echoes]),
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const note = claim("Rework the `retryBudget` and its `backoff` (#7)", [7]);
+  note.codeSpans = ["retryBudget", "backoff"];
+  const results = await verifyClaims(data, [note], opts);
+  assert.equal(results[0].verdict, "verified", "the claim is settled off its own commit");
+  assert.deepEqual(
+    results[0].evidence.files,
+    ["src/retry.ts"],
+    "an anchored claim's evidence stops at its anchor pool — that is the binding",
+  );
+
+  const coverage = await computeCoverage(data, [note], results);
+  assert.deepEqual(
+    coverage.uncovered.map((u) => u.commit.sha),
+    [elsewhere.sha],
+    "a commit the claim never anchored to is not documented by repeating its identifiers",
+  );
 });
 
 test("subject resemblance alone no longer buys coverage — the diff must carry the claim", async () => {

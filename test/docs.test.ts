@@ -70,10 +70,13 @@ test("prose that counts golden cases matches golden.json", async () => {
   );
 });
 
-// CONTRIBUTING.md and AGENTS.md are the map a contributor or coding agent
-// reads before touching anything. Both once listed 14 of 20 modules — watch
-// mode, --suggest and `guidelines` were invisible to whoever read them.
-const MODULE_MAPS = ["CONTRIBUTING.md", "AGENTS.md"];
+// CONTRIBUTING.md and docs/ARCHITECTURE.md are the map a contributor or
+// coding agent reads before touching anything. Both once listed 14 of 20
+// modules — watch mode, --suggest and `guidelines` were invisible to whoever
+// read them. AGENTS.md carried the agent-facing copy until 2026-08-14, when
+// it was moved out to hold that file inside its word budget: this list has to
+// follow the table, or it asserts against a file that no longer has one.
+const MODULE_MAPS = ["CONTRIBUTING.md", "docs/ARCHITECTURE.md"];
 
 test("the module maps cover src/, and name nothing that is gone", async () => {
   const modules = [

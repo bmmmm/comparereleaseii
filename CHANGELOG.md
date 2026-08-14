@@ -4,6 +4,62 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **Coverage's fourth route belongs to a claim now — `SCORING_GENERATION` is
+  4.** A commit counted as documented when *the union of every verified
+  claim's evidence* cited all of its files. That union grows with the notes
+  rather than with the evidence, so the more a release said the less the route
+  distinguished — and a commit no claim mentions could be documented by the
+  sum of claims about other things. Raising the share to 1 in 0.13.0 did not
+  reach it: a union arrives at 1.00 by adding claims. The question is now
+  asked of one claim at a time. `jundot/omlx@v0.5.4rc1` is the case in one
+  line — three of the hidden commit's four files come from a claim about
+  prefill priority, the fourth is a `pyproject.toml` cited by an unrelated
+  claim about a dependency version, and the best single claim reaches 0.75.
+
+  Measured over the 111-release corpus with the judge off: `omission` 63/65 →
+  **64/65** at an unchanged denominator, and every other class not merely
+  equal in rate but missing the *same releases* — `bump-overshoot` 22/22,
+  `bump-undershoot` 22/22, `foreign-claim` 109/110, `backtick-noise` 102/109.
+  The corpus median completeness does not move (51.5), and of the 65 releases
+  the harness reports a control completeness for, two do:
+  `jundot/omlx@v0.5.4rc1` 90 → 86 and `@v0.5.4rc2` 99 → 98. The generation
+  marker is bumped for those two rather than for a level shift — the change is
+  strictly stricter (each claim's evidence is a subset of the union), so a
+  completeness can only fall across the boundary, never rise. The README
+  validation table is re-measured and comes back bit-identical under
+  `--judge off` on all four rows, so it is not redrawn.
+
+  The candidate that looks like the deeper fix was implemented, measured and
+  rejected in the same session: re-running the lexical match against each
+  commit's own diff, which would also stop a claim citing a path because some
+  *other* commit changed it that way. But `evidence.files` for an anchored
+  claim is matched against that claim's own anchor pool, so re-deriving throws
+  that binding away and lets an anchored claim cover commits it never anchored
+  to. It reads `omission` 63/66 — `zed@v1.13.1` flips from detected to missed.
+  The rejection is anchored in `computeCoverage` and guarded by a test.
+
+  One `omission` miss survives and it is not coverage's. `jundot/omlx@v0.5.0`
+  hides a commit about adaptive MTP depth, and a claim about imatrix
+  quantization genuinely cites both of its files — on two terms, a lexical
+  score of 2. What lets a claim reach a file on that little is the lexical
+  bar: forge issue #12, the same finding as the `backtick-noise` survivors.
+  Forge issue #8 is closed.
+
+- **The `file-majority` sweep dial is retired rather than replaced.** It swept
+  the share of a commit's files that had to be cited before the commit counted
+  as documented, and there is no share in the source any more. A dial has to
+  be a literal somebody could reasonably set otherwise; "every file, from one
+  claim" is a rule.
+
+### Fixed
+
+- **The module-map test asserted against a file that no longer carries one.**
+  Moving AGENTS.md's module table to `docs/ARCHITECTURE.md` left
+  `test/docs.test.ts` pointing at AGENTS.md, so `pnpm test` failed on `main`
+  for every module in `src/`. The list follows the table.
+
 ## 0.13.0 — 2026-08-09
 
 ### Changed

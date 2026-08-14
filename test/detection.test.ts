@@ -73,8 +73,15 @@ test("the omission mutation strips every claim-specific coverage route", async (
   // as a harness bug — it reads as a detector miss, which is worse than no
   // measurement at all.
   //
-  // The union route is deliberately not in the list: it is claim-independent,
-  // so "the claims covering via it" is every claim in the release.
+  // The breadth route is deliberately not in the list, and the reason changed
+  // on 2026-08-14 without the answer changing. It used to be excused as
+  // claim-independent — a union, so "the claims covering via it" was every
+  // claim in the release. Now it names one claim, and it still does not
+  // belong here: that claim covers the commit because its evidence paths
+  // coincide with the commit's files, not because it describes them. Stripping
+  // it would delete the note that fools the detector and score the mutant as
+  // caught, which is the one direction this harness must never move in.
+  // `jundot/omlx@v0.5.0` is that case, and it is a miss on purpose.
   const source = await readFile(join(ROOT, "scripts/mutate-notes.ts"), "utf8");
   const filter = source.slice(
     source.indexOf("const covering = claims.filter("),

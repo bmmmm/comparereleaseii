@@ -47,18 +47,31 @@ same deterministic evidence. Where no pin of that name moved, or the two
 versions cannot be ordered, nothing is settled and the claim takes the
 ordinary route.
 
-Completeness has a fourth route, and it is the one that had to be tightened:
-a commit counts as documented when the claims' pooled evidence already cites
-**every** file it touches. That share was half until 2026-08-09, when the full
-corpus showed it was the sole cause of every remaining `omission` miss. The
+Completeness has a fourth route, and it had to be tightened twice: a commit
+counts as documented when **one** claim's evidence already cites **every**
+file it touches. The share was half until 2026-08-09, when the full corpus
+showed the route was the sole cause of every remaining `omission` miss. The
 `file-majority` sweep priced the alternatives over 111 releases — 0.5 catches
 59/66, 0.67 catches 60/65, 0.8 catches 62/65, 1 catches 63/65, and judge
 fidelity does not move at any of them — and 1 is both the only point on the
-Pareto front and the only one that states a rule instead of a preference. The
-cost is completeness alone: 27 releases move, 5 reach 0, and those are either
+Pareto front and the only one that states a rule instead of a preference. That
+cost completeness alone: 27 releases moved, 5 reached 0, and those were either
 tiny (one claim and three commits, where a single commit is worth 87 points)
-or already low. Two misses survive and no share can reach them: their commits
-sit at 1.00, every file cited by some other claim and none of their own.
+or already low.
+
+What survived the sweep was the **pooling**. The question was asked of the
+union over every verified claim, so the set grew with the notes and a commit
+that no claim mentions could be documented by the sum of claims about other
+things — which no share can fix, because the union reaches 1.00 by adding
+claims rather than by describing the commit. Since 2026-08-14 it is asked of
+one claim at a time. That is strictly stricter, each claim's evidence being a
+subset of the union, and it is close to free: `omission` reads 64/65 at an
+unchanged denominator, every other detection class misses exactly the same
+releases as before, the corpus median completeness does not move, and two of
+the 65 measured releases lose a few points (`SCORING_GENERATION` 4). One miss
+survives, and it is not this route's to fix: a claim whose two weak terms
+happen to reach both files of a commit it does not describe is the lexical
+bar's business.
 
 The version a bump note names it came **from** is a second statement, and it
 is read positionally rather than for equality. Measured over the corpus with

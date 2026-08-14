@@ -857,10 +857,14 @@ export async function computeCoverage(
   // (opencloud@v7.1.0 kept a test fix documented off a claim about
   // `golang.org/x/text`), and taken per claim it covers almost nothing,
   // because one bump claim owns one line of a file the commit changes
-  // wholesale. So bump claims leave the file-majority route entirely and get
-  // the route that fits them, below: the pin they name.
+  // wholesale. So bump claims leave the file route entirely and get the route
+  // that fits them, below: the pin they name.
   const isBumpClaim = (r: ClaimResult): boolean =>
     r.claim.bump !== undefined && r.claim.kind === "change";
+  // The union of every claim's cited paths. It is NOT a coverage route — it
+  // was one until 2026-08-14 and that is what issue #8 was about. What reads
+  // it now is the report's per-file map, where "some claim cited this path"
+  // is exactly the question being asked and pooling is the right answer.
   const evidenceFiles = new Set(
     results
       .filter((r) => (r.verdict === "verified" || r.verdict === "partial") && !isBumpClaim(r))
@@ -897,6 +901,31 @@ export async function computeCoverage(
     .map((r) => r.claim);
   const substanceCovered = (files: DiffFile[]): boolean =>
     changeClaims.some((claim) => lexicalMatch(claim, files).score >= 5);
+
+  // The breadth route, and the counterpart of the depth route above: ONE
+  // claim whose own evidence already cites every file of a commit describes
+  // that commit, at a term weight the depth bar would turn down. A wide,
+  // shallow match across the whole of a commit and a narrow, deep one into
+  // part of it are different shapes of evidence, and neither implies the
+  // other — so both routes stay.
+  //
+  // Kept as a list of per-claim sets rather than re-derived per commit. The
+  // obvious-looking alternative — re-run `lexicalMatch` against the commit's
+  // own diff, which would also stop a claim citing a path because some OTHER
+  // commit changed it that way — was implemented and measured on 2026-08-14,
+  // and it is worse: `evidence.files` for an ANCHORED claim is matched
+  // against that claim's own anchor pool, so re-deriving it per commit
+  // *removes* that binding and lets an anchored claim cover commits it never
+  // anchored to on identifier overlap alone. Corpus, judge off: omission
+  // 63/65 → 63/66, `zed@v1.13.1` flips from detected to missed (its control
+  // completeness rises 66 → 74, the giveaway), and `nextcloud/desktop@v33.0.6`
+  // becomes a mutable release only to be missed as well. Reading the evidence
+  // each claim actually earned is the binding; re-deriving it is not.
+  const citedPerClaim = results
+    .filter((r) => (r.verdict === "verified" || r.verdict === "partial") && !isBumpClaim(r))
+    .map((r) => new Set(r.evidence.files));
+  const breadthCovered = (files: DiffFile[]): boolean =>
+    citedPerClaim.some((cited) => files.every((f) => cited.has(f.path)));
 
   // A merge commit bundles commits that are themselves in the range — counting
   // it (and its aggregate diff) again would double every miss and every line.
@@ -966,49 +995,42 @@ export async function computeCoverage(
         return;
       }
     }
-    // A commit whose files are ALL cited as evidence by other claims counts as
-    // covered. The route is claim-independent — the union grows with the
-    // number of claims — which is what made it the last source of `omission`
-    // misses once bump claims left it (above).
+    // Breadth: ONE claim whose evidence cites every file of this commit.
+    // Until 2026-08-14 the question was asked of a *union* over every
+    // verified claim, and that union is what issue #8 was: it grows with the
+    // notes, so the more a release says the less the route distinguishes, and
+    // a commit no claim mentions ends up documented by the sum of claims
+    // about other things. `jundot/omlx@v0.5.4rc1` is the case in one line —
+    // three of a hidden benchmark commit's four files come from one claim
+    // about prefill priority, the fourth is `pyproject.toml`, cited by an
+    // unrelated claim naming a minimum dependency version. The best single
+    // claim reaches 0.75, so binding the question to one claim detects the
+    // removal.
     //
-    // The share was 0.5 until 2026-08-09, when the full corpus finally
-    // measured it: every one of the seven remaining misses was this route and
-    // no other (`pnpm diagnose-coverage`), at shares from 0.60 to 1.00. The
-    // `file-majority` sweep over 111 releases then priced the alternatives:
+    // No threshold moves. "Every file" is the rule the share sweep arrived at
+    // on 2026-08-09 (0.5/0.67/0.8/1 priced over 111 releases, only 1 on the
+    // Pareto front); what changes is the SET the rule reads, from a pool to
+    // one claim's own evidence. That direction is also why this is safe to
+    // land on a single measurement: each claim's evidence is a subset of the
+    // union, so no commit can become covered that was not covered before, and
+    // no class that reads verdicts rather than coverage can move at all.
     //
-    //   0.5   omission 59/66   median completeness 54.5   nothing moves
-    //   0.67  omission 60/65   51.5                       22 releases move
-    //   0.8   omission 62/65   51.5                       26 move
-    //   1     omission 63/65   51.5                       27 move
+    // Measured over the 111-release corpus, judge off, against the run this
+    // replaces: omission 63/65 → 64/65 at an unchanged denominator, and every
+    // other class not merely equal in rate but missing the same releases
+    // (bump-overshoot 22/22, bump-undershoot 22/22, foreign-claim 109/110,
+    // backtick-noise 102/109). Median completeness does not move at all
+    // (51.5): of the 65 releases the harness reports a control completeness
+    // for, two do — `jundot/omlx@v0.5.4rc1` 90 → 86 and `@v0.5.4rc2` 99 → 98.
     //
-    // 1 is the only point on the Pareto front, and it is the only one that is
-    // not a calibrated number: "every file of this commit is cited by another
-    // claim" states a rule, where 0.8 states a preference that the next corpus
-    // is free to contradict. Judge fidelity does not move across the dial
-    // (golden 21/43, 0 rubber stamps at every value), so this buys detection
-    // with completeness alone.
-    //
-    // What it costs, in the tail rather than the median: 27 releases move, 5
-    // reach completeness 0. Those are either tiny — `p0deje/Maccy@2.4.1` is
-    // one claim, three commits, 35 lines, where a single commit is worth 87
-    // points — or already low (traefik@v3.7.8 at 17, zen-browser@1.21.7b at
-    // 5). The case earlier candidates died on, `opencloud@v7.1.0`, loses two
-    // points here (98 → 96); the 2026-08-06 rejections (majority inside ONE
-    // claim, discounting files many commits touch, the same by file type) were
-    // all measured on the half corpus AND before the bump split, so their
-    // numbers are void rather than evidence.
-    //
-    // Two misses survive, and no share can reach them: their commits sit at
-    // 1.00 — every file cited by some other claim, no claim of their own
-    // (`jundot/omlx@v0.5.0`, 2/2 files; `@v0.5.4rc1`, 4/4). Closing those
-    // needs a different question than "how much of the commit", and the
-    // one-claim rule is the only known candidate. Tracked in forge issue #8.
-    if (files.length) {
-      const hit = files.filter((f) => evidenceFiles.has(f.path)).length;
-      if (hit / files.length >= 1) {
-        covered.add(commit.sha);
-        return;
-      }
+    // The one omission that survives is `jundot/omlx@v0.5.0`, where a claim
+    // about imatrix quantization really does cite both files of a commit
+    // about adaptive MTP depth — on two terms, a lexical score of 2. What
+    // lets a claim reach a file on that little is the bar, not this route:
+    // issue #12.
+    if (files.length && breadthCovered(files)) {
+      covered.add(commit.sha);
+      return;
     }
     if (files.length && substanceCovered(files)) {
       covered.add(commit.sha);

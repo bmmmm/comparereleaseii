@@ -67,8 +67,18 @@ import {
  * largest of the three by far: 27 of 111 corpus releases move their
  * completeness and 5 reach 0, so a generation-2 completeness and a
  * generation-3 completeness are not the same measurement of the same release.
+ *
+ * 4 — that route stops pooling. Every file of a commit must be cited by ONE
+ * claim's evidence rather than by the union over all of them
+ * (`computeCoverage` again, forge issue #8). Strictly stricter than
+ * generation 3 — each claim's evidence is a subset of the union — so a
+ * completeness can only fall across this boundary, never rise. It is also by
+ * far the smallest of the four: of the 65 corpus releases the mutation
+ * harness reports a control completeness for, two move (90 → 86, 99 → 98)
+ * and the median does not. Recorded anyway, because "small" is not "none"
+ * and the consumers reading this cannot tell the difference themselves.
  */
-export const SCORING_GENERATION = 3;
+export const SCORING_GENERATION = 4;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form

@@ -681,10 +681,16 @@ const MUTANTS: Mutant[] = [
     replace: "if (!opts.all) {",
   },
   {
-    guard: "the evidence union needs every file of a commit, not half of them",
+    guard: "coverage's breadth route reads one claim's evidence, not the pooled union",
     file: "src/verify.ts",
-    find: "if (hit / files.length >= 1) {",
-    replace: "if (hit / files.length >= 0.5) {",
+    find: "    citedPerClaim.some((cited) => files.every((f) => cited.has(f.path)));",
+    replace: "    files.every((f) => evidenceFiles.has(f.path));",
+  },
+  {
+    guard: "one claim's evidence must cite every file of a commit, not just some of them",
+    file: "src/verify.ts",
+    find: "    citedPerClaim.some((cited) => files.every((f) => cited.has(f.path)));",
+    replace: "    citedPerClaim.some((cited) => files.some((f) => cited.has(f.path)));",
   },
   {
     guard: "a resumed release is keyed to the claims its report carried",

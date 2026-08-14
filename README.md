@@ -352,7 +352,7 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-08-09, generation 3) |
+| Release | Notes style | Score (validation run, 2026-08-09; re-measured for generation 4, unmoved) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 87 (solid) |
@@ -379,6 +379,13 @@ so what moved them is the same judged flicker the three-draw protocol exists
 for. Worth stating plainly, because it is the uncomfortable half of the
 measurement — on two of four rows the flicker is wider than the scoring change
 this table was redrawn for.
+
+Re-measured again on 2026-08-14 for `SCORING_GENERATION` 4, where coverage's
+fourth route stopped pooling evidence across claims. All four rows come back
+bit-identical under `--judge off` — same three component scores, same uncovered
+counts, only the generation marker differs — so the published values stand
+instead of being redrawn. Given the paragraph above, a judged redraw here would
+have measured this table's own flicker and reported it as the change.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:
@@ -427,11 +434,11 @@ against the clone cache, so it needs no key and no network: every expectation
 below is settled deterministically, and a miss here is a miss no model was
 involved in.
 
-Measured on 111 releases (`test/eval/reference-detection.json`, 2026-08-09):
+Measured on 111 releases (`test/eval/reference-detection.json`, 2026-08-14):
 
 | Mutation | What it does | Detected |
 |---|---|---:|
-| `omission` | drops the notes covering a documented high-churn commit | 63/65 |
+| `omission` | drops the notes covering a documented high-churn commit | 64/65 |
 | `bump-overshoot` | restates a settled bump as a version the release did not reach | 22/22 |
 | `bump-undershoot` | restates it as a version the pin never held | 22/22 |
 | `foreign-claim` | plants a claim from a different release of the same repo | 109/110 |
@@ -489,13 +496,27 @@ than a calibrated preference. Judge fidelity did not move at any value.
 Completeness did: 27 releases, median 54.5 → 51.5, so scores from before and
 after are not comparable and `SCORING_GENERATION` is 3.
 
+`omission` moved 63/65 → 64/65 on 2026-08-14, and that closed the route rather
+than tuning it. No share could reach the two survivors, because the share was
+computed over a *union*: every file of the commit cited by SOME verified claim,
+a set that grows with the notes rather than with the evidence. Asked of one
+claim at a time, `jundot/omlx@v0.5.4rc1` falls out — three of the hidden
+commit's four files come from a claim about prefill priority and the fourth is
+a `pyproject.toml` cited by an unrelated claim about a dependency version, so
+the best single claim reaches 0.75. The change is strictly stricter (a claim's
+evidence is a subset of the union), which is why it was safe to land on one
+measurement: every other class misses exactly the same releases as before, the
+corpus median completeness does not move, and two releases lose a few points
+(`SCORING_GENERATION` 4).
+
 The reference records rates as measured, not as a target: a run that scores
 worse than the frozen file fails, and re-freezing is a decision someone makes,
-not a side effect. Open on the full corpus: `omission` at 63/65 — two commits
-whose every file is cited by some other claim and none of their own, which no
-share can reach — and `backtick-noise` at 102/109, where the padding that gets
-through is a version literal or a word like `version` that the lexical bar
-still reads as an identifier.
+not a side effect. Open on the full corpus: `omission` at 64/65 — one commit
+whose two files are genuinely cited by one claim that does not describe it,
+which is the lexical bar rather than coverage — and `backtick-noise` at
+102/109, where the padding that gets through is a version literal or a word
+like `version` that the same bar still reads as an identifier. Both are now
+the same finding wearing two hats.
 
 ### Releasing
 

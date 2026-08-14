@@ -39,10 +39,15 @@
 >
 > **Where a fresh session starts:** forge issue #12 (a version literal plus an
 > ordinary word hits the lexical bar exactly at 5 — the `lexical-bar` sweep
-> dial already exists and a sweep point is now minutes, not 25), issue #8's
-> remainder (two commits at share 1.00 that no threshold reaches; the
-> one-claim rule is the only candidate and its old measurement is void), or
-> issue #13. Entry 1 below still needs new facts more than budget.
+> dial already exists and a sweep point is now minutes, not 25), or issue #13.
+> Entry 1 below still needs new facts more than budget.
+>
+> Issue #8 closed on 2026-08-14: the one-claim rule was the candidate and it
+> held — `omission` 63/65 → 64/65 with every other class missing the same
+> releases, because a union reaches share 1.00 by adding claims rather than by
+> describing the commit. Its last survivor turned out to be #12 wearing a
+> different hat, which makes the lexical bar the one open finding behind both
+> remaining detection holes rather than two independent ones.
 >
 > One finding with no issue and no numbers yet: on two of four validation rows
 > the judged flicker is wider than the scoring change they were redrawn for

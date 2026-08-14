@@ -21,7 +21,11 @@ function point(over: Partial<Point> & { value: string }): Point {
 // convincing possible way to be wrong. The runtime throws on it; this catches
 // it in CI, where the sweep itself cannot run (it needs a watch home).
 test("every sweep dial still points at a literal that is in the source", async () => {
-  assert.ok(DIALS.length >= 3, "the dial set is not empty");
+  // A floor, not a census. It exists so an emptied DIALS cannot pass the loop
+  // below vacuously; it was `>= 3` and became a second thing to edit when
+  // `file-majority` was retired on 2026-08-14 for having no literal left to
+  // turn. Retiring a dial is a legitimate outcome of sweeping one.
+  assert.ok(DIALS.length >= 1, "the dial set is not empty");
   for (const dial of DIALS) {
     assert.ok(dial.sites.length >= 1, `${dial.name} names no site`);
     assert.ok(

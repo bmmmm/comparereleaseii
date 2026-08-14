@@ -78,15 +78,13 @@ export const DIALS: Dial[] = [
       { file: "scripts/mutate-notes.ts", pattern: "lexicalMatch(cl, files).score >= %" },
     ],
   },
-  {
-    name: "file-majority",
-    what:
-      "the share of a commit's files that must already be cited as evidence " +
-      "before the commit counts as documented",
-    current: "1",
-    values: ["0.34", "0.5", "0.67", "0.8", "1"],
-    sites: [{ file: "src/verify.ts", pattern: "hit / files.length >= %" }],
-  },
+  // `file-majority` lived here until 2026-08-14 and is deliberately not
+  // replaced. It swept the share of a commit's files that had to be cited
+  // before the commit counted as documented; the sweep settled on 1 and the
+  // route then stopped pooling evidence across claims, so the share is no
+  // longer a number in the source. A dial has to be a literal somebody could
+  // reasonably set otherwise — "every file, from one claim" is a rule, and
+  // there is nothing left to turn.
   {
     name: "generated-weight",
     what:
