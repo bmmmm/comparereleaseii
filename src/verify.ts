@@ -2,12 +2,15 @@
 import { pooled, truncate } from "./util.ts";
 import {
   anchorMatch,
+  assertsRemoval,
   functionsOf,
   isChangelogPath,
   lexicalMatch,
   rankHunks,
+  removesAny,
   tokenize,
   type AnchorMatch,
+  type LexicalMatch,
 } from "./match.ts";
 import { commitSurface } from "./substance.ts";
 import { pinBumps, sameName } from "./pins.ts";
@@ -350,6 +353,35 @@ function settleBump(claim: Claim, bump: BumpResolution, anchors: AnchorMatch): C
 type Route = Omit<Pending, "claim" | "commits">;
 
 /**
+ * The claim says something is gone and every term of it that the diff carries
+ * is on a line the diff ADDS. Overlap alone cannot tell those apart — a
+ * release that introduces `http_mp3_128_url` and a release that takes it away
+ * put the same token in their changed lines — so the lexical bar reads
+ * "removed" and "added" as the same evidence and settles either one.
+ *
+ * That is forge issue #13, and the release it was found on is the shape of
+ * the problem rather than an oddity: `soundcloud/api` publishes API
+ * documentation, so every release rewrites the same file about the same
+ * endpoints. A claim from a later release — "GET /tracks/{track_urn}/streams
+ * no longer returns `http_mp3_128_url`" — planted into 2026-06-15 matched
+ * `track_urn`, `http_mp3_128_url` and `preview_mp3_128_url` for a score of 8,
+ * and all three occur there on `+` lines only: that release is the one that
+ * ADDED those fields. Neither of the two fixes before it could see this.
+ * Coverage (#8) never runs on a claim's verdict, and the lexical weights
+ * (#12) rank symbols against words — both of these ARE symbols, and the
+ * problem is not how much they are worth but which direction they point.
+ *
+ * Deliberately not `contradicted`, which floors the score at 35 and raises a
+ * critical flag off a phrase match. The claim drops to the verdict that says
+ * "unproven", which is also what sends it to a judge that can read the
+ * sentence.
+ */
+function removalUnsupported(claim: Claim, lex: LexicalMatch, pool: DiffFile[]): boolean {
+  if (!lex.matchedTerms.length || !assertsRemoval(claim)) return false;
+  return !removesAny(lex.matchedTerms, pool);
+}
+
+/**
  * A claim that names a commit in the release range, weighed against that
  * commit's own diff.
  *
@@ -369,12 +401,16 @@ function routeAnchored(claim: Claim, anchors: AnchorMatch, pool: DiffFile[]): Ro
   const anchorLabel = anchors.viaPr.length
     ? `PR #${anchors.viaPr.join(", #")}`
     : `commit ${anchors.viaSha.join(", ")}`;
-  const strong = generated || lex.score >= 5;
+  // A generated entry is exempt: its title IS the commit's, so it is true by
+  // construction and there is no overlap reading to correct.
+  const blocked = !generated && lex.score >= 5 && removalUnsupported(claim, lex, pool);
+  const strong = generated || (lex.score >= 5 && !blocked);
   const detail = generated
     ? `auto-generated entry, title matches the squash commit`
     : `identifiers ${lex.matchedTerms.slice(0, 4).join(", ")} appear in its diff`;
-  const gap =
-    lex.score >= 2
+  const gap = blocked
+    ? `${lex.matchedTerms.join(", ")} appear in its diff only on lines it ADDS, and this note says they are gone`
+    : lex.score >= 2
       ? `only ${lex.matchedTerms.join(", ")} could be matched to its diff content`
       : bestSim >= 0.5
         ? `the claim restates the commit subject (${Math.round(bestSim * 100)}%), which asserts nothing about the diff`
@@ -412,6 +448,9 @@ function routeAnchored(claim: Claim, anchors: AnchorMatch, pool: DiffFile[]): Ro
  */
 function routeUnanchored(claim: Claim, data: ReleaseData): Route {
   const lex = lexicalMatch(claim, data.files);
+  // Only ever takes the bar away — a claim that had not reached it keeps the
+  // verdict it had, so this gate is one-way on both routes.
+  const blocked = lex.score >= 5 && removalUnsupported(claim, lex, data.files);
   const anchorNote = claim.prNumbers.length
     ? `Referenced PR #${claim.prNumbers.join(", #")} matches no commit message in the range. `
     : "";
@@ -427,7 +466,7 @@ function routeUnanchored(claim: Claim, data: ReleaseData): Route {
     generated: false,
     identifierOnly: lex.score >= 5,
     fallback:
-      lex.score >= 5
+      lex.score >= 5 && !blocked
         ? {
             verdict: "verified",
             confidence: 0.8,
@@ -437,7 +476,9 @@ function routeUnanchored(claim: Claim, data: ReleaseData): Route {
           ? {
               verdict: "partial",
               confidence: 0.55,
-              reasoning: `${anchorNote}Some identifiers (${lex.matchedTerms.join(", ")}) appear in the diff, but the match is weak.`,
+              reasoning: blocked
+                ? `${anchorNote}${lex.matchedTerms.slice(0, 5).join(", ")} appear in the diff, but only on lines it ADDS — this note says they are gone, and nothing here takes one of them away.`
+                : `${anchorNote}Some identifiers (${lex.matchedTerms.join(", ")}) appear in the diff, but the match is weak.`,
             }
           : {
               verdict: "no-evidence",

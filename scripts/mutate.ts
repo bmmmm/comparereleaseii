@@ -645,6 +645,36 @@ const MUTANTS: Mutant[] = [
     replace: "/-/.test(w)",
   },
   {
+    guard: "a note that says something is gone is read as saying it",
+    file: "src/match.ts",
+    find: "  return REMOVAL_PHRASE.test(claim.text);",
+    replace: "  return false;",
+  },
+  {
+    guard: "a note that asserts no removal is not a removal claim",
+    file: "src/match.ts",
+    find: "  return REMOVAL_PHRASE.test(claim.text);",
+    replace: "  return true;",
+  },
+  {
+    guard: "a diff that only adds a term does not remove it",
+    file: "src/match.ts",
+    find: '    const deleted = changedLines(file.patch, "-");',
+    replace: "    const deleted = changedLines(file.patch);",
+  },
+  {
+    guard: "an add-only diff does not settle a removal claim it merely mentions",
+    file: "src/verify.ts",
+    find: "  const blocked = lex.score >= 5 && removalUnsupported(claim, lex, data.files);",
+    replace: "  const blocked = false;",
+  },
+  {
+    guard: "naming a commit does not buy a removal claim an add-only diff",
+    file: "src/verify.ts",
+    find: "  const blocked = !generated && lex.score >= 5 && removalUnsupported(claim, lex, pool);",
+    replace: "  const blocked = false;",
+  },
+  {
     guard: "a release stored under both path layouts is one release, not two",
     file: "scripts/corpus-aggregate.ts",
     find: "if (!byRelease.has(key)) byRelease.set(key, r);",

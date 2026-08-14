@@ -177,13 +177,61 @@ export function functionsOf(files: DiffFile[], cap = 8): string[] {
   return [...out];
 }
 
-function changedLines(patch: string): string {
+function changedLines(patch: string, side?: "+" | "-"): string {
   // File headers are exactly "+++ b/…"/"--- a/…" (with a space) — the
   // space-less guard also dropped changed lines starting with ++ or --.
   return patch
     .split("\n")
     .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+ |--- )/.test(l))
+    .filter((l) => side === undefined || l.startsWith(side))
     .join("\n");
+}
+
+/**
+ * A sentence that says something is gone.
+ *
+ * Narrow on purpose, because everything downstream of it is a demotion. Only
+ * verbs whose object stops existing are in: `deprecated` is deliberately out
+ * (the symbol stays, that is the whole point of deprecating it) and so is
+ * `reverted` (a revert removes and adds in one move, so "did the diff take
+ * this away" has no single answer for it).
+ */
+const REMOVAL_PHRASE =
+  /\b(remove[sd]?|removal|removing|drops?|dropped|dropping|delete[sd]?|deleting|no longer)\b/i;
+
+export function assertsRemoval(claim: Claim): boolean {
+  return REMOVAL_PHRASE.test(claim.text);
+}
+
+/**
+ * Does this diff take any of these terms AWAY — one of them on a deleted
+ * line, or in the path of a file the release deletes outright?
+ *
+ * `lexicalMatch` asks the undirected question ("is this term in the churn"),
+ * which is the right one for "is this claim about this diff" and the wrong
+ * one for "does this diff do what the claim says". A release that ADDS
+ * `http_mp3_128_url` and a release that removes it contain the same token in
+ * their changed lines. Changelog files are out for the same reason they are
+ * out of `lexicalMatch`: notes restating themselves are not evidence.
+ *
+ * The rule itself is not new here — `src/promises.ts` has checked a
+ * *forward-looking* note this way since it was written (`provingLines`:
+ * deletions prove a removal, additions prove an addition). What was missing
+ * is the same reading for a note about THIS release, which is the half that
+ * carries a score. The two stay separate because promises answer with the
+ * list of proving files and a claim answers yes or no; if a third caller
+ * ever wants this, that is when it becomes one function.
+ */
+export function removesAny(terms: string[], files: DiffFile[]): boolean {
+  if (!terms.length) return false;
+  for (const file of files) {
+    if (isChangelogPath(file.path)) continue;
+    if (file.status === "removed" && terms.some((t) => file.path.includes(t))) return true;
+    if (!file.patch) continue;
+    const deleted = changedLines(file.patch, "-");
+    if (terms.some((t) => deleted.includes(t))) return true;
+  }
+  return false;
 }
 
 /**

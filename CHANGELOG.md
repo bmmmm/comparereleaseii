@@ -6,6 +6,78 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Changed
 
+- **A note that says something is gone is not settled by a diff that only adds
+  it — `SCORING_GENERATION` is 6.** Lexical overlap has no direction: the
+  release that introduced `http_mp3_128_url` and the release that took it away
+  put the same token in their changed lines, and the bar that settles a claim
+  `verified` with no judge read both as the same evidence. So a claim from a
+  later release of the same repository, planted into an earlier one, came back
+  `verified` against a diff that does the *opposite* of what it says.
+  `soundcloud/api@2026-06-15` is the case in one line — the note "**GET
+  /tracks/{track_urn}/streams** no longer returns `http_mp3_128_url`" belongs
+  to 2026-08-12 and matched `track_urn`, `http_mp3_128_url` and
+  `preview_mp3_128_url` here for a score of 8, every one of them on a `+` line,
+  because this is the release that *added* those fields. The repository is a
+  worst case rather than an exotic one: it publishes API documentation, so
+  every release rewrites the same file about the same endpoints.
+
+  A claim whose sentence asserts a removal (`removed`, `dropped`, `deleted`,
+  `no longer`) now has to find at least one of its matched terms on a line the
+  diff deletes, or in the path of a file it deletes outright. Otherwise it does
+  not reach `verified` — it drops to `partial` and goes to the judge, which can
+  read the sentence. Deliberately not `contradicted`: that verdict floors the
+  score at 35 and raises a critical flag, which is too much to hand a phrase
+  match. `deprecated` is not in the list (the symbol stays, which is the point
+  of deprecating it) and neither is a revert, which removes and adds in one
+  move. The gate is one-way — it only ever takes the bar away, never gives it
+  to a claim that had not reached it — and an auto-generated entry, true by
+  construction, is exempt.
+
+  The rule is not new to the codebase, only to this half of it: `src/promises.ts`
+  has checked *forward-looking* notes this way since it was written — deletions
+  prove a removal, additions prove an addition. What was missing is the same
+  reading for a note about the release under check, which is the half that
+  carries a score.
+
+  Measured over the 111-release corpus with the judge off: `foreign-claim`
+  109/110 → **110/110**. No other class moves — `omission` 63/64,
+  `bump-overshoot` 22/22, `bump-undershoot` 22/22, `backtick-noise` 109/109 —
+  and neither do the medians (correctness 47, completeness 48, overall 47 on
+  both sides). Neither does the judge bill: 4,800 claims, 3,261 of them
+  reaching the judge, before and after, because a `verified` resting on overlap
+  alone was already being asked for.
+
+  What it costs is one real claim of 4,364. 249 corpus claims assert a removal;
+  exactly one loses the bar — `zed-industries/zed@v1.11.3`'s "Fixed the
+  JetBrains keymap so the agent panel Rules entry uses `shift-alt-l` and no
+  longer flickers…", where "no longer" is about flickering and not about a
+  symbol going away. Its release is the only one of 111 to move a control score
+  (correctness 52 → 51; completeness 72 and overall 41 unmoved), and the claim
+  now reaches the judge instead of settling itself, so with a judge it can come
+  back `verified`.
+
+  Two alternatives were weighed and rejected. Demoting every `verified` that
+  rests on overlap alone catches the class by switching the deterministic floor
+  off — it would turn every honest unanchored claim into `partial`, a recall
+  trade rather than a fix. And a *temporal* test — "does the change this note
+  describes belong to this release at all" — is the question the issue asks but
+  not one a checker can answer: at check time the tool knows this range and the
+  notes that precede it, never the release a claim actually came from.
+
+  The README validation table is re-measured for this and all four rows are
+  bit-identical under `--judge off` across the generation-5 → 6 boundary. The
+  same measurement found that **generation 5 itself moved two of those rows**
+  (headscale overall 90 → 87, restic 64 → 55, both reproducible on a second
+  draw) and the table was never redrawn for it. That is recorded in README.md
+  rather than paid here — the column is a judged run, and paying it needs the
+  engine and the three-draw protocol, not a judge-free number written into a
+  judged column.
+
+  `SCORING.md`'s term-weight paragraph is corrected in passing: it still
+  described the two tiers generation 5 replaced with three.
+
+  Closes #13.
+
 - **A word the diff happens to contain no longer carries a claim over the
   lexical bar — `SCORING_GENERATION` is 5.** A matched term was worth 3 when
   its shape said code and 2 otherwise, and the bar that settles a claim

@@ -352,7 +352,7 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-08-09; re-measured for generation 4, unmoved) |
+| Release | Notes style | Score (validation run, 2026-08-09; unmoved by generations 4 and 6, **owed a redraw for generation 5** — below) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 87 (solid) |
@@ -386,6 +386,28 @@ bit-identical under `--judge off` — same three component scores, same uncovere
 counts, only the generation marker differs — so the published values stand
 instead of being redrawn. Given the paragraph above, a judged redraw here would
 have measured this table's own flicker and reported it as the change.
+
+Re-measured a third time on 2026-08-14 for `SCORING_GENERATION` 6, where a note
+saying something is *gone* stopped being settled by a diff that only adds it.
+All four rows are again bit-identical under `--judge off` across that boundary —
+same three component scores, same uncovered counts, same verdict distribution —
+so no value here is that change's doing. (The first draw of restic came back
+completeness `null` / overall 58 because one commit diff failed to load; that is
+the trap in AGENTS.md, and the redraw with all 38 commits present matches the
+other side exactly.)
+
+**What that same measurement found is owed and not paid: generation 5 moved two
+of these rows and the table was not redrawn for it.** Between generation 4 and
+generation 5 — the lexical weights, issue #12 — headscale falls correctness
+85 → 77 and overall 90 → 87, and restic falls correctness 50 → 44, completeness
+56 → 43, risk 90 → 80 and overall 64 → 55 with two more uncovered commits, all
+under `--judge off` and reproducible on a second draw. git-cliff and vaultwarden
+do not move. By the rule this section already states for generation 3, that is
+the deterministic kind of move and the published rows are stale by it. They are
+left standing rather than patched, because this column is a *judged* run: paying
+it needs the engine and the three-draw protocol above, and writing judge-free
+numbers into a judged column would be exactly the drift this table exists to
+catch.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:

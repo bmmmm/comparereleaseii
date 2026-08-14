@@ -28,10 +28,19 @@ without an anchor) can settle a claim deterministically — plus
 auto-generated entries, which are true by construction.
 A found term is worth 3 when it is a backticked span whose shape is code on
 its own (`snake_case`, camelCase, a path, a sigil, `cmd-shift-v`, a file
-name, a deep version), and 2 otherwise. The split is there because the
-backticks belong to the author of the notes: marking a dictionary word as
-code must not buy the two of them the bar between them. A span under three
-characters is no identifier at all — `!` is in nearly every diff.
+name, a deep version), 2 when the claim spells that shape out in prose, and
+1 when it names no symbol at all. The split is there because the backticks
+belong to the author of the notes: marking a dictionary word as code must
+not buy the two of them the bar between them, and a word the diff contains
+whatever the release did corroborates a claim without carrying one. A span
+under three characters is no identifier at all — `!` is in nearly every diff.
+Overlap has no direction, and the bar used to read it as if it had: a note
+saying something is **gone** (`removed`, `dropped`, `no longer`) does not
+settle on identifiers the diff carries only on the lines it **adds** — that
+is the release which introduced them, not the one that took them away. Such
+a claim drops to `partial` and goes to the judge. `deprecated` is
+deliberately not in that list (the symbol stays, which is the point of
+deprecating it) and neither is a revert, which removes and adds in one move.
 One class never reaches the judge at all: a **dependency-bump claim** the
 diff's own pin delta answers. "Bump `actions/cache` from 5.0.3 to 5.0.4"
 states a pin and a version, and the diff carries the same pin and its own

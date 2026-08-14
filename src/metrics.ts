@@ -90,8 +90,24 @@ import {
  * direction only — a claim that loses the bar reaches the judge instead of
  * settling itself, so with the judge on a score can also rise. A
  * generation-4 score and a generation-5 score are not the same measurement.
+ *
+ * 6 — a claim that says something is GONE is no longer settled by a diff that
+ * carries its identifiers only on the lines it ADDS (`removalUnsupported` in
+ * `verify.ts`, forge issue #13). Overlap has no direction: the release that
+ * introduced `http_mp3_128_url` and the release that took it away put the same
+ * token in their changed lines, and the bar read both as evidence. By far the
+ * smallest generation recorded here — of 4,364 corpus claims 249 assert a
+ * removal and exactly ONE loses the bar to this, so one release of 111 moves a
+ * control score (`zed-industries/zed@v1.11.3`, correctness 52 → 51, its
+ * completeness 72 and overall 41 unmoved) and no median moves at all
+ * (correctness 47, completeness 48, overall 47 on both sides). Like generation
+ * 5 and unlike generation 4 it is not strictly stricter in one direction: the
+ * demoted claim reaches the judge instead of settling itself, so with the judge
+ * on a score can also rise. Recorded for the reason generation 4 was — "small"
+ * is not "none", and the consumers reading a series cannot tell the difference
+ * themselves.
  */
-export const SCORING_GENERATION = 5;
+export const SCORING_GENERATION = 6;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form

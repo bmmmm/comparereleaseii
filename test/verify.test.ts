@@ -12,7 +12,7 @@ import {
   resolveVotes,
   verifyClaims,
 } from "../src/verify.ts";
-import { hunkFunctions } from "../src/match.ts";
+import { hunkFunctions, lexicalMatch } from "../src/match.ts";
 import {
   buildJudgePrompt,
   parseSurplusOutput,
@@ -692,6 +692,78 @@ test("one identifier hit in the linked commit is a lead, not a verified verdict"
     judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
   });
   assert.equal(r.verdict, "partial");
+});
+
+test("a note that says a field is gone is not settled by a diff that adds it", async () => {
+  // Issue #13, and `soundcloud/api@2026-06-15` is the shape of it rather than
+  // an oddity: the repo publishes API documentation, so every release rewrites
+  // the same file about the same endpoints. A claim belonging to a release two
+  // months later — "GET /tracks/{track_urn}/streams no longer returns
+  // `http_mp3_128_url`" — planted into it matched `track_urn`,
+  // `http_mp3_128_url` and `preview_mp3_128_url` for a lexical score of 8 and
+  // settled `verified` with no judge. All three occur there on `+` lines only:
+  // that release is the one that ADDED the fields the note says are gone.
+  const adding = {
+    path: "openapi/api.yaml",
+    status: "modified",
+    additions: 3,
+    deletions: 0,
+    patch:
+      "@@ -1,0 +1,3 @@\n+  '/tracks/{track_urn}/streams':\n+        http_mp3_128_url: 'https://api.example/x'\n+        preview_mp3_128_url: 'https://api.example/y'\n",
+  };
+  const removing = {
+    ...adding,
+    additions: 0,
+    deletions: 2,
+    patch:
+      "@@ -1,3 +1,1 @@\n   '/tracks/{track_urn}/streams':\n-        http_mp3_128_url: 'https://api.example/x'\n-        preview_mp3_128_url: 'https://api.example/y'\n",
+  };
+  const gone: Claim = {
+    ...claim(
+      "**GET /tracks/{track_urn}/streams** no longer returns `http_mp3_128_url` or `preview_mp3_128_url`.",
+    ),
+    codeSpans: ["http_mp3_128_url", "preview_mp3_128_url"],
+  };
+  const opts = {
+    judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  };
+  const release = (file: typeof adding, commits: Commit[] = []) => ({
+    repoLabel: "t/api", baseRef: "a", headRef: "b", notes: "",
+    commits, files: [file], commitFiles: async () => [file], warnings: [] as string[],
+  });
+
+  // The bar is reached either way — what separates them is direction, not weight.
+  assert.ok(lexicalMatch(gone, [adding]).score >= 5);
+  assert.ok(lexicalMatch(gone, [removing]).score >= 5);
+
+  const [planted] = await verifyClaims(release(adding), [gone], opts);
+  assert.equal(planted.verdict, "partial");
+  assert.match(planted.reasoning, /only on lines it ADDS/);
+
+  // Precision, the other half: the release that really does take the fields
+  // away settles exactly as it did before.
+  const [honest] = await verifyClaims(release(removing), [gone], opts);
+  assert.equal(honest.verdict, "verified");
+
+  // Naming a commit in the range does not buy the reading either — an anchor
+  // says which commit, not which direction.
+  const linked = commit("docs: document the streams payload (#12)", [12]);
+  const [anchored] = await verifyClaims(
+    release(adding, [linked]),
+    [{ ...gone, prNumbers: [12] }],
+    opts,
+  );
+  assert.equal(anchored.verdict, "partial");
+  assert.match(anchored.reasoning, /only on lines it ADDS/);
+
+  // And the gate reads what the sentence asserts, not how much the diff adds:
+  // the same evidence under an additive note is untouched.
+  const arrived: Claim = {
+    ...gone,
+    text: "**GET /tracks/{track_urn}/streams** now returns `http_mp3_128_url` and `preview_mp3_128_url`.",
+  };
+  const [added] = await verifyClaims(release(adding), [arrived], opts);
+  assert.equal(added.verdict, "verified");
 });
 
 test("a repeated line that points into this release is still a claim", async () => {

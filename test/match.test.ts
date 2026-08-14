@@ -2,11 +2,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  assertsRemoval,
   extractIdentifiers,
   anchorMatch,
   lexicalMatch,
   looksLikeIdentifier,
   rankHunks,
+  removesAny,
   termWeight,
 } from "../src/match.ts";
 import type { Claim, Commit, DiffFile } from "../src/types.ts";
@@ -137,6 +139,76 @@ test("a span under three characters is not an identifier at all", () => {
   const m = lexicalMatch(short, files);
   assert.equal(m.score, 0);
   assert.deepEqual(m.files, []);
+});
+
+test("a diff that only adds a term does not remove it", () => {
+  // Issue #13. `lexicalMatch` asks whether a term is in the churn, which
+  // cannot separate the release that introduced `http_mp3_128_url` from the
+  // one that took it away — both carry the token in their changed lines.
+  const added: DiffFile[] = [
+    {
+      path: "openapi/api.yaml",
+      status: "modified",
+      additions: 2,
+      deletions: 0,
+      patch: "@@ -1,0 +1,2 @@\n+        http_mp3_128_url:\n+          type: string\n",
+    },
+  ];
+  const removed: DiffFile[] = [
+    {
+      path: "openapi/api.yaml",
+      status: "modified",
+      additions: 0,
+      deletions: 2,
+      patch: "@@ -1,2 +1,0 @@\n-        http_mp3_128_url:\n-          type: string\n",
+    },
+  ];
+  assert.equal(removesAny(["http_mp3_128_url"], added), false);
+  assert.equal(removesAny(["http_mp3_128_url"], removed), true);
+  // A file the release deletes outright takes its own path with it, and the
+  // patch need not repeat the name.
+  assert.equal(
+    removesAny(
+      ["legacy_streams.yaml"],
+      [
+        {
+          path: "openapi/legacy_streams.yaml",
+          status: "removed",
+          additions: 0,
+          deletions: 3,
+          patch: "@@ -1,3 +0,0 @@\n-a\n-b\n-c\n",
+        },
+      ],
+    ),
+    true,
+  );
+  // Notes restating themselves are not evidence here either — the same reason
+  // changelog paths stay out of `lexicalMatch`.
+  assert.equal(removesAny(["http_mp3_128_url"], [{ ...removed[0], path: "CHANGELOG.md" }]), false);
+  assert.equal(removesAny([], removed), false);
+});
+
+test("assertsRemoval reads only verbs whose object stops existing", () => {
+  // Everything downstream of this predicate is a demotion, so it stays narrow.
+  for (const text of [
+    "**GET /tracks/{track_urn}/streams** no longer returns `http_mp3_128_url`.",
+    "Removed the legacy `/stream` endpoint",
+    "Dropped support for Node 18",
+    "Deletes stale `session_store` rows on boot",
+  ]) {
+    assert.equal(assertsRemoval(claim(text)), true, text);
+  }
+  // `deprecated` keeps the symbol — that is the point of deprecating it — and
+  // a revert takes lines away and puts lines back in one move, so "did the
+  // diff remove this" has no single answer for either.
+  for (const text of [
+    "Deprecated `http_mp3_128_url`; it still works",
+    "Reverted the `should_block_host` change",
+    "Added a dropdown for network host filters",
+    "Adds `should_block_host` support",
+  ]) {
+    assert.equal(assertsRemoval(claim(text)), false, text);
+  }
 });
 
 test("rankHunks prefers path matches over incidental content hits", () => {
