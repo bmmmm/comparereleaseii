@@ -77,8 +77,21 @@ import {
  * harness reports a control completeness for, two move (90 → 86, 99 → 98)
  * and the median does not. Recorded anyway, because "small" is not "none"
  * and the consumers reading this cannot tell the difference themselves.
+ *
+ * 5 — a matched term that names no symbol is worth 1 rather than 2
+ * (`termWeight`, forge issue #12). One identifier plus one ordinary word hit
+ * the `>= 5` bar exactly, and an ordinary word is what a release diff contains
+ * whatever the release did, so the bar settled claims nobody wrote. This is
+ * the largest generation since 3 and the one most likely to be misread as a
+ * project getting worse: 11 of 111 corpus releases move a control score, both
+ * medians move with them (correctness 50 → 47, completeness 51.5 → 48), and
+ * the largest single move is a release whose notes carry one `change` claim
+ * (78 → 27). Unlike generation 4 this is NOT strictly stricter in one
+ * direction only — a claim that loses the bar reaches the judge instead of
+ * settling itself, so with the judge on a score can also rise. A
+ * generation-4 score and a generation-5 score are not the same measurement.
  */
-export const SCORING_GENERATION = 4;
+export const SCORING_GENERATION = 5;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form

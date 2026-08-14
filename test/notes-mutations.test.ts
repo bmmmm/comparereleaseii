@@ -166,7 +166,7 @@ test("the fabricated claim still lands in the diff, and no longer settles there"
   assert.equal(planted.codeSpans.length, 2);
   const lex = lexicalMatch(planted, files);
   assert.deepEqual(lex.matchedTerms.sort(), ["budget", "retry"]);
-  assert.equal(lex.score, 4);
+  assert.equal(lex.score, 2);
 
   // The discount is about the shape of the token, not about ignoring
   // backticks: padding that is an identifier on its own still scores 3 each.

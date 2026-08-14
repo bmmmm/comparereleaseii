@@ -6,6 +6,57 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Changed
 
+- **A word the diff happens to contain no longer carries a claim over the
+  lexical bar — `SCORING_GENERATION` is 5.** A matched term was worth 3 when
+  its shape said code and 2 otherwise, and the bar that settles a claim
+  `verified` with no judge — and counts every commit it matches as documented
+  — is 5. One identifier plus one ordinary word hit it exactly, and an
+  ordinary word is what a release diff contains whatever the release did.
+  Every one of the seven fabricated claims still settling on the corpus had
+  that one shape: `version`/`6.0.3`, `value`/`0x0008`, `github`/`github.com`,
+  `remember`/`.then_some`. A term that names no symbol is now worth 1, so the
+  bar states a rule again — two symbols, or one symbol the diff corroborates
+  twice — and a word cannot complete it alone.
+
+  Measured over the 111-release corpus with the judge off: `backtick-noise`
+  102/109 → **109/109**, the seven survivors being exactly the seven the issue
+  named. No other class loses a case — `bump-overshoot` 22/22,
+  `bump-undershoot` 22/22, `foreign-claim` 109/110 missing the same release,
+  and `omission` 64/65 → 63/64, which is the same single miss
+  (`jundot/omlx@v0.5.0`) at a denominator one smaller because
+  `GyulyVGC/sniffnet@v1.4.1` (control completeness 1) no longer has a covered
+  commit whose covering claim can be removed.
+
+  What it costs is 8 real claims of 4,364 that lose the bar (5 → 4) and 39
+  that fall under the weak one (2 → 1) — 0.2 % and 0.9 %. All of them still
+  reach the judge, and the judge bill does not move at all (3,261 claims
+  before and after), because a `verified` reached on overlap alone was already
+  being asked. One of the eight is `GyulyVGC/sniffnet@v1.4.1`'s IPinfo note,
+  the `inverted-claim` survivor of 2026-08-06: the sentence overlap cannot
+  tell from its own negation now reaches the judge instead of settling itself.
+
+  11 of 111 releases move a control score, and the medians move with them
+  (correctness 50 → 47, completeness 51.5 → 48), so scores from before and
+  after are not comparable. The largest single move,
+  `soundcloud/api@2026-07-17` 78 → 27, is a release whose notes carry exactly
+  one `change` claim.
+
+  Two cheaper candidates were measured against the same corpus and rejected.
+  Scoring a version literal as an ordinary word — the issue's own first
+  candidate — cannot reach the class it was written for: two of the seven
+  survivors, `github.com` and `.then_some`, carry no version literal at all,
+  so it stops at 107/109. Raising the bar to 6 catches all seven, but it
+  blocks a backticked symbol plus a symbol the claim spells out in prose
+  (3 + 2) while still passing three backticked dictionary words (2 + 2 + 2) —
+  it turns the bar away from evidence, which is the opposite of the finding.
+
+  Forge issue #12 is closed. The one `omission` miss that #8 left behind is
+  **not** this bar and does not move: `jundot/omlx@v0.5.0`'s hidden commit is
+  reached by claims matching the single prose acronym `MoE`, a score of 2 that
+  buys `partial` and with it the file citations the breadth route reads. That
+  is the *weak* bar, and closing it would demote every claim resting on one
+  identifier — a much larger trade, and a separate decision.
+
 - **Coverage's fourth route belongs to a claim now — `SCORING_GENERATION` is
   4.** A commit counted as documented when *the union of every verified
   claim's evidence* cited all of its files. That union grows with the notes

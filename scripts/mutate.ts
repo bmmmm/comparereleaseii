@@ -623,8 +623,14 @@ const MUTANTS: Mutant[] = [
   {
     guard: "a backticked dictionary word is worth a word, not an identifier",
     file: "src/match.ts",
-    find: "return codeSpans.includes(term) && looksLikeIdentifier(term) ? 3 : 2;",
-    replace: "return codeSpans.includes(term) ? 3 : 2;",
+    find: "  if (!looksLikeIdentifier(term)) return 1;",
+    replace: "  if (!looksLikeIdentifier(term)) return codeSpans.includes(term) ? 3 : 1;",
+  },
+  {
+    guard: "an ordinary word corroborates a claim, it never carries one over the bar",
+    file: "src/match.ts",
+    find: "  if (!looksLikeIdentifier(term)) return 1;",
+    replace: "  if (!looksLikeIdentifier(term)) return 2;",
   },
   {
     guard: "a span too short to discriminate is no identifier",

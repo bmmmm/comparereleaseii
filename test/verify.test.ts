@@ -607,6 +607,17 @@ test("identifier overlap alone buys a reading, not a verified verdict", async ()
     c.codeSpans = ["country", "country_code"];
     return c;
   };
+  // The same sentence, quoting the file it changed as well. Issue #12 moved
+  // `country` — an ordinary word — from 2 to 1, so the sniffnet pair scores 4
+  // and the deterministic pass no longer settles it at all. That is the fix
+  // working; it also means the pair no longer reaches the bar this test's
+  // second half is about, and a fixture that does has to name two spans whose
+  // shape says code.
+  const atTheBar = (text: string): Claim => {
+    const c = claim(text);
+    c.codeSpans = ["country_code", "manage_packets.rs"];
+    return c;
+  };
   const honest = "Fix support for IPinfo's databases (the most recent version renamed the `country` field to `country_code`)";
   const inverted = honest.replace("Fix", "Break");
 
@@ -641,20 +652,26 @@ test("identifier overlap alone buys a reading, not a verified verdict", async ()
         return `{"verdict":"${v}","confidence":1,"files":[],"reasoning":"vote"}`;
       },
     };
-    const [result] = await verifyClaims(data, [spanned(inverted)], {
+    const [result] = await verifyClaims(data, [atTheBar(inverted)], {
       judgeMode: "auto", engine, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
     });
     assert.equal(call, 3, "a verified on overlap-only evidence must be reviewed, not taken");
     assert.equal(result.verdict, "contradicted");
   }
 
-  // With no judge the deterministic contract stands: same input, same output
-  // as before — the fallback still reads verified, and says so on overlap.
-  const [deterministic] = await verifyClaims(data, [spanned(inverted)], {
+  // With no judge the deterministic contract stands: same input, same output —
+  // the fallback still reads verified on overlap that reaches the bar, and the
+  // pair that no longer reaches it reads partial rather than settling.
+  const [deterministic] = await verifyClaims(data, [atTheBar(inverted)], {
     judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
   });
   assert.equal(deterministic.verdict, "verified");
   assert.equal(deterministic.judged, false);
+
+  const [belowBar] = await verifyClaims(data, [spanned(inverted)], {
+    judgeMode: "off", engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000,
+  });
+  assert.equal(belowBar.verdict, "partial");
 });
 
 test("one identifier hit in the linked commit is a lead, not a verified verdict", async () => {
@@ -772,7 +789,7 @@ test("a claim covers a commit only when it reaches EVERY file of it", async () =
   };
   const cited = {
     path: "src/retry.ts", status: "modified", additions: 20, deletions: 1,
-    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoff = retryBudget * 2;\n",
+    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoffMs = retryBudget * 2;\n",
   };
   const uncited = {
     path: "src/telemetry.ts", status: "modified", additions: 30, deletions: 0,
@@ -795,8 +812,11 @@ test("a claim covers a commit only when it reaches EVERY file of it", async () =
   };
   const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
 
-  const note = claim("Rework the `retryBudget` and its `backoff`");
-  note.codeSpans = ["retryBudget", "backoff"];
+  // Two spans whose shape says code: after issue #12 a lone identifier plus an
+  // ordinary word is 4, and this test needs the claim settled so that what it
+  // watches is the coverage route rather than the bar.
+  const note = claim("Rework the `retryBudget` and its `backoffMs`");
+  note.codeSpans = ["retryBudget", "backoffMs"];
   const results = await verifyClaims(data, [note], opts);
   assert.equal(results[0].verdict, "verified", "the claim itself is settled off the diff");
 
@@ -895,7 +915,7 @@ test("the breadth route reads the evidence a claim earned, not a match re-derive
   };
   const owned = {
     path: "src/retry.ts", status: "modified", additions: 20, deletions: 1,
-    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoff = retryBudget * 2;\n",
+    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoffMs = retryBudget * 2;\n",
   };
   // One identifier only: two would clear the depth bar (3 + 3) and this test
   // would be watching the substance route instead of the breadth one.
@@ -912,8 +932,8 @@ test("the breadth route reads the evidence a claim earned, not a match re-derive
   };
   const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
 
-  const note = claim("Rework the `retryBudget` and its `backoff` (#7)", [7]);
-  note.codeSpans = ["retryBudget", "backoff"];
+  const note = claim("Rework the `retryBudget` and its `backoffMs` (#7)", [7]);
+  note.codeSpans = ["retryBudget", "backoffMs"];
   const results = await verifyClaims(data, [note], opts);
   assert.equal(results[0].verdict, "verified", "the claim is settled off its own commit");
   assert.deepEqual(

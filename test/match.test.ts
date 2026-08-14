@@ -7,6 +7,7 @@ import {
   lexicalMatch,
   looksLikeIdentifier,
   rankHunks,
+  termWeight,
 } from "../src/match.ts";
 import type { Claim, Commit, DiffFile } from "../src/types.ts";
 
@@ -83,7 +84,7 @@ test("backticks around a dictionary word buy no extra weight", () => {
   // the backticks. Two common words that happen to occur in the diff must
   // therefore stay under it, while two real identifiers still clear it.
   const words = claim("Adds `true` and `bool` support", { codeSpans: ["true", "bool"] });
-  assert.equal(lexicalMatch(words, files).score, 4);
+  assert.equal(lexicalMatch(words, files).score, 2);
 
   const shaped = claim("Adds `should_block_host` and `Cargo.toml` support", {
     codeSpans: ["should_block_host", "Cargo.toml"],
@@ -96,6 +97,35 @@ test("backticks around a dictionary word buy no extra weight", () => {
   assert.equal(looksLikeIdentifier("cmd-shift-v"), true);
   assert.equal(looksLikeIdentifier("$ref"), true);
   assert.equal(looksLikeIdentifier("sha256"), true);
+});
+
+test("an ordinary word cannot carry a lone identifier over the bar", () => {
+  // Issue #12, in the shape all seven survivors had: one identifier the diff
+  // contains plus one ordinary word it also contains, and nothing else. The
+  // word was worth 2, which is exactly what a 3 needs to reach the >= 5 bar
+  // that settles a claim `verified` with no judge and counts every commit it
+  // matches as documented — so a sentence nobody wrote settled on a version
+  // number every release diff carries anyway.
+  const padded = claim("Adds `1.0.2` and `serde` support to the release pipeline", {
+    codeSpans: ["1.0.2", "serde"],
+  });
+  const lex = lexicalMatch(padded, files);
+  assert.deepEqual(lex.matchedTerms.sort(), ["1.0.2", "serde"]);
+  assert.equal(termWeight("1.0.2", padded.codeSpans), 3);
+  assert.equal(termWeight("serde", padded.codeSpans), 1);
+  assert.equal(lex.score, 4);
+
+  // What the bar still lets through, so this is a discount and not an
+  // off-switch: a second symbol clears it, and so does one symbol the diff
+  // corroborates with two words.
+  const twoSymbols = claim("Adds `1.0.2` for `should_block_host`", {
+    codeSpans: ["1.0.2", "should_block_host"],
+  });
+  assert.ok(lexicalMatch(twoSymbols, files).score >= 5);
+  const corroborated = claim("Adds `1.0.2` to `serde` for `true` hosts", {
+    codeSpans: ["1.0.2", "serde", "true"],
+  });
+  assert.ok(lexicalMatch(corroborated, files).score >= 5);
 });
 
 test("a span under three characters is not an identifier at all", () => {

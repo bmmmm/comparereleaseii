@@ -67,15 +67,28 @@ export function looksLikeIdentifier(w: string): boolean {
 }
 
 /**
- * What a matched term is worth as evidence. Backticks are the note author's
- * own markup — the input under test — so they cannot buy weight by
- * themselves: a span earns the higher one when its shape is an identifier,
- * and a backticked dictionary word counts the same as any other matched word.
- * Without that split, `language` and `checksum` in backticks were worth 6
+ * What a matched term is worth as evidence — three tiers, and what separates
+ * them is shape, never markup. A span the author marked as code *and* whose
+ * shape says code is worth 3; an identifier the claim spells out in prose, 2;
+ * a term that names no symbol at all, 1. Backticks are the note author's own
+ * markup — the input under test — so they cannot buy weight by themselves:
+ * without that split, `language` and `checksum` in backticks were worth 6
  * between them, which settled a claim nobody wrote as verified.
+ *
+ * The bottom tier is issue #12, and it is the same finding one step further
+ * in. A word like `version`, `const` or `value` occurs in a release diff
+ * whatever the release did, so matching one says nothing about THIS diff — but
+ * at 2 it was exactly the top-up that carried a lone identifier from 3 over
+ * the `>= 5` bar. All seven fabricated claims that still settled as `verified`
+ * across the 111-release corpus had that one shape: one identifier plus one
+ * ordinary word the diff happens to contain (`version`/`6.0.3`,
+ * `value`/`0x0008`, `remember`/`.then_some`). At 1 the bar states a rule
+ * again — two symbols, or one symbol corroborated twice — and a word can no
+ * longer complete it on its own.
  */
 export function termWeight(term: string, codeSpans: string[]): number {
-  return codeSpans.includes(term) && looksLikeIdentifier(term) ? 3 : 2;
+  if (!looksLikeIdentifier(term)) return 1;
+  return codeSpans.includes(term) ? 3 : 2;
 }
 
 /** Terms that look like code identifiers — the high-signal part of a claim. */
