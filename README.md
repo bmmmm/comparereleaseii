@@ -352,12 +352,12 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-08-09; unmoved by generations 4 and 6, **owed a redraw for generation 5** — below) |
+| Release | Notes style | Score (validation run, 2026-08-16, judged under generation 6 — five draws per row, bands below) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 87 (solid) |
 | restic v0.19.1 | setext sections, issue anchors, cherry-picks | 86 (solid) |
-| vaultwarden 1.37.0 | generated PR list + handwritten security | 79–82 (three draws, no majority — vague notes hide real changes) |
+| vaultwarden 1.37.0 | generated PR list + handwritten security | 79–82 (five draws, no majority — vague notes hide real changes) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 
 How to read that column: each row is a judged run against the default engine
@@ -396,18 +396,36 @@ completeness `null` / overall 58 because one commit diff failed to load; that is
 the trap in AGENTS.md, and the redraw with all 38 commits present matches the
 other side exactly.)
 
-**What that same measurement found is owed and not paid: generation 5 moved two
-of these rows and the table was not redrawn for it.** Between generation 4 and
-generation 5 — the lexical weights, issue #12 — headscale falls correctness
-85 → 77 and overall 90 → 87, and restic falls correctness 50 → 44, completeness
-56 → 43, risk 90 → 80 and overall 64 → 55 with two more uncovered commits, all
-under `--judge off` and reproducible on a second draw. git-cliff and vaultwarden
-do not move. By the rule this section already states for generation 3, that is
-the deterministic kind of move and the published rows are stale by it. They are
-left standing rather than patched, because this column is a *judged* run: paying
-it needs the engine and the three-draw protocol above, and writing judge-free
-numbers into a judged column would be exactly the drift this table exists to
-catch.
+**Re-measured judged on 2026-08-16, and the generation-5 debt dissolved on
+contact: no judged value moved.** Between generation 4 and generation 5 — the
+lexical weights, issue #12 — headscale falls correctness 85 → 77 and overall
+90 → 87, and restic falls to overall 55 with two more uncovered commits, all
+under `--judge off` and reproducible. Paying that debt (issue #15) meant the
+engine and the protocol above, drawn five times per row instead of three so the
+same run would finally number the flicker this section keeps citing. The judged
+column never carried the movement: headscale draws 100 in four of five (one
+96), git-cliff holds its 87 median, restic returns the same three component
+scores in five draws out of five, and vaultwarden stays inside its published
+79–82 (draws 82, 79, 82, 80, 79 — the first three would mint a majority of 82,
+which is why the spread stays: a majority found inside a real 3-point band is
+manufactured). The generation-5 numbers are real, but they live in the
+deterministic fallback: restic under `--judge off` reads 8 partial and 1
+no-evidence for overall 55, while a judged run asks those nine claims and the
+judge answered all nine `verified` in every draw. The lexical bar decides what
+the deterministic pass may settle on its own — with a judge present, what it no
+longer settles is asked, not lost.
+
+**And the flicker band has numbers now.** Overall across the valid draws:
+headscale 96–100, restic exactly 86 (spread zero), vaultwarden 79–82, git-cliff
+35–88. Three of four bands are ≤ 4 points — run-to-run flicker is smaller than
+the generation-3 paragraph feared. The fourth is not a band but a cliff: in one
+draw of six, the judge read git-cliff's "*(deps)* Replace dirs_next with
+etcetera" against a diff whose manifests remove `dirs` — not `dirs_next` — and
+ruled contradicted where every other draw ruled partial. One contradicted claim
+raises `critical/contradicted-claim`, and the same release that scores 87 five
+times scores 35 (suspicious) once. The three-draw protocol absorbed the outlier
+this time by luck, not by construction — issue #17 tracks gating that flag on a
+confirmation draw.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:

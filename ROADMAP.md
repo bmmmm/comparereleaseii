@@ -37,23 +37,31 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** forge issue #12 (a version literal plus an
-> ordinary word hits the lexical bar exactly at 5 — the `lexical-bar` sweep
-> dial already exists and a sweep point is now minutes, not 25), or issue #13.
-> Entry 1 below still needs new facts more than budget.
+> **Where a fresh session starts:** forge issue #16 (pnpm mutate at ~2 h — the
+> instrument that got skipped three fixes in a row), or issue #17 (one judged
+> flip across the contradicted boundary is a 52-point cliff; a confirmation
+> draw before the critical flag fires is the candidate). Entry 1 below still
+> needs new facts more than budget.
 >
 > Issue #8 closed on 2026-08-14: the one-claim rule was the candidate and it
 > held — `omission` 63/65 → 64/65 with every other class missing the same
 > releases, because a union reaches share 1.00 by adding claims rather than by
 > describing the commit. Its last survivor turned out to be #12 wearing a
 > different hat, which makes the lexical bar the one open finding behind both
-> remaining detection holes rather than two independent ones.
+> remaining detection holes rather than two independent ones. Issues #12 and
+> #13 closed later the same day (`5d9bf17`, `a2950da`) — the lexical bar is
+> generation 5, the deletion rule generation 6.
 >
-> One finding with no issue and no numbers yet: on two of four validation rows
-> the judged flicker is wider than the scoring change they were redrawn for
-> (git-cliff and vaultwarden moved while being bit-identical under
-> `--judge off`). That relativises every judged before/after comparison in
-> this project, and nobody has measured how wide the band actually is.
+> Issue #15 closed on 2026-08-16: the generation-5 redraw was paid judged,
+> five draws per row, and no judged value moved — the movement lives in the
+> deterministic fallback that `--judge off` prints and a judged run re-asks
+> (restic: 8 partial / 1 no-evidence at overall 55 judge-free; nine claims,
+> nine times `verified`, in every judged draw, for the same 86 five times).
+> The same run numbered the flicker band this note used to carry as open:
+> three rows ≤ 4 points wide, one 52-point cliff via a single
+> partial↔contradicted flip — issue #17. Numbers in README's validation
+> section. Judged before/after comparisons are safer than the 2026-08-09 note
+> feared, except across the contradicted boundary.
 
 ## Open (2026-08-07): what the instruments found and nobody has closed
 
