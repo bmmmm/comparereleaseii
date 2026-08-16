@@ -24,7 +24,9 @@ private variant of the commit.
 AGENTS.md makes a run against one part of the definition of done for any change
 to matching, coverage or the pin join. That directory is **`tmp/corpus/`**,
 inside this repo and covered by the existing `tmp/` ignore rule — refresh it
-from a watch home with `cp -R <watch home>/reports tmp/corpus` and then stay in
+from a watch home with `cp -Rp <watch home>/reports tmp/corpus` — the `-p`
+matters, report mtimes are the only record of *when* a report was produced, and
+a copy without it flattens them all to today — and then stay in
 the checkout. A session that reaches into `~/release-watch` to measure has left
 the working folder for no reason; the numbers are identical either way.
 

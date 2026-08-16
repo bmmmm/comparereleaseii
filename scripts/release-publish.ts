@@ -137,3 +137,15 @@ const create = spawnSync(
 if (create.status !== 0) {
   fail("gh release create failed — the tag and pushes already went through, retry just that step.");
 }
+
+// The extension chain is two separate steps and the second one is the one
+// that gets skipped: bumping tool.pin updates the extension REPO, while the
+// installed copy (and with it the hourly watch) stays on the old release
+// until `gh extension upgrade` runs on this machine. v0.12.0 and v0.13.0
+// both shipped with the production watch left on v0.11.0 that way.
+console.error(
+  `\nRelease created. The watch does not run it yet — finish the chain:\n` +
+    `  1. bump tool.pin in bmmmm/gh-comparereleaseii to ${tag}\n` +
+    `  2. gh extension upgrade comparereleaseii   # updates the INSTALLED copy\n` +
+    `  3. gh comparereleaseii --version           # must print ${tag.replace(/^v/, "")}\n`,
+);

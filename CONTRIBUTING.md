@@ -131,6 +131,9 @@ $ git diff                     # review
 $ git add package.json CHANGELOG.md README.md docs/
 $ git commit -m "Release v0.2.2: <short pitch>"
 $ pnpm release:publish         # tag, push to every remote, open the GitHub release
+$ # then finish the extension chain it prints: bump tool.pin, gh extension
+$ # upgrade, and prove it with `gh comparereleaseii --version` — the pin bump
+$ # alone leaves the installed copy (and the hourly watch) on the old release
 ```
 
 `release:prepare` refuses to run on a dirty tree or a branch behind its
