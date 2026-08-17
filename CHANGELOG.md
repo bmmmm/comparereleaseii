@@ -6,6 +6,56 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Changed
 
+- **Breadth earned by other commits stops counting — `SCORING_GENERATION` is
+  7.** An unanchored claim's evidence is matched against the whole release
+  diff, so in a repository whose core files every commit touches it cites
+  paths *other* commits changed — at two files the every-file bar was
+  trivially met, and one ordinary word ("MoE", identifier-shaped but
+  span-less) sitting in every file of a commit was "breadth", carried by two
+  claims about other features. That is the `jundot/omlx@v0.5.0` miss the
+  entry below left with the lexical bar, and the lexical bar was not where it
+  lived. Coverage's breadth route now re-asks an **unanchored** claim of the
+  commit's own diff, at a floor of one span-backed identifier (3 —
+  deliberately below the depth bar of 5, which is the point of a breadth
+  route); an anchored claim's evidence keeps its anchor-pool binding, the
+  2026-08-14 measurement being exactly that re-deriving it is worse. Aimed
+  from a census, not a comment: `scripts/breadth-census.ts` (tracked) read
+  259 corpus commits held by breadth alone, 239 of them at one or two files,
+  their biggest concentrations under evidence-vacuum claims. Swept before
+  shipping (the new `breadth-floor` dial): floors 0 and 2 leave the miss
+  standing at `omission` 69/70, floors 4 and 5 detect nothing more and cost
+  six points of median completeness. At 3, on the full corpus with the judge
+  off: `omission` 69/70 → **70/70 — no detection miss of any class
+  remains** — with both canaries unmoved (`opencloud@v7.1.0` control
+  completeness 96, `web@v7.0.0` 69 and still detected), 10 of 70 measurable
+  releases losing 1–6 points of control completeness they never earned, and
+  one validation row moving: restic 86 → 82, three identical judged draws —
+  coverage is not a question the judge is asked, so nothing re-asks what the
+  route no longer grants. `diagnose-coverage` mirrors both branches and
+  prints the lexical score, so the instrument measures the route the product
+  runs.
+
+- **A seconded, non-unanimous `contradicted` says so in every report
+  format.** The verdict that flipped git-cliff v2.13.0 from 87 to 35 in one
+  draw of six settled on votes [contradicted, contradicted, partial] and
+  rendered as "contradicted (0.95)" — the dissenting pass lived in the JSON
+  `votes` array and nowhere else, while the un-seconded path has annotated
+  its reasoning all along. `resolveVotes` now writes the split into the
+  reasoning ("2 of 3 verification passes read this as contradicted — the
+  dissenting partial is on the record"), which the terminal, markdown and
+  HTML reports inherit without a renderer change. Verdict, score, flags and
+  `--judge off` output are bit-identical; unanimous votes stay untouched.
+
+- **The golden set grows to 44 with its first `field` case, and the haiku
+  reference is re-frozen at 42/44.** The claim behind that 87 → 35 flip —
+  "*(deps)* Replace dirs_next with etcetera", where the manifests remove
+  `dirs` — is lifted from the stored report with expected `partial`: a real
+  change under a wrong crate name is partially supported, not contradicted.
+  Field cases are named at every `--calibrate` and never move the frozen
+  fitness gate. The reference freeze followed its own protocol, two fresh
+  `--no-cache` runs (40/44 and 42/44 — the delta is exactly the two known
+  flicker cases, the new case among them), gate unchanged at escalate-only.
+
 - **A note that says something is gone is not settled by a diff that only adds
   it — `SCORING_GENERATION` is 6.** Lexical overlap has no direction: the
   release that introduced `http_mp3_128_url` and the release that took it away
@@ -175,6 +225,22 @@ All notable changes to comparereleaseii are documented here. The format follows 
   as documented, and there is no share in the source any more. A dial has to
   be a literal somebody could reasonably set otherwise; "every file, from one
   claim" is a rule.
+
+- **`pnpm mutate` kills at the first red test.** The runner spent a full
+  parallel suite (~16 s) on every mutant when almost every mutant dies
+  against its own module's test file in a fraction of a second. Each now runs
+  its candidate file first (basename mapping plus two hints for the
+  watch-state/watch-index split) and only a survivor pays for the full
+  suite — the verdicts are unchanged by construction, and the full set reads
+  123/123 in about five and a half minutes where the old runner extrapolates
+  to ~33 here. The run prints which path killed each mutant and how long it
+  took, so the next timing claim carries data.
+
+- **`release-publish` ends by printing the extension chain.** Bumping
+  `tool.pin` updates the extension repository, not the installed copy — two
+  releases in a row shipped with the hourly watch left on v0.11.0 that way.
+  The script now names the three finishing steps after creating the release:
+  bump the pin, `gh extension upgrade`, prove it with `--version`.
 
 ### Fixed
 
