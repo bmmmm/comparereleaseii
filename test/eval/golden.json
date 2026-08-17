@@ -682,9 +682,17 @@
         "hunk": "@@ -12,6 +12,7 @@ func recordSweep(n int) {\n \tsweepCounter.Add(1)\n+\tsweepSize.Observe(float64(n))\n \tlog.Debug(\"swept\", \"n\", n)\n }"
       }
     ],
-    "allPaths": ["internal/session/metrics.go", "internal/session/cleanup.go"],
-    "expected": ["no-evidence", "need"],
-    "finalExpected": ["no-evidence"]
+    "allPaths": [
+      "internal/session/metrics.go",
+      "internal/session/cleanup.go"
+    ],
+    "expected": [
+      "no-evidence",
+      "need"
+    ],
+    "finalExpected": [
+      "no-evidence"
+    ]
   },
   {
     "name": "commit-subject-denies-what-the-diff-shows",
@@ -704,7 +712,9 @@
         "hunk": "@@ -30,7 +30,7 @@ func newTransport() *http.Transport {\n \treturn &http.Transport{\n-\t\tTLSClientConfig: &tls.Config{InsecureSkipVerify: true},\n+\t\tTLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},\n \t}\n }"
       }
     ],
-    "expected": ["verified"]
+    "expected": [
+      "verified"
+    ]
   },
   {
     "name": "commit-subject-supplies-the-detail-the-diff-omits",
@@ -724,9 +734,19 @@
         "hunk": "@@ -18,5 +18,7 @@ func deliver(ctx context.Context, ev Event) error {\n \t\tif err := post(ctx, ev); err == nil {\n \t\t\treturn nil\n \t\t}\n-\t\ttime.Sleep(backoff(attempt))\n+\t\twait := backoff(attempt)\n+\t\tdeliveryWait.Observe(wait.Seconds())\n+\t\ttime.Sleep(wait)\n \t}"
       }
     ],
-    "allPaths": ["internal/webhook/deliver.go", "internal/webhook/backoff.go"],
-    "expected": ["no-evidence", "partial", "need"],
-    "finalExpected": ["no-evidence", "partial"]
+    "allPaths": [
+      "internal/webhook/deliver.go",
+      "internal/webhook/backoff.go"
+    ],
+    "expected": [
+      "no-evidence",
+      "partial",
+      "need"
+    ],
+    "finalExpected": [
+      "no-evidence",
+      "partial"
+    ]
   },
   {
     "name": "commit-subject-names-a-cve-the-diff-never-mentions",
@@ -746,6 +766,152 @@
         "hunk": "@@ -41,4 +41,7 @@ func extractEntry(hdr *tar.Header, dst string) error {\n \ttarget := filepath.Join(dst, hdr.Name)\n+\tif hdr.Size > maxEntryBytes {\n+\t\treturn fmt.Errorf(\"entry %q exceeds the %d byte limit\", hdr.Name, maxEntryBytes)\n+\t}\n \tf, err := os.Create(target)\n \tif err != nil {\n \t\treturn err"
       }
     ],
-    "expected": ["no-evidence", "partial", "contradicted"]
+    "expected": [
+      "no-evidence",
+      "partial",
+      "contradicted"
+    ]
+  },
+  {
+    "name": "orhun-git-cliff-v2-13-0-claim13",
+    "category": "field",
+    "section": "🚜 Refactor",
+    "claim": "*(deps)* Replace dirs_next with etcetera (#1477 ) - (ee8bfd1 )",
+    "hunks": [
+      {
+        "path": "Cargo.lock",
+        "hunk": "@@ -1002,8 +1012,8 @@ dependencies = [\n  \"clap\",\n  \"clap_complete\",\n  \"clap_mangen\",\n- \"dirs\",\n  \"env_logger\",\n+ \"etcetera 0.11.0\",\n  \"git-cliff-core\",\n  \"glob\",\n  \"indicatif\",\n"
+      },
+      {
+        "path": "Cargo.lock",
+        "hunk": "@@ -1030,9 +1040,9 @@ dependencies = [\n  \"cacache\",\n  \"chrono\",\n  \"config\",\n- \"dirs\",\n  \"document-features\",\n  \"dyn-clone\",\n+ \"etcetera 0.11.0\",\n  \"expect-test\",\n  \"futures\",\n  \"git-conventional\",\n"
+      },
+      {
+        "path": "Cargo.toml",
+        "hunk": "@@ -7,7 +7,7 @@ regex = \"1.11.1\"\n glob = \"0.3.2\"\n log = \"0.4.21\"\n secrecy = { version = \"0.8.0\", features = [\"serde\"] }\n-dirs = \"6.0.0\"\n+etcetera = \"0.11.0\"\n url = \"2.5.3\"\n reqwest = { version = \"0.12.28\", default-features = false, features = [\n   \"blocking\","
+      },
+      {
+        "path": "git-cliff-core/Cargo.toml",
+        "hunk": "@@ -52,7 +52,7 @@ glob.workspace = true\n regex.workspace = true\n log.workspace = true\n secrecy.workspace = true\n-dirs.workspace = true\n+etcetera.workspace = true\n thiserror = \"2.0.17\"\n serde = { version = \"1.0.228\", features = [\"derive\"] }\n serde_json = \"1.0.145\""
+      },
+      {
+        "path": "git-cliff-core/src/config.rs",
+        "hunk": "@@ -488,34 +489,25 @@ impl Config {\n             .try_deserialize()?)\n     }\n \n-    /// Find a special config path on macOS.\n-    ///\n-    /// The `dirs` crate ignores the `XDG_CONFIG_HOME` env var on macOS and only considers\n-    /// `Library/Application Support` as the config dir, which is primarily used by GUI apps.\n-    ///\n-    /// This function determines the config path and honors the `XDG_CONFIG_HOME` env var.\n-    /// If it is not set, it will fall back to `~/.config`\n-    #[cfg(target_os = \"macos\")]\n-    pub fn retrieve_xdg_config_on_macos() -> PathBuf {\n-        let config_dir = std::env::var(\"XDG_CONFIG_HOME\").map_or_else(\n-            |_| dirs::home_dir().unwrap_or_default().join(\".config\"),\n-            PathBuf::from,\n-        );\n-        config_dir.join(\"git-cliff\")\n-    }\n-\n     /// Find the path of the config file.\n     ///\n     /// If the config file is not found in its standard locations, [`None`] is returned.\n     #[must_use]\n     pub fn retrieve_config_path() -> Option<PathBuf> {\n+        // cannot panic - see https://github.com/lunacookies/etcetera/issues/42\n+        let strategy = choose_base_strategy()\n+            .expect(\"cannot determine current OS's default strategy (layout)\");\n         for supported_path in [\n+            strategy.config_dir().join(\"git-cliff\").join(DEFAULT_CONFIG),\n+            // paths for backwards compatibility\n             #[cfg(target_os = \"macos\")]\n-            Some(Config::retrieve_xdg_config_on_macos().join(DEFAULT_CONFIG)),\n-            dirs::config_dir().map(|dir| dir.join(\"git-cliff\").join(DEFAULT_CONFIG)),\n+            strategy\n+                .home_dir()\n+                .to_path_buf()\n+                .join(\"Library/Application Support/git-cliff\")\n+                .join(DEFAULT_CONFIG),\n         ]\n         .iter()\n-        .filter_map(|v| v.as_ref())\n         {\n             if supported_path.exists() {\n                 #[allow(clippy::unnecessary_debug_formatting)]"
+      },
+      {
+        "path": "git-cliff/Cargo.toml",
+        "hunk": "@@ -49,7 +49,7 @@ glob.workspace = true\n regex.workspace = true\n log.workspace = true\n secrecy.workspace = true\n-dirs.workspace = true\n+etcetera.workspace = true\n clap = { version = \"4.5.53\", features = [\"derive\", \"env\", \"wrap_help\", \"cargo\"] }\n clap_complete = \"4.5.61\"\n clap_mangen = \"0.2.31\""
+      }
+    ],
+    "allPaths": [
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/actions/run-fixtures-test/action.yml",
+      ".github/dependabot.yml",
+      ".github/fixtures/test-commit-statistics/cliff.toml",
+      ".github/fixtures/test-commit-statistics/commit.sh",
+      ".github/fixtures/test-commit-statistics/expected.md",
+      ".github/fixtures/test-github-integration-skipped-contributors/cliff.toml",
+      ".github/fixtures/test-github-integration-skipped-contributors/commit.sh",
+      ".github/fixtures/test-github-integration-skipped-contributors/expected.md",
+      ".github/fixtures/test-include-path-config/cliff.toml",
+      ".github/fixtures/test-include-path-config/commit.sh",
+      ".github/fixtures/test-include-path-config/expected.md",
+      ".github/fixtures/test-include-path-env-var-github/cliff.toml",
+      ".github/fixtures/test-include-path-env-var-github/commit.sh",
+      ".github/fixtures/test-include-path-env-var-github/expected.md",
+      ".github/fixtures/test-include-path-env-var/cliff.toml",
+      ".github/fixtures/test-include-path-env-var/commit.sh",
+      ".github/fixtures/test-include-path-env-var/expected.md",
+      ".github/fixtures/test-include-path-repeated-flag/cliff.toml",
+      ".github/fixtures/test-include-path-repeated-flag/commit.sh",
+      ".github/fixtures/test-include-path-repeated-flag/expected.md",
+      ".github/fixtures/test-include-path-space-separated/cliff.toml",
+      ".github/fixtures/test-include-path-space-separated/commit.sh",
+      ".github/fixtures/test-include-path-space-separated/expected.md",
+      ".github/workflows/cd.yml",
+      ".github/workflows/check-semver.yml",
+      ".github/workflows/ci.yml",
+      ".github/workflows/codeql.yml",
+      ".github/workflows/dependency-review.yml",
+      ".github/workflows/docker.yml",
+      ".github/workflows/test-fixtures.yml",
+      ".github/workflows/website.yml",
+      ".lycheeignore",
+      "CHANGELOG.md",
+      "CONTRIBUTING.md",
+      "Cargo.lock",
+      "Cargo.toml",
+      "Dockerfile",
+      "cliff.toml",
+      "flake.lock",
+      "git-cliff-core/Cargo.toml",
+      "git-cliff-core/src/changelog.rs",
+      "git-cliff-core/src/command.rs",
+      "git-cliff-core/src/commit.rs",
+      "git-cliff-core/src/config.rs",
+      "git-cliff-core/src/error.rs",
+      "git-cliff-core/src/lib.rs",
+      "git-cliff-core/src/process.rs",
+      "git-cliff-core/src/release.rs",
+      "git-cliff-core/src/remote/azure_devops.rs",
+      "git-cliff-core/src/remote/bitbucket.rs",
+      "git-cliff-core/src/remote/gitea.rs",
+      "git-cliff-core/src/remote/github.rs",
+      "git-cliff-core/src/remote/gitlab.rs",
+      "git-cliff-core/src/remote/mod.rs",
+      "git-cliff-core/src/repo.rs",
+      "git-cliff-core/src/statistics.rs",
+      "git-cliff-core/src/summary.rs",
+      "git-cliff-core/src/template.rs",
+      "git-cliff-core/tests/integration_test.rs",
+      "git-cliff/Cargo.toml",
+      "git-cliff/src/args.rs",
+      "git-cliff/src/bin/mangen.rs",
+      "git-cliff/src/lib.rs",
+      "git-cliff/src/logger.rs",
+      "git-cliff/src/main.rs",
+      "git-cliff/src/profiler.rs",
+      "lychee.toml",
+      "npm/git-cliff/package.json",
+      "npm/git-cliff/src/getExePath.ts",
+      "npm/git-cliff/src/index.ts",
+      "npm/git-cliff/tsconfig.json",
+      "npm/git-cliff/tsup.config.ts",
+      "npm/git-cliff/yarn.lock",
+      "website/.gitignore",
+      "website/blog/git-cliff-2.12.0.md",
+      "website/blog/git-cliff-2.13.0.md",
+      "website/docs/configuration/changelog.md",
+      "website/docs/configuration/git.md",
+      "website/docs/configuration/index.md",
+      "website/docs/configuration/remote.md",
+      "website/docs/docker.md",
+      "website/docs/gitlab.md",
+      "website/docs/templating/context.md",
+      "website/docs/templating/examples.md",
+      "website/docs/tips-and-tricks.md",
+      "website/docs/usage/args.md",
+      "website/docs/usage/submodules.md",
+      "website/docusaurus.config.js",
+      "website/e2e/crawl.spec.ts",
+      "website/package-lock.json",
+      "website/package.json",
+      "website/playwright.config.ts",
+      "website/src/components/Testimonials/index.tsx",
+      "website/static/img/logs-after.gif",
+      "website/static/img/logs-before.gif",
+      "website/tsconfig.json",
+      "website/yarn.lock"
+    ],
+    "expected": [
+      "partial"
+    ],
+    "lifted": {
+      "repo": "orhun/git-cliff",
+      "tag": "v2.13.0",
+      "got": "contradicted",
+      "why": "The note names dirs_next but the manifests remove dirs - a real change under a wrong crate name is partially supported, not contradicted. Judged contradicted in 1 of 6 draws (seconded 2-of-3), flooring an honest release from 87 to 35 - issue #17.",
+      "added": "2026-08-17"
+    }
   }
 ]

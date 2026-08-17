@@ -39,9 +39,10 @@
 >
 > **Where a fresh session starts:** forge issue #16 (pnpm mutate at ~2 h — the
 > instrument that got skipped three fixes in a row), or issue #17 (one judged
-> flip across the contradicted boundary is a 52-point cliff; a confirmation
-> draw before the critical flag fires is the candidate). Entry 1 below still
-> needs new facts more than budget.
+> flip across the contradicted boundary is a 52-point cliff; the re-vote
+> safeguard exists and seconded it 2-of-3, so the open half is score-side and
+> needs an operator ruling — menu in the issue). Entry 1 below still needs
+> new facts more than budget.
 >
 > Issue #8 closed on 2026-08-14: the one-claim rule was the candidate and it
 > held — `omission` 63/65 → 64/65 with every other class missing the same
@@ -58,8 +59,8 @@
 > (restic: 8 partial / 1 no-evidence at overall 55 judge-free; nine claims,
 > nine times `verified`, in every judged draw, for the same 86 five times).
 > The same run numbered the flicker band this note used to carry as open:
-> three rows ≤ 4 points wide, one 52-point cliff via a single
-> partial↔contradicted flip — issue #17. Numbers in README's validation
+> three rows ≤ 4 points wide, one 52-point cliff via a partial↔contradicted
+> flip that survived its own re-vote — issue #17. Numbers in README's validation
 > section. Judged before/after comparisons are safer than the 2026-08-09 note
 > feared, except across the contradicted boundary.
 

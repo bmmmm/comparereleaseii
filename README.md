@@ -423,9 +423,12 @@ draw of six, the judge read git-cliff's "*(deps)* Replace dirs_next with
 etcetera" against a diff whose manifests remove `dirs` — not `dirs_next` — and
 ruled contradicted where every other draw ruled partial. One contradicted claim
 raises `critical/contradicted-claim`, and the same release that scores 87 five
-times scores 35 (suspicious) once. The three-draw protocol absorbed the outlier
-this time by luck, not by construction — issue #17 tracks gating that flag on a
-confirmation draw.
+times scores 35 (suspicious) once. The flip survived the safeguard built for
+it: a contradicted is re-voted twice by design, and the outlier draw's votes
+read contradicted, contradicted, partial — seconded. The three-draw protocol
+absorbed the outlier this time by luck, not by construction — issue #17 tracks
+the cliff, and what may yet gate it is an operator ruling, not a mechanism the
+pipeline lacks.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:
