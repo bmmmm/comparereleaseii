@@ -752,8 +752,27 @@ const MUTANTS: Mutant[] = [
 // fixtures and fail on them.
 const testFiles = (await readdir("test")).filter((f) => f.endsWith(".test.ts")).map((f) => `test/${f}`);
 
-function runSuite(): boolean {
-  const res = spawnSync("node", ["--test", ...testFiles], { encoding: "utf8" });
+// A mutant is killed the moment ANY test goes red, so most runs do not need
+// the whole suite: try the mutated file's own test file first (a fraction of
+// a second against ~16s for the full set), and only a mutant that survives
+// it pays for the full parallel run. The verdicts are unchanged by
+// construction — killed still means some test failed, survived still means
+// the complete suite stayed green (issue #16).
+const KILLER_HINTS: Record<string, string[]> = {
+  // Split modules whose tests live under the feature's name, not the file's.
+  "src/watch-state.ts": ["test/watch.test.ts", "test/watch-longview.test.ts"],
+  "src/watch-index.ts": ["test/watch.test.ts", "test/watch-detail.test.ts"],
+};
+
+function candidatesFor(file: string): string[] {
+  const base = file.split("/").pop()!.replace(/\.ts$/, "");
+  const own = `test/${base}.test.ts`;
+  const picked = KILLER_HINTS[file] ?? [own];
+  return picked.filter((f) => testFiles.includes(f));
+}
+
+function runSuite(files: string[] = testFiles): boolean {
+  const res = spawnSync("node", ["--test", ...files], { encoding: "utf8" });
   return res.status === 0;
 }
 
@@ -771,6 +790,8 @@ if (!runSuite()) {
 }
 
 let killed = 0;
+let fullRuns = 0;
+const sweepStart = performance.now();
 const survivors: Mutant[] = [];
 // `finally` only covers thrown errors — a SIGINT/SIGTERM mid-mutant would
 // leave the mutated source on disk, where the next `git add -u` commits it
@@ -799,13 +820,22 @@ for (const [i, m] of selected.entries()) {
   active = { file: m.file, source };
   await writeFile(m.file, source.replace(m.find, m.replace));
   try {
-    const green = runSuite();
+    const t0 = performance.now();
+    const candidates = candidatesFor(m.file);
+    let green = candidates.length === 0 || runSuite(candidates);
+    let path = "own tests";
+    if (green) {
+      fullRuns++;
+      green = runSuite();
+      path = "full suite";
+    }
+    const secs = ((performance.now() - t0) / 1000).toFixed(1);
     if (green) {
       survivors.push(m);
-      console.error("SURVIVED — no test catches this");
+      console.error(`SURVIVED — no test catches this (${secs}s)`);
     } else {
       killed++;
-      console.error("killed");
+      console.error(`killed via ${path} (${secs}s)`);
     }
   } finally {
     await writeFile(m.file, source);
@@ -813,7 +843,10 @@ for (const [i, m] of selected.entries()) {
   }
 }
 
-console.error(`\n${killed}/${selected.length} mutants killed.`);
+const totalMin = ((performance.now() - sweepStart) / 60000).toFixed(1);
+console.error(
+  `\n${killed}/${selected.length} mutants killed in ${totalMin} min (${fullRuns} needed the full suite).`,
+);
 if (survivors.length) {
   console.error("Survivors (each needs a test):");
   for (const m of survivors) console.error(`  - ${m.guard} (${m.file})`);

@@ -35,12 +35,13 @@ async function readMutants(): Promise<Mutant[]> {
   }));
 }
 
-// `pnpm mutate` runs the whole suite once per guard — 25 minutes locally — and
-// exits on the FIRST pattern that no longer matches its file. Three had gone
-// stale under refactorings (two of them before this test existed, unseen
-// because the nightly runs on the release mirror, which lags `main`), and the
-// run died at 16 of 94 having measured nothing about the other 78. The
-// staleness is readable in milliseconds; only the killing needs the 25 minutes.
+// `pnpm mutate` runs tests once per guard — ~7 minutes locally since the
+// fast-kill runner (issue #16), formerly 25 — and exits on the FIRST pattern
+// that no longer matches its file. Three had gone stale under refactorings
+// (two of them before this test existed, unseen because the nightly runs on
+// the release mirror, which lags `main`), and the run died at 16 of 94 having
+// measured nothing about the other 78. The staleness is readable in
+// milliseconds; only the killing needs the minutes.
 test("every mutant still points at the code it claims to break", async () => {
   const mutants = await readMutants();
   // Without this a regex that stopped matching would pass as "nothing stale".

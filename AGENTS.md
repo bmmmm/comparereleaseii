@@ -77,7 +77,9 @@ watch mode).
   suite, writes the original back — from the copy it read at the start. Editing
   a source file or running `pnpm test` during a mutation run therefore either
   loses the edit or fails a test against someone else's mutant. Let it finish;
-  it takes about fifteen minutes for the full set.
+  the full set is about seven minutes — most mutants die against their own
+  module's test file in under a second, and the ~17 that need the full suite
+  cost ~17 s each (the run prints which path killed, and how long it took).
 - **`pnpm sweep` owns `src/` the same way, for far longer.** The dial IS the
   literal in the source, so a sweep holds a patched threshold for the whole of
   each measurement — an hour or more over a full corpus. Two consequences, both
