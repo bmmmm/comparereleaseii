@@ -82,6 +82,24 @@ survives, and it is not this route's to fix: a claim whose two weak terms
 happen to reach both files of a commit it does not describe is the lexical
 bar's business.
 
+It became the route's business on 2026-08-17, because the miss was not the
+terms' weight but where the evidence came from (issue #18,
+`SCORING_GENERATION` 7). An **unanchored** claim's evidence is matched
+against the whole release diff, so in a repo whose core files every commit
+touches it cites paths *other* commits changed — at two files the every-file
+bar is trivially met, and a corpus census read 259 commits held by breadth
+alone, 239 of them at one or two files, almost all covered by claims about
+something else. Since then the route asks an unanchored claim's breadth of
+the commit's **own** diff, at a floor of one span-backed identifier (3 —
+deliberately below the depth bar of 5, which is the point of a breadth
+route); an anchored claim's evidence keeps its anchor-pool binding, the
+2026-08-14 measurement being exactly that re-deriving it is worse. Corpus,
+judge off, full base: `omission` 69/70 → 70/70 — the last detection miss of
+any class — at 10 of 70 measurable releases losing 1–6 points of control
+completeness to coverage they never earned, median completeness 52 → 51,
+and both canaries unmoved (`opencloud@v7.1.0` 96, `web@v7.0.0` 69 and still
+detected).
+
 The version a bump note names it came **from** is a second statement, and it
 is read positionally rather than for equality. Measured over the corpus with
 `pnpm corpus-bump-origins`, which re-derives it: of 216 bump claims naming a

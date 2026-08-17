@@ -37,12 +37,29 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** forge issue #18 — the small-commit end of
-> the breadth question: a two-file commit is covered by any unrelated claim
-> that cites its two paths (omission 69/70, the one miss on the full base;
-> diagnosis in the issue). Cutting v0.14.0 is user-gated and has accumulated
-> generations 4–6, the flicker-band redraw, the fast mutate runner and the
-> #17 dissent annotation.
+> **Where a fresh session starts:** no forge issue is open. Cutting v0.14.0
+> is user-gated and has accumulated generations 4–7, the flicker-band redraw,
+> the fast mutate runner and the #17 dissent annotation. The standing
+> corpus-stats lead for the next deterministic rule is the `anchored-weak`
+> class — 51.7 % of the judge bill, 206 second looks, 26 split votes.
+>
+> Issue #18 closed on 2026-08-17 (`SCORING_GENERATION` 7): the small-commit
+> end of the breadth question was where the evidence came from, not the
+> file count — an unanchored claim's evidence is matched against the whole
+> release diff, so claims cite paths other commits changed, and one ordinary
+> word in both files of a two-file commit was "breadth". The route now
+> re-asks unanchored claims of the commit's own diff at a floor of one
+> span-backed identifier; anchored claims keep their pool binding (the
+> 2026-08-14 measurement). Corpus, full base: omission 69/70 → **70/70 — no
+> detection miss of any class remains**; canaries unmoved; 10 of 70
+> releases lose 1–6 points of control completeness they never earned;
+> validation row restic 86 → 82 (three identical judged draws — coverage is
+> not a question the judge is asked, so unlike generation 5 nothing absorbs
+> the move). A candidate floor on the commit's file count died before
+> measurement: the recall fixture in `test/verify.test.ts` IS a documented
+> two-file commit, and the census read 259 breadth-only commits (239 at 1–2
+> files) whose biggest concentrations were evidence-vacuum claims, not
+> honest collections.
 >
 > Issues #16 and #17 closed on 2026-08-17. #16: the mutate runner tries the
 > mutated module's own test file first and pays the full suite only for

@@ -975,11 +975,37 @@ export async function computeCoverage(
   // completeness rises 66 → 74, the giveaway), and `nextcloud/desktop@v33.0.6`
   // becomes a mutable release only to be missed as well. Reading the evidence
   // each claim actually earned is the binding; re-deriving it is not.
-  const citedPerClaim = results
+  const breadthClaims = results
     .filter((r) => (r.verdict === "verified" || r.verdict === "partial") && !isBumpClaim(r))
-    .map((r) => new Set(r.evidence.files));
+    .map((r) => ({
+      claim: r.claim,
+      anchored: r.evidence.commitShas.length > 0,
+      cited: new Set(r.evidence.files),
+    }));
+  // The two shapes of evidence part ways here. An ANCHORED claim's
+  // `evidence.files` is bound to its anchor pool, and that binding is the
+  // measure (see above — re-deriving it was measured worse). An UNANCHORED
+  // claim's evidence was matched against the whole RELEASE diff, so in a
+  // repo whose core files every commit touches it cites paths other commits
+  // changed — and at two files the every-file bar is trivially met
+  // (jundot/omlx@v0.5.0, issue #18). So an unanchored claim's breadth is
+  // re-asked of the commit's own diff: every file of the commit must carry
+  // the claim's identifiers itself. The 2026-08-14 rejection above measured
+  // re-derivation for BOTH shapes at once; the anchored half is what made
+  // it worse, and it keeps its binding here.
+  // The re-ask carries a floor: 3 is one span-backed identifier, the
+  // smallest match that NAMES code (`termWeight`) — deliberately below the
+  // depth bar of 5, which is the whole point of a breadth route. Without it,
+  // a single ordinary word sitting in every file of a two-file commit is
+  // "breadth": that is how jundot/omlx@v0.5.0's hidden commit stayed covered
+  // — two claims about other features each mention "MoE", and "MoE" appears
+  // in both of the commit's files.
   const breadthCovered = (files: DiffFile[]): boolean =>
-    citedPerClaim.some((cited) => files.every((f) => cited.has(f.path)));
+    breadthClaims.some((b) => {
+      if (b.anchored) return files.every((f) => b.cited.has(f.path));
+      const lex = lexicalMatch(b.claim, files);
+      return lex.score >= 3 && lex.files.length === files.length;
+    });
 
   // A merge commit bundles commits that are themselves in the range — counting
   // it (and its aggregate diff) again would double every miss and every line.

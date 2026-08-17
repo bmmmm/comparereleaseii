@@ -106,8 +106,23 @@ import {
  * on a score can also rise. Recorded for the reason generation 4 was — "small"
  * is not "none", and the consumers reading a series cannot tell the difference
  * themselves.
+ *
+ * 7 — coverage's breadth route re-asks an UNANCHORED claim of the commit's
+ * own diff, at a floor of one span-backed identifier (issue #18). An
+ * unanchored claim's evidence is matched against the whole release diff, so
+ * in a repo whose core files every commit touches it cites paths other
+ * commits changed — at two files the every-file bar was trivially met, and
+ * one ordinary word ("MoE") sitting in every file was "breadth". Corpus,
+ * judge off, full base: `omission` 69/70 → 70/70 — the last detection miss
+ * of any class — with 10 of 70 measurable releases losing 1–6 points of
+ * control completeness (the census behind the rule read 259 commits held by
+ * breadth alone, 239 of them at one or two files, almost all accidental).
+ * Medians: correctness 50 → 50, completeness 52 → 51. One validation row
+ * moves: restic completeness 43 → 41 under `--judge off`, and unlike
+ * generation 5 the judged column follows it — coverage is not a question the
+ * judge is asked, so there is no re-ask to absorb the move.
  */
-export const SCORING_GENERATION = 6;
+export const SCORING_GENERATION = 7;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form

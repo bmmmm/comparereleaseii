@@ -352,11 +352,11 @@ handwritten security sections, Keep-a-Changelog files, setext/issue-anchored
 notes (restic), full sha-list changelogs (headscale). If the checker holds up
 across that spread, it'll hold up on yours:
 
-| Release | Notes style | Score (validation run, 2026-08-16, judged under generation 6 — five draws per row, bands below) |
+| Release | Notes style | Score (validation run, 2026-08-16/17, judged under generation 7 — bands below) |
 |---|---|---|
 | headscale v0.29.2 | prose + full sha list | 100 (solid) |
 | git-cliff v2.13.0 | Keep a Changelog, conventional commits | 87 (solid) |
-| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 86 (solid) |
+| restic v0.19.1 | setext sections, issue anchors, cherry-picks | 82 (minor gaps — three identical draws) |
 | vaultwarden 1.37.0 | generated PR list + handwritten security | 79–82 (five draws, no majority — vague notes hide real changes) |
 | negative control: our own fabricated notes on the vaultwarden 1.37.0 diff | — | 5 (suspicious), exit 1 |
 
@@ -429,6 +429,19 @@ read contradicted, contradicted, partial — seconded. The three-draw protocol
 absorbed the outlier this time by luck, not by construction — issue #17 tracks
 the cliff, and what may yet gate it is an operator ruling, not a mechanism the
 pipeline lacks.
+
+**Re-measured on 2026-08-17 for generation 7, where breadth earned by other
+commits stopped counting (issue #18).** headscale, git-cliff and vaultwarden
+come back bit-identical under `--judge off` — same component scores, same
+uncovered counts, same verdict distribution — so their published values stand.
+restic moves, and this time it is the deterministic kind: three of its commits
+were covered by ordinary words other claims had earned into the release diff,
+completeness falls 43 → 41 judge-off with uncovered 26 → 29, and the judged
+column follows — coverage is not a question the judge is asked, so nothing
+re-asks what the route no longer grants. Redrawn per protocol: three draws,
+82, 82, 82, every report warning-free. The row's label moves solid → minor
+gaps, and the three newly uncovered commits are exactly what restic's notes
+never documented.
 
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:

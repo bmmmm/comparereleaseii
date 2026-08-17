@@ -153,20 +153,33 @@ for (const report of reports) {
     bumpClaims.length > 0 &&
     pins.length > 0 &&
     bumpClaims.some((r) => pins.some((p) => sameName(r.claim.bump!.name, p.name)));
-  // The breadth route asks this of ONE claim at a time. Ranking every claim by
-  // how much of the commit its own evidence reaches is what makes the answer
-  // actionable: "0.75, and the missing file is a manifest another claim cites"
-  // says which claim to read, where a pooled share said only "somebody".
+  // The breadth route asks this of ONE claim at a time, and since issue #18
+  // it asks it differently per evidence shape: an anchored claim's cited
+  // pool must reach every file; an unanchored claim is re-asked of the
+  // commit's own diff. Mirroring both branches here is what keeps this
+  // instrument honest — evaluating the retired pooled/cited semantics would
+  // measure a route the product no longer runs (the 2026-08-09 lesson: the
+  // omission was the harness's).
   const perClaim = mutant.results
     .filter((r) => (r.verdict === "verified" || r.verdict === "partial") && !isBump(r))
     .map((r) => {
+      const anchored = r.evidence.commitShas.length > 0;
       const cited = new Set(r.evidence.files);
-      const hit = files.filter((f) => cited.has(f.path)).length;
-      return { claim: r.claim, hit, share: files.length ? hit / files.length : 0 };
+      const lex = anchored ? null : lexicalMatch(r.claim, files);
+      const hit = anchored ? files.filter((f) => cited.has(f.path)).length : lex!.files.length;
+      const covers = files.length > 0 && hit === files.length && (anchored || lex!.score >= 3);
+      return {
+        claim: r.claim,
+        anchored,
+        hit,
+        score: lex?.score ?? null,
+        covers,
+        share: files.length ? hit / files.length : 0,
+      };
     })
-    .sort((a, b) => b.share - a.share);
+    .sort((a, b) => Number(b.covers) - Number(a.covers) || b.share - a.share);
   const best = perClaim[0];
-  const viaBreadth = best !== undefined && files.length > 0 && best.hit === files.length;
+  const viaBreadth = best !== undefined && best.covers;
   const changeClaims = mutant.results
     .filter((r) => r.claim.kind === "change" && r.verdict !== "skipped")
     .map((r) => r.claim);
@@ -182,7 +195,8 @@ for (const report of reports) {
       `\n  route pin join   : ${viaPin}${pins.length ? ` (${pins.length} pin(s) in the commit)` : ""}` +
       `\n  route breadth    : ${viaBreadth}` +
       (best
-        ? ` (best single claim ${best.hit}/${files.length} = ${best.share.toFixed(2)} — "${best.claim.text.slice(0, 60)}")`
+        ? ` (best single claim ${best.hit}/${files.length} = ${best.share.toFixed(2)}, ` +
+          `${best.anchored ? "anchored" : `unanchored, lex ${best.score}`} — "${best.claim.text.slice(0, 60)}")`
         : " (no claim can cover)") +
       `\n  route substance  : ${viaSubstance}` +
       (substanceClaim ? ` — "${substanceClaim.text.slice(0, 60)}" scores ${lexicalMatch(substanceClaim, files).score}` : ""),

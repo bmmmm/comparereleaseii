@@ -1040,6 +1040,116 @@ test("the breadth route reads the evidence a claim earned, not a match re-derive
   );
 });
 
+test("an unanchored claim's breadth reaches only commits whose own diff carries it", async () => {
+  // The jundot/omlx@v0.5.0 miss (issue #18): an UNANCHORED claim's evidence
+  // is matched against the RELEASE diff, so in a small repo whose core files
+  // every commit touches, a claim about one feature cites the paths another
+  // commit changed — and at two files the every-file bar is trivially met.
+  // Here the quantization claim's identifier lands in core.ts and util.ts
+  // through commit B, and commit A (adaptive depth, same two files, none of
+  // the claim's identifiers) used to ride that evidence to full coverage.
+  const depth: Commit = {
+    sha: "aaaa000011", subject: "rework adaptive depth to measured cost", body: "", author: "dev", prNumbers: [],
+  };
+  const quant: Commit = {
+    sha: "bbbb222233", subject: "oQe imatrix enhanced quantization", body: "", author: "dev", prNumbers: [],
+  };
+  const releaseFiles = [
+    { path: "src/core.ts", status: "modified", additions: 12, deletions: 2,
+      patch: "@@ -1,1 +1,13 @@\n+const depthBudget = probe();\n+export const packed = imatrixPack(core);\n" },
+    { path: "src/util.ts", status: "modified", additions: 6, deletions: 0,
+      patch: "@@ -1,1 +1,7 @@\n+const probeWindow = 4;\n+import { imatrixPack } from \"./extra\";\n" },
+    { path: "src/extra.ts", status: "added", additions: 9, deletions: 0,
+      patch: "@@ -0,0 +1,9 @@\n+export function imatrixPack(x) { return x; }\n" },
+  ];
+  const depthFiles = [
+    { path: "src/core.ts", status: "modified", additions: 4, deletions: 2,
+      patch: "@@ -1,1 +1,5 @@\n+const depthBudget = probe(); // MoE tune\n" },
+    { path: "src/util.ts", status: "modified", additions: 2, deletions: 0,
+      patch: "@@ -1,1 +1,3 @@\n+const probeWindow = 4; // MoE tune\n" },
+  ];
+  const quantFiles = [
+    { path: "src/core.ts", status: "modified", additions: 8, deletions: 0,
+      patch: "@@ -1,1 +1,9 @@\n+export const packed = imatrixPack(core);\n" },
+    { path: "src/util.ts", status: "modified", additions: 4, deletions: 0,
+      patch: "@@ -1,1 +1,5 @@\n+import { imatrixPack } from \"./extra\";\n" },
+    releaseFiles[2],
+  ];
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [depth, quant],
+    files: releaseFiles,
+    commitFiles: async (sha: string) => (sha === depth.sha ? depthFiles : quantFiles),
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const note = claim("Enhanced `imatrixPack` quantization");
+  note.codeSpans = ["imatrixPack"];
+  // The second shape of the same miss: "MoE" lands in BOTH of the depth
+  // commit's files, so a claim that earns its verdict elsewhere (its
+  // `imatrixPack` span, in the release diff) and merely mentions the word
+  // reaches every file of a commit it does not describe — a term that only
+  // corroborates (weight 2, issue #12) must not be what breadth stands on.
+  // One span-backed identifier (3) is the smallest match that names code.
+  const weak = claim("Faster `imatrixPack` MoE scheduling");
+  weak.codeSpans = ["imatrixPack"];
+  const results = await verifyClaims(data, [note, weak], opts);
+  assert.equal(results[0].evidence.commitShas.length, 0, "the claim is unanchored — that is the shape under test");
+  assert.equal(results[1].evidence.commitShas.length, 0, "the weak claim is unanchored too");
+
+  const coverage = await computeCoverage(data, [note, weak], results);
+  assert.deepEqual(
+    coverage.uncovered.map((u) => u.commit.sha),
+    [depth.sha],
+    "evidence another commit earned into the release diff does not document this one, and an ordinary word in every file is no breadth",
+  );
+});
+
+test("anchored breadth still asks for every file, not just one it cited", async () => {
+  // The anchored half keeps its earned-evidence binding (the 2026-08-14
+  // measurement above), and its bar stays every-file: an anchor pool that
+  // reaches ONE file of a foreign commit is not a description of it.
+  const anchored: Commit = {
+    sha: "cccc555566", subject: "Rework the retry budget (#7)", body: "", author: "dev", prNumbers: [7],
+  };
+  const foreign: Commit = {
+    sha: "dddd777788", subject: "Split the queue draining", body: "", author: "dev", prNumbers: [],
+  };
+  const owned = {
+    path: "src/retry.ts", status: "modified", additions: 20, deletions: 1,
+    patch: "@@ -1,1 +1,21 @@\n+const retryBudget = 3;\n+export const backoffMs = retryBudget * 2;\n",
+  };
+  const drained = {
+    path: "src/queue.ts", status: "modified", additions: 9, deletions: 0,
+    patch: "@@ -1,1 +1,10 @@\n+const drained = true;\n",
+  };
+  const touched = {
+    path: "src/retry.ts", status: "modified", additions: 2, deletions: 0,
+    patch: "@@ -1,1 +1,3 @@\n+const jitter = 1;\n",
+  };
+  const data = {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits: [anchored, foreign],
+    files: [owned, drained],
+    commitFiles: async (sha: string) => (sha === anchored.sha ? [owned] : [touched, drained]),
+    warnings: [] as string[],
+  };
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+  const note = claim("Rework the `retryBudget` and its `backoffMs` (#7)", [7]);
+  note.codeSpans = ["retryBudget", "backoffMs"];
+  const results = await verifyClaims(data, [note], opts);
+  assert.ok(results[0].evidence.commitShas.length > 0, "the claim is anchored — that is the shape under test");
+
+  const coverage = await computeCoverage(data, [note], results);
+  assert.deepEqual(
+    coverage.uncovered.map((u) => u.commit.sha),
+    [foreign.sha],
+    "one cited file of two is not every file",
+  );
+});
+
 test("subject resemblance alone no longer buys coverage — the diff must carry the claim", async () => {
   // The retired shortcut marked a commit covered when its SUBJECT resembled
   // a claim — claims describing claims. A fabricated note that echoes an

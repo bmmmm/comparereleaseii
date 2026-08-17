@@ -723,16 +723,22 @@ const MUTANTS: Mutant[] = [
     replace: "if (!opts.all) {",
   },
   {
-    guard: "coverage's breadth route reads one claim's evidence, not the pooled union",
-    file: "src/verify.ts",
-    find: "    citedPerClaim.some((cited) => files.every((f) => cited.has(f.path)));",
-    replace: "    files.every((f) => evidenceFiles.has(f.path));",
-  },
-  {
     guard: "one claim's evidence must cite every file of a commit, not just some of them",
     file: "src/verify.ts",
-    find: "    citedPerClaim.some((cited) => files.every((f) => cited.has(f.path)));",
-    replace: "    citedPerClaim.some((cited) => files.some((f) => cited.has(f.path)));",
+    find: "      if (b.anchored) return files.every((f) => b.cited.has(f.path));",
+    replace: "      if (b.anchored) return files.some((f) => b.cited.has(f.path));",
+  },
+  {
+    guard: "an unanchored claim's breadth is asked of the commit's own diff, not the release's",
+    file: "src/verify.ts",
+    find: "      const lex = lexicalMatch(b.claim, files);\n      return lex.score >= 3 && lex.files.length === files.length;",
+    replace: "      return files.every((f) => b.cited.has(f.path));",
+  },
+  {
+    guard: "an ordinary word in every file is no breadth — the re-ask keeps a substance floor",
+    file: "src/verify.ts",
+    find: "      return lex.score >= 3 && lex.files.length === files.length;",
+    replace: "      return lex.score >= 0 && lex.files.length === files.length;",
   },
   {
     guard: "a resumed release is keyed to the claims its report carried",
