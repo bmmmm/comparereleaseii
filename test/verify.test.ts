@@ -134,6 +134,24 @@ test("resolveVotes: contradicted needs a second voter", () => {
   );
 });
 
+test("resolveVotes: a seconded contradicted names its dissent on the record", () => {
+  // The git-cliff v2.13.0 dirs_next draw (issue #17): votes came back
+  // contradicted, contradicted, partial, and the report showed only
+  // "contradicted (0.95)" — the dissent lived in the JSON and nowhere else.
+  // The annotation rides the reasoning, so all three renderers inherit it.
+  const seconded = resolveVotes([vote("contradicted"), vote("contradicted"), vote("partial")]);
+  assert.equal(seconded.verdict, "contradicted");
+  assert.match(seconded.reasoning, /2 of 3 verification passes/);
+  assert.match(seconded.reasoning, /dissenting partial/);
+  // Unanimity has no dissent to report — reasoning stays untouched.
+  const unanimous = resolveVotes([
+    vote("contradicted"),
+    vote("contradicted"),
+    vote("contradicted"),
+  ]);
+  assert.equal(unanimous.reasoning, "contradicted");
+});
+
 test("parseJudgeResponse: need-protocol and verdicts", () => {
   const need = parseJudgeResponse('{"need":["src/a.rs","src/b.rs"]}');
   assert.ok("need" in need);

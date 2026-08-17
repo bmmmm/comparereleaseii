@@ -124,8 +124,14 @@ const MUTANTS: Mutant[] = [
   {
     guard: "contradicted needs a second concordant voter",
     file: "src/verify.ts",
-    find: 'const seconded = votes.filter((v) => v.verdict === "contradicted").length >= 2;',
-    replace: 'const seconded = votes.filter((v) => v.verdict === "contradicted").length >= 1;',
+    find: 'const contradicting = votes.filter((v) => v.verdict === "contradicted").length;\n  const seconded = contradicting >= 2;',
+    replace: 'const contradicting = votes.filter((v) => v.verdict === "contradicted").length;\n  const seconded = contradicting >= 1;',
+  },
+  {
+    guard: "a seconded contradicted names its dissenting vote on the record",
+    file: "src/verify.ts",
+    find: 'const dissent = votes.filter((v) => v.verdict !== "contradicted");',
+    replace: "const dissent: JudgeVerdict[] = [];",
   },
   {
     guard: "a local primary's verified on sensitive evidence paths escalates",

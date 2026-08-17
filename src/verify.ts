@@ -159,8 +159,21 @@ export function medianVerdict(votes: JudgeVerdict[]): JudgeVerdict {
 export function resolveVotes(votes: JudgeVerdict[]): JudgeVerdict {
   const median = medianVerdict(votes);
   if (median.verdict !== "contradicted") return median;
-  const seconded = votes.filter((v) => v.verdict === "contradicted").length >= 2;
-  if (seconded) return median;
+  const contradicting = votes.filter((v) => v.verdict === "contradicted").length;
+  const seconded = contradicting >= 2;
+  if (seconded) {
+    // A 2-of-3 rendered as "contradicted (0.95)" hides that a pass disagreed
+    // — the votes array reaches only the JSON. Riding the reasoning puts the
+    // dissent in every report format without a renderer change (issue #17).
+    const dissent = votes.filter((v) => v.verdict !== "contradicted");
+    if (!dissent.length) return median;
+    return {
+      ...median,
+      reasoning:
+        `${median.reasoning} (${contradicting} of ${votes.length} verification passes read this as ` +
+        `contradicted — the dissenting ${dissent.map((v) => v.verdict).join(" and ")} is on the record.)`,
+    };
+  }
   const others = votes
     .filter((v) => v.verdict !== "contradicted")
     .sort((a, b) => SEVERITY[b.verdict] - SEVERITY[a.verdict]);
