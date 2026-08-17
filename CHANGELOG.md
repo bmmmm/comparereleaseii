@@ -4,6 +4,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+## 0.14.0 — 2026-08-17
+
 ### Changed
 
 - **Breadth earned by other commits stops counting — `SCORING_GENERATION` is
@@ -57,7 +59,7 @@ All notable changes to comparereleaseii are documented here. The format follows 
   flicker cases, the new case among them), gate unchanged at escalate-only.
 
 - **A note that says something is gone is not settled by a diff that only adds
-  it — `SCORING_GENERATION` is 6.** Lexical overlap has no direction: the
+  it (scoring generation 6).** Lexical overlap has no direction: the
   release that introduced `http_mp3_128_url` and the release that took it away
   put the same token in their changed lines, and the bar that settles a claim
   `verified` with no judge read both as the same evidence. So a claim from a
@@ -128,8 +130,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
   Closes #13.
 
-- **A word the diff happens to contain no longer carries a claim over the
-  lexical bar — `SCORING_GENERATION` is 5.** A matched term was worth 3 when
+- **An ordinary word the diff happens to contain cannot carry a claim over
+  the lexical bar on its own (scoring generation 5).** A matched term was worth 3 when
   its shape said code and 2 otherwise, and the bar that settles a claim
   `verified` with no judge — and counts every commit it matches as documented
   — is 5. One identifier plus one ordinary word hit it exactly, and an
@@ -179,8 +181,8 @@ All notable changes to comparereleaseii are documented here. The format follows 
   is the *weak* bar, and closing it would demote every claim resting on one
   identifier — a much larger trade, and a separate decision.
 
-- **Coverage's fourth route belongs to a claim now — `SCORING_GENERATION` is
-  4.** A commit counted as documented when *the union of every verified
+- **Coverage's fourth route belongs to a claim now (scoring generation
+  4).** A commit counted as documented when *the union of every verified
   claim's evidence* cited all of its files. That union grows with the notes
   rather than with the evidence, so the more a release said the less the route
   distinguished — and a commit no claim mentions could be documented by the
@@ -243,6 +245,12 @@ All notable changes to comparereleaseii are documented here. The format follows 
   bump the pin, `gh extension upgrade`, prove it with `--version`.
 
 ### Fixed
+
+- **The stdout-truncation proof test runs only where the bug exists.** The
+  test demonstrating that `console.log` plus `process.exit` loses data on a
+  pipe proves a macOS behaviour — on Linux stdout blocks on a pipe, so CI
+  went red on the first run after v0.13.0 for a bug it cannot have. The test
+  is gated to darwin, with the reason in `test/stdout.test.ts`.
 
 - **The module-map test asserted against a file that no longer carries one.**
   Moving AGENTS.md's module table to `docs/ARCHITECTURE.md` left
