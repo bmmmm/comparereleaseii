@@ -114,6 +114,12 @@ watch mode).
 - **`test/eval/golden.json` `expected` is a list.** Several verdicts can be
   correct for genuinely ambiguous evidence. Do not collapse it to one value to
   make a run pass.
+- **A script that prints a large result makes exactly ONE final write and no
+  `process.exit` after it.** On macOS a pipe stdout is non-blocking:
+  `console.log` + `process.exit` truncates at 64 KiB (test/stdout.test.ts).
+  This cost two sweep runs in August 2026 and was reintroduced verbatim in a
+  brand-new script the same month — the pattern to copy is the single
+  conditional `console.log` at the end of `scripts/anchored-weak-census.ts`.
 - **Never widen the diff beyond the task.** Adjacent problems go in the PR's
   "Out of scope" section or into a new issue.
 
