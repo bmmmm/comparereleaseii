@@ -37,11 +37,19 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** no forge issue is open. Cutting v0.14.0
-> is user-gated and has accumulated generations 4–7, the flicker-band redraw,
-> the fast mutate runner and the #17 dissent annotation. The standing
-> corpus-stats lead for the next deterministic rule is the `anchored-weak`
-> class — 51.7 % of the judge bill, 206 second looks, 26 split votes.
+> **Where a fresh session starts:** no forge issue is open. v0.14.0 shipped
+> on 2026-08-17 (`680441e`, both forges, extension pin bumped). The
+> anchored-weak lead that stood here — 51.7 % of the judge bill, 206 second
+> looks, 26 split votes — was resolved the same evening: the census
+> (`scripts/anchored-weak-census.ts`) read the class as GitHub auto-changelog
+> lines, and 320 of them carry their title verbatim in their anchor commit's
+> BODY (merge-commit workflow) — 202 of the second looks and 25 of the 26
+> splits in one shape. `isGeneratedEntry` now reads body lines too
+> (`SCORING_GENERATION` 8, `b825c1d`): detection unchanged on every class,
+> medians unchanged, validation table stands bit-identical, ~19.8 % of the
+> judge bill gone. What remains of the class (1279 claims, 1159 calls) showed
+> 4 second looks and 1 split — the judge is stable there and earns its calls
+> reading paraphrases; no further deterministic cut is indicated by the data.
 >
 > Issue #18 closed on 2026-08-17 (`SCORING_GENERATION` 7): the small-commit
 > end of the breadth question was where the evidence came from, not the
