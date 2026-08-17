@@ -615,6 +615,12 @@ const MUTANTS: Mutant[] = [
     replace: "  const lock = { ok: true as const, release: async () => {} };",
   },
   {
+    guard: "a merge commit's body line is the PR title a squash subject would carry",
+    file: "src/verify.ts",
+    find: '  return c.body.split("\\n").some((line) => normTitle(line) === core);',
+    replace: "  return false;",
+  },
+  {
     guard: "an empty release list that contradicts the state is a load failure, not 'up to date'",
     file: "src/watch.ts",
     find: "    const emptyWarning = emptyListingWarning(key, releases, repoState);",

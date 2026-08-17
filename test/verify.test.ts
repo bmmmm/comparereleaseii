@@ -53,6 +53,39 @@ test("isGeneratedEntry: PR-list boilerplate whose title equals the squash subjec
   assert.equal(isGeneratedEntry(c2, [commit("Actual subject (#7)", [7])]), false);
 });
 
+// The merge-commit workflow's counterpart of the squash case above: the PR
+// title never reaches the merge commit's SUBJECT ("Merge pull request #9469
+// from …") — it sits in its BODY. The anchored-weak census (2026-08-17,
+// scripts/anchored-weak-census.ts --bodies) measured 320 corpus claims of
+// exactly this shape, carrying 202 of the class's 206 second looks and 25 of
+// its 26 split votes: the pipeline paid the judge to stay unsure about
+// quotations it could prove the same way it already proves squash subjects.
+test("isGeneratedEntry: merge-commit workflow carries the PR title in the body", () => {
+  const c = claim("Server Actions Integration for File Provider Extension by @i2h3 in #9469", [9469]);
+  const merge: Commit = {
+    sha: "abc123def",
+    subject: "Merge pull request #9469 from nextcloud/feature/server-actions",
+    body: "Server Actions Integration for File Provider Extension",
+    author: "dev",
+    prNumbers: [9469],
+  };
+  assert.equal(isGeneratedEntry(c, [merge]), true);
+  // A diverging title is a real claim — a mutated or fabricated line must
+  // not ride the body match into `generated`.
+  const diverging = claim(
+    "Server Actions removed from File Provider Extension by @i2h3 in #9469",
+    [9469],
+  );
+  assert.equal(isGeneratedEntry(diverging, [merge]), false);
+  // A multi-line body still matches on the title line alone — but never on a
+  // fragment spread across lines.
+  const longBody: Commit = {
+    ...merge,
+    body: "Server Actions Integration for File Provider Extension\n\nMakes the extension answer server actions.\nCo-authored-by: Y <y@example.org>",
+  };
+  assert.equal(isGeneratedEntry(c, [longBody]), true);
+});
+
 test("isGeneratedEntry: sha-list changelog entries restating the commit subject", () => {
   const c = claim("f885d87827bcae30a07063f2723cd03458144a00 Fix invalid ip syntax");
   c.shas = ["f885d87827bcae30a07063f2723cd03458144a00"];

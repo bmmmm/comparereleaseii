@@ -445,6 +445,14 @@ re-asks what the route no longer grants. Redrawn per protocol: three draws,
 gaps, and the three newly uncovered commits are exactly what restic's notes
 never documented.
 
+Re-verified on 2026-08-17 for `SCORING_GENERATION` 8, where a claim whose
+core title sits verbatim in a body line of its anchor commit became a
+generated entry (the merge-commit workflow's counterpart of the squash
+subject match). None of the four releases carries a claim of that shape —
+three have no attribution lines at all, and vaultwarden's squash subjects
+already matched — so all four rows and the fabricated negative control come
+back bit-identical under `--judge off`, and the published values stand.
+
 One verdict from the vaultwarden run shows the point — a fabricated claim,
 caught against the actual diff:
 

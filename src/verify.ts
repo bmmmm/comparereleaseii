@@ -79,6 +79,18 @@ function normTitle(s: string): string {
 }
 
 /**
+ * The claim's core title is this commit's own title. Squash merges carry it
+ * as the SUBJECT; the merge-commit workflow buries it in the BODY ("Merge
+ * pull request #N from …" above, the PR title a line below) — the same
+ * quotation, one line lower. Whole lines only: a fragment assembled across
+ * body lines is not a title.
+ */
+function titleMatchesCommit(core: string, c: Commit): boolean {
+  if (normTitle(c.subject) === core) return true;
+  return c.body.split("\n").some((line) => normTitle(line) === core);
+}
+
+/**
  * Auto-generated notes entry that merely restates a commit — "Title by @user
  * in #N" PR lists, or "<sha> subject" changelog lists. True by construction
  * (generated from the same commits we check against), so it must not inflate
@@ -88,11 +100,11 @@ export function isGeneratedEntry(claim: Claim, commits: Commit[]): boolean {
   const core = normTitle(coreText(claim).replace(/\b[0-9a-f]{7,40}\b/g, ""));
   if (!core) return false;
   if (GENERATED_TAIL.test(claim.text)) {
-    return commits.some((c) => normTitle(c.subject) === core);
+    return commits.some((c) => titleMatchesCommit(core, c));
   }
   if (claim.shas.length) {
     return commits.some(
-      (c) => claim.shas.some((s) => c.sha.startsWith(s)) && normTitle(c.subject) === core,
+      (c) => claim.shas.some((s) => c.sha.startsWith(s)) && titleMatchesCommit(core, c),
     );
   }
   return false;

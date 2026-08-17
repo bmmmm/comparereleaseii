@@ -121,8 +121,26 @@ import {
  * moves: restic completeness 43 → 41 under `--judge off`, and unlike
  * generation 5 the judged column follows it — coverage is not a question the
  * judge is asked, so there is no re-ask to absorb the move.
+ *
+ * 8 — a claim whose core title sits verbatim in a BODY line of its anchor
+ * commit is a generated entry. The merge-commit workflow puts "Merge pull
+ * request #N from …" in the subject and the PR title one line below — the
+ * same quotation the squash workflow carries as its subject, which has been
+ * `generated` since the class existed. Aimed from the anchored-weak census
+ * (scripts/anchored-weak-census.ts --bodies): 320 of the corpus's 1599
+ * anchored-weak claims are this shape, and they carried 202 of the class's
+ * 206 second looks, 25 of its 26 split votes and ~19.8 % of the corpus's
+ * whole judge bill — paid to stay unsure about quotations the pipeline can
+ * prove (the judge answered 188 of them `no-evidence`). Corpus, judge off:
+ * detection unchanged on every class (omission 70/70), medians unchanged
+ * (correctness 50 · completeness 51 · overall 50), and 12 of 123 releases
+ * move UP (+3..+23 overall; correctness 50 → 100 where the notes are pure
+ * auto-PR lists) — all of them in the two merge-workflow repos, which until
+ * now scored worse than a squash-workflow repo for byte-identical notes.
+ * The validation table stands: all four rows and the fabricated negative
+ * control are bit-identical under --judge off.
  */
-export const SCORING_GENERATION = 7;
+export const SCORING_GENERATION = 8;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form

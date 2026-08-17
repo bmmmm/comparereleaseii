@@ -4,6 +4,30 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Changed
+
+- **A merge commit's body line is the PR title a squash subject would carry —
+  `SCORING_GENERATION` is 8.** An auto-changelog line ("Title by @author in
+  #N") whose title matches its anchor commit's squash SUBJECT has always been
+  a `generated` entry — true by construction, zero judge calls. The
+  merge-commit workflow carries the identical quotation one line lower
+  ("Merge pull request #N from …" as the subject, the PR title in the body),
+  and the pipeline paid the judge to stay unsure about it: the anchored-weak
+  census (`scripts/anchored-weak-census.ts`, new, with a `--bodies` mode
+  measuring against the clone cache) read 320 such claims in the corpus's
+  1599-claim anchored-weak class, carrying 202 of its 206 second looks, 25 of
+  its 26 split votes and ~19.8 % of the corpus's whole judge bill — answered
+  188 times with `no-evidence` against claims that are provably quotations.
+  `isGeneratedEntry` now matches the core title against whole body lines of
+  the anchor commit, same normalization, whole lines only — a diverging
+  (mutated or fabricated) title stays a real, judged claim. Corpus, judge
+  off: detection unchanged on every class (omission 70/70, foreign-claim
+  121/121), medians unchanged, 12 of 123 releases move up (+3..+23 overall)
+  — all in the two merge-workflow repos, which until now scored worse than a
+  squash-workflow repo for byte-identical notes. The README validation table
+  stands: all four rows and the fabricated negative control are bit-identical
+  under `--judge off`.
+
 ### Fixed
 
 - **An empty release list that contradicts the state is a load failure, not

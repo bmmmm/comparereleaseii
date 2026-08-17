@@ -179,11 +179,6 @@ for (const r of reports) {
   }
 }
 
-if (asJson) {
-  console.log(JSON.stringify({ releases: reports.length, rows }, null, 1));
-  process.exit(0);
-}
-
 const judgedRows = rows.filter((x) => x.judged);
 const pct = (n: number, d: number) => (d === 0 ? "—" : `${((n / d) * 100).toFixed(1)} %`);
 const count = <K extends string>(xs: Row[], key: (x: Row) => K): Record<string, number> => {
@@ -354,4 +349,8 @@ for (const x of rows.filter((x) => x.split)) {
   out.push(`  "${x.text.slice(0, 140)}"`);
 }
 
-console.log(out.join("\n"));
+// One write, no process.exit after it: on macOS a pipe stdout is non-blocking
+// and exiting right after console.log truncates at 64 KiB (test/stdout.test.ts
+// — the bug that cost two sweep runs). The census JSON is well past that
+// size, and this file reproduced the truncation on its first --json read.
+console.log(asJson ? JSON.stringify({ releases: reports.length, rows }, null, 1) : out.join("\n"));
