@@ -999,7 +999,11 @@ export async function computeCoverage(
   // a single ordinary word sitting in every file of a two-file commit is
   // "breadth": that is how jundot/omlx@v0.5.0's hidden commit stayed covered
   // — two claims about other features each mention "MoE", and "MoE" appears
-  // in both of the commit's files.
+  // in both of the commit's files. Swept 2026-08-17 (`breadth-floor`, full
+  // corpus): 0 and 2 leave that miss standing (omission 69/70), 3 reads
+  // 70/70, and 4 and 5 detect nothing more while median completeness falls
+  // 51 → 45 — the honest score-3 coverings die for no detection gain. 3 is
+  // the lowest full-detection point, and the only one that states a rule.
   const breadthCovered = (files: DiffFile[]): boolean =>
     breadthClaims.some((b) => {
       if (b.anchored) return files.every((f) => b.cited.has(f.path));

@@ -362,7 +362,9 @@ across that spread, it'll hold up on yours:
 
 How to read that column: each row is a judged run against the default engine
 (`claude-cli/haiku`), measured serially with `--no-cache`, and any run whose
-report carries a load or `judge-unavailable` warning is dropped and redrawn. A
+report carries a load warning or the `judge-unavailable` risk flag is dropped
+and redrawn — the two live in different channels (`warnings[]` and
+`metrics.flags`), and a validity gate that reads only one misses the other. A
 judged score carries run-to-run flicker, so a row whose score moves is drawn
 three times and the table publishes the value two of the three agree on; a row
 that does not move is drawn once. Where three draws produce no majority the

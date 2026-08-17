@@ -86,6 +86,19 @@ export const DIALS: Dial[] = [
   // reasonably set otherwise — "every file, from one claim" is a rule, and
   // there is nothing left to turn.
   {
+    name: "breadth-floor",
+    what:
+      "how much lexical substance an unanchored claim needs in a commit's own " +
+      "diff before reaching every file counts as breadth (issue #18) — 0 is " +
+      "no floor (one ordinary word was breadth), 3 is one span-backed " +
+      "identifier, 5 would be the depth bar and the route's off switch",
+    current: "3",
+    values: ["0", "2", "3", "4", "5"],
+    sites: [
+      { file: "src/verify.ts", pattern: "lex.score >= % && lex.files.length === files.length" },
+    ],
+  },
+  {
     name: "generated-weight",
     what:
       "what an auto-generated PR-list entry is worth against a handwritten " +
