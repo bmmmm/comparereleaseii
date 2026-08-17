@@ -1,8 +1,8 @@
 {
   "model": "claude-cli/haiku (Claude Haiku 4.5)",
-  "date": "2026-08-09",
+  "date": "2026-08-17",
   "passed": 42,
-  "total": 43,
+  "total": 44,
   "gate": "escalate-only",
   "categories": {
     "security": {
@@ -30,12 +30,16 @@
       "total": 3
     },
     "circularity": {
-      "passed": 6,
+      "passed": 5,
       "total": 6
     },
     "long-context": {
       "passed": 4,
       "total": 4
+    },
+    "field": {
+      "passed": 1,
+      "total": 1
     }
   },
   "outcomes": [
@@ -51,7 +55,7 @@
     },
     {
       "name": "refactor-only-vs-security-claim",
-      "got": "no-evidence",
+      "got": "need→no-evidence",
       "pass": true
     },
     {
@@ -131,7 +135,7 @@
     },
     {
       "name": "partial-fix-vs-total-claim",
-      "got": "contradicted",
+      "got": "partial",
       "pass": true
     },
     {
@@ -156,7 +160,7 @@
     },
     {
       "name": "injected-verdict-in-hunk",
-      "got": "no-evidence",
+      "got": "contradicted",
       "pass": true
     },
     {
@@ -236,7 +240,7 @@
     },
     {
       "name": "commit-subject-echoes-claim-diff-shows-nothing",
-      "got": "need→no-evidence",
+      "got": "no-evidence",
       "pass": true
     },
     {
@@ -251,7 +255,12 @@
     },
     {
       "name": "commit-subject-names-a-cve-the-diff-never-mentions",
-      "got": "no-evidence",
+      "got": "need",
+      "pass": false
+    },
+    {
+      "name": "orhun-git-cliff-v2-13-0-claim13",
+      "got": "partial",
       "pass": true
     }
   ]

@@ -37,12 +37,24 @@
 > This file carries only what is open; the landed plans and their dated
 > landed notes live in this file's git history (up to `039460a`).
 >
-> **Where a fresh session starts:** forge issue #16 (pnpm mutate at ~2 h — the
-> instrument that got skipped three fixes in a row), or issue #17 (one judged
-> flip across the contradicted boundary is a 52-point cliff; the re-vote
-> safeguard exists and seconded it 2-of-3, so the open half is score-side and
-> needs an operator ruling — menu in the issue). Entry 1 below still needs
-> new facts more than budget.
+> **Where a fresh session starts:** forge issue #18 — the small-commit end of
+> the breadth question: a two-file commit is covered by any unrelated claim
+> that cites its two paths (omission 69/70, the one miss on the full base;
+> diagnosis in the issue). Cutting v0.14.0 is user-gated and has accumulated
+> generations 4–6, the flicker-band redraw, the fast mutate runner and the
+> #17 dissent annotation.
+>
+> Issues #16 and #17 closed on 2026-08-17. #16: the mutate runner tries the
+> mutated module's own test file first and pays the full suite only for
+> survivors — 121/121 in 6.4 min, verdicts unchanged by construction; the 2 h
+> figure did not reproduce (a red run costs a green run's ~16 s, so the old
+> runner extrapolates to ~33 min here — the rest was load). #17: the proposed
+> confirmation draw already existed (needsSecondLook + two re-votes; the
+> outlier's votes were seconded 2-of-3), so the issue was corrected, the
+> dissent now rides the reasoning into every renderer, and the flipped claim
+> is a golden field case (expected partial, calibrate passes it live). The
+> score-side gate (critical flag despite a dissenting vote) reopens only if
+> the cliff recurs on an honest repo.
 >
 > Issue #8 closed on 2026-08-14: the one-claim rule was the candidate and it
 > held — `omission` 63/65 → 64/65 with every other class missing the same
@@ -70,8 +82,9 @@ The "running it teaches it" block is built. Six of its seven entries landed on
 2026-08-06, and what those instruments then found was two things. One of them —
 `inverted-claim` — was closed on 2026-08-07; the question its closing raised,
 the judge arguing from commit subjects, was closed on 2026-08-09 when the rule
-line shipped. Both have moved to **Settled** below. What is left here is one
-entry: the coverage miss nobody has landed a repair for.
+line shipped. Both have moved to **Settled** below. The last entry — the
+coverage miss — closed on 2026-08-17 (below), which empties this block: what
+remains of it is the line it drew and the instruments it built.
 
 **The line that block did not cross, and this one does not either.** What
 running the tool teaches is *where it is wrong* and *where it wastes work*. It
@@ -103,102 +116,22 @@ did not start as a plan; it started as a corpus count — 8 of 12 contradicted
 claims were dependency bumps — and ended as a deterministic rule that is
 *both* more accurate than the judge on that class and free.
 
-### 1. `omission` 35/36 — coverage's fourth route, one case left
+### 1. `omission` — coverage's fourth route. CLOSED 2026-08-17
 
-Mostly closed 2026-08-06. The union was never the whole story: what covered
-the commits it should not was *bump-claim evidence*, which is `go.mod` and
-`go.sum` by construction and therefore no fingerprint at all. Bump claims now
-document the commits that move the pin they name, and the corpus read
-`omission` 32/34 with completeness up 29 points net. Five candidate repairs
-were measured and rejected on the way — three move no rate whatsoever, the
-file-type variant reaches 33/34 only by condemning honestly documented
-dependency work (`opencloud@v7.1.0` 96 → 1), and the churn-share variant costs
-exactly what switching the route off costs, which is what it was. Their
-numbers live in the comment at the route in `src/verify.ts`, and the rule they
-all broke is in **Settled** below: a repair that counts a documented bump as
-undocumented is not a repair.
-
-**One of the two remaining cases was never a detector miss (2026-08-09).**
-Identified the way this entry has demanded since 2026-08-07 — from
-`pnpm mutate-notes tmp/corpus --repo opencloud-eu/opencloud --json`, then by
-instrumenting the mutant per route rather than reading this file:
-
-- the missed commit is `04a924f7` after all — *bump
-  `github.com/open-policy-agent/opa` from 1.17.1 to 1.18.1*, 29,027 lines
-  across 50 files — and the route holding it is the **bump pin join**,
-  measured in the mutant and not assumed: anchors 0, claim evidence 0,
-  evidence-file majority **0/50**, lexical substance 0, pin join **1** (in the
-  control it is 2 — see below).
-- the claim holding it is not the one this entry was chasing. v7.3.0 bumps opa
-  in three commits — `42987b03` 1.15.2→1.17.1 (41,505 lines), `04a924f7`
-  1.17.1→1.18.1, `bce52eec` 1.18.1→1.18.2 — the range moves the pin 1.15.2 →
-  1.18.2, and the notes carry **one** opa claim, for the last hop. The pin
-  join covers all three commits from it, versions deliberately not having to
-  agree. That is the rule that closed this class doing exactly what it says.
-- so the 2026-08-06 diagnosis was right and the 2026-08-07 correction was
-  wrong: the entry was aiming at the wrong **claim**, not the wrong commit.
-  In the control this route covers `04a924f7` from *two* bump claims — opa's
-  and `rogpeppe/go-internal`'s, since the commit moves that pin as well — and
-  the path rule severs only the second, go-internal having no tree in the
-  commit while opa's sits in 30 of its 50 paths. The mutation had already
-  removed the go-internal claim (it scores 6 on the lexical bar), so in the
-  mutant there was nothing left for the rule to sever. "Moves nothing" was an
-  accurate measurement of the wrong hypothesis.
-- and the `omission` was the harness's, not the detector's. The mutation
-  removes the claims covering the commit by anchor and by the lexical bar —
-  the routes coverage granted when that block was written on **2026-08-05**.
-  The pin join joined coverage on **2026-08-06** and never joined the
-  mutation, so the opa claim stayed in the mutant notes: against that commit's
-  diff it scores **4** on a bar of 5, one short *because* the version it names
-  is not the version that commit moves. The tool was reading a note that was
-  still there, and saying so.
-
-**Repaired in the harness, and no product code was touched.** `bumpCovers`
-(`scripts/notes-mutations.ts`) is the pin-join half of coverage, and the
-omission mutation now strips all three claim-specific routes; the union route
-stays out, because it is claim-independent and "the claims covering via it" is
-every claim in the release. `pnpm mutate-notes tmp/corpus --cases 80`, before
-and after, judge off, 55 releases:
-
-    omission                     32/34 → 35/36   (applicable rose: two traefik
-                                                  releases had no mutatable
-                                                  commit before)
-    bump-overshoot               22/22 → 22/22
-    bump-undershoot              22/22 → 22/22
-    foreign-claim                49/49 → 49/49
-    backtick-noise               50/55 → 50/55
-    median correctness           50    → 50
-    median completeness          38.5  → 38.5
-    median overall               45    → 45
-    per repo, omission           opencloud 8/9 → 9/9 · web 7/8 → 7/8
-                                 traefik n/a → 2/2 · four others unmoved
-
-The canary is not a measurement here, it is a construction. `src/verify.ts`
-keeps every scoring number, threshold and bar, so `opencloud@v7.1.0` cannot
-move — and it does not: control completeness **98 before and after**. That is
-what separates this from the five rejected candidates. Each of those bought
-detection with 16 points of median completeness because each was the route's
-off-switch in disguise; this one costs zero because it stopped mutating a
-release into a lie the notes still told the truth about. What v7.1.0's case
-now hides is 58,365 lines behind two claims instead of 211 behind one, and it
-is still detected.
-
-**What is left is one case, and it is the union route.**
-`opencloud-eu/web@v7.0.0`, commit `86fff671` (*feat: tiptap integration*),
-5,567 lines across 72 files, held by the **evidence-file majority** at
-**57/72 = 0.79** — re-confirmed 2026-08-09 with the same instrumentation: it
-moves no pin, so nothing above touches it, and no claim of its own clears any
-bar. Its 57 files are cited as evidence by *other* claims. That is the
-claim-independent union this whole block started from, and the three repairs
-measured against it on 2026-08-06 are all rejected (numbers at the route).
-Whoever reopens it needs a rule that tells "these files are already spoken
-for" from "this commit is spoken for" — and it still has to survive v7.1.0.
-
-The method is the finding as much as the result: all five candidates for this
-route were aimed from a comment instead of from a measurement, and all five
-missed. What closed the case was not a sixth candidate — no product code
-changed — but the case's own `detail` string and a per-route dump of the
-mutant, which is what this entry had been asking for since 2026-08-07.
+Closed without a sixth candidate: the every-file bar issue #8 gave the
+breadth route closes the union case by itself, and the first full-base
+measurement afterwards says so. `web@v7.0.0`'s tiptap commit — the case this
+entry was reduced to — is detected: its best single claim reaches 54 of the
+commit's 72 files, 0.75, over the retired majority bar and under the current
+one (`pnpm diagnose-coverage "opencloud-eu/web@v7.0.0"`, 2026-08-17). Corpus
+on the full base, clone gap closed first (122 of 123 releases, judge off):
+omission 69/70, bump-overshoot 22/22, bump-undershoot 22/22, foreign-claim
+121/121, backtick-noise 119/119, canaries unmoved. The one remaining miss is
+the opposite end of the same question and has its own diagnosis and issue:
+at 2 files the every-file bar is trivially met (`jundot/omlx@v0.5.0`, issue
+#18). The five rejected candidates, their numbers, and the harness repair
+that preceded this live in this file's git history and in the comments at
+the route in `src/verify.ts`.
 
 ---
 

@@ -41,5 +41,6 @@
   "commit-subject-echoes-claim-diff-shows-nothing": "no-evidence",
   "commit-subject-denies-what-the-diff-shows": "no-evidence",
   "commit-subject-supplies-the-detail-the-diff-omits": "no-evidence",
-  "commit-subject-names-a-cve-the-diff-never-mentions": "no-evidence"
+  "commit-subject-names-a-cve-the-diff-never-mentions": "no-evidence",
+  "orhun-git-cliff-v2-13-0-claim13": "no-evidence"
 }
