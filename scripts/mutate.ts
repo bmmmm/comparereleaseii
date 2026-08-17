@@ -615,6 +615,12 @@ const MUTANTS: Mutant[] = [
     replace: "  const lock = { ok: true as const, release: async () => {} };",
   },
   {
+    guard: "an empty release list that contradicts the state is a load failure, not 'up to date'",
+    file: "src/watch.ts",
+    find: "    const emptyWarning = emptyListingWarning(key, releases, repoState);",
+    replace: "    const emptyWarning = null;",
+  },
+  {
     guard: "a lock is removed by its holder, never by whoever came after",
     file: "src/watch-lock.ts",
     find: "if (holder && (holder.pid !== mine.pid || holder.startedAt !== mine.startedAt)) return;",

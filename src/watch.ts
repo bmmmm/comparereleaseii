@@ -722,6 +722,38 @@ function deadTagPatternWarning(
     : null;
 }
 
+/**
+ * The warning for a release listing that came back empty although this repo's
+ * state has already seen a release, or null when the empty list is believable.
+ * A repository cannot go from released to never-released, so this answer is
+ * the API failing to load the list (GitHub's REST release list did exactly
+ * that on 2026-08-17, for every repository, while the rest of the API
+ * answered) — and not answering must never look better than answering. The
+ * caller counts it like a failed listing and leaves the poll cursor
+ * untouched; only a repo with no recorded history keeps reading an empty
+ * list as a legitimate "never released".
+ */
+export function emptyListingWarning(
+  key: string,
+  releases: ReleaseInfo[],
+  repoState: RepoState,
+): string | null {
+  // `failing`/`skipped` count as "seen": both exist only for a release that
+  // was on a listing once, even when no check ever succeeded.
+  const seenRelease =
+    repoState.lastTag !== null ||
+    repoState.lastPublishedAt !== null ||
+    repoState.history.length > 0 ||
+    repoState.failing !== undefined ||
+    (repoState.skipped?.length ?? 0) > 0;
+  if (releases.length > 0 || !seenRelease) return null;
+  return (
+    `${key}: the release list came back empty, but ${repoState.lastTag ?? "a release"} has been ` +
+    `seen here before — a repository cannot go from released to never-released. Counting this ` +
+    `as a load failure; the state stays put and the next run retries.`
+  );
+}
+
 /** What to print for a watched repo with nothing new. */
 export function nothingNewMessage(
   key: string,
@@ -763,6 +795,12 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
       ({ releases, forge } = await listRepoReleases(rc));
     } catch (err) {
       console.error(`${key}: listing releases failed — ${(err as Error).message}`);
+      codes.push(2);
+      continue;
+    }
+    const emptyWarning = emptyListingWarning(key, releases, repoState);
+    if (emptyWarning) {
+      console.error(emptyWarning);
       codes.push(2);
       continue;
     }
@@ -1081,6 +1119,15 @@ async function planBackfill(
     try {
       const listing = await listReleasesDeep(rc, scope(rc));
       const repoState = state.repos[key] ?? { lastPublishedAt: null, lastTag: null, history: [] };
+      // The same contradiction the watch poll refuses: an empty deep listing
+      // for a repo whose state has seen releases would plan zero checks and
+      // read as "already covered" — count it as the load failure it is.
+      const emptyWarning = emptyListingWarning(key, listing.releases, repoState);
+      if (emptyWarning) {
+        console.error(emptyWarning);
+        codes.push(2);
+        continue;
+      }
       const plan = pickBackfillReleases(listing.releases, repoState, scope(rc));
       const deadPattern = !plan.length && deadTagPatternWarning(key, rc, listing.releases);
       if (deadPattern) console.error(deadPattern);

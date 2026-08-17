@@ -3,6 +3,7 @@ import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import {
   configuredEntries,
+  emptyListingWarning,
   nothingNewMessage,
   runWatch,
   runBackfill,
@@ -54,7 +55,7 @@ import {
   type WatchRepoConfig,
 } from "../src/watch-state.ts";
 import type { ClaimResult, Finding, PromiseCheck, ReleaseSurface, Report, Verdict } from "../src/types.ts";
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 
@@ -153,6 +154,89 @@ test("a tagPattern that matches nothing says so instead of 'up to date'", () => 
     nothingNewMessage("o/r", { repo: "o/r", tagPattern: "^v\\d" }, [], null),
     /up to date \(no releases\)/,
   );
+});
+
+// 2026-08-17: GitHub's REST release list returned [] for every repository for
+// half an hour while the rest of the API answered. The production watch
+// printed "up to date" for all 14 repos and exited 0 — a run that measured
+// nothing, indistinguishable from a healthy one. The state knew better: a
+// repository with a checked release cannot have an empty release list.
+test("an empty release list that contradicts the state is a load failure, not 'up to date'", () => {
+  const seen: RepoState = { lastPublishedAt: "2026-07-20T00:00:00Z", lastTag: "v1.0.0", history: [] };
+
+  const warning = emptyListingWarning("o/r", [], seen);
+  assert.ok(warning, "an empty list against recorded history must warn");
+  assert.match(warning, /load failure/);
+  assert.ok(warning.includes("v1.0.0"), `the contradicting tag is quoted back: ${warning}`);
+
+  // A repo with no recorded history: empty is a legitimate answer — it may
+  // simply never have released. Today's behaviour stays.
+  assert.equal(
+    emptyListingWarning("o/r", [], { lastPublishedAt: null, lastTag: null, history: [] }),
+    null,
+  );
+  // A non-empty listing is never contradicted, whatever the state knows.
+  assert.equal(emptyListingWarning("o/r", [rel("v1.0.0", "2026-07-20T00:00:00Z")], seen), null);
+  // Mid-retry on the very first check: no cursor yet, but the failing release
+  // was on a listing once — an empty answer contradicts that just the same.
+  assert.ok(
+    emptyListingWarning("o/r", [], {
+      lastPublishedAt: null,
+      lastTag: null,
+      history: [],
+      failing: { tag: "v1.0.0", attempts: 1, lastError: "x" },
+    }),
+  );
+});
+
+// The wiring, not just the diagnosis: a real watch tick over a source that
+// answers [] must fail loud (exit 2), print no "up to date" line, and leave
+// the poll cursor untouched. The pure function above could be left uncalled
+// and every test still pass — this drives `runWatch` end to end with a fake
+// `gh` on PATH, the same pattern github.test.ts uses.
+test("a watch tick whose listing comes back empty against recorded state fails loud", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "crii-watch-empty-"));
+  await writeFile(join(dir, "gh"), "#!/usr/bin/env bash\necho '[]'\n", { mode: 0o755 });
+  const statePath = join(dir, "state.json");
+  await writeFile(
+    statePath,
+    JSON.stringify({
+      version: 1,
+      repos: { "o/r": { lastPublishedAt: "2026-07-20T00:00:00Z", lastTag: "v1.0.0", history: [] } },
+    }),
+  );
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  const errors: string[] = [];
+  const mocked = mock.method(console, "error", (...args: unknown[]) => {
+    errors.push(args.join(" "));
+  });
+  try {
+    const ec = await runWatch(
+      { repos: [{ repo: "o/r" }] },
+      {
+        configPath: join(dir, "watch.json"),
+        stateFile: statePath,
+        reportsDir: join(dir, "reports"),
+        cache: false,
+      },
+    );
+    assert.equal(ec, 2, "a run that could not poll is a failed run, not a clean one");
+    assert.ok(
+      errors.some((l) => l.includes("load failure")),
+      `the warning reaches the operator:\n${errors.join("\n")}`,
+    );
+    assert.ok(
+      !errors.some((l) => l.includes("up to date (")),
+      `no 'up to date' line for the blind repo:\n${errors.join("\n")}`,
+    );
+    const after = JSON.parse(await readFile(statePath, "utf8")) as WatchState;
+    assert.equal(after.repos["o/r"].lastTag, "v1.0.0", "the poll cursor did not move");
+    assert.equal(after.repos["o/r"].lastPublishedAt, "2026-07-20T00:00:00Z");
+  } finally {
+    mocked.mock.restore();
+    process.env.PATH = previousPath;
+  }
 });
 
 test("pickBackfillReleases: tagPattern scopes the backfill the same way", () => {

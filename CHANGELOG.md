@@ -4,6 +4,19 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Fixed
+
+- **An empty release list that contradicts the state is a load failure, not
+  "up to date"** (#19). During the 2026-08-17 GitHub incident the REST
+  release list returned `[]` for every repository while the rest of the API
+  answered; the production watch printed "up to date" for all 14 repos and
+  exited 0 — a run that measured nothing, indistinguishable from a healthy
+  one. A repository cannot go from released to never-released, so a watch
+  poll (and a backfill listing) whose answer is empty for a repo whose state
+  has already seen a release now warns, exits 2, and leaves the poll cursor
+  untouched — the next run retries. A repo with no recorded history keeps
+  reading an empty list as a legitimate "never released".
+
 ## 0.14.0 — 2026-08-17
 
 ### Changed

@@ -62,6 +62,14 @@ The reports directory works the same way: `reportsDir` in the config, or
   The skip is never silent: it is logged, and the release stays listed
   under "Unchecked releases" on the repo's history page — a gap there
   means "unchecked", not "fine".
+- An empty release list for a repo whose state has already seen a release
+  counts as a load failure, not as "up to date": a repository cannot go
+  from released to never-released, so that answer is the API failing to
+  load the list (GitHub's REST release list did exactly that for every
+  repository for half an hour on 2026-08-17, while the rest of the API
+  answered). The run warns, exits 2, and the cursor stays put — the next
+  run retries. Only a repo with no recorded history keeps reading an
+  empty list as "never released".
 - One run at a time per state file. A run takes `<state>.lock` before it
   reads anything and drops it when it is done; a second run — the hourly job
   meeting a backfill that is still going — prints who holds the lock and
