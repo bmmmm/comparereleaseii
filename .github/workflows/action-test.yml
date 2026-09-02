@@ -23,6 +23,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - id: check
@@ -45,6 +46,7 @@ jobs:
   # default and reads its notes from the forge's own API.
   forge:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - id: check
@@ -71,6 +73,7 @@ jobs:
   # make silently; the action must refuse it rather than pick one.
   conflicting-inputs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - id: check
