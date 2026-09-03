@@ -1,8 +1,12 @@
 # comparereleaseii — session rules
 
-[AGENTS.md](AGENTS.md) is binding and is **not** loaded automatically — read it
-before the first edit. It carries the commands, the module map, the traps, and
-the definition of done. Start any code question at `src/types.ts`.
+@AGENTS.md
+
+The line above imports [AGENTS.md](AGENTS.md), which is binding: it carries the
+commands, the module map, the traps, and the definition of done. It used to say
+"read it before the first edit" — a request, not a mechanism, and one that only
+held as long as every session remembered. Start any code question at
+`src/types.ts`.
 
 This file holds only what AGENTS.md does not say, or what overrides a global rule.
 
