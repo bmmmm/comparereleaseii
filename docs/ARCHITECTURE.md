@@ -22,6 +22,7 @@ orchestration.
 | `src/golden.ts` | `--add-golden`: a claim from a stored report becomes a golden case, with the release's own evidence rebuilt |
 | `src/cache.ts` | Verdict cache |
 | `src/paths.ts` | Build version, the private cache directory and its vetting, path-segment sanitizer |
+| `src/env.ts` | Local-server address and key: environment → package `.env` (the per-app oMLX sub-key) → `~/.env`, `OPENAI_*` before `OMLX_*` |
 | `src/metrics.ts` | Score, risk flags, per-file coverage |
 | `src/bump.ts` | Semver bump vs the commits' own BREAKING/feat markers |
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |

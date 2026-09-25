@@ -6,6 +6,7 @@ import { basename } from "node:path";
 import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { VERSION } from "./paths.ts";
 import { resolveEngines, discoverLocalModels } from "./judge.ts";
+import { localServerBase, localServerKey } from "./env.ts";
 import {
   runCalibration,
   printCalibration,
@@ -431,8 +432,7 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const openaiBase =
-    values["openai-url"] ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
+  const openaiBase = values["openai-url"] ?? localServerBase() ?? "http://127.0.0.1:11434/v1";
 
   if (values.calibrate && engineName === "openai") {
     // "Which model is the best judge?" — rank an explicit shortlist, or
@@ -440,7 +440,7 @@ async function main(): Promise<number> {
     const rankAndExit = async (models: string[]): Promise<number> => {
       const cals = await calibrateModels(models, {
         baseUrl: openaiBase,
-        apiKey: process.env.OPENAI_API_KEY,
+        apiKey: localServerKey(),
         cache: !values["no-cache"],
         concurrency,
       });

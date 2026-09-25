@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { tmpdir } from "node:os";
+import { localServerBase, localServerKey } from "./env.ts";
 import { commandExists, run } from "./util.ts";
 import { withVerdictCache } from "./cache.ts";
 import type { Finding, SurplusItem, JudgedVerdict } from "./types.ts";
@@ -128,9 +129,7 @@ export async function discoverLocalModels(baseUrl: string): Promise<LocalDiscove
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(1500),
-      headers: process.env.OPENAI_API_KEY
-        ? { authorization: `Bearer ${process.env.OPENAI_API_KEY}` }
-        : {},
+      headers: localServerKey() ? { authorization: `Bearer ${localServerKey()}` } : {},
     });
     if (res.status === 401 || res.status === 403) {
       return { models: [], authRequired: true };
@@ -165,9 +164,8 @@ export function selectEngine(opts: {
         "Engine 'openai' needs an explicit --model (e.g. --model qwen3:8b for Ollama) — local servers have no default model.",
       );
     }
-    const baseUrl =
-      opts.openaiUrl ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
-    return makeOpenAiEngine(opts.model, baseUrl, process.env.OPENAI_API_KEY);
+    const baseUrl = opts.openaiUrl ?? localServerBase() ?? "http://127.0.0.1:11434/v1";
+    return makeOpenAiEngine(opts.model, baseUrl, localServerKey());
   }
   return makeClaudeCliEngine(opts.model ?? "haiku");
 }
@@ -193,8 +191,7 @@ export async function resolveEngines(
   opts: EngineOptions,
 ): Promise<{ engine: JudgeEngine | null; escalate: JudgeEngine | null }> {
   if (opts.judgeMode === "off") return { engine: null, escalate: null };
-  const openaiBase =
-    opts.openaiUrl ?? process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:11434/v1";
+  const openaiBase = opts.openaiUrl ?? localServerBase() ?? "http://127.0.0.1:11434/v1";
   let effective = opts.engine;
   let model = opts.model;
 

@@ -17,6 +17,7 @@ import { safeSegment } from "./paths.ts";
 import { commandExists, c } from "./util.ts";
 import { ghApi } from "./sources/github.ts";
 import { discoverLocalModels } from "./judge.ts";
+import { localServerKey } from "./env.ts";
 import { calibrateModels, gateCalibration, printCalibration, loadReference } from "./calibrate.ts";
 import { runNotify } from "./util.ts";
 import type { WatchConfig, WatchRepoConfig, WatchState } from "./watch-state.ts";
@@ -459,7 +460,7 @@ async function configureLocalJudge(
   if (yes(calAns)) {
     const [cal] = await calibrateModels([model], {
       baseUrl: openaiUrl,
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: localServerKey(),
       cache: true,
       concurrency: 4,
     });

@@ -63,6 +63,7 @@ that way — a dependency needs a strong argument.
 | `src/types.ts` | Data model — the `--json` schema lives here |
 | `src/util.ts` | Subprocess helpers, concurrency pool, markdown section extraction, HTML escaping, the notify hook |
 | `src/paths.ts` | Build version, the private cache directory and its vetting, path-segment sanitizer |
+| `src/env.ts` | Local-server address and key: environment → package `.env` (the per-app oMLX sub-key) → `~/.env`, `OPENAI_*` before `OMLX_*` |
 | `test/fixtures/*.md` | Real release notes, per dialect |
 | `test/eval/golden.json` | Judge cases with accepted verdicts |
 

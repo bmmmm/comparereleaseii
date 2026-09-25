@@ -5,6 +5,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { localServerBase, localServerKey } from "../src/env.ts";
 import { buildJudgePrompt } from "../src/judge.ts";
 
 const golden = JSON.parse(
@@ -25,12 +26,13 @@ const prompt = buildJudgePrompt({
   commits: [],
 });
 
-const baseUrl = (process.env.OPENAI_BASE_URL ?? "http://127.0.0.1:8010/v1").replace(/\/+$/, "");
+const baseUrl = (localServerBase() ?? "http://127.0.0.1:8010/v1").replace(/\/+$/, "");
+const apiKey = localServerKey();
 const res = await fetch(`${baseUrl}/chat/completions`, {
   method: "POST",
   headers: {
     "content-type": "application/json",
-    ...(process.env.OPENAI_API_KEY ? { authorization: `Bearer ${process.env.OPENAI_API_KEY}` } : {}),
+    ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
   },
   body: JSON.stringify({
     model: process.env.EVAL_MODEL ?? "Qwen3.5-9B-MLX-4bit",
