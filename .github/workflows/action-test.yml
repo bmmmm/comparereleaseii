@@ -32,6 +32,9 @@ jobs:
           repo: restic/restic
           tag: v0.19.1
           engine: "off"
+          # Plumbing only, like `forge` below: under the default gate the
+          # verdict on restic's notes decided this job (red since 2026-09-02).
+          fail-on: none
           artifact-name: smoke-report
       - name: Assert outputs
         env:
