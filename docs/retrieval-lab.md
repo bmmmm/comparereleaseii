@@ -188,3 +188,63 @@ Before treating the lab as a fitness comparison, establish positive, negative,
 contradictory and injection controls for the exact input layout, then use
 independent labels on complete pools larger than the selection limit. Passing
 implementation tests must not stand in for that model-task validation.
+
+## Task-fitness follow-up
+
+On 2026-10-05, the unchanged question, untrusted-block layout, runtime and
+pinned checkpoint above were measured offline on three synthetic controls
+and three independently read real-diff cases. Labels were frozen before
+inference. Each set used one serial repetition; repeated smoke runs were
+not counted as additional quality samples.
+
+The controls each contained eleven hunks: two timeout-setting changes
+(supporting and contradicting the claim), seven unrelated UI changes, and
+two wording-only changes. Variants added an instruction and forged boundary
+to one unrelated diff, or to the claim. States were produced by
+`candidatesFor`, including its boundary escaping, and all pairs fit the
+context. Laya retained both evidence hunks in all three top-six selections,
+as did lexical ranking with fill; current selection retained one of two.
+In the clean pool, four unrelated hunks outranked the contradicting change.
+The matched UI hunk scored 1.0000 without injected instructions and 0.9834
+with them, ranking first in both. This is a relevance-ranking failure on
+that control, not evidence that the injection succeeded. No general injection
+resistance was established.
+
+The real cases retained complete, unmodified pools larger than six hunks:
+
+| Release and claim | Pool | Current recall | Lexical + fill | Laya | Result |
+|---|---:|---:|---:|---:|---|
+| Maccy 2.6.1: copying crash on macOS 14 | 7 | 1.00 | 1.00 | 0.50 | Valid holdout loss |
+| Maccy 2.6.1: cursor over a hidden search field | 7 | 1.00 | 1.00 | 1.00 | Valid holdout tie |
+| Zed v1.13.2: tab-expanded selection panic | 12 | 0.60 | 0.60 | — | Context-truncated; excluded |
+
+For the crash claim, Laya placed Indonesian translation hunks above the
+code changes and ranked `Maccy/Clipboard.swift` seventh (0.5409), dropping
+the immediate macOS-14 storage insertion from the six-hunk evidence budget.
+The other relevant hunk, `Maccy/Observables/History.swift`, ranked sixth.
+Mean recall on the two paired holdout claims was 1.00 for both controls and
+0.75 for Laya: zero wins, one loss, one tie. Both claims belong to one release
+and use Codex labels; this is a concrete counterexample, not a population
+estimate or a human benchmark. The Zed fallback is not a Laya quality result.
+
+The real-case worker measured 694 ms load/import and 1,349 ms total, with
+196, 151 and 306 ms per case. These are retrieval-worker timings, not
+end-to-end latency or an efficiency comparison. Frozen inputs, labels,
+rankings and comparisons remain under `tmp/laya-lab/fitness-*`. The original
+comparison was regenerated with the existing three smoke labels; its page
+links to these follow-up measurements.
+
+Recommendation: keep Laya isolated. The measured setup loses real evidence
+and demonstrates no gain over lexical ranking with fill. Do not expand the
+production pipeline or run a larger corpus to justify integration on this
+evidence. Any later experiment needs a separately frozen setup and independent
+labels. Synthetic controls must compute both reference selections before
+comparison; empty placeholder selections create artificial wins.
+
+Chrome verification over a loopback HTTP server confirmed the assessment,
+the linked real-case comparison and the blind-review export. The downloaded
+JSON contained exactly the one reviewed claim, the expected two evidence
+IDs, its rationale and the matching dataset fingerprint. Unreviewed claims
+were absent. `pnpm check` and all 562 tests passed without skips. No production
+code or scoring changed; verdict accuracy, general injection resistance and
+end-to-end efficiency remain unmeasured.
