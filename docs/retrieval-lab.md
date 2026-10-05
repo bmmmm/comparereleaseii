@@ -162,3 +162,29 @@ The implementation passed 562 tests without skips. All 43 lab mutants were
 killed by the lab test file itself. HTML escaping was tested; browser testing
 of the local pages and the download button remained unverified because the
 browser tool rejected `file:` navigation.
+
+## Usage audit after the smoke run
+
+The API call follows the documented `load` / `predict` / `noul` contract.
+That establishes transport and parsing, not evidence-ranking fitness.
+Short synthetic controls repeated three times on the same pinned checkpoint
+showed a substantial input-format effect with no truncation:
+
+| Irrelevant input | Plain field labels | Current untrusted-block layout |
+|---|---:|---:|
+| Button-color change against a request-timeout claim | 0.0306 | 0.8252 |
+| Release-feed text repeating the timeout claim | 0.0251 | 0.6778 |
+
+The supporting and contradicting controls still ranked above these negatives
+in both layouts. This does not prove a ranking failure, nor justify removing
+the untrusted markers; it shows that these values are not established relevance
+probabilities on our task. The identical values in all three repetitions are
+reproducibility observations, not three independent quality samples.
+
+The three valid corpus cases contain only four, two and three candidates,
+below the six-hunk selection limit. The only positive labeled case therefore
+does not test whether Laya can choose useful evidence from a competing pool.
+Before treating the lab as a fitness comparison, establish positive, negative,
+contradictory and injection controls for the exact input layout, then use
+independent labels on complete pools larger than the selection limit. Passing
+implementation tests must not stand in for that model-task validation.
