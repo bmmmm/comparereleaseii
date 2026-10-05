@@ -12,7 +12,9 @@ import {
   makeApiEngine,
   makeOpenAiEngine,
   discoverLocalModels,
+  resolveEngines,
 } from "../src/judge.ts";
+import { calibrateModels } from "../src/calibrate.ts";
 
 /** Put a fake `claude` on PATH that swallows stdin and prints a canned reply. */
 async function stubClaude(t: TestContext, outerJson: string): Promise<void> {
@@ -98,4 +100,83 @@ test("discoverLocalModels: auth wall, server error, timeout, and a model list", 
     models: ["a", "b"],
     authRequired: false,
   });
+});
+
+const localOptions = {
+  judgeMode: "auto", engine: "openai", openaiUrl: "http://x/v1",
+  escalate: "off", cache: false,
+} as const;
+
+test("Laya cannot be a text judge, including a reviewer or a calibration shortlist", async (t) => {
+  const requests = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("No inference should be attempted");
+  });
+  for (const model of ["laya", "convaiinnovations/laya-multilingual", "aac6fef/laya-multilingual-mlx", "Laya-typed-decisions:latest", "local/laya_multilingual.Q4"]) {
+    assert.throws(() => makeOpenAiEngine(model, "http://x/v1"), /Laya.*typed-decision.*--model/);
+    await assert.rejects(resolveEngines({ ...localOptions, model }), /Laya.*typed-decision/);
+  }
+  await assert.rejects(resolveEngines({
+    ...localOptions, model: "qwen3:8b", escalate: "openai", escalateModel: "laya-multilingual",
+  }), /Laya.*typed-decision/);
+  await assert.rejects(calibrateModels(["qwen3:8b", "laya-multilingual"], {
+    baseUrl: "http://x/v1", cache: false,
+  }), /Laya.*typed-decision/);
+  assert.equal(requests.mock.callCount(), 0);
+});
+
+test("local discovery skips Laya and sends the judge request to the next model", async (t) => {
+  const messages: string[] = [];
+  t.mock.method(console, "error", (message: string) => messages.push(message));
+  let sentModel: string | undefined;
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init?: RequestInit) => {
+    if (!init?.body) return Response.json({ data: [
+      { id: "aac6fef/laya-multilingual-mlx" }, { id: "laya-ai/qwen3" }, { id: "malaya" },
+    ] });
+    sentModel = JSON.parse(String(init.body)).model;
+    return Response.json({ choices: [{ message: { content: "judged" } }] });
+  });
+  const { engine } = await resolveEngines(localOptions);
+  assert.equal(await engine!.judge("claim and diff"), "judged");
+  assert.equal(sentModel, "laya-ai/qwen3", "the provider name does not define model capabilities");
+  assert.ok(messages.some((m) => m.includes("also available: malaya")));
+  assert.ok(messages.every((m) => !m.includes("laya-multilingual")));
+  assert.equal(makeOpenAiEngine("malaya", "http://x/v1").name, "openai/malaya@4096");
+  assert.equal(makeOpenAiEngine("layabout", "http://x/v1").name, "openai/layabout@4096");
+});
+
+test("a Laya-only server explains the missing text judge; judge off never probes it", async (t) => {
+  const requests = t.mock.method(globalThis, "fetch", async () => Response.json({
+    data: [{ id: "laya-multilingual" }],
+  }));
+  await assert.rejects(resolveEngines(localOptions), /No text-generating judge.*Laya/s);
+  assert.deepEqual(await resolveEngines({ ...localOptions, judgeMode: "off", model: "laya" }), {
+    engine: null, escalate: null,
+  });
+  assert.equal(requests.mock.callCount(), 1);
+});
+
+test("missing Claude falls back past Laya, or stays deterministic on a Laya-only server", async (t) => {
+  const originalPath = process.env.PATH;
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  process.env.PATH = "";
+  delete process.env.ANTHROPIC_API_KEY;
+  t.after(() => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalKey;
+  });
+  const messages: string[] = [];
+  t.mock.method(console, "error", (message: string) => messages.push(message));
+  let models = ["laya-multilingual", "qwen3:8b"];
+  t.mock.method(globalThis, "fetch", async () => Response.json({ data: models.map((id) => ({ id })) }));
+  const opts = { ...localOptions, engine: "claude-cli" } as const;
+  assert.equal((await resolveEngines(opts)).engine!.name, "openai/qwen3:8b@4096");
+  models = ["laya-multilingual"];
+  assert.deepEqual(await resolveEngines(opts), { engine: null, escalate: null });
+  assert.ok(messages.some((m) => /deterministic-only/.test(m) && /Laya.*typed-decision/.test(m)));
+  models = Array.from({ length: 21 }, (_, i) => `laya-${i}`);
+  await assert.rejects(resolveEngines(localOptions), /aggregator/);
+  assert.deepEqual(await resolveEngines(opts), { engine: null, escalate: null });
+  assert.ok(messages.some((m) => /21 models.*aggregator/.test(m)));
 });

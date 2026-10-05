@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -11,6 +11,40 @@ import { dirname, join } from "node:path";
 const exec = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(ROOT, "src/cli.ts");
+
+test("automatic calibration excludes Laya before making judge requests", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "crii-model-routing-"));
+  const preload = join(dir, "fetch.mjs");
+  const trace = join(dir, "models.jsonl");
+  await writeFile(preload, `
+import { appendFileSync } from "node:fs";
+globalThis.fetch = async (_url, init) => {
+  if (!init?.body) return Response.json({ data: [
+    { id: "aac6fef/laya-multilingual-mlx" }, { id: "judge-a" }, { id: "judge-b" }
+  ] });
+  const { model } = JSON.parse(init.body);
+  appendFileSync(${JSON.stringify(trace)}, JSON.stringify(model) + "\\n");
+  return Response.json({ choices: [{ message: { content: JSON.stringify({
+    verdict: "no_evidence", confidence: 0.9, files: [], reasoning: "Test response"
+  }) } }] });
+};
+`);
+  const result = await exec(process.execPath, [
+    "--import", preload, CLI, "--calibrate", "--engine", "openai",
+    "--openai-url", "http://routing-test.invalid/v1", "--no-cache", "--concurrency", "1",
+  ]).then(
+    (out) => ({ ...out, code: 0 }),
+    (err: { code: number; stdout: string; stderr: string }) => err,
+  );
+  assert.equal(result.code, 1, "the canned judge fails calibration, not model selection");
+  assert.match(result.stderr, /Found 2 judge models/);
+  assert.match(result.stdout, /judge-a/);
+  assert.match(result.stdout, /judge-b/);
+  const calls = (await readFile(trace, "utf8")).trim().split("\n").map((s) => JSON.parse(s));
+  assert.deepEqual([...new Set(calls)], ["judge-a", "judge-b"]);
+  assert.ok(calls.filter((m) => m === "judge-a").length >= 44);
+  assert.ok(calls.filter((m) => m === "judge-b").length >= 44);
+});
 
 // `--version` is the first thing typed on a tool you were just handed. It used
 // to fall through to parseArgs and exit 2 with "Unknown option '--version'",

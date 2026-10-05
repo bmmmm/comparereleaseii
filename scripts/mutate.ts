@@ -20,6 +20,78 @@ interface Mutant {
 
 const MUTANTS: Mutant[] = [
   {
+    guard: "Laya is rejected before a text judge can be built",
+    file: "src/judge.ts",
+    find: "if (isLayaModel(model)) {",
+    replace: "if (false) {",
+  },
+  {
+    guard: "Laya recognition uses the model basename, not its provider",
+    file: "src/judge.ts",
+    find: 'model.split("/").at(-1)!',
+    replace: "model",
+  },
+  {
+    guard: "Laya recognition requires a model-name prefix",
+    file: "src/judge.ts",
+    find: "/^laya(?:[-_.:]|$)/i",
+    replace: "/laya(?:[-_.:]|$)/i",
+  },
+  {
+    guard: "Laya recognition requires a model-name boundary",
+    file: "src/judge.ts",
+    find: "/^laya(?:[-_.:]|$)/i",
+    replace: "/^laya/i",
+  },
+  {
+    guard: "Laya recognition accepts capitalized model IDs",
+    file: "src/judge.ts",
+    find: "/^laya(?:[-_.:]|$)/i",
+    replace: "/^laya(?:[-_.:]|$)/",
+  },
+  {
+    guard: "Laya is excluded from missing-Claude fallback selection",
+    file: "src/judge.ts",
+    find: "const judgeModels = found?.models.filter((id) => !isLayaModel(id)) ?? [];",
+    replace: "const judgeModels = found?.models ?? [];",
+  },
+  {
+    guard: "Laya is excluded from explicit local-engine discovery",
+    file: "src/judge.ts",
+    find: "const judgeModels = found.models.filter((id) => !isLayaModel(id));",
+    replace: "const judgeModels = found.models;",
+  },
+  {
+    guard: "Laya-only discovery explains the missing text judge",
+    file: "src/judge.ts",
+    find: "if (!judgeModels.length) {",
+    replace: "if (false) {",
+  },
+  {
+    guard: "Laya is excluded from automatic judge calibration",
+    file: "src/cli.ts",
+    find: "const judgeModels = found?.models.filter((id) => !isLayaModel(id)) ?? [];",
+    replace: "const judgeModels = found?.models ?? [];",
+  },
+  {
+    guard: "Laya shortlist validation precedes every inference",
+    file: "src/calibrate.ts",
+    find: "const engines = models.map((model) => makeOpenAiEngine(model, opts.baseUrl, opts.apiKey));",
+    replace: "const engines = models.map((model) => ({ name: model, judge: (prompt: string) => makeOpenAiEngine(model, opts.baseUrl, opts.apiKey).judge(prompt) }));",
+  },
+  {
+    guard: "Laya-filtered discovery preserves the raw aggregator limit",
+    file: "src/judge.ts",
+    find: "if (found.models.length > 20) {",
+    replace: "if (found.models.filter((id) => !isLayaModel(id)).length > 20) {",
+  },
+  {
+    guard: "Laya-filtered fallback preserves the raw aggregator limit",
+    file: "src/judge.ts",
+    find: "const aggregator = !!found && !found.authRequired && found.models.length > 20;",
+    replace: "const aggregator = !!found && !found.authRequired && found.models.filter((id) => !isLayaModel(id)).length > 20;",
+  },
+  {
     guard: "retrieval lab rejects an unknown dataset version",
     file: "scripts/retrieval-lab.ts",
     find: 'assert.equal(data.version, 1, "Unsupported lab dataset version");',
@@ -1042,6 +1114,7 @@ const testFiles = (await readdir("test")).filter((f) => f.endsWith(".test.ts")).
 // the complete suite stayed green (issue #16).
 const KILLER_HINTS: Record<string, string[]> = {
   "scripts/laya-rank.py": ["test/retrieval-lab.test.ts"],
+  "src/calibrate.ts": ["test/calibrate.test.ts", "test/judge.test.ts"],
   // Split modules whose tests live under the feature's name, not the file's.
   "src/watch-state.ts": ["test/watch.test.ts", "test/watch-longview.test.ts"],
   "src/watch-index.ts": ["test/watch.test.ts", "test/watch-detail.test.ts"],

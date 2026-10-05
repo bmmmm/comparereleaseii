@@ -5,7 +5,7 @@ import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { loadLocalRelease, localRepoContext } from "./sources/local.ts";
 import { VERSION } from "./paths.ts";
-import { resolveEngines, discoverLocalModels } from "./judge.ts";
+import { resolveEngines, discoverLocalModels, isLayaModel } from "./judge.ts";
 import { localServerBase, localServerKey } from "./env.ts";
 import {
   runCalibration,
@@ -461,11 +461,12 @@ async function main(): Promise<number> {
           `${openaiBase} offers ${found.models.length} models — that looks like an aggregator. Rank a shortlist instead: --model "vendor/a,vendor/b,vendor/c".`,
         );
       }
-      if (found && !found.authRequired && found.models.length > 1) {
+      const judgeModels = found?.models.filter((id) => !isLayaModel(id)) ?? [];
+      if (found && !found.authRequired && judgeModels.length > 1) {
         console.error(
-          `Found ${found.models.length} models on ${openaiBase} — calibrating all to find the best judge (sequential, one model at a time).`,
+          `Found ${judgeModels.length} judge models on ${openaiBase} — calibrating all to find the best judge (sequential, one model at a time).`,
         );
-        return rankAndExit(found.models);
+        return rankAndExit(judgeModels);
       }
     }
   }

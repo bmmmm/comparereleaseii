@@ -1,7 +1,7 @@
 # Local models as judge
 
 Fully local judging works via any OpenAI-compatible server (Ollama, MLX,
-LM Studio, vLLM) — nothing leaves your machine, and no model is hardcoded:
+LM Studio, vLLM) — with a text-generating model:
 
 ```console
 $ node src/cli.ts owner/repo --engine openai            # auto-discovers the model
@@ -11,9 +11,18 @@ $ OPENAI_BASE_URL=http://127.0.0.1:8080/v1 node src/cli.ts owner/repo --engine o
 ## Zero config
 
 `--model` is optional — the server's `/v1/models` list is queried and the
-model picked automatically. The same discovery runs in the fallback path:
+first eligible model picked automatically. Known Laya IDs (`laya`,
+`laya-*`, including provider prefixes) are excluded: Laya returns typed
+decisions, while this adapter needs generated verdict JSON. An explicit
+Laya selection, including an escalation model or calibration shortlist,
+is rejected before inference. Arbitrarily renamed models cannot be identified
+from their IDs; calibrate your generative judge before using it.
+
+The same discovery runs in the fallback path:
 when neither `claude` nor an API key is available but a local server is
 running, the tool uses it instead of degrading to deterministic-only.
+If that server offers only Laya, the fallback stays deterministic-only;
+explicit `--engine openai` instead reports the missing text judge.
 
 ## Calibrate your model — or find your best one
 
@@ -22,11 +31,12 @@ configured judge and tells you whether it is safe as a sole judge —
 over-verification (rubber-stamping unsupported claims) is called out
 explicitly.
 
-- With `--engine openai` and no `--model`, every model the server offers is
+- With `--engine openai` and no `--model`, every eligible model the server offers is
   calibrated sequentially and ranked (accuracy, rubber-stamp risk, speed)
   with a "best local judge" recommendation.
 - A comma-separated `--calibrate --model "a,b,c"` ranks a shortlist of
   candidate judges — on local servers and aggregators alike.
+- The aggregator limit still counts every offered model, before excluding Laya.
 - Run calibration against single-model local servers with `--concurrency 1` —
   parallel prefills can trip their memory guards.
 
@@ -34,6 +44,12 @@ explicitly.
 $ node src/cli.ts --calibrate --engine openai \
     --openai-url http://127.0.0.1:8010/v1 --concurrency 1
 ```
+
+Laya remains in the [isolated retrieval lab](retrieval-lab.md). The measured
+Maccy crash case lost one of two relevant hunks at the six-hunk budget;
+changing markers or answer type did not recover it. Its ranking does not
+select production evidence or decide verdicts. Exact version-pin comparisons
+stay deterministic; unresolved semantic claims use the configured text judge.
 
 ## Is my model fit to judge?
 

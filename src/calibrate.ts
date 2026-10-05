@@ -418,10 +418,11 @@ export async function calibrateModels(
   models: string[],
   opts: { baseUrl: string; apiKey?: string; cache: boolean; concurrency?: number },
 ): Promise<Calibration[]> {
+  const engines = models.map((model) => makeOpenAiEngine(model, opts.baseUrl, opts.apiKey));
   const cals: Calibration[] = [];
   for (const [i, model] of models.entries()) {
     console.error(`Calibrating ${model} (${i + 1}/${models.length})…`);
-    let engine = makeOpenAiEngine(model, opts.baseUrl, opts.apiKey);
+    let engine = engines[i]!;
     if (opts.cache) engine = withVerdictCache(engine);
     const cal = await runCalibration(engine, opts.concurrency);
     cals.push({ ...cal, model });

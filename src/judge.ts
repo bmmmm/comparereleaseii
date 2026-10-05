@@ -77,6 +77,11 @@ export function makeApiEngine(model: string, apiKey: string): JudgeEngine {
  * vLLM and friends. Local servers usually need no API key.
  */
 export function makeOpenAiEngine(model: string, baseUrl: string, apiKey?: string): JudgeEngine {
+  if (isLayaModel(model)) {
+    throw new Error(
+      "Laya is a typed-decision model, not a text-generating release judge. Choose a generative --model; use pnpm retrieval-lab for isolated Laya ranking experiments.",
+    );
+  }
   const url = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
   // Reasoning models spend max_tokens on hidden thinking before the JSON —
   // 1024 truncated Qwen3.5 answers mid-object. Budget is part of the cache
@@ -121,6 +126,10 @@ export function makeOpenAiEngine(model: string, baseUrl: string, apiKey?: string
 export interface LocalDiscovery {
   models: string[];
   authRequired: boolean;
+}
+
+export function isLayaModel(model: string): boolean {
+  return /^laya(?:[-_.:]|$)/i.test(model.split("/").at(-1)!);
 }
 
 /** Probe an OpenAI-compatible server for its model list (fast, best-effort). */
@@ -205,8 +214,9 @@ export async function resolveEngines(
       // auto-picking models[0] from a 200-model list (OpenRouter & co.)
       // would be arbitrary and possibly expensive.
       const aggregator = !!found && !found.authRequired && found.models.length > 20;
-      if (found && !found.authRequired && found.models.length && !aggregator) {
-        model ??= found.models[0];
+      const judgeModels = found?.models.filter((id) => !isLayaModel(id)) ?? [];
+      if (found && !found.authRequired && judgeModels.length && !aggregator) {
+        model ??= judgeModels[0];
         console.error(
           `claude CLI not found — using the local model server at ${openaiBase} (model ${model}).`,
         );
@@ -218,7 +228,9 @@ export async function resolveEngines(
               ? `(A local server at ${openaiBase} responded but needs OPENAI_API_KEY.)\n`
               : aggregator
                 ? `(The server at ${openaiBase} offers ${found.models.length} models — that looks like an aggregator; pick one explicitly with --engine openai --model <m>.)\n`
-                : "") +
+                : found?.models.length
+                  ? "(Laya is a typed-decision model; no text-generating judge is available.)\n"
+                  : "") +
             "For LLM-judged verdicts install Claude Code (https://code.claude.com), export ANTHROPIC_API_KEY, or start a local OpenAI-compatible server (Ollama/MLX).",
         );
         return { engine: null, escalate: null };
@@ -246,11 +258,17 @@ export async function resolveEngines(
         `${openaiBase} offers ${found.models.length} models — that looks like an aggregator (OpenRouter?). Auto-picking would be arbitrary and possibly expensive; pass --model explicitly.`,
       );
     }
-    model = found.models[0];
+    const judgeModels = found.models.filter((id) => !isLayaModel(id));
+    if (!judgeModels.length) {
+      throw new Error(
+        `No text-generating judge available at ${openaiBase} — Laya is a typed-decision model. Start a generative model or use --judge off.`,
+      );
+    }
+    model = judgeModels[0];
     console.error(
       `Local server: using model ${model}` +
-        (found.models.length > 1
-          ? ` (override with --model; also available: ${found.models.slice(1, 6).join(", ")})`
+        (judgeModels.length > 1
+          ? ` (override with --model; also available: ${judgeModels.slice(1, 6).join(", ")})`
           : "") +
         ".",
     );
