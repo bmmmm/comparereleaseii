@@ -490,6 +490,10 @@ $ pnpm mutate-notes ~/release-watch/reports   # does the detector catch a lie?
 
 No runtime dependencies; `gh`, `git` and `claude` are called as subprocesses.
 
+For the isolated Laya evidence-ranking experiment, see the
+[retrieval comparison lab](docs/retrieval-lab.md): frozen diffs, blind evidence
+labels, three selection methods and local GPU measurements.
+
 ### Does it catch a release that lies?
 
 `pnpm mutate` mutates this tool's own source and asks whether the suite

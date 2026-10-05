@@ -60,6 +60,7 @@
     "corpus-clones": "node scripts/corpus-clones.ts",
     "corpus-bump-origins": "node scripts/corpus-bump-origins.ts",
     "diagnose-coverage": "node scripts/diagnose-coverage.ts",
+    "retrieval-lab": "node scripts/retrieval-lab.ts",
     "start": "node src/cli.ts"
   },
   "devDependencies": {
