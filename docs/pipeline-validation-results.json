@@ -1,0 +1,668 @@
+{
+  "date": "2026-10-05",
+  "baseline": "0302db9",
+  "productionChanged": false,
+  "runtime": {
+    "node": "26.10.0",
+    "pnpm": "11.17.0",
+    "claudeCode": "2.1.289",
+    "engine": "claude-cli/claude-haiku-4-5-20251001"
+  },
+  "settings": {
+    "judgeMode": "auto",
+    "concurrency": 1,
+    "reverse": true,
+    "baseline": 0,
+    "findings": true,
+    "escalateEngine": null,
+    "maxHunks": 6,
+    "maxEvidenceChars": 20000
+  },
+  "experiment": {
+    "scope": "target verifyClaims only",
+    "baselineMaxHunks": 6,
+    "variantMaxHunks": 12,
+    "maxEvidenceChars": 20000,
+    "promoted": false
+  },
+  "usage": "unavailable: production Claude engine exposes result text only",
+  "goldenProbe": {
+    "name": "orhun-git-cliff-v2-13-0-claim13",
+    "expected": [
+      "partial"
+    ],
+    "parsed": {
+      "verdict": "no-evidence",
+      "confidence": 0.95,
+      "files": [],
+      "reasoning": "The claim states 'Replace dirs_next with etcetera', but the evidence shows the actual dependency being replaced is 'dirs' (version 6.0.0 per Cargo.toml), not 'dirs_next'. The Cargo.toml and Cargo.lock diffs consistently show '-dirs = \"6.0.0\"' \u2192 '+etcetera = \"0.11.0\"', demonstrating a different package name than what the claim specifies."
+    },
+    "ms": 15846.244499999999
+  },
+  "recallDefinition": "Path and entire independently reviewed hunk must reach boundary; not just a filename or a matching token",
+  "recallMutations": "Each relevant hunk removed; path and full-body operands independently mutated",
+  "cases": [
+    {
+      "name": "maccy",
+      "source": {
+        "base": "96e65e6625cf34af1380acc6d47a55f063506623",
+        "head": "dec66013b1a6865608949845e8eabd85cff3fc29",
+        "hashes": {
+          "diff": "3ccf82ca3b7d545020e91ef1cb22506f41de662aef95d843a6a2f569d9604dfb",
+          "notes": "08544ae65ea74f1ac06ed861ed1c99317b337d29726bc34cbd8c338549525d76",
+          "files": "1603feabd8c87c84d235f8183778607f7979143c022e15553f1bbec5db8ccd14",
+          "commits": "8bffb15f7bd3036027c6d491ff72944589b34fdd862931d55ac55cb7e7cba997",
+          "byCommit": "491958363d32713880c20f51385be879ae399f2409e03a9b7c68d0206e7384e4"
+        },
+        "files": 6,
+        "commits": 4,
+        "loadMs": 164.08158300000002
+      },
+      "anchors": [],
+      "pool": 7,
+      "relevant": [
+        {
+          "id": "5bfe1cfce2b35a5292b46207d5bb4d36fe9ea3cdfd0082cb95a42a712a7c3359",
+          "path": "Maccy/Clipboard.swift",
+          "hunkHash": "b0f99b42504c7d59b55bdb4d2b92004cebbd6fab3a9e634956c8fea3aecdb8b8"
+        },
+        {
+          "id": "846f13c16baddfbc2d3d121b4b5baf00fa45fcb2cc3ac6f3498755939f1ea2dd",
+          "path": "Maccy/Observables/History.swift",
+          "hunkHash": "d649db7dd384c38ff9f232a1cc44a9578f95153ed6a66cd8c8b079438d5cc8e1"
+        }
+      ],
+      "reference": {
+        "expected": [
+          "verified"
+        ],
+        "relevant": [
+          {
+            "path": "Maccy/Clipboard.swift",
+            "needle": "if #unavailable(macOS 15.0)"
+          },
+          {
+            "path": "Maccy/Observables/History.swift",
+            "needle": "func insertIntoStorage"
+          }
+        ],
+        "rationale": "The Clipboard change inserts the newly constructed item before setting its properties on macOS below 15. History extracts insertion into a helper and only performs the later insertion on macOS 15+. Both executable changes are needed to support the timing change; their comments alone do not prove a crash fix. The code supports the described fix, but the crash has not been reproduced on macOS 14."
+      },
+      "traces": [
+        {
+          "run": "cold",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 6,
+          "selectedChars": 4949,
+          "promptChars": [
+            8485
+          ],
+          "logicalCalls": 4,
+          "upstreamCalls": 4,
+          "targetCalls": 1,
+          "replayE2eMs": 62821.572709,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "warm",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 6,
+          "selectedChars": 4949,
+          "promptChars": [
+            8485
+          ],
+          "logicalCalls": 4,
+          "upstreamCalls": 0,
+          "targetCalls": 1,
+          "replayE2eMs": 39.81895900000001,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "target-six",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 6,
+          "selectedChars": 4949,
+          "promptChars": [
+            8485
+          ],
+          "logicalCalls": 1,
+          "upstreamCalls": 0,
+          "targetCalls": 1,
+          "replayE2eMs": 30.011459000000002,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "target-twelve",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 7,
+          "selectedChars": 5325,
+          "promptChars": [
+            8896
+          ],
+          "logicalCalls": 1,
+          "upstreamCalls": 1,
+          "targetCalls": 1,
+          "replayE2eMs": 13581.812708,
+          "warnings": [],
+          "truncated": false
+        }
+      ],
+      "deterministic": [],
+      "judgementFailures": [],
+      "findingsErrors": [],
+      "release": "p0deje/Maccy@2.6.1",
+      "refs": {
+        "base": "2.6.0",
+        "head": "2.6.1"
+      },
+      "claim": {
+        "id": 0,
+        "section": "Notes",
+        "text": "Fixed a crash when copying on macOS 14 (#1264).",
+        "kind": "change",
+        "prNumbers": [
+          1264
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      }
+    },
+    {
+      "name": "zed",
+      "source": {
+        "base": "00bd72e7838f4b875a913cd112b47a0ebe1ca62b",
+        "head": "5cdb7ab9d9546db683132cfa78e68acec3064cac",
+        "hashes": {
+          "diff": "827951253f0db1782744361344c8cd072105d1b29e99c7b76e7af28bae86871e",
+          "notes": "66f468b88939e206cdbdc2d498bbf755056aa941c1ee03fe78f058bcc3621322",
+          "files": "72528cda4fa600ef35f7e77c9ebb5c75a24e27f1e1c10b906f46bb69425609fd",
+          "commits": "e82374aa36ab166562980d69820976d977319d80cba9e4aa55bec28fa51bdbe8",
+          "byCommit": "c79806f312129ba5dba90d316053c9c29c669b063f7331f341924ff500207947"
+        },
+        "files": 9,
+        "commits": 5,
+        "loadMs": 380.57975000000005
+      },
+      "anchors": [
+        "eb4ae4b155f61e50c2fe6d441a18f6a8d0b59041"
+      ],
+      "pool": 12,
+      "relevant": [
+        {
+          "id": "5683d05fdb7edd044f59c68ea532da391078eae4dbeb50905da815076cb82e99",
+          "path": "crates/editor/src/display_map.rs",
+          "hunkHash": "c83bdb84f2a5812af997950e52569fb9c5185588105afacc9a4e9d5515cc7c1b"
+        },
+        {
+          "id": "198150c26544da636f9d6abddba600b364f919d98044e1316e86d5a4f9f99ce1",
+          "path": "crates/editor/src/display_map/tab_map.rs",
+          "hunkHash": "e6217317e3349e3d95353a90f224808a01474159468a5fd3a074cf8e84d4da3a"
+        },
+        {
+          "id": "b83219692978b029770e76361a7e43961de4746c41f8c9bff4dc75a412fe62a0",
+          "path": "crates/editor/src/editor_tests.rs",
+          "hunkHash": "ce96e7165606e96ec5003a5f52ab1ad1ca2f2129affe822a57eeaebc12d29034"
+        },
+        {
+          "id": "76ee74c1e6edc8a461d4a21aa48d2fd2863591ea2eb912539e4ced65a7d1331a",
+          "path": "crates/editor/src/selections_collection.rs",
+          "hunkHash": "f18e17956ab216e0725ec2aa59d027130a46347b8cccec2ea5a60bad83dd0bdf"
+        },
+        {
+          "id": "7b9d1790b95d7850dad00560619f72c7083bcd8f3eb3cd6d3a1ec26bc50a124e",
+          "path": "crates/editor/src/selections_collection.rs",
+          "hunkHash": "93cb570210824cb56266d5f49b7e53e32a939e1d29af5b4d6c38337f7a32a61d"
+        }
+      ],
+      "reference": {
+        "expected": [
+          "verified"
+        ],
+        "relevant": [
+          {
+            "path": "crates/editor/src/display_map.rs",
+            "needle": "let tab_row = tab_snapshot.buffer_row_to_tab_row(buffer_row);"
+          },
+          {
+            "path": "crates/editor/src/display_map/tab_map.rs",
+            "needle": "pub fn buffer_row_to_tab_row"
+          },
+          {
+            "path": "crates/editor/src/editor_tests.rs",
+            "needle": "async fn test_add_selection_above_below_with_fold"
+          },
+          {
+            "path": "crates/editor/src/selections_collection.rs",
+            "needle": "multi_buffer_row: MultiBufferRow"
+          },
+          {
+            "path": "crates/editor/src/selections_collection.rs",
+            "needle": "let buffer_row = MultiBufferRow"
+          }
+        ],
+        "rationale": "Buffer row indices are converted to tab-map rows before querying line length or converting columns; selection call sites carry MultiBufferRow. The new regression test exercises selections above and below a multi-line fold, whose buffer rows can exceed the fold map's row range. Visibility changes and imports alone do not settle the behavioral claim. The upstream test has been read, not executed."
+      },
+      "traces": [
+        {
+          "run": "cold",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 0.6,
+          "promptRecall": [
+            0.6
+          ],
+          "selectedCount": 6,
+          "selectedChars": 5095,
+          "promptChars": [
+            8760
+          ],
+          "logicalCalls": 10,
+          "upstreamCalls": 10,
+          "targetCalls": 1,
+          "replayE2eMs": 188029.176208,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "warm",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 0.6,
+          "promptRecall": [
+            0.6
+          ],
+          "selectedCount": 6,
+          "selectedChars": 5095,
+          "promptChars": [
+            8760
+          ],
+          "logicalCalls": 10,
+          "upstreamCalls": 0,
+          "targetCalls": 1,
+          "replayE2eMs": 25.706084000000004,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "target-six",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 0.6,
+          "promptRecall": [
+            0.6
+          ],
+          "selectedCount": 6,
+          "selectedChars": 5095,
+          "promptChars": [
+            8760
+          ],
+          "logicalCalls": 1,
+          "upstreamCalls": 0,
+          "targetCalls": 1,
+          "replayE2eMs": 19.078666999999996,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "target-twelve",
+          "verdict": "verified",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 11,
+          "selectedChars": 9195,
+          "promptChars": [
+            13094
+          ],
+          "logicalCalls": 1,
+          "upstreamCalls": 1,
+          "targetCalls": 1,
+          "replayE2eMs": 16699.956250000003,
+          "warnings": [],
+          "truncated": false
+        }
+      ],
+      "deterministic": [],
+      "judgementFailures": [],
+      "findingsErrors": [],
+      "release": "zed-industries/zed@v1.13.2",
+      "refs": {
+        "base": "v1.13.1",
+        "head": "v1.13.2"
+      },
+      "claim": {
+        "id": 1,
+        "section": "Notes",
+        "text": "Fixed a panic when selections are added by tab-expanded column (#62063 )",
+        "kind": "change",
+        "prNumbers": [
+          62063
+        ],
+        "shas": [],
+        "advisories": [],
+        "codeSpans": []
+      }
+    },
+    {
+      "name": "git-cliff",
+      "source": {
+        "base": "988e8638432dcfc762dfec3ea470eb82aab80380",
+        "head": "d2354923cdc09b4da80dc110eec15569fc2ae871",
+        "hashes": {
+          "diff": "ecde92725704ea80790df170209c7a639ef78a5a177a8c5a86168de42188bd0d",
+          "notes": "cc5eeebc7ac8550602a6ebc9cca9e4e53ec537b5d1f4a634df1ce7aebb4024d3",
+          "files": "4decb80c04b3d6321555b2aea2a868b823b1bb82573ad80d87ef3b4173760868",
+          "commits": "73d46d49c3c2774f0e048201fecba3b4d7ed578686a6dbc653c6f60a973858e1",
+          "byCommit": "fe89999fa832774a33604f305eff4c58d37ba4f42dc78907812f5b576f0770b8"
+        },
+        "files": 98,
+        "commits": 85,
+        "loadMs": 217396.58937499998
+      },
+      "anchors": [
+        "ee8bfd19811fbdfaf31d8c595c75d00ad21611ce"
+      ],
+      "pool": 13,
+      "relevant": [
+        {
+          "id": "ed74f3311d778a8899647a536e0b61aaff970c9f0c17f1647cda9187100e9192",
+          "path": "Cargo.toml",
+          "hunkHash": "ba522aa8370094fbd21e78dabebd3c3460e290729e8042f09be98dcb73c5fc53"
+        },
+        {
+          "id": "f3472dbb503529da6e94f6fc4cad9f29a660e8c0e7e1ca53834b9ee8f32445ff",
+          "path": "git-cliff-core/Cargo.toml",
+          "hunkHash": "b5aa3c294cdc91e0cf31980013a6257b5317a7d10f9c142b59d6501f745ed6e3"
+        },
+        {
+          "id": "4ac9071f58e45b8e3002875e8f0b1cb9095f5758a409f4f4773afedf6df5ed04",
+          "path": "git-cliff/Cargo.toml",
+          "hunkHash": "e2fea1051aa6b58a649a485d24e08f7cd27ca8ab43de3618d8a768bbcec6bfba"
+        },
+        {
+          "id": "17f5277d81839e0617df1cb80357531efa2bde4a8a0dea048652ebb37abdb887",
+          "path": "git-cliff-core/src/config.rs",
+          "hunkHash": "1cdbb14d0f80c2d875c5bc0560f459917e213d5e93f59fa4e2c8e7cb7d3bf244"
+        }
+      ],
+      "reference": {
+        "expected": null,
+        "rationale": "Complete linked commit ee8bfd19811fbdfaf31d8c595c75d00ad21611ce reviewed before production calls: manifests remove dirs 6.0.0 (not dirs_next), introduce etcetera 0.11.0, and config.rs replaces dirs home/config lookups with choose_base_strategy. The migration is supported under a different crate identity, making partial plausible. Literal contradiction of the named crate is also plausible under the current prompt rules; no agreed human reference exists. The golden partial-only reference is disputed, not automatically relabeled.",
+        "relevant": [
+          {
+            "path": "Cargo.toml",
+            "needle": "-dirs = \"6.0.0\""
+          },
+          {
+            "path": "git-cliff-core/Cargo.toml",
+            "needle": "-dirs.workspace = true"
+          },
+          {
+            "path": "git-cliff/Cargo.toml",
+            "needle": "-dirs.workspace = true"
+          },
+          {
+            "path": "git-cliff-core/src/config.rs",
+            "needle": "let strategy = choose_base_strategy()"
+          }
+        ]
+      },
+      "traces": [
+        {
+          "run": "cold",
+          "verdict": "partial",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 6,
+          "selectedChars": 3153,
+          "promptChars": [
+            9757
+          ],
+          "logicalCalls": 71,
+          "upstreamCalls": 71,
+          "targetCalls": 1,
+          "replayE2eMs": 866023.0318749999,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "warm",
+          "verdict": "partial",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 6,
+          "selectedChars": 3153,
+          "promptChars": [
+            9757
+          ],
+          "logicalCalls": 71,
+          "upstreamCalls": 0,
+          "targetCalls": 1,
+          "replayE2eMs": 134.634459,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "target-six",
+          "verdict": "partial",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 6,
+          "selectedChars": 3153,
+          "promptChars": [
+            9757
+          ],
+          "logicalCalls": 1,
+          "upstreamCalls": 0,
+          "targetCalls": 1,
+          "replayE2eMs": 29.01724999999999,
+          "warnings": [],
+          "truncated": false
+        },
+        {
+          "run": "target-twelve",
+          "verdict": "partial",
+          "judged": true,
+          "judgeFailed": false,
+          "selectedRecall": 1,
+          "promptRecall": [
+            1
+          ],
+          "selectedCount": 12,
+          "selectedChars": 5368,
+          "promptChars": [
+            12147
+          ],
+          "logicalCalls": 1,
+          "upstreamCalls": 1,
+          "targetCalls": 1,
+          "replayE2eMs": 38129.60387500001,
+          "warnings": [],
+          "truncated": false
+        }
+      ],
+      "deterministic": [
+        {
+          "claim": 31,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 32,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 33,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 34,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 35,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 36,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 37,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 38,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 39,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 40,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 41,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        },
+        {
+          "claim": 42,
+          "verdict": "skipped",
+          "methods": [
+            "none"
+          ],
+          "generated": false
+        }
+      ],
+      "judgementFailures": [],
+      "findingsErrors": [],
+      "release": "orhun/git-cliff@v2.13.0",
+      "refs": {
+        "base": "v2.12.0",
+        "head": "v2.13.0"
+      },
+      "claim": {
+        "id": 13,
+        "section": "\ud83d\ude9c Refactor",
+        "text": "*(deps)* Replace dirs_next with etcetera (#1477 ) - (ee8bfd1 )",
+        "kind": "change",
+        "prNumbers": [
+          1477
+        ],
+        "shas": [
+          "ee8bfd1",
+          "ee8bfd19811fbdfaf31d8c595c75d00ad21611ce"
+        ],
+        "advisories": [],
+        "codeSpans": []
+      }
+    }
+  ],
+  "recallGuardMutations": [
+    {
+      "operand": "path",
+      "killed": true,
+      "exit": 1,
+      "assertion": "Path operand mutation"
+    },
+    {
+      "operand": "body",
+      "killed": true,
+      "exit": 1,
+      "assertion": "Full-hunk operand mutation"
+    }
+  ],
+  "emptyReferenceRejected": true,
+  "coldWarmReportsByteIdentical": true
+}

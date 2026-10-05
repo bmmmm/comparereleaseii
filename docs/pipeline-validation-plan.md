@@ -1,6 +1,9 @@
 # Pipeline validation plan
 
-Status: planned; execution has not started. Recorded on 2026-10-05.
+Status: executed on 2026-10-05; see the
+[three-case comparison](pipeline-validation-results.md). Production code
+remains unchanged; the git-cliff reference and benefit of a production
+correction remain unresolved.
 Baseline: `0302db9` (`fix(judge): keep Laya out of text judge routing`).
 
 ## Objective
