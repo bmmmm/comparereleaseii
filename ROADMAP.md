@@ -158,6 +158,16 @@ at 2 files the every-file bar is trivially met (`jundot/omlx@v0.5.0`, issue
 that preceded this live in this file's git history and in the comments at
 the route in `src/verify.ts`.
 
+### 2. The six-hunk evidence cap drops a small anchored commit. OPEN
+
+A three-case production trace (2026-10-05, against `0302db9`) found one
+measured evidence loss: on a Zed claim, the six-hunk selection cap cut hunks of
+a small anchored commit that a paired 12-hunk control kept; both reviewed
+claims still finished `verified`. Proposed, never acted on: keep the complete
+evidence of a small anchored commit when it fits the existing character budget.
+Plan, results and raw numbers: `git show 2237188` (removed from `docs/` on
+2026-10-13).
+
 ---
 
 ## Settled — do not reopen without new facts
