@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { candidatesFor, lexicalFill, sampleCases, signTestP, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
+import { candidatesFor, lexicalFill, sampleCases, signTestP, blindOrder, labelExport, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
 import type { Candidate, Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
 import type { Claim } from "../src/types.ts";
 
@@ -395,4 +395,27 @@ test("Laya is also counted against lexical + fill, the stronger control", () => 
   for (const s of loss.ranking.runs[0]!.cases[0]!.scores) s.score = s.id === candidates[0]!.id ? 0.1 : 0.9;
   assert.deepEqual(compare(loss.data, loss.ranking, loss.labels).runs[0]!.bySplit[1]!.vsExpanded,
     { wins: 0, losses: 1, ties: 0, signTestP: 1 });
+});
+
+test("labelers see the pool in blind order and nothing an arm produced", () => {
+  const { data } = fixture();
+  const pool = candidatesFor(["b", "a", "c", "d"].map((n) => ({ path: `${n}.ts`, status: "modified", additions: 1, deletions: 0,
+    patch: `@@ -1 +1 @@\n+${n}\n` })));
+  data.cases[0]!.candidates = pool;
+  data.cases[0]!.pool = "lexical-top";
+  data.cases.push({ ...data.cases[0]!, id: "gone", candidates: [], excluded: "merge-diff-unread" });
+  data.fingerprint = fingerprint(data);
+  const sorted = [...pool].map((h) => h.id).sort();
+  assert.deepEqual(blindOrder(pool).map((h) => h.id), sorted);
+  assert.notDeepEqual(pool.map((h) => h.id), sorted);
+  const exported = labelExport(data);
+  assert.deepEqual(exported.cases.map((c) => c.id), ["case"]);
+  assert.deepEqual(exported.cases[0]!.candidates.map((h) => h.id), sorted);
+  assert.deepEqual(Object.keys(exported.cases[0]!).sort(), ["candidates", "claim", "id", "release"]);
+  assert.deepEqual(Object.keys(exported.cases[0]!.candidates[0]!).sort(), ["hunk", "id", "path"]);
+  assert.equal(labelExport(data, new Set(["other"])).cases.length, 0);
+  const html = reviewHtml(data);
+  const shown = [...html.matchAll(/value="([0-9a-f]{64})"/g)].map((m) => m[1]);
+  assert.deepEqual(shown, sorted);
+  assert.ok(!reviewHtml(data, new Set(["other"])).includes('data-id="case"'));
 });

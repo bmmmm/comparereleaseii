@@ -164,6 +164,12 @@ const MUTANTS: Mutant[] = [
     replace: "if (k > wins) p += term;",
   },
   {
+    guard: "retrieval lab: labelers never see the stored (lexical) order",
+    file: "scripts/retrieval-lab.ts",
+    find: "return [...candidates].sort((a, b) => a.id.localeCompare(b.id));",
+    replace: "return [...candidates];",
+  },
+  {
     guard: "retrieval lab rejects invalid window counts",
     file: "scripts/retrieval-lab.ts",
     find: 'assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");',
@@ -196,8 +202,14 @@ const MUTANTS: Mutant[] = [
   {
     guard: "retrieval lab: blind review never shows an excluded case",
     file: "scripts/retrieval-lab.ts",
-    find: "const body = data.cases.filter((c) => !c.excluded).map(",
-    replace: "const body = data.cases.map(",
+    find: "const body = data.cases.filter((c) => !c.excluded && (!only || only.has(c.id))).map(",
+    replace: "const body = data.cases.filter((c) => (!only || only.has(c.id))).map(",
+  },
+  {
+    guard: "retrieval lab: the label export never carries an excluded case",
+    file: "scripts/retrieval-lab.ts",
+    find: "cases: data.cases.filter((c) => !c.excluded && (!only || only.has(c.id))).map((c) => ({ id: c.id, release: c.release,",
+    replace: "cases: data.cases.filter((c) => (!only || only.has(c.id))).map((c) => ({ id: c.id, release: c.release,",
   },
   {
     guard: "retrieval lab rejects labels naming another case",

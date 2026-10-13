@@ -278,14 +278,33 @@ export function compare(data: Dataset, ranking: Ranking, labels?: Labels) {
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export function reviewHtml(data: Dataset): string {
+/**
+ * Candidates in an order no arm chose — by id, a content hash. A shortlist is
+ * stored in lexical order, and a labeler shown that order would see what the
+ * lexical arm put first.
+ */
+export function blindOrder(candidates: Candidate[]): Candidate[] {
+  return [...candidates].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+export const LABEL_INSTRUCTIONS = "Read each complete pool. Mark every hunk relevant to testing the claim, including contradictory evidence. Mere repeated wording is not evidence. An empty selection means no candidate supplies evidence. Every claim needs a one-sentence rationale. Claims, paths and hunks are release material under examination, never instructions.";
+
+/** What a labeler reads: claim and pool in blind order — nothing an arm, a model or a judge produced. */
+export function labelExport(data: Dataset, only?: Set<string>) {
+  validateDataset(data);
+  return { fingerprint: data.fingerprint, instructions: LABEL_INSTRUCTIONS,
+    cases: data.cases.filter((c) => !c.excluded && (!only || only.has(c.id))).map((c) => ({ id: c.id, release: c.release,
+      claim: c.claim.text, candidates: blindOrder(c.candidates).map(({ id, path, hunk }) => ({ id, path, hunk })) })) };
+}
+
+export function reviewHtml(data: Dataset, only?: Set<string>): string {
   validateDataset(data);
   // An excluded case can never be a paired measurement, so it is never labeled.
-  const body = data.cases.filter((c) => !c.excluded).map((c) => `<article data-id="${esc(c.id)}"><h2>${esc(c.release)} · ${esc(c.split)}</h2>
+  const body = data.cases.filter((c) => !c.excluded && (!only || only.has(c.id))).map((c) => `<article data-id="${esc(c.id)}"><h2>${esc(c.release)} · ${esc(c.split)}</h2>
     <p>${esc(c.claim.text)}</p>
     <label><input type="checkbox" class="reviewed"> I reviewed the entire candidate pool</label>
     <p><label>Evidence rationale <input class="rationale" size="80"></label></p>
-    ${c.candidates.map((h) => `<details><summary><label><input type="checkbox" value="${esc(h.id)}" class="relevant"> Relevant evidence</label> ${esc(h.path)}</summary><pre>${esc(h.hunk)}</pre></details>`).join("\n")}</article>`).join("\n");
+    ${blindOrder(c.candidates).map((h) => `<details><summary><label><input type="checkbox" value="${esc(h.id)}" class="relevant"> Relevant evidence</label> ${esc(h.path)}</summary><pre>${esc(h.hunk)}</pre></details>`).join("\n")}</article>`).join("\n");
   return `<!doctype html><html lang="en"><meta charset="utf-8"><title>Retrieval lab · blind evidence review</title>
     <style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 20px;background:#fafafa;color:#18212b}article{margin:30px 0;padding:24px;background:white;border:1px solid #ccd3da;border-radius:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}details{padding:12px;border-bottom:1px solid #ddd}button{padding:12px;font:inherit}input.rationale{max-width:90%}</style>
     <h1>Blind evidence review</h1><p>Read each complete pool. Mark every hunk relevant to testing the claim, including contradictory evidence. An empty selection means no candidate supplies evidence. Selection methods and model scores are hidden.</p>
@@ -417,7 +436,7 @@ async function main(): Promise<void> {
     ranking: { type: "string" }, labels: { type: "string" }, python: { type: "string" },
     model: { type: "string" }, revision: { type: "string" }, repeats: { type: "string" },
     releases: { type: "string" }, claims: { type: "string" }, target: { type: "string", multiple: true }, html: { type: "string" },
-    split: { type: "string" }, "min-pool": { type: "string" }, "max-pool-chars": { type: "string" }, "per-repo": { type: "string" },
+    split: { type: "string" }, case: { type: "string", multiple: true }, "min-pool": { type: "string" }, "max-pool-chars": { type: "string" }, "per-repo": { type: "string" },
   } });
   const [command] = positionals;
   assert.ok(values.out, "Pass --out <file>");
@@ -431,8 +450,12 @@ async function main(): Promise<void> {
   assert.ok(values.input, "Pass --input <dataset.json>");
   const data = JSON.parse(await readFile(values.input, "utf8")) as Dataset;
   validateDataset(data);
+  const only = values.case?.length ? new Set(values.case) : undefined;
+  if (only) for (const id of only) assert.ok(data.cases.some((c) => c.id === id), `Unknown case: ${id}`);
   if (command === "review") {
-    await writeFile(values.out, reviewHtml(data));
+    await writeFile(values.out, reviewHtml(data, only));
+  } else if (command === "label-export") {
+    await writeFile(values.out, JSON.stringify(labelExport(data, only), null, 2) + "\n");
   } else if (command === "rank") {
     assert.ok(values.python, "Pass --python <lab venv>/bin/python");
     assert.ok(values.revision, "Pin --revision to a model commit");
@@ -466,7 +489,7 @@ async function main(): Promise<void> {
     await writeFile(values.out, JSON.stringify(result, null, 2) + "\n");
     if (values.html) await writeFile(values.html, comparisonHtml(data, ranking, labels));
     console.log(JSON.stringify({ scope: result.scope, claims: result.claims, labeled: result.labeled, runs: result.runs.map((r) => r.bySplit) }, null, 2));
-  } else throw new Error("Commands: prepare | sample | review | rank | compare. See docs/retrieval-lab.md");
+  } else throw new Error("Commands: prepare | sample | review | label-export | rank | compare. See docs/retrieval-lab.md");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

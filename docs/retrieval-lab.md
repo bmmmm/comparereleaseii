@@ -297,7 +297,10 @@ stand behind.
 **Labels.** Two blind model labelers, independently: a Claude subagent and
 Codex (`codex exec -s read-only`). Each sees what `retrieval-lab review`
 shows — claim and complete pool — and nothing else: no selection, no score,
-no stored verdict. Agreement is reported per hunk and per claim; every claim
+no stored verdict. Both the export (`retrieval-lab label-export`) and the
+review page list candidates by id, a content hash: a shortlist is stored in
+lexical order, and showing that order would tell the reader what the lexical
+arm put first. Agreement is reported per hunk and per claim; every claim
 the two disagree on is decided by the user on the review page. Labels are
 frozen before `rank` runs and the labeler of each claim is recorded.
 
