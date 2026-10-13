@@ -71,7 +71,8 @@ export interface Ranking {
 }
 export interface Labels {
   fingerprint: string;
-  cases: Array<{ id: string; relevant: string[]; rationale: string }>;
+  /** labeler: who decided this claim — "claude+codex" when both agreed, "user" after arbitration. */
+  cases: Array<{ id: string; relevant: string[]; rationale: string; labeler?: string }>;
 }
 const digest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
@@ -125,6 +126,51 @@ export function sampleCases(data: Dataset, rule: SampleRule): Dataset {
   sampled.fingerprint = fingerprint(sampled);
   validateDataset(sampled);
   return sampled;
+}
+
+/**
+ * Two independent label sets over the same dataset: claims both answered with
+ * the same hunks are agreed; every other claim is disputed and goes to the
+ * user. Per-hunk agreement is Cohen's kappa over every (claim, candidate)
+ * decision, so agreeing on the many irrelevant hunks does not inflate it.
+ */
+export function agreeLabels(data: Dataset, a: Labels, b: Labels, names: [string, string]) {
+  validateDataset(data);
+  const eligible = data.cases.filter((c) => !c.excluded);
+  for (const set of [a, b]) {
+    assert.equal(set.fingerprint, data.fingerprint, "Labels belong to another dataset");
+    const ids = set.cases.map((l) => l.id);
+    assert.equal(new Set(ids).size, ids.length, "Duplicate label");
+    assert.deepEqual([...ids].sort(), eligible.map((c) => c.id).sort(), "A labeler must answer every eligible case exactly once");
+    for (const l of set.cases) {
+      const c = eligible.find((c) => c.id === l.id)!;
+      assert.equal(new Set(l.relevant).size, l.relevant.length, "Duplicate evidence label");
+      for (const hunk of l.relevant) assert.ok(c.candidates.some((h) => h.id === hunk), "Unknown evidence label");
+    }
+  }
+  let both = 0, onlyA = 0, onlyB = 0, neither = 0;
+  const agreed: Labels["cases"] = [];
+  const disputed: string[] = [];
+  for (const c of eligible) {
+    const x = new Set(a.cases.find((l) => l.id === c.id)!.relevant);
+    const y = new Set(b.cases.find((l) => l.id === c.id)!.relevant);
+    for (const h of c.candidates) {
+      if (x.has(h.id) && y.has(h.id)) both++;
+      else if (x.has(h.id)) onlyA++;
+      else if (y.has(h.id)) onlyB++;
+      else neither++;
+    }
+    if (x.size === y.size && [...x].every((id) => y.has(id))) {
+      const rationale = [a, b].map((l, i) => `${names[i]}: ${l.cases.find((l) => l.id === c.id)!.rationale}`).join(" | ");
+      agreed.push({ id: c.id, relevant: blindOrder(c.candidates).filter((h) => x.has(h.id)).map((h) => h.id), rationale, labeler: names.join("+") });
+    } else disputed.push(c.id);
+  }
+  const n = both + onlyA + onlyB + neither;
+  const observed = (both + neither) / n;
+  const expected = ((both + onlyA) * (both + onlyB) + (neither + onlyA) * (neither + onlyB)) / (n * n);
+  const kappa = expected === 1 ? 1 : (observed - expected) / (1 - expected);
+  return { decisions: { both, onlyA, onlyB, neither }, kappa, claims: eligible.length, agreedClaims: agreed.length,
+    labels: { fingerprint: data.fingerprint, cases: agreed } as Labels, disputed };
 }
 
 /** One-sided sign test: P(at least `wins` successes in wins + losses fair coin flips). Ties are dropped. */
@@ -436,7 +482,7 @@ async function main(): Promise<void> {
     ranking: { type: "string" }, labels: { type: "string" }, python: { type: "string" },
     model: { type: "string" }, revision: { type: "string" }, repeats: { type: "string" },
     releases: { type: "string" }, claims: { type: "string" }, target: { type: "string", multiple: true }, html: { type: "string" },
-    split: { type: "string" }, case: { type: "string", multiple: true }, "min-pool": { type: "string" }, "max-pool-chars": { type: "string" }, "per-repo": { type: "string" },
+    split: { type: "string" }, case: { type: "string", multiple: true }, a: { type: "string" }, b: { type: "string" }, "min-pool": { type: "string" }, "max-pool-chars": { type: "string" }, "per-repo": { type: "string" },
   } });
   const [command] = positionals;
   assert.ok(values.out, "Pass --out <file>");
@@ -481,6 +527,16 @@ async function main(): Promise<void> {
     await writeFile(values.out, JSON.stringify(sampled, null, 2) + "\n");
     console.log(JSON.stringify({ claims: sampled.cases.length, releases: sampled.releases.length,
       repos: new Set(sampled.cases.map((c) => c.release.split("@")[0])).size, sample: sampled.sample, fingerprint: sampled.fingerprint }));
+  } else if (command === "agree") {
+    assert.ok(values.a && values.b, "Pass --a <name=labels.json> --b <name=labels.json>");
+    const [nameA, fileA] = values.a.split("=") as [string, string];
+    const [nameB, fileB] = values.b.split("=") as [string, string];
+    assert.ok(fileA && fileB, "Labels are passed as name=file");
+    const result = agreeLabels(data, JSON.parse(await readFile(fileA, "utf8")) as Labels,
+      JSON.parse(await readFile(fileB, "utf8")) as Labels, [nameA, nameB]);
+    await writeFile(values.out, JSON.stringify(result, null, 2) + "\n");
+    console.log(JSON.stringify({ claims: result.claims, agreedClaims: result.agreedClaims, disputed: result.disputed.length,
+      kappa: result.kappa, decisions: result.decisions }, null, 2));
   } else if (command === "compare") {
     assert.ok(values.ranking, "Pass --ranking <laya.json>");
     const ranking = JSON.parse(await readFile(values.ranking, "utf8")) as Ranking;
@@ -489,7 +545,7 @@ async function main(): Promise<void> {
     await writeFile(values.out, JSON.stringify(result, null, 2) + "\n");
     if (values.html) await writeFile(values.html, comparisonHtml(data, ranking, labels));
     console.log(JSON.stringify({ scope: result.scope, claims: result.claims, labeled: result.labeled, runs: result.runs.map((r) => r.bySplit) }, null, 2));
-  } else throw new Error("Commands: prepare | sample | review | label-export | rank | compare. See docs/retrieval-lab.md");
+  } else throw new Error("Commands: prepare | sample | review | label-export | agree | rank | compare. See docs/retrieval-lab.md");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

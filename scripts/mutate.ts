@@ -170,6 +170,18 @@ const MUTANTS: Mutant[] = [
     replace: "return [...candidates];",
   },
   {
+    guard: "retrieval lab: a labeler must answer every eligible case",
+    file: "scripts/retrieval-lab.ts",
+    find: 'assert.deepEqual([...ids].sort(), eligible.map((c) => c.id).sort(), "A labeler must answer every eligible case exactly once");',
+    replace: 'assert.ok(true, "A labeler must answer every eligible case exactly once");',
+  },
+  {
+    guard: "retrieval lab: only identical hunk sets are agreed",
+    file: "scripts/retrieval-lab.ts",
+    find: "if (x.size === y.size && [...x].every((id) => y.has(id))) {",
+    replace: "if ([...x].every((id) => y.has(id))) {",
+  },
+  {
     guard: "retrieval lab rejects invalid window counts",
     file: "scripts/retrieval-lab.ts",
     find: 'assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");',

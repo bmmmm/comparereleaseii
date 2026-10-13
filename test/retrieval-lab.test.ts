@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { candidatesFor, lexicalFill, sampleCases, signTestP, blindOrder, labelExport, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
+import { candidatesFor, lexicalFill, sampleCases, signTestP, blindOrder, labelExport, agreeLabels, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
 import type { Candidate, Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
 import type { Claim } from "../src/types.ts";
 
@@ -418,4 +418,30 @@ test("labelers see the pool in blind order and nothing an arm produced", () => {
   const shown = [...html.matchAll(/value="([0-9a-f]{64})"/g)].map((m) => m[1]);
   assert.deepEqual(shown, sorted);
   assert.ok(!reviewHtml(data, new Set(["other"])).includes('data-id="case"'));
+});
+
+test("two label sets agree claim by claim; kappa counts every hunk decision", () => {
+  const { data } = fixture();
+  data.cases.push({ ...data.cases[0]!, id: "second" }, { ...data.cases[0]!, id: "gone", candidates: [], excluded: "merge-diff-unread" });
+  data.fingerprint = fingerprint(data);
+  const [x, y] = candidates.map((h) => h.id) as [string, string];
+  const a: Labels = { fingerprint: data.fingerprint, cases: [
+    { id: "case", relevant: [y, x], rationale: "both" }, { id: "second", relevant: [x], rationale: "one" }] };
+  const b: Labels = { fingerprint: data.fingerprint, cases: [
+    { id: "case", relevant: [x, y], rationale: "same" }, { id: "second", relevant: [], rationale: "none" }] };
+  const r = agreeLabels(data, a, b, ["claude", "codex"]);
+  assert.deepEqual(r.decisions, { both: 2, onlyA: 1, onlyB: 0, neither: 1 });
+  assert.equal(r.agreedClaims, 1);
+  assert.deepEqual(r.disputed, ["second"]);
+  assert.deepEqual(r.labels.cases[0], { id: "case", relevant: blindOrder(candidates).map((h) => h.id),
+    rationale: "claude: both | codex: same", labeler: "claude+codex" });
+  // observed 3/4; expected (3*2 + 1*2)/16 = 0.5; kappa = 0.25 / 0.5
+  assert.ok(Math.abs(r.kappa - 0.5) < 1e-12);
+  for (const broken of [
+    { ...b, fingerprint: "other" },
+    { ...b, cases: [b.cases[0]!] },
+    { ...b, cases: [...b.cases, b.cases[0]!] },
+    { ...b, cases: [b.cases[0]!, { id: "second", relevant: ["other"], rationale: "x" }] },
+    { ...b, cases: [b.cases[0]!, { id: "second", relevant: [x, x], rationale: "x" }] },
+  ]) assert.throws(() => agreeLabels(data, a, broken, ["claude", "codex"]));
 });
