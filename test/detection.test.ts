@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseUnifiedDiff } from "../src/sources/local.ts";
+import { releaseSurface } from "../src/substance.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -110,4 +112,68 @@ test("the frozen rates are a measurement, not an aspiration", async () => {
     Object.values(reference.classes).some(({ applicable, detected }) => detected < applicable),
     "every mutation class detects everything — the harness has run out of questions",
   );
+});
+
+// Every field case (docs/field-cases.md) is a regression test the day it is
+// recorded: the real hunk, trimmed to the file that carries the change, and
+// what the surface must read off it. A case is added before the fix with the
+// expectation the fix has to meet — and a documented miss is a case too, so
+// the day the decision behind it changes, this is what says so.
+const FIELD_CASES: Array<{
+  fixture: string;
+  defaults: Array<[name: string, from: string, to: string]>;
+  removedKeys?: string[];
+}> = [
+  {
+    fixture: "openai-codex-rust-v0.157.0-daemon-auto-start.patch",
+    defaults: [
+      ["daemon_auto_start", "false", "true"],
+      ["guardianv2.thread_context", "Stage::UnderDevelopment", "Stage::Stable"],
+      ["guardianv2.thread_context", "false", "true"],
+    ],
+  },
+  {
+    fixture: "opencloud-eu-opencloud-v6.0.0-clean-stop-words.patch",
+    defaults: [
+      ["CleanStopWords", "true", "false"],
+      ["BatchSize", "500", "50"],
+    ],
+  },
+  {
+    // A key removed is not a value moved: it lands in the key delta.
+    fixture: "zed-industries-zed-v1.11.3-auto-replace-emoji-shortcode.patch",
+    defaults: [],
+    removedKeys: ["auto_replace_emoji_shortcode", "message_editor"],
+  },
+  {
+    // Class C — a setter's argument — is off: the 2026-10-13 census found 84
+    // of the corpus's 95 toggles unnamed AND noise (layout widths, i18n keys),
+    // with `.promisc(false)` one real change among them. The miss is recorded
+    // here, not hidden.
+    fixture: "gyulyvgc-sniffnet-v1.4.2-promisc.patch",
+    defaults: [],
+  },
+];
+
+test("every field fixture reads as its case records", async () => {
+  const dir = join(ROOT, "test/fixtures/field");
+  const present = (await readdir(dir)).filter((f) => f.endsWith(".patch")).sort();
+  assert.deepEqual(
+    present,
+    FIELD_CASES.map((c) => c.fixture).sort(),
+    "a fixture without a case, or a case without a fixture",
+  );
+  for (const c of FIELD_CASES) {
+    const files = parseUnifiedDiff(await readFile(join(dir, c.fixture), "utf8"));
+    assert.ok(files.length, `${c.fixture} parsed to no files`);
+    const s = releaseSurface(files);
+    assert.deepEqual(
+      s.defaults?.map((d) => [d.name, d.from, d.to]),
+      c.defaults,
+      c.fixture,
+    );
+    for (const k of c.removedKeys ?? []) {
+      assert.ok(s.configKeys.removed.includes(k), `${c.fixture}: −key ${k}`);
+    }
+  }
 });

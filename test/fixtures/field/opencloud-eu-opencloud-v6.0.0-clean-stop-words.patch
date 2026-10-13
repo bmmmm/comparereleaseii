@@ -1,0 +1,22 @@
+diff --git a/services/search/pkg/config/defaults/defaultconfig.go b/services/search/pkg/config/defaults/defaultconfig.go
+index 630cd24e7..3e504350f 100644
+--- a/services/search/pkg/config/defaults/defaultconfig.go
++++ b/services/search/pkg/config/defaults/defaultconfig.go
+@@ -50,7 +50,7 @@ func DefaultConfig() *config.Config {
+ 			CS3AllowInsecure: false,
+ 			Tika: config.ExtractorTika{
+ 				TikaURL:        "http://127.0.0.1:9998",
+-				CleanStopWords: true,
++				CleanStopWords: false,
+ 			},
+ 		},
+ 		Events: config.Events{
+@@ -64,7 +64,7 @@ func DefaultConfig() *config.Config {
+ 			AckWait:          1 * time.Minute,
+ 		},
+ 		ContentExtractionSizeLimit: 20 * 1024 * 1024, // Limit content extraction to <20MB files by default
+-		BatchSize:                  500,
++		BatchSize:                  50,
+ 	}
+ }
+ 

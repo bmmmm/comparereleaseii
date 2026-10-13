@@ -1,0 +1,36 @@
+diff --git a/src/networking/types/capture_context.rs b/src/networking/types/capture_context.rs
+index b28d4d22..12fc363c 100644
+--- a/src/networking/types/capture_context.rs
++++ b/src/networking/types/capture_context.rs
+@@ -128,7 +128,7 @@ fn from_source(source: &CaptureSource, pcap_out_path: Option<&String>) -> Result
+             CaptureSource::Device(device) => {
+                 let inactive = Capture::from_device(device.to_pcap_device())?;
+                 let cap = inactive
+-                    .promisc(true)
++                    .promisc(false)
+                     .buffer_size(2_000_000) // 2MB buffer -> 10k packets of 200 bytes
+                     .snaplen(if pcap_out_path.is_some() {
+                         i32::from(u16::MAX)
+@@ -150,6 +150,22 @@ fn set_bpf(&mut self, bpf: &str) -> Result<(), Error> {
+             Self::Offline(cap) => cap.filter(bpf, true),
+         }
+     }
++
++    pub fn pause(&mut self) {
++        if let Self::Live(cap) = self {
++            let _ = cap.filter("less 2", true).log_err(location!());
++        }
++    }
++
++    pub fn resume(&mut self, filters: &Filters) {
++        if let Self::Live(cap) = self {
++            if filters.is_some_filter_active() {
++                let _ = cap.filter(filters.bpf(), true).log_err(location!());
++            } else if cap.filter("", true).log_err(location!()).is_err() {
++                let _ = cap.filter("greater 0", true).log_err(location!());
++            }
++        }
++    }
+ }
+ 
+ #[derive(Clone)]

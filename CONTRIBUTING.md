@@ -124,6 +124,32 @@ table and update it in the same commit. Nothing automated can catch that one —
 it takes real judge runs — and a table the current code no longer reproduces is
 the drift this tool exists to find.
 
+### Recording a field case
+
+An external "the tool missed X" — an issue, a reader's mail — becomes a row in
+[docs/field-cases.md](docs/field-cases.md) and a fixture under
+`test/fixtures/field/`, in that order and **before** the fix, so the row's
+"what it said" column is a real run and not a memory:
+
+1. `gh issue view <n> --repo <o/r>` for the claim. The notes:
+   `gh release view <tag> --repo <o/r> --json body -q .body > notes.md`, and
+   `sed '/^## Changelog/,$d'` off a bot-appended commit list when there is one.
+2. The deterministic run, with the release's own compare range as `--base`:
+   `pickBaseRelease` picks by publish date, and a backport published last gives
+   a base that is not an ancestor (OpenCloud v7.0.0 got v4.0.7 in the corpus).
+   `node src/cli.ts o/r --tag <tag> --base <base> --engine off --judge off
+   --baseline 0 --md tmp/<case>.md`.
+3. Where the miss sits: `pnpm defaults-census <reports dir>` when it is a moved
+   value (is the class measured, and how noisy?); the counterfactual when it is
+   a findings-budget miss — `buildFindingsPrompt` over the files the issue
+   names, nothing else, one Haiku call — which says whether the judge *would*
+   have named it had the budget reached the file.
+4. `git -C <clone> diff <base>...<tag> -- <file>` into
+   `test/fixtures/field/<repo>-<tag>-<slug>.patch`, and a `FIELD_CASES` entry
+   in `test/detection.test.ts` with what the surface must read off it. A
+   documented miss is an entry too — it is the test that fails the day the
+   decision changes.
+
 ## Releasing
 
 ```console
