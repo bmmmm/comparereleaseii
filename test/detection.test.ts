@@ -97,10 +97,10 @@ test("the omission mutation strips every claim-specific coverage route", async (
 });
 
 test("the frozen rates are a measurement, not an aspiration", async () => {
-  // The reference records open holes as such on purpose: freezing 100 %
-  // everywhere would turn the yardstick into a wish and hide the very
-  // findings the harness was built to produce. This test fails when someone
-  // "fixes" the reference instead of the detector.
+  // The reference records open holes as such on purpose: it is written by
+  // `mutate-notes --freeze`, never by hand, so a rate below 100 % stays in it
+  // until the detector, not the file, is fixed. This test only checks that
+  // the table is sound; it cannot tell a hand edit from a measurement.
   const reference = await loadReference();
   for (const [name, { applicable, detected }] of Object.entries(reference.classes)) {
     assert.ok(applicable > 0, `${name} has no applicable cases in the reference`);
@@ -111,7 +111,8 @@ test("the frozen rates are a measurement, not an aspiration", async () => {
   // a better detector. It was the detector: the last miss (jundot/omlx@v0.5.0)
   // closed on 2026-08-17 when breadth earned by other commits stopped counting
   // (c573fc0, measured on the full corpus), with the five mutation classes
-  // unchanged. A class that misses again is recorded here as before.
+  // unchanged. A class that misses again goes into the reference through the
+  // next freeze, as before.
 });
 
 // Every field case (docs/field-cases.md) is a regression test the day it is
