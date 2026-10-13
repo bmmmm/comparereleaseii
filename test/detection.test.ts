@@ -96,6 +96,24 @@ test("the omission mutation strips every claim-specific coverage route", async (
   }
 });
 
+test("the resume fingerprint covers the harness that makes the mutants", async () => {
+  // A cached outcome is replayed whenever the fingerprint matches. Leaving
+  // the harness out of it let an edit to the omission block (the merge-commit
+  // filter of 2026-10-13) reuse outcomes the old harness had measured, and a
+  // change to `dedupeReports` reuse foreign-claim donors picked from the old
+  // corpus order.
+  const source = await readFile(join(ROOT, "scripts/mutate-notes.ts"), "utf8");
+  const fingerprint = source.slice(
+    source.indexOf("async function buildFingerprint("),
+    source.indexOf("return h.digest(", source.indexOf("async function buildFingerprint(")),
+  );
+  assert.ok(fingerprint.length, "could not read buildFingerprint");
+  const hashed = ["scripts/notes-mutations.ts", "scripts/mutate-notes.ts", "scripts/corpus-aggregate.ts"];
+  for (const file of hashed) {
+    assert.ok(fingerprint.includes(`"${file}"`), `the resume fingerprint does not hash ${file}`);
+  }
+});
+
 test("the frozen rates are a measurement, not an aspiration", async () => {
   // The reference records open holes as such on purpose: it is written by
   // `mutate-notes --freeze`, never by hand, so a rate below 100 % stays in it

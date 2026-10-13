@@ -111,7 +111,10 @@ const reportsDir = args.find((a) => !a.startsWith("--") && args[args.indexOf(a) 
 /**
  * The other half of a resume key: everything about this build that decides an
  * answer. `src/` is the detector, `scripts/notes-mutations.ts` is the
- * mutations themselves, and `--max-commits` moves which releases are in scope
+ * mutations themselves, `scripts/mutate-notes.ts` decides which claims a
+ * mutant strips (the omission block's choice of commit, for one),
+ * `scripts/corpus-aggregate.ts` dedupes and orders the corpus that picks each
+ * foreign-claim donor, and `--max-commits` moves which releases are in scope
  * at all.
  *
  * This is what makes resuming safe under `pnpm sweep`, which patches a
@@ -134,7 +137,11 @@ async function buildFingerprint(): Promise<string> {
     }
   }
   await walk("src");
-  files.push("scripts/notes-mutations.ts");
+  files.push(
+    "scripts/notes-mutations.ts",
+    "scripts/mutate-notes.ts",
+    "scripts/corpus-aggregate.ts",
+  );
   for (const f of files.sort()) h.update(f).update(await readFile(f, "utf8"));
   h.update(`max-commits=${maxCommits}`);
   return h.digest("hex").slice(0, 16);
