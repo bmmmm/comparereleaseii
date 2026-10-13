@@ -249,15 +249,15 @@ A fabricated claim from the negative control, caught against the diff:
 
 **Does it catch a release that lies?** `pnpm mutate-notes` falsifies the notes
 of real releases and asks whether the detector notices — judge off, no
-network. On 111 releases (`test/eval/reference-detection.json`, 2026-08-14):
+network. On 122 releases (`test/eval/reference-detection.json`, 2026-10-13):
 
 | Mutation | What it does | Detected |
 |---|---|---:|
-| `omission` | drops the notes covering a documented high-churn commit | 63/64 |
+| `omission` | drops the notes covering a documented high-churn commit | 71/71 |
 | `bump-overshoot` | restates a bump as a version the release did not reach | 22/22 |
 | `bump-undershoot` | restates it as a version the pin never held | 22/22 |
-| `foreign-claim` | plants a claim from a different release of the same repo | 110/110 |
-| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | 109/109 |
+| `foreign-claim` | plants a claim from a different release of the same repo | 121/121 |
+| `backtick-noise` | fabricates a claim padded with two identifiers from the diff | 119/119 |
 
 A run worse than the frozen reference fails; re-freezing is a deliberate
 decision.

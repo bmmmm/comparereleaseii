@@ -83,7 +83,8 @@ test("the omission mutation strips every claim-specific coverage route", async (
   // coincide with the commit's files, not because it describes them. Stripping
   // it would delete the note that fools the detector and score the mutant as
   // caught, which is the one direction this harness must never move in.
-  // `jundot/omlx@v0.5.0` is that case, and it is a miss on purpose.
+  // `jundot/omlx@v0.5.0` was that case, a miss on purpose until the detector
+  // closed it on 2026-08-17.
   const source = await readFile(join(ROOT, "scripts/mutate-notes.ts"), "utf8");
   const filter = source.slice(
     source.indexOf("const covering = claims.filter("),
@@ -105,13 +106,12 @@ test("the frozen rates are a measurement, not an aspiration", async () => {
     assert.ok(applicable > 0, `${name} has no applicable cases in the reference`);
     assert.ok(detected <= applicable, `${name} detects more than it applies to`);
   }
-  // The day every class reads perfect there are two possible explanations,
-  // and "the harness stopped asking hard questions" is the likelier one.
-  // Whoever gets there deletes this assertion and says which it was.
-  assert.ok(
-    Object.values(reference.classes).some(({ applicable, detected }) => detected < applicable),
-    "every mutation class detects everything — the harness has run out of questions",
-  );
+  // Until 2026-10-13 a further assertion demanded one class below 100 %, on
+  // the grounds that a perfect table more likely means a softer harness than
+  // a better detector. It was the detector: the last miss (jundot/omlx@v0.5.0)
+  // closed on 2026-08-17 when breadth earned by other commits stopped counting
+  // (c573fc0, measured on the full corpus), with the five mutation classes
+  // unchanged. A class that misses again is recorded here as before.
 });
 
 // Every field case (docs/field-cases.md) is a regression test the day it is
