@@ -152,6 +152,18 @@ const MUTANTS: Mutant[] = [
     replace: "...({})",
   },
   {
+    guard: "retrieval lab: losses against lexical + fill are counted",
+    file: "scripts/retrieval-lab.ts",
+    find: "const lossesVsExpanded = measured.filter((r) => r.layaRecall! < r.expandedRecall!).length;",
+    replace: "const lossesVsExpanded = 0;",
+  },
+  {
+    guard: "retrieval lab: the sign test sums the upper tail",
+    file: "scripts/retrieval-lab.ts",
+    find: "if (k >= wins) p += term;",
+    replace: "if (k > wins) p += term;",
+  },
+  {
     guard: "retrieval lab rejects invalid window counts",
     file: "scripts/retrieval-lab.ts",
     find: 'assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");',

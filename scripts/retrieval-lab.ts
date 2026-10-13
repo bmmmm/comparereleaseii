@@ -127,6 +127,19 @@ export function sampleCases(data: Dataset, rule: SampleRule): Dataset {
   return sampled;
 }
 
+/** One-sided sign test: P(at least `wins` successes in wins + losses fair coin flips). Ties are dropped. */
+export function signTestP(wins: number, losses: number): number | null {
+  const n = wins + losses;
+  if (!n) return null;
+  let p = 0;
+  let term = 0.5 ** n; // C(n, 0) / 2^n
+  for (let k = 0; k <= n; k++) {
+    if (k >= wins) p += term;
+    term = term * (n - k) / (k + 1);
+  }
+  return Math.min(1, p);
+}
+
 /** Lexically ranked candidates first (once each), then the rest of the pool in its own order. */
 export function lexicalFill(candidates: Candidate[], lexical: Hunk[]): Candidate[] {
   const first = new Set(lexical.map((l) => candidates.find((h) => h.path === l.path && h.hunk === l.hunk)!));
@@ -242,10 +255,15 @@ export function compare(data: Dataset, ranking: Ranking, labels?: Labels) {
         ? measured.reduce((n, r) => n + r[key]!, 0) / measured.length : null;
       const wins = measured.filter((r) => r.layaRecall! > r.baselineRecall!).length;
       const losses = measured.filter((r) => r.layaRecall! < r.baselineRecall!).length;
+      // Against the stronger control too: beating the current selection alone proves little.
+      const winsVsExpanded = measured.filter((r) => r.layaRecall! > r.expandedRecall!).length;
+      const lossesVsExpanded = measured.filter((r) => r.layaRecall! < r.expandedRecall!).length;
       return { split, claims: slice.length, labeled: slice.filter((r) => r.labeled).length,
         applicable: slice.filter((r) => r.fallback === null).length, paired: measured.length,
         baselineRecall: mean("baselineRecall"), expandedRecall: mean("expandedRecall"), layaRecall: mean("layaRecall"),
-        wins, losses, ties: measured.length - wins - losses };
+        wins, losses, ties: measured.length - wins - losses,
+        vsExpanded: { wins: winsVsExpanded, losses: lossesVsExpanded, ties: measured.length - winsVsExpanded - lossesVsExpanded,
+          signTestP: signTestP(winsVsExpanded, lossesVsExpanded) } };
     };
     const splits = ["development", "holdout"] as const;
     // The two pool kinds answer different questions, so they are also reported apart.

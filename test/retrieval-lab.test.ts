@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { candidatesFor, lexicalFill, sampleCases, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
+import { candidatesFor, lexicalFill, sampleCases, signTestP, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
 import type { Candidate, Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
 import type { Claim } from "../src/types.ts";
 
@@ -30,7 +30,8 @@ test("retrieval lab compares complete contradictory evidence, not repeated words
   const { data, ranking, labels } = fixture();
   const result = compare(data, ranking, labels);
   assert.deepEqual(result.runs[0]!.bySplit[1], { split: "holdout", claims: 1, labeled: 1, applicable: 1,
-    paired: 1, baselineRecall: 0, expandedRecall: 1, layaRecall: 1, wins: 1, losses: 0, ties: 0 });
+    paired: 1, baselineRecall: 0, expandedRecall: 1, layaRecall: 1, wins: 1, losses: 0, ties: 0,
+    vsExpanded: { wins: 0, losses: 0, ties: 1, signTestP: null } });
   assert.equal(result.runs[0]!.rows[0]!.laya[0]!.hunk, candidates[0]!.hunk);
   assert.equal(compare(data, ranking).runs[0]!.bySplit[1]!.layaRecall, null);
   assert.equal(compare(data, ranking).labeled, 0);
@@ -373,4 +374,25 @@ test("a sample keeps one split, real pools, labelable sizes and a per-repo cap â
   assert.deepEqual(sampleCases(data, rule), sampled);
   assert.notEqual(sampleCases(data, { ...rule, perRepo: 3 }).fingerprint, sampled.fingerprint);
   validateDataset(sampled);
+});
+
+test("the sign test is one-sided, drops ties and matches the binomial tail", () => {
+  assert.equal(signTestP(0, 0), null);
+  assert.equal(signTestP(1, 0), 0.5);
+  assert.equal(signTestP(0, 3), 1);
+  assert.ok(Math.abs(signTestP(5, 0)! - 1 / 32) < 1e-12);
+  assert.ok(Math.abs(signTestP(9, 1)! - 11 / 1024) < 1e-12);
+  assert.ok(Math.abs(signTestP(3, 3)! - 42 / 64) < 1e-12);
+});
+
+test("Laya is also counted against lexical + fill, the stronger control", () => {
+  const win = fixture();
+  win.data.cases[0]!.expanded = [candidates[1]!];
+  win.data.fingerprint = win.ranking.fingerprint = win.labels.fingerprint = fingerprint(win.data);
+  assert.deepEqual(compare(win.data, win.ranking, win.labels).runs[0]!.bySplit[1]!.vsExpanded,
+    { wins: 1, losses: 0, ties: 0, signTestP: 0.5 });
+  const loss = fixture();
+  for (const s of loss.ranking.runs[0]!.cases[0]!.scores) s.score = s.id === candidates[0]!.id ? 0.1 : 0.9;
+  assert.deepEqual(compare(loss.data, loss.ranking, loss.labels).runs[0]!.bySplit[1]!.vsExpanded,
+    { wins: 0, losses: 1, ties: 0, signTestP: 1 });
 });

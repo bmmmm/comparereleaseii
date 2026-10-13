@@ -275,3 +275,50 @@ IDs, its rationale and the matching dataset fingerprint. Unreviewed claims
 were absent. `pnpm check` and all 562 tests passed without skips. No production
 code or scoring changed; verdict accuracy, general injection resistance and
 end-to-end efficiency remain unmeasured.
+
+## Fitness run 2 — pre-registered 2026-10-13, before any label or score
+
+The follow-up above rests on two paired claims from one release. This run is
+designed to decide, and everything below was fixed and committed before a
+single label was written or a single pair was scored.
+
+**Sample.** `retrieval-lab sample` over the whole corpus (`prepare --releases
+200 --claims 8`, 561 claims, dataset `c79215cc…`): holdout split only, pools
+above six hunks, at most 40,000 pool characters (a labeler reads the whole
+pool), at most six claims per repository and pool kind, chosen by a hash of
+the case id. Result `537cb38b191a376683684bf72c47fcfa59cc7ca2f1feef9ec4678b529b282b7e`:
+79 claims from 39 releases of 10 repositories — 41 complete pools (9 repos)
+and 38 lexical shortlists (10 repos), 1.56 M characters. Dropped: 160 other
+split, 58 excluded, 57 pools of six or fewer, 140 pools over the character
+cap, 67 over the repository cap. The character cap under-represents the very
+long hunks windowing exists for; that is the price of labels a reader can
+stand behind.
+
+**Labels.** Two blind model labelers, independently: a Claude subagent and
+Codex (`codex exec -s read-only`). Each sees what `retrieval-lab review`
+shows — claim and complete pool — and nothing else: no selection, no score,
+no stored verdict. Agreement is reported per hunk and per claim; every claim
+the two disagree on is decided by the user on the review page. Labels are
+frozen before `rank` runs and the labeler of each claim is recorded.
+
+**Arms.** Current `claimEvidence`, lexical + fill, and Laya (pinned
+checkpoint above, windowed, `--repeats 1`), each six hunks and 20,000
+characters.
+
+**Measure.** Per pool kind, on paired holdout claims (labeled with at least
+one relevant hunk, no Laya fallback): mean recall of each arm, and Laya's
+wins and losses against lexical + fill — the stronger control — with a
+one-sided sign test over the non-tied claims (`vsExpanded.signTestP`).
+
+**Decision.** For a pool kind, Laya becomes a candidate for an opt-in flag
+only if all three hold: its mean recall is higher than lexical + fill's, it
+wins more claims than it loses against lexical + fill, and the sign test gives
+p < 0.05. Otherwise the isolation recommendation stands for that pool kind,
+now with numbers. Not-worse is not enough: a new runtime dependency has to buy
+something.
+
+**Validity.** If more than 5 % of the labeled claims fall back (truncation or
+worker error), the run is invalid; the cause is fixed and the run repeated
+against the same frozen sample and labels. The development split is not
+read. Not measured by this run: verdict accuracy, general injection
+resistance, end-to-end latency.
