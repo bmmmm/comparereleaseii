@@ -70,6 +70,7 @@ import { analyzeRelease, type CheckSettings } from "../src/check.ts";
 import { cacheDir, cloneDirFor } from "../src/paths.ts";
 import { loadLocalRange, localRepoContext } from "../src/sources/local.ts";
 import { lexicalMatch, tokenize } from "../src/match.ts";
+import { mergeCommitShas } from "../src/verify.ts";
 import { pinBumps } from "../src/pins.ts";
 import { pooled, run } from "../src/util.ts";
 import type { Claim, ClaimResult, DiffFile, Report, Verdict } from "../src/types.ts";
@@ -488,10 +489,14 @@ async function analyseOne(report: Report): Promise<ReleaseOutcome> {
       const covers = r.verdict === "verified" || r.verdict === "partial";
       if (covers || !controlVerdict.has(r.claim.text)) controlVerdict.set(r.claim.text, r.verdict);
     }
+    // A merge commit carries its first-parent diff (the biggest churn in a
+    // PR-merged repo) but coverage never lists one as uncovered, so hiding
+    // its claims could only read as a miss. Hide what coverage can see.
+    const merges = mergeCommitShas(range.commits);
     const ranked = (
       await Promise.all(
         range.commits
-          .filter((c) => !uncovered.has(c.sha))
+          .filter((c) => !uncovered.has(c.sha) && !merges.has(c.sha))
           .map(async (c) => ({ c, churn: await commitChurn(range.commitFiles, c.sha) })),
       )
     ).sort((a, b) => b.churn - a.churn);

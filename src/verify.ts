@@ -889,6 +889,19 @@ export interface Coverage {
   unreadableShas: Set<string>;
 }
 
+/**
+ * A merge commit bundles commits that are themselves in the range — counting
+ * it (and its aggregate diff) again would double every miss and every line.
+ * Coverage never reports one as uncovered and never counts its churn, and the
+ * mutation harness has to hide the same commits coverage can see, so the rule
+ * lives once. A range that is nothing but merges keeps them: there is nothing
+ * else to count.
+ */
+export function mergeCommitShas(commits: Commit[]): Set<string> {
+  const nonMerge = commits.filter((c) => !/^Merge (pull request|branch|remote)/i.test(c.subject));
+  return new Set(nonMerge.length ? commits.filter((c) => !nonMerge.includes(c)).map((c) => c.sha) : []);
+}
+
 /** Completeness check: which commits are not covered by any release-note claim? */
 export async function computeCoverage(
   data: ReleaseData,
@@ -1023,12 +1036,7 @@ export async function computeCoverage(
       return lex.score >= 3 && lex.files.length === files.length;
     });
 
-  // A merge commit bundles commits that are themselves in the range — counting
-  // it (and its aggregate diff) again would double every miss and every line.
-  const nonMerge = data.commits.filter((c) => !/^Merge (pull request|branch|remote)/i.test(c.subject));
-  const mergeShas = new Set(
-    nonMerge.length ? data.commits.filter((c) => !nonMerge.includes(c)).map((c) => c.sha) : [],
-  );
+  const mergeShas = mergeCommitShas(data.commits);
 
   const uncovered: UncoveredCommit[] = [];
   data.commits.forEach((commit, i) => {

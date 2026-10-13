@@ -247,9 +247,19 @@ export async function loadLocalRange(
   const commitFiles = (sha: string): Promise<DiffFile[]> => {
     let p = commitCache.get(sha);
     if (!p) {
-      p = git(repo, ["show", "--patch", "--no-color", "--format=", sha]).then(
-        parseUnifiedDiff,
-      );
+      // Plain `git show` prints a combined (`--cc`) diff for a merge commit,
+      // which is empty for a clean merge and unparseable for a conflicted one;
+      // what the merge brought in is its diff against the first parent — the
+      // files the GitHub commit endpoint lists, so both sources answer the
+      // same question. `--diff-merges` needs git 2.31 (2021).
+      p = git(repo, [
+        "show",
+        "--patch",
+        "--no-color",
+        "--format=",
+        "--diff-merges=first-parent",
+        sha,
+      ]).then(parseUnifiedDiff);
       commitCache.set(sha, p);
     }
     return p;

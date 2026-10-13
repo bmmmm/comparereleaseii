@@ -385,3 +385,34 @@ test("a bare tag finds its v-prefixed changelog heading", async () => {
   const data = await loadLocalRelease({ repo, head: "1.0.0" });
   assert.ok(data.notes.includes("First"), `notes not found: ${JSON.stringify(data.notes)}`);
 });
+
+test("commitFiles reads a merge commit against its first parent, as the GitHub source does", async () => {
+  const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
+  const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
+  await git("init", "-q", "-b", "main");
+  await git("config", "user.email", "test@example.invalid");
+  await git("config", "user.name", "test");
+  await writeFile(join(repo, "a.txt"), "first\n");
+  await git("add", "a.txt");
+  await git("commit", "-q", "-m", "first commit");
+  await git("checkout", "-q", "-b", "topic");
+  await writeFile(join(repo, "t.txt"), "topic\n");
+  await git("add", "t.txt");
+  await git("commit", "-q", "-m", "topic commit");
+  await git("checkout", "-q", "main");
+  await writeFile(join(repo, "m.txt"), "main\n");
+  await git("add", "m.txt");
+  await git("commit", "-q", "-m", "main moves on");
+  await git("merge", "-q", "--no-ff", "topic", "-m", "merge topic");
+
+  const range = await loadLocalRange(repo, EMPTY_TREE, "HEAD");
+  const merge = range.commits.find((c) => c.subject === "merge topic");
+  assert.ok(merge);
+  // `git show` prints no patch for a merge; what the merge brought in is its
+  // diff against the first parent — the files the GitHub commit endpoint lists.
+  const files = await range.commitFiles(merge.sha);
+  assert.deepEqual(files.map((f) => f.path), ["t.txt"]);
+  assert.ok(files[0]!.patch?.includes("+topic"));
+  const plain = await range.commitFiles(range.commits.find((c) => c.subject === "topic commit")!.sha);
+  assert.deepEqual(plain.map((f) => f.path), ["t.txt"]);
+});

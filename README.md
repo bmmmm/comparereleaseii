@@ -76,8 +76,8 @@ option.
 | Source | How you name it | Published notes come from | Needs |
 |---|---|---|---|
 | GitHub | `owner/repo` | the GitHub release | authenticated `gh` |
-| Any other forge | `--repo-url <url>` | the forge's release API, else the CHANGELOG section for the tag | `git` |
-| A local checkout | `--local <path>` | the CHANGELOG section for the tag | `git` |
+| Any other forge | `--repo-url <url>` | the forge's release API, else the CHANGELOG section for the tag | `git` ≥ 2.31 |
+| A local checkout | `--local <path>` | the CHANGELOG section for the tag | `git` ≥ 2.31 |
 
 `--repo-url` clones (cached, fetched on later runs) and then checks exactly
 like `--local`, so Forgejo, Gitea, GitLab, private servers and air-gapped
