@@ -110,6 +110,24 @@ const MUTANTS: Mutant[] = [
     replace: "candidates: c.candidates.map((h) => ({ id: h.id, ...layaParts(c.claim, h) }))",
   },
   {
+    guard: "retrieval lab: a shortlist never exceeds maxCandidates",
+    file: "scripts/retrieval-lab.ts",
+    find: 'if (data.version === 2 && !c.excluded) assert.ok(c.candidates.length <= data.budget.maxCandidates, "Shortlist exceeds maxCandidates");',
+    replace: 'if (false) assert.ok(c.candidates.length <= data.budget.maxCandidates, "Shortlist exceeds maxCandidates");',
+  },
+  {
+    guard: "retrieval lab: lexical fill lists a candidate once",
+    file: "scripts/retrieval-lab.ts",
+    find: "return [...first, ...candidates.filter((h) => !first.has(h))];",
+    replace: "return [...first, ...candidates];",
+  },
+  {
+    guard: "retrieval lab: per-pool summaries filter by pool",
+    file: "scripts/retrieval-lab.ts",
+    find: "(!pool || r.pool === pool)",
+    replace: "(true)",
+  },
+  {
     guard: "retrieval lab rejects invalid window counts",
     file: "scripts/retrieval-lab.ts",
     find: 'assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");',

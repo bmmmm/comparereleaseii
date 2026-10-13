@@ -24,10 +24,20 @@ GIT_NO_LAZY_FETCH=1 pnpm retrieval-lab prepare \
   --out tmp/laya-lab/dataset.json
 ```
 
-Repeat `--target owner/repo@tag` to select exact releases instead. Empty pools,
-more than 32 candidates, and merge commits whose first-parent diff contains
-patches that the current loader missed are excluded from Laya. Load failures
-are recorded separately. No production loader workaround is applied.
+Repeat `--target owner/repo@tag` to select exact releases instead. Empty pools
+and merge commits whose first-parent diff contains patches that the current
+loader missed are excluded from Laya. Load failures are recorded separately.
+No production loader workaround is applied.
+
+A pool larger than 32 candidates is no longer excluded (dataset version 2): it
+becomes a `lexical-top` case whose candidates are the pool's first 32 in
+lexical + fill order, and Laya can only reorder that shortlist. These cases
+answer a different question — does Laya order the lexical shortlist better —
+and `compare` reports them apart (`byPool`). A relevant hunk outside the
+shortlist is invisible to every arm and every labeler. On the 2026-10-13
+corpus this turned 239 of 561 sampled claims from excluded into measurable
+(213 of them in the holdout split); the frozen file grows to 154 MB because
+shortlists keep their largest hunks.
 
 The dataset retains the original claim, complete candidate hunks, current
 selection, control selection, release inventory and exclusions. An excluded

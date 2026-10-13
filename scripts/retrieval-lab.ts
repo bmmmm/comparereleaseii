@@ -25,6 +25,12 @@ export interface LabCase {
   candidates: Candidate[];
   /** Hunks in the claim's pool. An excluded case stores none of them, only this count. */
   poolSize?: number;
+  /**
+   * "complete": candidates are the whole pool. "lexical-top": the pool was larger
+   * than maxCandidates, so candidates are its first maxCandidates in lexical +
+   * fill order and Laya can only reorder that shortlist. Absent in version 1.
+   */
+  pool?: "complete" | "lexical-top";
   baseline: Hunk[];
   expanded: Hunk[];
   excluded: string | null;
@@ -75,6 +81,12 @@ export function candidatesFor(files: DiffFile[]): Candidate[] {
   return [...unique.values()];
 }
 
+/** Lexically ranked candidates first (once each), then the rest of the pool in its own order. */
+export function lexicalFill(candidates: Candidate[], lexical: Hunk[]): Candidate[] {
+  const first = new Set(lexical.map((l) => candidates.find((h) => h.path === l.path && h.hunk === l.hunk)!));
+  return [...first, ...candidates.filter((h) => !first.has(h))];
+}
+
 /** What Laya reads for one pair: claim and diff, each fenced as untrusted. */
 export function layaState(claim: Claim, h: Hunk): string {
   return untrustedBlock("CLAIM", claim.text) + "\n" + untrustedBlock("DIFF", `${h.path}\n${h.hunk}`);
@@ -115,6 +127,7 @@ export function validateDataset(data: Dataset): void {
     assert.equal(new Set(c.candidates.map((h) => h.id)).size, c.candidates.length, "Duplicate candidates");
     for (const h of c.candidates) assert.equal(h.id, digest([h.path, h.hunk]), "Candidate content changed");
     if (data.version === 2 && c.excluded) assert.equal(c.candidates.length, 0, "An excluded case stores no pool");
+    if (data.version === 2 && !c.excluded) assert.ok(c.candidates.length <= data.budget.maxCandidates, "Shortlist exceeds maxCandidates");
   }
 }
 
@@ -172,12 +185,12 @@ export function compare(data: Dataset, ranking: Ranking, labels?: Labels) {
           return hunks.some((selected) => selected.path === h.path && selected.hunk.includes(h.hunk));
         }).length / label.relevant.length;
       };
-      return { id: c.id, release: c.release, split: c.split, fallback: laya.fallback, ms: r.ms,
+      return { id: c.id, release: c.release, split: c.split, pool: c.pool ?? "complete", fallback: laya.fallback, ms: r.ms,
         labeled: Boolean(label), baselineRecall: recall(c.baseline), expandedRecall: recall(c.expanded),
         layaRecall: recall(laya.hunks), laya: laya.hunks };
     });
-    const bySplit = (["development", "holdout"] as const).map((split) => {
-      const slice = rows.filter((r) => r.split === split);
+    const summarize = (split: "development" | "holdout", pool?: "complete" | "lexical-top") => {
+      const slice = rows.filter((r) => r.split === split && (!pool || r.pool === pool));
       const measured = slice.filter((r) => r.baselineRecall !== null && r.fallback === null);
       const mean = (key: "baselineRecall" | "expandedRecall" | "layaRecall") => measured.length
         ? measured.reduce((n, r) => n + r[key]!, 0) / measured.length : null;
@@ -187,8 +200,12 @@ export function compare(data: Dataset, ranking: Ranking, labels?: Labels) {
         applicable: slice.filter((r) => r.fallback === null).length, paired: measured.length,
         baselineRecall: mean("baselineRecall"), expandedRecall: mean("expandedRecall"), layaRecall: mean("layaRecall"),
         wins, losses, ties: measured.length - wins - losses };
-    });
-    return { bySplit, rows };
+    };
+    const splits = ["development", "holdout"] as const;
+    // The two pool kinds answer different questions, so they are also reported apart.
+    const byPool = (["complete", "lexical-top"] as const).flatMap((pool) =>
+      splits.map((split) => ({ pool, ...summarize(split, pool) })));
+    return { bySplit: splits.map((split) => summarize(split)), byPool, rows };
   });
   return { scope: "Retrieval experiment only; no verdict accuracy or production benefit measured",
     fingerprint: data.fingerprint, runtime: ranking.runtime, loadMs: ranking.loadMs, totalMs: ranking.totalMs,
@@ -305,14 +322,15 @@ async function prepare(reportsDir: string, releases: number, claims: number, tar
         }
         const candidates = candidatesFor(pool);
         if (!excluded && !candidates.length) excluded = "empty-pool";
-        if (!excluded && candidates.length > data.budget.maxCandidates) excluded = "candidate-limit";
         const baseline = await claimEvidence(releaseData, claim, data.budget);
         assert.equal(releaseData.warnings.length, 0, "Source emitted load warnings");
-        const lexical = rankHunks(claim, pool, data.budget.maxHunks);
-        const extended = [...lexical, ...candidates.filter((h) => !lexical.some((l) => l.path === h.path && l.hunk === h.hunk))];
+        const lexicalOrder = (k: number) => lexicalFill(candidates, rankHunks(claim, pool, k));
+        const extended = lexicalOrder(data.budget.maxHunks);
+        const shortlist = candidates.length > data.budget.maxCandidates;
         frozen.push({ id: digest([release, claim.id, claim.text]), release,
           split: parseInt(digest(report.repoLabel).slice(0, 8), 16) % 2 ? "holdout" : "development",
-          claim, candidates: excluded ? [] : candidates, poolSize: candidates.length, baseline: baseline.hunks,
+          claim, candidates: excluded ? [] : shortlist ? lexicalOrder(data.budget.maxCandidates).slice(0, data.budget.maxCandidates) : candidates,
+          poolSize: candidates.length, pool: shortlist ? "lexical-top" : "complete", baseline: baseline.hunks,
           expanded: capHunks(extended.slice(0, data.budget.maxHunks), data.budget.maxEvidenceChars), excluded });
       }
       data.cases.push(...frozen);

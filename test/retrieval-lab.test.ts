@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { candidatesFor, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
+import { candidatesFor, lexicalFill, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
 import type { Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
 import type { Claim } from "../src/types.ts";
 
@@ -317,4 +317,29 @@ assert module.pack_windows(head, [], tail, count, 1) == [head + tail]
 `;
   const result = spawnSync("python3", ["-B", "-c", code], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("lexical fill ranks matches first, once each, then keeps pool order", () => {
+  const pool = candidatesFor([1, 2, 3, 4].map((n) => ({ path: `f${n}.ts`, status: "modified", additions: 1, deletions: 0,
+    patch: `@@ -1 +1 @@\n+line ${n}\n` })));
+  const [a, b, c, d] = pool;
+  assert.deepEqual(lexicalFill(pool, [c!, a!, c!]).map((h) => h.path), [c!.path, a!.path, b!.path, d!.path]);
+  assert.deepEqual(lexicalFill(pool, []).map((h) => h.path), pool.map((h) => h.path));
+});
+
+test("a shortlist pool stays within maxCandidates and is reported apart", () => {
+  const { data } = fixture();
+  data.budget.maxCandidates = 1;
+  data.fingerprint = fingerprint(data);
+  assert.throws(() => validateDataset(data), /Shortlist exceeds maxCandidates/);
+  const fresh = fixture();
+  fresh.data.cases[0]!.pool = "lexical-top";
+  fresh.data.cases[0]!.poolSize = 40;
+  fresh.data.fingerprint = fresh.ranking.fingerprint = fresh.labels.fingerprint = fingerprint(fresh.data);
+  const run = compare(fresh.data, fresh.ranking, fresh.labels).runs[0]!;
+  const holdout = (pool: string) => run.byPool.find((p) => p.pool === pool && p.split === "holdout")!;
+  assert.equal(holdout("lexical-top").paired, 1);
+  assert.equal(holdout("complete").paired, 0);
+  assert.equal(run.bySplit[1]!.paired, 1);
+  assert.equal(run.rows[0]!.pool, "lexical-top");
 });
