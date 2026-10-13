@@ -312,8 +312,19 @@ assert module.pack_windows(head, lines, tail, count, len(whole)) == [whole]
 windows = module.pack_windows(head, lines, tail, count, len(head) + len(tail) + 10)
 assert windows == [head + "\\naaaa\\nbbbb" + tail, head + "\\ncccc\\ndddd" + tail], windows
 assert all(len(w) <= len(head) + len(tail) + 10 for w in windows)
+# A line no window can hold is cut into pieces that fit alone (9 chars here), and
+# the remainder shares a window with the next line like any other line would.
 long = module.pack_windows(head, ["x" * 50, "ab"], tail, count, len(head) + len(tail) + 10)
-assert long == [head + "\\n" + "x" * 50 + tail, head + "\\nab" + tail], long
+assert long == [head + "\\n" + "x" * 9 + tail] * 5 + [head + "\\nxxxxx\\nab" + tail], long
+assert all(len(w) <= len(head) + len(tail) + 10 for w in long)
+# A later piece keeps the line's diff marker, so a fragment of an added line is
+# still an added line; a window that fits whole is left exactly as it is.
+marked = module.pack_windows(head, ["+" + "y" * 20], tail, count, len(head) + len(tail) + 10)
+assert marked == [head + "\\n+yyyyyyyy" + tail] * 2 + [head + "\\n+yyyy" + tail], marked
+# Every hunk ends in an empty line (the split keeps the trailing newline); it
+# stays a line of its own and is never dropped by the cut.
+blank = module.pack_windows(head, ["aaaa", "", "bbbb"], tail, count, len(head) + len(tail) + 7)
+assert blank == [head + "\\naaaa\\n" + tail, head + "\\nbbbb" + tail], blank
 assert module.pack_windows(head, [], tail, count, 1) == [head + tail]
 `;
   const result = spawnSync("python3", ["-B", "-c", code], { encoding: "utf8" });

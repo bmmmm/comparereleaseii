@@ -389,3 +389,29 @@ opt-in flag; production stays untouched.
 with windowing (a single long line is the likely cause, not checked). Verdict
 accuracy, general injection resistance and end-to-end latency, as
 pre-registered.
+
+### Addendum, 2026-10-13: the one fallback, re-measured
+
+The fallback above was two SVG path lines of 2,198 and 5,640 characters in
+`Maccy/AppIcon.icon/Assets/*.svg`: the windowing cut on line boundaries only,
+and a line no window could hold stayed over budget by design. `laya-rank.py`
+now cuts such a line into pieces that fit on their own, each later piece
+keeping the line's diff marker (the ranking JSON's `windowing` string says
+so); every line that fits, the empty one each hunk ends in included, passes
+through untouched. A first re-run dropped those empty lines and moved 58
+windowed scores for a reason that had nothing to do with the cut — a reviewer
+caught it, and that run (`ranking2.json`) counts for nothing. The corrected
+run (`ranking3.json`, `comparison3.json`) is the controlled repeat on the same
+frozen sample and labels: 79 claims, no error, no truncation, no fallback,
+354 s; every single-window score is identical to run 1, and of the 140
+windowed pairs exactly the two cut hunks changed (now 4 and 8 windows). The
+complete pool pairs 41 claims instead of 40: `claimEvidence` 0.604, lexical +
+fill 0.634, Laya 0.519, W/L/T 5/16/20, p 0.996; the shortlist row is
+unchanged. The verdict is the same in every digit that matters.
+
+The `merge-diff-unread` exclusion in the census (98 of 561 sampled claims)
+was a loader gap, not a property of the claims: `git show` prints no patch for
+a clean merge commit, so the local source's `commitFiles` came back empty where
+the GitHub commit endpoint lists the first-parent diff. Fixed the same day in
+`src/sources/local.ts` (`--diff-merges=first-parent`, issue #20); the next
+`prepare` over the corpus excludes nothing for that reason.

@@ -46,16 +46,43 @@ def pack_windows(head, lines, tail, count, room):
     """Contiguous line windows whose whole state fits ``room`` tokens.
 
     A pair that fits stays one window, byte-identical to the unwindowed state.
-    A single line too long for any window stays alone and over budget, so Laya
-    reports it truncated and the case falls back instead of scoring a fragment.
+    A single line too long for any window is cut into pieces that fit on their
+    own (a minified SVG path, a lockfile hash line), so the case is scored on
+    fragments instead of falling back whole. Every line that fits — the empty
+    one included — passes through untouched, so a pair without an over-long
+    line windows exactly as before. A piece that cannot be cut any further
+    stays over budget, and Laya's truncation flag reports it.
     """
     def state(window):
         return head + ("\n" + "\n".join(window) if window else "") + tail
 
+    def pieces(line):
+        # A later piece keeps the line's diff marker: a fragment of an added
+        # line must not read as context or as a removal (SVG path data is
+        # full of "-5.2"), and no piece starts bare, so a cut can never
+        # complete a frame marker across the inserted newline.
+        marker = line[:1] if line[:1] in "+- " else ""
+        out, rest = [], line
+        while rest and count(state([rest])) > room:
+            lo, hi = 1, len(rest) - 1
+            while lo < hi:  # longest prefix that fits alone
+                mid = (lo + hi + 1) // 2
+                if count(state([rest[:mid]])) <= room:
+                    lo = mid
+                else:
+                    hi = mid - 1
+            if lo <= len(marker) or count(state([rest[:lo]])) > room:
+                break  # no progress possible: the rest stays over budget
+            out.append(rest[:lo])
+            rest = marker + rest[lo:]
+        if rest or not out:
+            out.append(rest)
+        return out
+
     if count(state(lines)) <= room:
         return [state(lines)]
     windows, current = [], []
-    for line in lines:
+    for line in [piece for line in lines for piece in pieces(line)]:
         if current and count(state(current + [line])) > room:
             windows.append(state(current))
             current = [line]
@@ -112,7 +139,7 @@ def main():
         "question": QUESTION,
         "maxTokens": agent.cfg["max_len"],
         "stateTokens": room,
-        "windowing": "contiguous lines, each window re-headed with the hunk's @@ line; score = max over windows",
+        "windowing": "contiguous lines, each window re-headed with the hunk's @@ line; a line too long for one window is cut into pieces that fit; score = max over windows",
     }
     runs = []
     for repeat in range(args.repeats):
