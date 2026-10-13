@@ -408,6 +408,11 @@ windowed pairs exactly the two cut hunks changed (now 4 and 8 windows). The
 complete pool pairs 41 claims instead of 40: `claimEvidence` 0.604, lexical +
 fill 0.634, Laya 0.519, W/L/T 5/16/20, p 0.996; the shortlist row is
 unchanged. The verdict is the same in every digit that matters.
+Run 3's 354 s against run 1's 325 s is noise, not the cut: the Maccy case
+alone moved 0.25 s, the 23 single-window cases — which never reach the cut —
+slowed more (+13.7 %) than the 56 windowed ones (+7.3 %), and a fourth run of
+the same code (`ranking4.json`) took 315 s with every score, windowed or not,
+byte-identical to run 3.
 
 The `merge-diff-unread` exclusion in the census (98 of 561 sampled claims)
 was a loader gap, not a property of the claims: `git show` prints no patch for
