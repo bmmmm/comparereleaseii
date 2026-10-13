@@ -325,3 +325,67 @@ worker error), the run is invalid; the cause is fixed and the run repeated
 against the same frozen sample and labels. The development split is not
 read. Not measured by this run: verdict accuracy, general injection
 resistance, end-to-end latency.
+
+## Fitness run 2 — results, 2026-10-13
+
+Measured against the pre-registration above, on the frozen sample
+`537cb38b…` (79 holdout claims: 41 complete pools, 38 lexical shortlists).
+Artifacts: `tmp/laya-lab/fitness2/` (labels-claude.json, labels-codex.json,
+agreement.json, arbitrated-labels.json, labels-final.json, ranking.json,
+comparison.json; not committed).
+
+**Labels.** Both blind labelers covered all 79 claims. Per-hunk kappa 0.839;
+48 claims agreed, 31 disputed on 128 hunks. One deviation from the
+pre-registration: the user delegated the arbitration of the 31 disputed
+claims to a third model session (Claude Fable 5.1, instructed to decide
+logically and to run small checks where unclear) instead of deciding on the
+review page. The arbiter saw what the page shows — claim, pool, both
+labelers' choices and rationales — and no arm or score, and is recorded as
+labeler `claude-arbiter`. Checks it ran before deciding: the vaultwarden
+advisory texts (GHSA-455c-vgg9-jxw8 is the orphaned cross-organization
+collection link in `share_cipher_by_uuid`; the 1.36.0 release body files the
+email-verification change under "SSO existing-user binding", not under the
+CSRF advisories), reva #687 as the backport of #681, the file lists of
+opencloud web #2688/#2707 and omlx #2690, the web v7.1.2/v7.1.3 release
+bodies, and the zen-browser clone's history for gh-14843. Outcome: 14 of the
+128 contested hunks relevant, 114 not — the arbiter was stricter than either
+labeler, rejecting all 59 hunks only Codex had marked (plumbing, mechanical
+refactors, lockfiles, a `.Trash` constant substitution) and 55 of the 69 only
+Claude had marked (comment-only and docstring hunks, import lines, migration
+notes). The 14 kept: the `WEB_ASSETS_VERSION` bump that is the only hunk
+tying two web-frontend fixes to an opencloud release, the three modal-height
+hunks that PR #2688 ships as the "won't overlap certain views" half of the
+collapsible upload dialog, and the go.mod/go.sum bump plus the substantive
+Ignorer hunks for "Backport #681". The arbiter shares a vendor with one
+labeler; the pre-registered design avoided that and this run did not.
+
+**Ranking.** 79 claims, no worker error, 325 s in total (mean 4.1 s per
+claim, max 12.1 s; up to 32 pairs and 8 windows per claim). One fallback:
+Maccy 2.7.1, `context-truncated` on a pool whose longest hunk is 6.1 k
+characters — 1.3 % of the labeled claims, under the 5 % validity bar. Controls
+reproduced all 33 scores of 2026-10-05, one window each.
+
+**Holdout, per pool kind** (recall = labeled relevant hunks among the six
+selected; W/L/T and p are Laya against lexical + fill, one-sided sign test):
+
+| pool | claims | paired | `claimEvidence` | lexical + fill | Laya | W/L/T | p |
+| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| complete | 41 | 40 | 0.602 | 0.634 | 0.516 | 5/16/19 | 0.996 |
+| lexical-top | 38 | 30 | 0.522 | 0.537 | 0.170 | 5/19/6 | 0.999 |
+
+Unpaired: the one fallback (complete) and eight shortlist claims whose label
+holds no relevant hunk — seven agreed by both labelers, one arbitrated (a
+bare "File actions" heading).
+
+**Verdict against the rule.** Laya fails all three conditions in both pool
+kinds: lower mean recall than lexical + fill, more losses than wins, p far
+from 0.05. The isolation recommendation stands, now with numbers. On
+shortlists the reorder is much worse than the lexical order it reorders
+(0.17 against 0.54): Laya's pair score moves relevant hunks out of the top
+six far more often than it moves them in. Nothing in this run argues for an
+opt-in flag; production stays untouched.
+
+**Open, not measured here.** Why one 6.1 k-character hunk still truncates
+with windowing (a single long line is the likely cause, not checked). Verdict
+accuracy, general injection resistance and end-to-end latency, as
+pre-registered.
