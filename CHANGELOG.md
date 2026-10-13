@@ -4,8 +4,46 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ## Unreleased
 
+### Added
+
+- **The report lists the default values a release moves, and whether a note
+  names them.** A flipped default is the cheapest consequential change a
+  release can carry, and nothing in the report answered "did one move, and
+  did anyone say so?" — openai/codex rust-v0.157.0 flipped
+  `daemon_auto_start` from `false` to `true` in 2.4k chars, the note said
+  "background-server", and the claim check read it as `partial`.
+  `ReleaseSurface.defaults` (`DefaultChange { name, from, to, file,
+  documented }`) holds one entry per removed/added line pair identical but
+  for one literal, in a config file or settings-shaped JSON, or on a
+  defaults/features/settings source path or a line that calls itself a
+  default; an enclosing `key:` names a generic owner (`default_enabled`).
+  `documented` means a claim carries the name as a whole token — `port` is
+  not named by "support". All three renderers show `defaults changed (⚠ = no
+  note names it)`, unnamed first. Informational, never scored: the README
+  validation table stands. Setter arguments (`.promisc(false)`) are measured
+  and deliberately not shipped — `pnpm defaults-census` (new) found 88 of 96
+  such toggles unnamed in the corpus, nearly all layout widths and i18n
+  keys. Removed settings-JSON keys now join the key delta as `−key`.
+  `docs/field-cases.md` records the four releases behind this, each with a
+  fixture the test suite runs.
+
 ### Changed
 
+- **The findings pass reads what matters first.** It read 7 of codex
+  0.157.0's 1091 changed files, and none of them was the one that flipped a
+  default. Vendored paths no longer enter the plan (corpus: vendored files
+  read 41 → 0); test files carry the tests weight, never the sensitive
+  boost, and sort after their subsystem's source; a directory holding ≥ 80 %
+  of a release's files is split by its second segment; and a reserved
+  `(defaults)` read, taken from the existing budget, puts the files that
+  carry a moved default in front of the judge first — whole files only.
+  Corpus-wide the pass reads 6.49 % → 7.68 % of changed files. No verdict
+  moves.
+- **A local server's address and key are read from the environment, then
+  the package's own `.env`, then `~/.env`.** Only `OPENAI_BASE_URL` and
+  `OPENAI_API_KEY` from the environment were read, so a per-application key
+  in a `.env` file never took effect. oMLX's own spelling
+  (`OMLX_URL`/`OMLX_API_KEY`) is accepted too; `OPENAI_*` wins.
 - **A merge commit's body line is the PR title a squash subject would carry —
   `SCORING_GENERATION` is 8.** An auto-changelog line ("Title by @author in
   #N") whose title matches its anchor commit's squash SUBJECT has always been
@@ -30,6 +68,10 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **Laya models are never picked as a judge.** Local discovery could
+  auto-select or calibrate a Laya model, which ranks typed decisions and
+  does not generate text; it is now filtered out of discovery, and naming
+  one with `--engine openai --model` fails with a message saying why.
 - **An empty release list that contradicts the state is a load failure, not
   "up to date"** (#19). During the 2026-08-17 GitHub incident the REST
   release list returned `[]` for every repository while the rest of the API
