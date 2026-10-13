@@ -831,6 +831,36 @@ const MUTANTS: Mutant[] = [
     replace: "const alloc = Math.min(PER_CALL_CHARS, Math.max(remaining, MIN_CALL_CHARS));",
   },
   {
+    guard: "vendored code is never findings evidence",
+    file: "src/findings.ts",
+    find: "      !VENDORED_PATH.test(f.path),",
+    replace: "      true,",
+  },
+  {
+    guard: "a test is read after its subsystem's source files",
+    file: "src/findings.ts",
+    find: "  Number(isTestFile(a)) - Number(isTestFile(b)) ||\n",
+    replace: "",
+  },
+  {
+    guard: "a test never carries the sensitive-path boost, whichever spelling names it",
+    file: "src/findings.ts",
+    find: "const sensitive = !test && sensitiveCategory(f.path) ? 4 : 0;",
+    replace: "const sensitive = sensitiveCategory(f.path) ? 4 : 0;",
+  },
+  {
+    guard: "a directory holding most of the release is a container, grouped by its second segment",
+    file: "src/findings.ts",
+    find: "const CONTAINER_SHARE = 0.8;",
+    replace: "const CONTAINER_SHARE = 2;",
+  },
+  {
+    guard: "a moved default is read first, inside a reserved slice of the budget",
+    file: "src/findings.ts",
+    find: "export const RESERVED_CHARS = 4000;",
+    replace: "export const RESERVED_CHARS = 0;",
+  },
+  {
     guard: "a lens never hides a finding addressed to everyone",
     file: "src/report.ts",
     find: '(f) => f.audience === lens || f.audience === "everyone"',
@@ -851,8 +881,8 @@ const MUTANTS: Mutant[] = [
   {
     guard: "changelog diffs are never findings evidence — the notes cannot describe themselves",
     file: "src/findings.ts",
-    find: "if (isChangelogPath(f.path)) continue;",
-    replace: "",
+    find: "      !isChangelogPath(f.path) &&",
+    replace: "      true &&",
   },
   {
     guard: "coverage is earned by the commit's own diff, never by resemblance alone",

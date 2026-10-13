@@ -7,6 +7,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_FINDINGS_BUDGET,
+  RESERVED_CHARS,
+  RESERVED_NAME,
+  containerOf,
   planFindings,
   subsystemOf,
   summarizeShipped,
@@ -118,6 +121,85 @@ test("planFindings spends the budget top-priority-first and declares the rest", 
   // 1,000 chars left is below a useful read — the budget is a hard cap,
   // the subsystem beyond it is declared unread, never silently skipped.
   assert.equal(plan[1].alloc, 0);
+});
+
+test("vendored code is never findings evidence — it is someone else's release", () => {
+  const files = [
+    file("vendor/github.com/x/y/z.go", "@@ -1 +1 @@\n-a\n+b\n", 900, 900),
+    file("src/core/a.go", "@@ -1 +1 @@\n-a\n+b\n", 20, 10),
+  ];
+  assert.deepEqual(planFindings(files, 21000).map((p) => p.name), ["src/core"]);
+});
+
+test("within a subsystem a test is read after every source file, boost or not", () => {
+  // The Rust spelling neither fileCategory nor sensitiveCategory knows: on an
+  // auth path, 520 added lines — codex 0.157.0's first read in `codex-rs`.
+  const files = [
+    file("src/login/gateway_auth_login_tests.rs", "@@ -1 +1 @@\n-a\n+b\n", 520, 0),
+    file("src/login/token_test.go", "@@ -1 +1 @@\n-a\n+b\n", 300, 0),
+    file("src/login/auth.rs", "@@ -1 +1 @@\n-a\n+b\n", 14, 9),
+  ];
+  const [plan] = planFindings(files, 21000);
+  assert.deepEqual(
+    plan.files.map((f) => f.path),
+    ["src/login/auth.rs", "src/login/gateway_auth_login_tests.rs", "src/login/token_test.go"],
+  );
+});
+
+test("a directory holding most of the release groups by its second segment", () => {
+  const paths = [
+    "codex-rs/core/src/a.rs",
+    "codex-rs/tui/src/b.rs",
+    "codex-rs/login/src/c.rs",
+    "codex-rs/Cargo.lock",
+    "README.md",
+  ];
+  assert.equal(containerOf(paths), "codex-rs");
+  // 4 of 5 is the bar; 3 of 5 is a big directory, not a container.
+  assert.equal(containerOf([...paths.slice(0, 3), "docs/a.md", "sdk/b.ts"]), null);
+  // A flat directory, however dominant, has no second segment to group by.
+  assert.equal(containerOf(["Maccy/a.swift", "Maccy/b.swift", "Maccy/c.swift"]), null);
+  assert.equal(subsystemOf("codex-rs/core/src/a.rs", "codex-rs"), "codex-rs/core");
+  assert.equal(subsystemOf("codex-rs/Cargo.lock", "codex-rs"), "codex-rs");
+  assert.equal(subsystemOf("codex-rs/core/src/a.rs"), "codex-rs");
+  const plan = planFindings(
+    paths.map((p) => file(p, "@@ -1 +1 @@\n-a\n+b\n")),
+    DEFAULT_FINDINGS_BUDGET,
+  );
+  assert.deepEqual(
+    plan.map((p) => p.name).sort(),
+    ["(root)", "codex-rs", "codex-rs/core", "codex-rs/login", "codex-rs/tui"],
+  );
+});
+
+test("a moved default is read first, inside a reserved slice of the same budget", () => {
+  const flip = file(
+    "codex-rs/features/src/lib.rs",
+    "@@ -1,3 +1,3 @@\n key: \"daemon_auto_start\",\n-default_enabled: false,\n+default_enabled: true,\n",
+    1,
+    1,
+  );
+  const big = file("codex-rs/core/src/big.rs", `@@ -1 +1 @@\n-a\n+${"b".repeat(30000)}\n`, 1, 1);
+  // A second carrier that alone fills the slice: OpenCloud's
+  // `introductionVersion` stamp, 4k of config.go churn.
+  const stamp = file(
+    "services/webfinger/pkg/config/config.go",
+    `@@ -1,3 +1,3 @@\n-  introductionVersion: "%%NEXT%%",\n+  introductionVersion: "6.0.0",\n+${"b".repeat(RESERVED_CHARS)}\n`,
+    40,
+    1,
+  );
+  const plan = planFindings([big, stamp, flip], 20000);
+  assert.equal(plan[0].name, RESERVED_NAME);
+  // Smallest carrier first — the slice is for the hunk churn buries.
+  assert.deepEqual(plan[0].files.map((f) => f.path), [flip.path, stamp.path]);
+  assert.equal(plan[0].alloc, RESERVED_CHARS);
+  // Taken from the budget: the subsystem read shrinks, the cap holds, and
+  // the reserved file is not read a second time in its own subsystem.
+  assert.equal(plan[1].alloc, 20000 - RESERVED_CHARS);
+  assert.ok(!plan[1].files.some((f) => f.path === flip.path));
+  assert.equal(plan.reduce((s, p) => s + p.alloc, 0), 20000);
+  // Nothing to reserve, nothing reserved.
+  assert.equal(planFindings([big], 20000)[0].name, "codex-rs/core");
 });
 
 test("a mid-size remainder still buys a smaller second read", () => {
