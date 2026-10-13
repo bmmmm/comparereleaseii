@@ -106,8 +106,38 @@ const MUTANTS: Mutant[] = [
   {
     guard: "retrieval lab: the worker gets no pairs for an excluded case",
     file: "scripts/retrieval-lab.ts",
-    find: "candidates: c.excluded ? [] : c.candidates.map((h) => ({ id: h.id, state: layaState(c.claim, h) }))",
-    replace: "candidates: c.candidates.map((h) => ({ id: h.id, state: layaState(c.claim, h) }))",
+    find: "candidates: c.excluded ? [] : c.candidates.map((h) => ({ id: h.id, ...layaParts(c.claim, h) }))",
+    replace: "candidates: c.candidates.map((h) => ({ id: h.id, ...layaParts(c.claim, h) }))",
+  },
+  {
+    guard: "retrieval lab rejects invalid window counts",
+    file: "scripts/retrieval-lab.ts",
+    find: 'assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");',
+    replace: 'assert.ok(true, "Invalid window count");',
+  },
+  {
+    guard: "retrieval lab: the window cut keeps the @@ line in the head",
+    file: "scripts/retrieval-lab.ts",
+    find: "rows.slice(0, header + 1).join",
+    replace: "rows.slice(0, header).join",
+  },
+  {
+    guard: "retrieval lab: a fitting pair stays one window",
+    file: "scripts/laya-rank.py",
+    find: "if count(state(lines)) <= room:",
+    replace: "if False:",
+  },
+  {
+    guard: "retrieval lab: a window closes before it overflows",
+    file: "scripts/laya-rank.py",
+    find: "if current and count(state(current + [line])) > room:",
+    replace: "if current and count(state(current + [line])) > room * 2:",
+  },
+  {
+    guard: "retrieval lab: the last window is kept",
+    file: "scripts/laya-rank.py",
+    find: "    windows.append(state(current))\n    return windows",
+    replace: "    return windows",
   },
   {
     guard: "retrieval lab: blind review never shows an excluded case",

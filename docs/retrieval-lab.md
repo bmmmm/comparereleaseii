@@ -113,6 +113,19 @@ reported an error, the case falls back to its current selection and is excluded
 from paired quality measurement. Malformed rows or stale dataset/label hashes
 fail the comparison. Ties retain the frozen candidate order.
 
+Laya reads 961 tokens of state (1024 minus a 62-token question prefix and a
+separator, checkpoint above); 268 of the corpus's 2,077 eligible pairs are
+longer, and chars per token run from 1.09 to a median of 2.71, so no character
+budget is safe. The worker therefore windows each pair with Laya's own
+tokenizer: contiguous body lines, every window re-headed with the claim and the
+hunk's `@@` line, as many lines as fit; the candidate's score is the maximum
+over its windows and the ranking records how many there were. A pair that fits
+stays one window, identical to the unwindowed state. A single line that cannot
+fit still reports truncation. On a six-claim smoke sample this turned three
+cases that would have fallen back for truncation (a 424k-char hunk, 194
+windows, ~14 s per claim) into scored ones; short pools stay at one window per
+candidate and ~200 ms per claim.
+
 Recall counts independently labeled relevant hunks that reach the selection
 in full, on the correct path. A clipped prefix does not count. Results report
 labeled, applicable and paired claims separately for development and holdout,

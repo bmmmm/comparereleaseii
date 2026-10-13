@@ -47,7 +47,8 @@ export interface Ranking {
   runs: Array<{ cases: Array<{
     id: string;
     ms: number;
-    scores: Array<{ id: string; score: number; truncated: boolean }>;
+    /** score is the maximum over the candidate's windows; absent windows means one (version-1 rankings). */
+    scores: Array<{ id: string; score: number; truncated: boolean; windows?: number }>;
     error?: string;
   }> }>;
 }
@@ -79,10 +80,29 @@ export function layaState(claim: Claim, h: Hunk): string {
   return untrustedBlock("CLAIM", claim.text) + "\n" + untrustedBlock("DIFF", `${h.path}\n${h.hunk}`);
 }
 
-/** The worker's input: only eligible cases carry pairs, each with its fenced state. */
+const DIFF_OPEN = "\n-----BEGIN UNTRUSTED DIFF-----\n";
+
+/**
+ * `layaState` cut where the worker may window it: everything up to the hunk's
+ * `@@` line, the escaped body lines, and the closing marker. Laya reads 961
+ * tokens of state; 13 % of the corpus's pairs are longer, and a truncated
+ * pair invalidates its whole case. The cut is taken from the fenced text, so
+ * any contiguous run of lines is a substring of an already-escaped block.
+ */
+export function layaParts(claim: Claim, h: Hunk): { head: string; lines: string[]; tail: string } {
+  const state = layaState(claim, h);
+  const open = state.indexOf(DIFF_OPEN) + DIFF_OPEN.length;
+  const rows = state.slice(open).split("\n");
+  const header = rows.findIndex((r) => r.startsWith("@@"));
+  const close = rows.length - 1;
+  return { head: state.slice(0, open) + rows.slice(0, header + 1).join("\n"),
+    lines: rows.slice(header + 1, close), tail: "\n" + rows[close] };
+}
+
+/** The worker's input: only eligible cases carry pairs, each cut for windowing. */
 export function workerInput(data: Dataset) {
   return { fingerprint: data.fingerprint, cases: data.cases.map((c) => ({ id: c.id, excluded: c.excluded,
-    candidates: c.excluded ? [] : c.candidates.map((h) => ({ id: h.id, state: layaState(c.claim, h) })) })) };
+    candidates: c.excluded ? [] : c.candidates.map((h) => ({ id: h.id, ...layaParts(c.claim, h) })) })) };
 }
 
 export function validateDataset(data: Dataset): void {
@@ -111,6 +131,7 @@ export function layaSelection(c: LabCase, row: Ranking["runs"][number]["cases"][
     assert.ok(s.score >= 0, "Negative Laya probability");
     assert.ok(s.score <= 1, "Laya probability exceeds one");
     assert.equal(typeof s.truncated, "boolean", "Missing truncation diagnostic");
+    assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");
   }
   if (row.scores.some((s) => s.truncated)) return { hunks: c.baseline, fallback: "context-truncated" };
   const scores = new Map(row.scores.map((s) => [s.id, s.score]));
