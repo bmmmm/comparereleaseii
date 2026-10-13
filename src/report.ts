@@ -7,6 +7,7 @@ import type {
   BumpJoin,
   ClaimResult,
   ComponentCheck,
+  DefaultChange,
   Finding,
   FindingKind,
   PinBump,
@@ -97,6 +98,33 @@ export function configSurfaceEntries(
     ...s.configKeys.removed.map((v) => `−key ${wrap(v)}`),
     ...(s.hosts?.added ?? []).map((v) => `+host ${wrap(v)}`),
     ...(s.hosts?.removed ?? []).map((v) => `−host ${wrap(v)}`),
+  ];
+}
+
+/**
+ * The defaults a release moves, undocumented first: a flip no note names is
+ * the entry a reader must not miss, and the one the claim check cannot see
+ * (truth is not salience). `⚠` marks it; each renderer's label says so.
+ */
+export function defaultChangeEntries(
+  s: ReleaseSurface,
+  wrap: (value: string) => string = (v) => v,
+): string[] {
+  // The same move in several files is one fact (OpenCloud stamps
+  // `introductionVersion "%%NEXT%%" → "6.0.0"` into four config.go files).
+  const counts = new Map<string, { d: DefaultChange; n: number }>();
+  for (const d of s.defaults ?? []) {
+    const key = `${d.documented}\0${d.name}\0${d.from}\0${d.to}`;
+    const hit = counts.get(key);
+    if (hit) hit.n++;
+    else counts.set(key, { d, n: 1 });
+  }
+  const all = [...counts.values()];
+  const entry = ({ d, n }: { d: DefaultChange; n: number }): string =>
+    `${wrap(d.name)} ${wrap(d.from)}→${wrap(d.to)}${n > 1 ? ` ×${n}` : ""}`;
+  return [
+    ...all.filter((x) => !x.d.documented).map((x) => `⚠ ${entry(x)}`),
+    ...all.filter((x) => x.d.documented).map(entry),
   ];
 }
 
@@ -512,6 +540,16 @@ export function printTerminal(report: Report): void {
         ),
       );
     }
+    const defs = defaultChangeEntries(surf);
+    if (defs.length) {
+      const shown = defs.slice(0, 10);
+      const tone = surf.defaults?.some((d) => !d.documented) ? c.yellow : c.dim;
+      console.log(
+        tone(
+          `  defaults changed (⚠ = no note names it): ${safe(shown.join(", "))}${defs.length > shown.length ? ` … +${defs.length - shown.length} more` : ""}`,
+        ),
+      );
+    }
     if (surf.migrations.length) {
       console.log(
         c.dim(
@@ -749,6 +787,8 @@ export function toMarkdown(report: Report): string {
     }
     const cfg = configSurfaceEntries(surf, (v) => `\`${v}\``);
     if (cfg.length) lines.push(`- config surface: ${cfg.join(", ")}`);
+    const defs = defaultChangeEntries(surf, (v) => `\`${v}\``);
+    if (defs.length) lines.push(`- defaults changed (⚠ = no note names it): ${defs.join(", ")}`);
     if (surf.migrations.length) {
       lines.push(`- migrations: ${surf.migrations.map((m) => `\`${m}\``).join(", ")}`);
     }

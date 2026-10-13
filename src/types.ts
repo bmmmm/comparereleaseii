@@ -281,6 +281,21 @@ export interface ConfigDelta {
 }
 
 /**
+ * One default value the diff moves — the same key, a different literal.
+ * Informational, never scored.
+ */
+export interface DefaultChange {
+  /** The key that owns the value: a config key, a struct field, or the
+   * enclosing entry's `key:` when the struct literal spells one. */
+  name: string;
+  from: string;
+  to: string;
+  file: string;
+  /** Some claim names the key — by identifier, or as a substring of its text. */
+  documented: boolean;
+}
+
+/**
  * What actually shipped, read deterministically off the diff — no LLM, no
  * scoring. The category rollup is total (every file lands in one bucket);
  * the config surface is extracted from changed lines only, so an unchanged
@@ -310,6 +325,15 @@ export interface ReleaseSurface {
   migrations: string[];
   /** Route/handler/API-spec files touched. */
   apiRoutes: string[];
+  /**
+   * A default or setting value this release moves: same key, different
+   * literal, in a config-category file or a defaults/features/settings
+   * source path. The class the codex 0.157.0 daemon flip and the OpenCloud
+   * 6.0.0 stop-word flip belong to — a value change is the opposite of a
+   * moved line, so the key delta above cancels it. Absent in surfaces
+   * recorded before the field existed.
+   */
+  defaults?: DefaultChange[];
 }
 
 export type FindingKind = "breaking" | "security" | "behavior" | "feature" | "internal";

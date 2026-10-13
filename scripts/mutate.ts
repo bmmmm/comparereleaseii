@@ -765,6 +765,30 @@ const MUTANTS: Mutant[] = [
     replace: 'const ownFlags = category === "source" && !STYLE_FILE.test(f.path);',
   },
   {
+    guard: "a test's expectation is not a default this release moves",
+    file: "src/substance.ts",
+    find: "if (VENDORED_PATH.test(path) || TEST_PATH.test(path) || EXAMPLE_PATH.test(path)) return null;",
+    replace: "if (VENDORED_PATH.test(path) || EXAMPLE_PATH.test(path)) return null;",
+  },
+  {
+    guard: "only a line identical but for one literal is a value change — a rewrite pairs with nothing",
+    file: "src/substance.ts",
+    find: "if (skeleton(plus[i], plits) !== mskel) continue;",
+    replace: "if (false) continue;",
+  },
+  {
+    guard: "a moved default is documented only when a note names its key",
+    file: "src/substance.ts",
+    find: "documented: namedByClaims(c.name, claims),",
+    replace: "documented: true,",
+  },
+  {
+    guard: "a settings-JSON key counts in the key delta — zed's removed auto_replace_emoji_shortcode",
+    file: "src/substance.ts",
+    find: "  if (JSON_FILE.test(path)) {\n    const m = line.match(JSON_KEY);\n    return m ? [m[1]] : [];\n  }\n",
+    replace: "",
+  },
+  {
     guard: "a component that carries a stylesheet ships no flags — CSS custom properties spell alike",
     file: "src/substance.ts",
     find: "const STYLE_FILE = /\\.(css|scss|sass|less|styl|vue)$/i;",

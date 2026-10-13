@@ -8,6 +8,7 @@ import {
   carriedOver,
   componentBits,
   configSurfaceEntries,
+  defaultChangeEntries,
   countVerdicts,
   findingTagger,
   lensFindings,
@@ -335,11 +336,13 @@ function surfaceHtml(s: ReleaseSurface): string {
     )
     .join("");
   const cfg = configSurfaceEntries(s);
+  const defs = defaultChangeEntries(s);
   const facts = [
     s.symbols.length
       ? `symbols: ${esc(s.symbols.join(", "))}${s.moreSymbols ? ` (+${s.moreSymbols} more)` : ""}`
       : "",
     cfg.length ? `config surface: ${esc(cfg.join(", "))}` : "",
+    defs.length ? `defaults changed (⚠ = no note names it): ${esc(defs.join(", "))}` : "",
     s.migrations.length ? `migrations: ${esc(s.migrations.join(", "))}` : "",
     s.apiRoutes.length ? `api surface: ${esc(s.apiRoutes.join(", "))}` : "",
   ]

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { commitSurface, releaseSurface } from "../src/substance.ts";
 import { fileCategory } from "../src/metrics.ts";
-import type { DiffFile } from "../src/types.ts";
+import type { Claim, DiffFile } from "../src/types.ts";
 
 function df(path: string, patch?: string, churn = 1): DiffFile {
   return { path, status: "modified", additions: churn, deletions: 0, patch };
@@ -335,4 +335,149 @@ test("commitSurface describes a commit by observation, empty diffs stay silent",
   assert.match(line!, /−env OC_LEGACY_UPLOAD/);
   assert.match(line!, /migration/);
   assert.equal(commitSurface([]), undefined);
+});
+
+// ---------- default changes ----------
+
+function claimOf(text: string): Claim {
+  return {
+    id: 0,
+    section: "Changes",
+    text,
+    kind: "change",
+    prNumbers: [],
+    shas: [],
+    advisories: [],
+    codeSpans: [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]),
+  };
+}
+
+/** openai/codex rust-v0.157.0: the daemon flip, its `key:` two context lines up. */
+const CODEX_FEATURES = df(
+  "codex-rs/features/src/lib.rs",
+  `@@ -937,12 +940,8 @@ pub const FEATURES: &[FeatureSpec] = &[
+     FeatureSpec {
+         id: Feature::DaemonAutoStart,
+         key: "daemon_auto_start",
+-        stage: Stage::Experimental {
+-            name: "Automatically start the background server",
+-            menu_description: "Use the shared local server for new sessions.",
+-            announcement: "Automatic background server startup can now be enabled.",
+-        },
+-        default_enabled: false,
++        stage: Stage::Stable,
++        default_enabled: true,
+     },
+`,
+  9,
+);
+
+/** OpenCloud 6.0.0: a struct-literal default under pkg/config/defaults/. */
+const OC_DEFAULTS = df(
+  "services/search/pkg/config/defaults/defaultconfig.go",
+  `@@ -50,7 +50,7 @@ func DefaultConfig() *config.Config {
+       Tika: config.ExtractorTika{
+         TikaURL:        "http://127.0.0.1:9998",
+-        CleanStopWords: true,
++        CleanStopWords: false,
+       },
+`,
+  2,
+);
+
+/** zed v1.11.3: a settings-JSON key removed, and a value moved. */
+const ZED_SETTINGS = df(
+  "assets/settings/default.json",
+  `@@ -1025,11 +1025,6 @@
+     "entry_primary_click_action": "project_diff",
+   },
+-  "message_editor": {
+-    // Whether to automatically replace emoji shortcodes with emoji characters.
+-    "auto_replace_emoji_shortcode": true,
+-  },
+   "agent": {
+@@ -1902,6 +1897,6 @@
+-    "copy_on_select": false,
++    "copy_on_select": true,
+     "keep_selection_on_copy": true,
+`,
+  4,
+);
+
+/** sniffnet v1.4.2: a setter toggle — class C, measured and not shipped. */
+const SNIFFNET_CAPTURE = df(
+  "src/networking/types/capture_context.rs",
+  `@@ -40,7 +40,7 @@ impl CaptureContext {
+                 let cap = Capture::from_device(device)
+-                    .promisc(true)
++                    .promisc(false)
+                     .snaplen(256);
+`,
+  2,
+);
+
+const flip = (path: string, key: string): DiffFile =>
+  df(path, `@@ -1,3 +1,3 @@\n a\n-  ${key}: false,\n+  ${key}: true,\n b\n`, 2);
+
+test("the defaults surface names each moved value by its key and says whether a note does", () => {
+  const s = releaseSurface(
+    [CODEX_FEATURES, OC_DEFAULTS, ZED_SETTINGS, SNIFFNET_CAPTURE],
+    [claimOf("Enabled automatic background-server startup for eligible interactive sessions")],
+  );
+  assert.deepEqual(s.defaults, [
+    // The entry's `key:` names the flip, not the generic `default_enabled`.
+    // The note says "background-server", never the key — that gap IS the
+    // finding the claim check cannot make: it says "true", not "salient".
+    {
+      name: "daemon_auto_start",
+      from: "false",
+      to: "true",
+      file: "codex-rs/features/src/lib.rs",
+      documented: false,
+    },
+    {
+      name: "CleanStopWords",
+      from: "true",
+      to: "false",
+      file: "services/search/pkg/config/defaults/defaultconfig.go",
+      documented: false,
+    },
+    {
+      name: "copy_on_select",
+      from: "false",
+      to: "true",
+      file: "assets/settings/default.json",
+      documented: false,
+    },
+  ]);
+  // The removed JSON keys reach the key delta: settings JSON is a config
+  // file whatever fileCategory calls it.
+  assert.deepEqual(s.configKeys.removed, ["auto_replace_emoji_shortcode", "message_editor"]);
+  // The uncovered list carries the same observation.
+  assert.match(commitSurface([CODEX_FEATURES])!, /±default daemon_auto_start false→true/);
+
+  // A note that names the key, in a code span or in prose, documents it.
+  const inSpan = releaseSurface(
+    [OC_DEFAULTS],
+    [claimOf("Search no longer strips stop words (`CleanStopWords` is off by default)")],
+  );
+  assert.equal(inSpan.defaults?.[0].documented, true);
+  const inProse = releaseSurface([OC_DEFAULTS], [claimOf("cleanstopwords now defaults to off")]);
+  assert.equal(inProse.defaults?.[0].documented, true);
+});
+
+test("a bare toggle, a vendored or test flip, a component field and a rewrite stay silent", () => {
+  const s = releaseSurface([
+    // Class C: no key owns a setter's argument, so no note could name it.
+    SNIFFNET_CAPTURE,
+    // Angular's `standalone` lives in a component, not on a defaults path.
+    flip("src/app/login/login.component.ts", "standalone"),
+    // Someone else's defaults.
+    flip("vendor/github.com/x/config/defaults.go", "Enabled"),
+    // A test's expectation.
+    flip("pkg/config/defaults_test.go", "Enabled"),
+    // Two literals in different keys: a rewrite, not a value change.
+    df("pkg/config/defaults.go", `@@ -1,3 +1,3 @@\n a\n-  retries: 3,\n+  timeout: 30,\n b\n`, 2),
+  ]);
+  assert.deepEqual(s.defaults, []);
 });

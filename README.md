@@ -147,8 +147,11 @@ the diff and independent of what the notes claim: a file-category rollup
 (source, tests, docs, ci/build, dependencies, config, migrations, assets),
 the changed symbols git's own hunk headers name, the config surface
 (environment-variable reads, `--flag` literals, config keys — moved lines
-cancel, so refactoring is not "new surface"), migrations and API-route
-files. Undocumented commits are described the same way — by what their diff
+cancel, so refactoring is not "new surface"), the default values it moves
+(same key, different literal, in a config file or a defaults/settings source
+path — marked `⚠` when no note names the key, because a flipped default is
+the smallest diff with the largest blast radius and a note that restates the
+commit still reads as "true"), migrations and API-route files. Undocumented commits are described the same way — by what their diff
 touched, not only by the subject line they chose for themselves. All of it
 works with `--judge off`; none of it is scored.
 

@@ -36,6 +36,12 @@ When writing or editing a release note or changelog entry:
 - Give any commit touching auth, crypto, CI/build config, or a dependency
   manifest its own explicit line, even a one-sentence one, even if the diff
   itself is small.
+- Name the default you changed by its key, with the old and new value
+  ("`daemon_auto_start` is now on by default"; "search no longer strips
+  stop words — `CleanStopWords` defaults to false"). A flipped default is the
+  smallest diff with the largest blast radius, and the checker lists every one
+  it finds with whether any note names the key — a note that describes the
+  feature without the key is marked as not naming it.
 - Never write a placeholder note ("misc fixes", "various improvements") for
   a commit with any user-visible effect. A placeholder is only correct for
   genuinely internal changes (formatting, comments, a behavior-preserving

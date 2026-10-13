@@ -763,3 +763,74 @@ test("a new outbound host reaches all three renderers", () => {
     assert.doesNotMatch(text, /host /, `${label} invented a host entry`);
   }
 });
+
+// A moved default is the surface entry the claim check cannot see — a note
+// that restates the commit reads as "true" however little it says — so the
+// one thing every renderer must agree on is which entries carry the ⚠ and
+// that those come first. It renders through defaultChangeEntries so that
+// agreement is structural.
+test("a default change says whether a note names it, in all three renderers", () => {
+  const r: Report = {
+    ...report(null),
+    surface: {
+      ...SURFACE,
+      defaults: [
+        {
+          name: "CleanStopWords",
+          from: "true",
+          to: "false",
+          file: "services/search/pkg/config/defaults/defaultconfig.go",
+          documented: true,
+        },
+        {
+          name: "daemon_auto_start",
+          from: "false",
+          to: "true",
+          file: "codex-rs/features/src/lib.rs",
+          documented: false,
+        },
+        // The same move stamped into two files is one fact, counted.
+        {
+          name: "introductionVersion",
+          from: '"%%NEXT%%"',
+          to: '"6.0.0"',
+          file: "services/a/config.go",
+          documented: false,
+        },
+        {
+          name: "introductionVersion",
+          from: '"%%NEXT%%"',
+          to: '"6.0.0"',
+          file: "services/b/config.go",
+          documented: false,
+        },
+      ],
+    },
+  };
+  for (const [label, text] of [
+    ["terminal", terminalOf(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    const flagged = text.search(/⚠ `?daemon_auto_start`? `?false`?→`?true/);
+    const plain = text.indexOf("CleanStopWords");
+    assert.ok(flagged >= 0, `${label} drops the ⚠ on the default no note names`);
+    assert.ok(plain >= 0, `${label} drops the documented default`);
+    assert.ok(flagged < plain, `${label} does not put the undocumented default first`);
+    assert.doesNotMatch(text, /⚠ `?CleanStopWords/, `${label} flags a default a note names`);
+    assert.match(text, /no note names it/, `${label} leaves the ⚠ unexplained`);
+    assert.equal(text.split("introductionVersion").length - 1, 1, `${label} lists one fact twice`);
+    assert.match(text, /×2/, `${label} drops the count`);
+  }
+
+  // A surface recorded before the field existed says nothing about defaults.
+  const old = { ...report(null), surface: SURFACE };
+  assert.equal(SURFACE.defaults, undefined);
+  for (const [label, text] of [
+    ["terminal", terminalOf(old)],
+    ["markdown", toMarkdown(old)],
+    ["html", toHtml(old)],
+  ] as Array<[string, string]>) {
+    assert.doesNotMatch(text, /defaults changed/, `${label} invented a defaults line`);
+  }
+});

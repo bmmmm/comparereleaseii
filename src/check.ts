@@ -443,7 +443,7 @@ export async function analyzeRelease(
       ? authorActivity(data.commits, coverage?.commitFiles ?? null)
       : undefined,
     pins: pins.length ? pins : undefined,
-    surface: data.files.length ? releaseSurface(data.files) : undefined,
+    surface: data.files.length ? releaseSurface(data.files, claims) : undefined,
     components,
     findings,
     audience: s.audience,

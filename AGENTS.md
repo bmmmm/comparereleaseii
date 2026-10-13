@@ -22,6 +22,7 @@ pnpm mutate-notes <dir> --generate  # + the model-written inverted-claim class (
 pnpm corpus-stats <reports dir>  # aggregate a watch home's reports; anonymous unless --named
 pnpm corpus-clones <reports dir> # which releases the clone cache cannot answer, and clone them
 pnpm corpus-bump-origins <dir>   # the from-version distribution SCORING.md's pin rule rests on
+pnpm defaults-census <reports dir> # moved default values per class, and whether the notes name them
 pnpm diagnose-coverage "o/r@tag" # which coverage route keeps a commit documented
 node src/cli.ts --help
 ```
