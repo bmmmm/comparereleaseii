@@ -87,7 +87,7 @@ export const VENDORED_PATH = /(^|\/)(vendor|node_modules)\//;
  * `_tests?\.<ext>$` is the Rust convention (`gateway_auth_login_tests.rs`):
  * without it that file read as auth source and took a findings slot. */
 export const TEST_PATH =
-  /(^|\/)(test|tests|__tests__|spec|e2e|integration|testdata|fixtures?|mocks?)(\/|\.)|_tests?\.[a-z0-9]+$|\.test\.|\.spec\./i;
+  /(^|\/)(test|tests|__tests__|spec|e2e|testdata|fixtures?|mocks?)(\/|\.)|_tests?\.[a-z0-9]+$|\.test\.|\.spec\./i;
 
 /** Languages whose lines can dial out. `fileCategory`'s fallback bucket is
  * "source", so without this a metadata dotfile (.all-contributorsrc) ships
@@ -201,6 +201,9 @@ const TRANSLATION_PATH = /\.lproj\/|\.strings$|(^|\/)(translations?|i18n|locales
 /** A compose file under docs/ is an example; traefik's v3.7.x releases each
  * carried six `image: traefik:v3.6 → v3.7` bumps there, none a default. */
 const EXAMPLE_PATH = /(^|\/)(docs?|examples?|samples?)\//i;
+/** `.vscode/settings.json`, `.claude/settings.json`: an editor's or a tool's
+ * settings for working ON the repo, not the product's. */
+const DOTDIR_PATH = /(^|\/)\.[\w-]+\//;
 
 /** Source paths where a literal is a default by construction (class B's
  * path arm): `codex-rs/features/src/lib.rs`, `pkg/config/defaults/`. */
@@ -223,6 +226,29 @@ const CALL_NOISE =
 const ENTRY_KEY = /\bkey\s*[:=]\s*["']([^"']{1,80})["']/;
 /** Eight lines reach past a removed five-line `stage: Experimental {…}` block. */
 const LOOKBACK_LINES = 8;
+/** Owners that name nothing on their own — the enclosing entry's key does.
+ * A specific field (`ttl`, `CleanStopWords`) keeps its name even when a
+ * `key:` sits above it (koa-session's `{ key: "koa.sess", maxAge: … }`). */
+const GENERIC_OWNER = /^(?:default|default_\w+|\w+_default|enabled|value|stage)$/i;
+
+/**
+ * The enclosing entry's `key:`, walking up within the same braces: a `}` on
+ * the way up opens a nested block to skip, a `{` closes this entry and ends
+ * the search — so a neighbouring entry's key never names this one.
+ */
+function entryKey(context: string[]): string | null {
+  let depth = 0;
+  for (let i = context.length - 1; i >= 0; i--) {
+    const line = context[i];
+    depth += (line.match(/[})\]]/g) ?? []).length - (line.match(/[{(\[]/g) ?? []).length;
+    if (depth < 0) return null;
+    if (depth === 0) {
+      const m = line.match(ENTRY_KEY);
+      if (m) return m[1];
+    }
+  }
+  return null;
+}
 /** Owners whose string value is prose or a pointer, never a default a user
  * sets: a schema description, a `$ref`, a button label, a log message. */
 const NAME_NOISE =
@@ -286,9 +312,9 @@ function singleDiff(a: Literal[], b: Literal[]): number {
   return idx;
 }
 
-function defaultsClass(path: string): Exclude<DefaultClass, "toggle"> | null {
+export function defaultsClass(path: string): Exclude<DefaultClass, "toggle"> | null {
   if (VENDORED_PATH.test(path) || TEST_PATH.test(path) || EXAMPLE_PATH.test(path)) return null;
-  if (LOCK_OR_SNAPSHOT.test(path) || TRANSLATION_PATH.test(path)) return null;
+  if (LOCK_OR_SNAPSHOT.test(path) || TRANSLATION_PATH.test(path) || DOTDIR_PATH.test(path)) return null;
   const category = fileCategory(path);
   if (category === "config") return "config";
   const segments = path.split("/");
@@ -358,8 +384,8 @@ export function defaultCandidates(
             if ((onPath || DEFAULT_LINE.test(m.line)) && !NAME_NOISE.test(owner[1])) {
               klass = cls;
               name = owner[1];
-              if (cls === "source") {
-                const entry = [...m.context].reverse().map((l) => l.match(ENTRY_KEY)?.[1]).find(Boolean);
+              if (cls === "source" && GENERIC_OWNER.test(name)) {
+                const entry = entryKey(m.context);
                 if (entry) name = entry;
               }
             }
@@ -402,13 +428,15 @@ export function defaultCandidates(
   return out;
 }
 
-/** Whether any claim names the value's owner — by identifier, or anywhere in
- * its text once the name is long enough that a substring still means it. */
+/** Whether any claim names the value's owner — by identifier, or as a whole
+ * token of its text: `port` is not named by "support", `mode` not by
+ * "model", and the ⚠ this decides is the signal the surface exists for. */
 export function namedByClaims(name: string, claims: Claim[]): boolean {
   const needle = name.toLowerCase();
+  const token = new RegExp(`(?<![\\w])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
   for (const c of claims) {
     if (extractIdentifiers(c).some((id) => id.toLowerCase() === needle)) return true;
-    if (needle.length >= 3 && c.text.toLowerCase().includes(needle)) return true;
+    if (needle.length >= 3 && token.test(c.text)) return true;
   }
   return false;
 }

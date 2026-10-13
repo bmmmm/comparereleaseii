@@ -823,6 +823,18 @@ test("a default change says whether a note names it, in all three renderers", ()
     assert.match(text, /×2/, `${label} drops the count`);
   }
 
+  // Every value comes from the diff — the party under examination. A name
+  // that is markup must reach the page as text.
+  const hostile: Report = {
+    ...report(null),
+    surface: {
+      ...SURFACE,
+      defaults: [{ name: "<img src=x onerror=1>", from: '"a"', to: '"b"', file: "config/app.json", documented: false }],
+    },
+  };
+  assert.ok(!toHtml(hostile).includes("<img"), "html renders a default name as markup");
+  assert.ok(toHtml(hostile).includes("&lt;img"), "html drops the hostile name instead of escaping it");
+
   // A surface recorded before the field existed says nothing about defaults.
   const old = { ...report(null), surface: SURFACE };
   assert.equal(SURFACE.defaults, undefined);

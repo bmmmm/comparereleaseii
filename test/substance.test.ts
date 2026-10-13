@@ -476,8 +476,38 @@ test("a bare toggle, a vendored or test flip, a component field and a rewrite st
     flip("vendor/github.com/x/config/defaults.go", "Enabled"),
     // A test's expectation.
     flip("pkg/config/defaults_test.go", "Enabled"),
+    // The editor's settings for working on the repo, not the product's.
+    flip(".vscode/settings.json", '"editor.formatOnSave"'),
     // Two literals in different keys: a rewrite, not a value change.
     df("pkg/config/defaults.go", `@@ -1,3 +1,3 @@\n a\n-  retries: 3,\n+  timeout: 30,\n b\n`, 2),
+    // Two values moved on one line: a rewrite too, not one default.
+    df("pkg/config/limits.go", `@@ -1,3 +1,3 @@\n a\n-  retries: 3, timeout: 30,\n+  retries: 5, timeout: 60,\n b\n`, 2),
   ]);
   assert.deepEqual(s.defaults, []);
+});
+
+test("a note names a key as a whole token, never as the inside of another word", () => {
+  const port = df("config/server.yaml", `@@ -1,3 +1,3 @@\n a\n-port: 8080\n+port: 9090\n b\n`, 2);
+  const named = (text: string): boolean | undefined =>
+    releaseSurface([port], [claimOf(text)]).defaults?.[0].documented;
+  assert.equal(named("Add support for OIDC logout"), false, "`port` inside `support`");
+  assert.equal(named("Listen on a new port by default"), true);
+  assert.equal(named("Changed the default PORT"), true, "case-insensitive");
+});
+
+test("the enclosing key names a generic owner only, and only within its own braces", () => {
+  // koa-session shape: `key:` is a cookie name, `ttl` keeps its own name.
+  const session = df(
+    "src/config/session.ts",
+    `@@ -1,4 +1,4 @@\n export const session = {\n   key: "koa.sess",\n-  ttl: 3600,\n+  ttl: 7200,\n };\n`,
+    2,
+  );
+  assert.deepEqual(releaseSurface([session]).defaults?.map((d) => d.name), ["ttl"]);
+  // The previous entry's key sits above, but outside this entry's braces.
+  const neighbour = df(
+    "src/features/registry.rs",
+    `@@ -1,9 +1,9 @@\n     Spec {\n         key: "alpha",\n         default_enabled: true,\n     },\n     Spec {\n-        default_enabled: false,\n+        default_enabled: true,\n         key: "beta",\n     },\n`,
+    2,
+  );
+  assert.deepEqual(releaseSurface([neighbour]).defaults?.map((d) => d.name), ["default_enabled"]);
 });

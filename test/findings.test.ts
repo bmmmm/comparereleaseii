@@ -190,16 +190,56 @@ test("a moved default is read first, inside a reserved slice of the same budget"
   );
   const plan = planFindings([big, stamp, flip], 20000);
   assert.equal(plan[0].name, RESERVED_NAME);
-  // Smallest carrier first — the slice is for the hunk churn buries.
-  assert.deepEqual(plan[0].files.map((f) => f.path), [flip.path, stamp.path]);
+  // Smallest carrier first — the slice is for the hunk churn buries — and
+  // whole files only: the stamp does not fit beside the flip, so it stays
+  // in its own subsystem to be read in full there, never as a fragment.
+  assert.deepEqual(plan[0].files.map((f) => f.path), [flip.path]);
   assert.equal(plan[0].alloc, RESERVED_CHARS);
-  // Taken from the budget: the subsystem read shrinks, the cap holds, and
-  // the reserved file is not read a second time in its own subsystem.
+  const webfinger = plan.find((p) => p.name === "services/webfinger");
+  assert.deepEqual(webfinger?.files.map((f) => f.path), [stamp.path]);
+  // Taken from the budget: the next read shrinks, the cap holds, and the
+  // reserved file is not read a second time in its own subsystem.
   assert.equal(plan[1].alloc, 20000 - RESERVED_CHARS);
-  assert.ok(!plan[1].files.some((f) => f.path === flip.path));
+  const own = plan.find((p) => p.name === "codex-rs");
+  assert.ok(own, "the flip's own subsystem is still planned (for big.rs)");
+  assert.ok(!own!.files.some((f) => f.path === flip.path), "the flip is read twice");
   assert.equal(plan.reduce((s, p) => s + p.alloc, 0), 20000);
   // Nothing to reserve, nothing reserved.
   assert.equal(planFindings([big], 20000)[0].name, "codex-rs/core");
+  // Below one useful read there is no reserved call either: the budget
+  // floor `--findings-budget` always had keeps its meaning.
+  // (big.rs and lib.rs both sit under codex-rs/, 2 of 2: a container, two
+  // subsystems, both declared unread.)
+  assert.deepEqual(planFindings([big, flip], 2000).map((p) => p.alloc), [0, 0]);
+  assert.deepEqual(planFindings([big, flip], 5000).map((p) => [p.name, p.alloc]), [
+    [RESERVED_NAME, RESERVED_CHARS],
+    ["codex-rs/core", 0],
+  ]);
+});
+
+test("a defaults path is read first only when the file is one the extractor would read", () => {
+  const big = file("src/server/big.go", `@@ -1 +1 @@\n-a\n+${"b".repeat(30000)}\n`, 1, 1);
+  const path = file("pkg/config/server.go", "@@ -1 +1 @@\n-a\n+b\n", 1, 1);
+  const test = file("pkg/config/server_test.go", "@@ -1 +1 @@\n-a\n+b\n", 1, 1);
+  const doc = file("docs/config/guide.md", "@@ -1 +1 @@\n-a\n+b\n", 1, 1);
+  const plan = planFindings([big, path, test, doc], 20000);
+  assert.equal(plan[0].name, RESERVED_NAME);
+  assert.deepEqual(plan[0].files.map((f) => f.path), [path.path]);
+});
+
+test("analyzeRelease hands the claims to the surface, so a named default reads as documented", async () => {
+  const flip = file(
+    "pkg/config/defaults.go",
+    "@@ -1,3 +1,3 @@\n a\n-  CleanStopWords: true,\n+  CleanStopWords: false,\n b\n",
+    1,
+    1,
+  );
+  const run = (notes: string) =>
+    analyzeRelease(shippedData({ notes, files: [flip] }), CONTEXT, null, settings({ judgeMode: "off" }));
+  const named = await run("- Search no longer strips stop words: `CleanStopWords` defaults to false\n");
+  assert.deepEqual(named.surface?.defaults?.map((d) => [d.name, d.documented]), [["CleanStopWords", true]]);
+  const unnamed = await run("- Search improvements\n");
+  assert.deepEqual(unnamed.surface?.defaults?.map((d) => [d.name, d.documented]), [["CleanStopWords", false]]);
 });
 
 test("a mid-size remainder still buys a smaller second read", () => {

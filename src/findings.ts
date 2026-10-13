@@ -10,7 +10,13 @@ import { pooled } from "./util.ts";
 import { capHunks } from "./verify.ts";
 import { isChangelogPath } from "./match.ts";
 import { fileCategory, sensitiveCategory } from "./metrics.ts";
-import { DEFAULTS_PATH, TEST_PATH, VENDORED_PATH, defaultCandidates } from "./substance.ts";
+import {
+  DEFAULTS_PATH,
+  TEST_PATH,
+  VENDORED_PATH,
+  defaultCandidates,
+  defaultsClass,
+} from "./substance.ts";
 import {
   buildFindingsPrompt,
   buildFindingsRollupPrompt,
@@ -154,29 +160,35 @@ export function planFindings(files: DiffFile[], budgetChars: number): SubsystemP
       !VENDORED_PATH.test(f.path),
   );
 
-  // The reserved read, filled the way capHunks will fill it: a file is in
-  // while chars remain, and leaves its subsystem so no hunk is read twice.
-  // Carriers go smallest first: the slice exists for the hunk churn
-  // ordering buries, and one 4k carrier (OpenCloud's `introductionVersion`
-  // stamp in webfinger/config.go) would otherwise fill it alone and push
-  // the 1.5k `CleanStopWords` flip back out.
+  // The reserved read: whole files only, each leaving its subsystem so no
+  // hunk is read twice. A file that would be cut to a fragment stays where
+  // it is, read in full or declared — the first draft cut Handy v0.9.1's
+  // 20k `settings.rs` to 4k and dropped the rest. Carriers go smallest
+  // first: the slice exists for the hunk churn ordering buries, and one 4k
+  // carrier (OpenCloud's `introductionVersion` stamp) would otherwise fill
+  // it alone and push the 1.5k `CleanStopWords` flip back out. The path arm
+  // obeys the same eligibility as the extractor: no tests, translations,
+  // examples or vendored code in the first read.
   const carriers = new Set(defaultCandidates(eligible).map((c) => c.file));
   const bySize = (a: DiffFile, b: DiffFile): number =>
     a.patch!.length - b.patch!.length || byName(a.path, b.path);
   const reserved: DiffFile[] = [];
   let reservedUsed = 0;
   for (const f of eligible
-    .filter((f) => carriers.has(f.path) || DEFAULTS_PATH.test(f.path))
+    .filter((f) => carriers.has(f.path) || (DEFAULTS_PATH.test(f.path) && defaultsClass(f.path) !== null))
     .sort(
       (a, b) =>
         Number(carriers.has(b.path)) - Number(carriers.has(a.path)) ||
         (carriers.has(a.path) ? bySize(a, b) : byPriority(a, b)),
     )) {
-    if (reservedUsed >= RESERVED_CHARS) break;
+    if (f.patch!.length > RESERVED_CHARS - reservedUsed) continue;
     reserved.push(f);
-    reservedUsed += Math.min(f.patch!.length, RESERVED_CHARS - reservedUsed);
+    reservedUsed += f.patch!.length;
   }
-  const taken = new Set(reserved.map((f) => f.path));
+  // Below one useful read there is no reserved call either — the floor
+  // `--findings-budget` always had (MIN_CALL_CHARS) keeps its meaning.
+  const reserveActive = reserved.length > 0 && budgetChars >= RESERVED_CHARS;
+  const taken = new Set(reserveActive ? reserved.map((f) => f.path) : []);
 
   const container = containerOf(eligible.map((f) => f.path));
   const groups = new Map<string, DiffFile[]>();
@@ -196,10 +208,9 @@ export function planFindings(files: DiffFile[], budgetChars: number): SubsystemP
     .sort((a, b) => b.score - a.score || byName(a.name, b.name));
   let remaining = budgetChars;
   const plan: SubsystemPlan[] = [];
-  if (reserved.length) {
-    const alloc = Math.min(RESERVED_CHARS, remaining);
-    remaining -= alloc;
-    plan.push({ name: RESERVED_NAME, files: reserved, alloc });
+  if (reserveActive) {
+    remaining -= RESERVED_CHARS;
+    plan.push({ name: RESERVED_NAME, files: reserved, alloc: RESERVED_CHARS });
   }
   for (const g of ordered) {
     const alloc = remaining >= MIN_CALL_CHARS ? Math.min(PER_CALL_CHARS, remaining) : 0;

@@ -141,9 +141,10 @@ An external "the tool missed X" — an issue, a reader's mail — becomes a row 
    --baseline 0 --md tmp/<case>.md`.
 3. Where the miss sits: `pnpm defaults-census <reports dir>` when it is a moved
    value (is the class measured, and how noisy?); the counterfactual when it is
-   a findings-budget miss — `buildFindingsPrompt` over the files the issue
-   names, nothing else, one Haiku call — which says whether the judge *would*
-   have named it had the budget reached the file.
+   a findings-budget miss — `node scripts/findings-counterfactual.ts o/r --tag
+   <tag> --base <base> --files <a,b>` reads exactly those files with one
+   judge call and says whether the judge *would* have named it had the budget
+   reached the file.
 4. `git -C <clone> diff <base>...<tag> -- <file>` into
    `test/fixtures/field/<repo>-<tag>-<slug>.patch`, and a `FIELD_CASES` entry
    in `test/detection.test.ts` with what the surface must read off it. A

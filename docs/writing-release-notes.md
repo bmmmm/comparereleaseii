@@ -39,8 +39,9 @@ When writing or editing a release note or changelog entry:
 - Name the default you changed by its key, with the old and new value
   ("`daemon_auto_start` is now on by default"; "search no longer strips
   stop words — `CleanStopWords` defaults to false"). A flipped default is the
-  smallest diff with the largest blast radius, and the checker lists every one
-  it finds with whether any note names the key — a note that describes the
+  smallest diff with the largest blast radius, and the checker lists the ones
+  it finds with whether any note names the key (the terminal shows the first
+  ten, the Markdown and HTML reports all of them) — a note that describes the
   feature without the key is marked as not naming it.
 - Never write a placeholder note ("misc fixes", "various improvements") for
   a commit with any user-visible effect. A placeholder is only correct for

@@ -783,6 +783,42 @@ const MUTANTS: Mutant[] = [
     replace: "documented: true,",
   },
   {
+    guard: "a note names a key as a whole token — `port` is not named by `support`",
+    file: "src/substance.ts",
+    find: "if (needle.length >= 3 && token.test(c.text)) return true;",
+    replace: "if (needle.length >= 3 && c.text.toLowerCase().includes(needle)) return true;",
+  },
+  {
+    guard: "the enclosing key names a generic owner only — `ttl` keeps its name under a `key:`",
+    file: "src/substance.ts",
+    find: 'if (cls === "source" && GENERIC_OWNER.test(name)) {',
+    replace: 'if (cls === "source") {',
+  },
+  {
+    guard: "the enclosing-key search stops at the entry's own brace — a neighbour's key never names it",
+    file: "src/substance.ts",
+    find: "    if (depth < 0) return null;\n",
+    replace: "",
+  },
+  {
+    guard: "two literals moved on one line is a rewrite, not one default",
+    file: "src/substance.ts",
+    find: "    if (idx !== -1) return -1;\n",
+    replace: "",
+  },
+  {
+    guard: "the surface gets the claims — a named default reads as documented in a real run",
+    file: "src/check.ts",
+    find: "releaseSurface(data.files, claims)",
+    replace: "releaseSurface(data.files)",
+  },
+  {
+    guard: "a default's name from the diff is escaped before it reaches the page",
+    file: "src/html.ts",
+    find: '${esc(defs.join(", "))}',
+    replace: '${defs.join(", ")}',
+  },
+  {
     guard: "a settings-JSON key counts in the key delta — zed's removed auto_replace_emoji_shortcode",
     file: "src/substance.ts",
     find: "  if (JSON_FILE.test(path)) {\n    const m = line.match(JSON_KEY);\n    return m ? [m[1]] : [];\n  }\n",
@@ -859,6 +895,30 @@ const MUTANTS: Mutant[] = [
     file: "src/findings.ts",
     find: "export const RESERVED_CHARS = 4000;",
     replace: "export const RESERVED_CHARS = 0;",
+  },
+  {
+    guard: "the reserved read takes whole files only — a fragment stays in its subsystem",
+    file: "src/findings.ts",
+    find: "if (f.patch!.length > RESERVED_CHARS - reservedUsed) continue;",
+    replace: "if (false) continue;",
+  },
+  {
+    guard: "the reserved read's path arm obeys the extractor's eligibility — no test or doc in the first read",
+    file: "src/findings.ts",
+    find: "(DEFAULTS_PATH.test(f.path) && defaultsClass(f.path) !== null)",
+    replace: "DEFAULTS_PATH.test(f.path)",
+  },
+  {
+    guard: "a defaults path without a carrier still reaches the reserved read",
+    file: "src/findings.ts",
+    find: "carriers.has(f.path) || (DEFAULTS_PATH.test(f.path) && defaultsClass(f.path) !== null)",
+    replace: "carriers.has(f.path)",
+  },
+  {
+    guard: "below one useful read there is no reserved call — the budget floor keeps its meaning",
+    file: "src/findings.ts",
+    find: "const reserveActive = reserved.length > 0 && budgetChars >= RESERVED_CHARS;",
+    replace: "const reserveActive = reserved.length > 0;",
   },
   {
     guard: "a lens never hides a finding addressed to everyone",

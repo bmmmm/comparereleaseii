@@ -146,8 +146,8 @@ const FIELD_CASES: Array<{
     removedKeys: ["auto_replace_emoji_shortcode", "message_editor"],
   },
   {
-    // Class C — a setter's argument — is off: the 2026-10-13 census found 84
-    // of the corpus's 95 toggles unnamed AND noise (layout widths, i18n keys),
+    // Class C — a setter's argument — is off: the 2026-10-13 census found 88
+    // of the corpus's 96 toggles unnamed AND noise (layout widths, i18n keys),
     // with `.promisc(false)` one real change among them. The miss is recorded
     // here, not hidden.
     fixture: "gyulyvgc-sniffnet-v1.4.2-promisc.patch",
