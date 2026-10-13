@@ -2,8 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { candidatesFor, lexicalFill, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
-import type { Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
+import { candidatesFor, lexicalFill, sampleCases, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
+import type { Candidate, Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
 import type { Claim } from "../src/types.ts";
 
 const claim: Claim = { id: 1, text: "Remove insecure fallback", section: "Security", kind: "change",
@@ -342,4 +342,35 @@ test("a shortlist pool stays within maxCandidates and is reported apart", () => 
   assert.equal(holdout("complete").paired, 0);
   assert.equal(run.bySplit[1]!.paired, 1);
   assert.equal(run.rows[0]!.pool, "lexical-top");
+});
+
+test("a sample keeps one split, real pools, labelable sizes and a per-repo cap — and records it", () => {
+  const pool = (n: number, size = 10) => candidatesFor(Array.from({ length: n }, (_, i) => ({ path: `f${i}.ts`,
+    status: "modified", additions: 1, deletions: 0, patch: `@@ -1 +1 @@\n+${"x".repeat(size)} ${i}\n` })));
+  const base = fixture().data;
+  const make = (id: string, release: string, split: "development" | "holdout", candidates: Candidate[],
+    extra: Partial<LabCase> = {}): LabCase => ({ ...base.cases[0]!, id, release, split, candidates, ...extra });
+  const cases = [
+    make("dev", "a/x@1", "development", pool(8)),
+    make("excluded", "a/x@1", "holdout", [], { excluded: "merge-diff-unread" }),
+    make("small", "a/x@1", "holdout", pool(6)),
+    make("huge", "a/x@1", "holdout", pool(8, 1000)),
+    ...["k1", "k2", "k3"].map((id) => make(id, "a/x@1", "holdout", pool(8))),
+    make("short", "a/x@2", "holdout", pool(8), { pool: "lexical-top" }),
+    make("other", "b/y@1", "holdout", pool(7)),
+  ];
+  const data: Dataset = { ...base, releases: ["a/x@1", "a/x@2", "b/y@1"], cases, fingerprint: "" };
+  data.fingerprint = fingerprint(data);
+  const rule = { split: "holdout" as const, minPool: 7, maxPoolChars: 2000, perRepo: 2 };
+  const sampled = sampleCases(data, rule);
+  const ids = sampled.cases.map((c) => c.id);
+  assert.equal(ids.length, 4);
+  assert.equal(ids.filter((id) => id.startsWith("k")).length, 2);
+  assert.ok(ids.includes("short") && ids.includes("other"));
+  assert.deepEqual(sampled.sample, { from: data.fingerprint, rule,
+    dropped: { split: 1, excluded: 1, smallPool: 1, poolChars: 1, repoCap: 1 } });
+  assert.deepEqual(sampled.releases, ["a/x@1", "a/x@2", "b/y@1"]);
+  assert.deepEqual(sampleCases(data, rule), sampled);
+  assert.notEqual(sampleCases(data, { ...rule, perRepo: 3 }).fingerprint, sampled.fingerprint);
+  validateDataset(sampled);
 });

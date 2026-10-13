@@ -128,6 +128,30 @@ const MUTANTS: Mutant[] = [
     replace: "(true)",
   },
   {
+    guard: "retrieval lab: the sample keeps only its split",
+    file: "scripts/retrieval-lab.ts",
+    find: 'const reason = c.split !== rule.split ? "split" : c.excluded',
+    replace: 'const reason = false ? "split" : c.excluded',
+  },
+  {
+    guard: "retrieval lab: the sample drops pools a labeler cannot read",
+    file: "scripts/retrieval-lab.ts",
+    find: 'chars > rule.maxPoolChars ? "poolChars" : null',
+    replace: 'false ? "poolChars" : null',
+  },
+  {
+    guard: "retrieval lab: the sample caps each repository",
+    file: "scripts/retrieval-lab.ts",
+    find: "ordered.slice(0, rule.perRepo).forEach",
+    replace: "ordered.forEach",
+  },
+  {
+    guard: "retrieval lab: the fingerprint covers the sample record",
+    file: "scripts/retrieval-lab.ts",
+    find: "...(sample ? { sample } : {})",
+    replace: "...({})",
+  },
+  {
     guard: "retrieval lab rejects invalid window counts",
     file: "scripts/retrieval-lab.ts",
     find: 'assert.ok(s.windows === undefined || (Number.isSafeInteger(s.windows) && s.windows > 0), "Invalid window count");',

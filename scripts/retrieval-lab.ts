@@ -43,7 +43,18 @@ export interface Dataset {
   budget: { maxHunks: number; maxEvidenceChars: number; maxCandidates: number };
   cases: LabCase[];
   loads: Array<{ release: string; error: string }>;
+  /** Set when this dataset is a frozen sample of another: where it came from, the rule, what the rule dropped. */
+  sample?: { from: string; rule: SampleRule; dropped: Record<string, number> };
   fingerprint: string;
+}
+export interface SampleRule {
+  split: "development" | "holdout";
+  /** Smallest pool worth measuring: at or below maxHunks every arm selects everything. */
+  minPool: number;
+  /** A labeler must read the whole pool; above this it cannot be labeled honestly. */
+  maxPoolChars: number;
+  /** Per repository and pool kind, so one prolific repository cannot carry the result. */
+  perRepo: number;
 }
 export interface Ranking {
   fingerprint: string;
@@ -65,8 +76,8 @@ export interface Labels {
 const digest = (value: unknown): string => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 export function fingerprint(data: Omit<Dataset, "fingerprint"> | Dataset): string {
-  const { version, source, releases, budget, cases, loads } = data;
-  return digest({ version, source, releases, budget, cases, loads });
+  const { version, source, releases, budget, cases, loads, sample } = data;
+  return digest({ version, source, releases, budget, cases, loads, ...(sample ? { sample } : {}) });
 }
 
 export function candidatesFor(files: DiffFile[]): Candidate[] {
@@ -79,6 +90,41 @@ export function candidatesFor(files: DiffFile[]): Candidate[] {
     }
   }
   return [...unique.values()];
+}
+
+/**
+ * A deterministic sample, frozen before any ranking exists: eligible cases of
+ * one split with a pool larger than minPool - 1 and at most maxPoolChars,
+ * then per repository and pool kind the first perRepo by a hash of the case id.
+ */
+export function sampleCases(data: Dataset, rule: SampleRule): Dataset {
+  validateDataset(data);
+  const dropped: Record<string, number> = { split: 0, excluded: 0, smallPool: 0, poolChars: 0, repoCap: 0 };
+  const kept: LabCase[] = [];
+  for (const c of data.cases) {
+    const chars = c.candidates.reduce((n, h) => n + h.hunk.length, 0);
+    const reason = c.split !== rule.split ? "split" : c.excluded ? "excluded"
+      : c.candidates.length < rule.minPool ? "smallPool" : chars > rule.maxPoolChars ? "poolChars" : null;
+    if (reason) dropped[reason]!++;
+    else kept.push(c);
+  }
+  const groups = new Map<string, LabCase[]>();
+  for (const c of kept) {
+    const key = `${c.release.split("@")[0]} ${c.pool ?? "complete"}`;
+    groups.set(key, [...(groups.get(key) ?? []), c]);
+  }
+  const chosen = new Set<LabCase>();
+  for (const group of groups.values()) {
+    const ordered = [...group].sort((a, b) => digest(a.id).localeCompare(digest(b.id)));
+    ordered.slice(0, rule.perRepo).forEach((c) => chosen.add(c));
+    dropped.repoCap! += Math.max(0, ordered.length - rule.perRepo);
+  }
+  const cases = data.cases.filter((c) => chosen.has(c));
+  const sampled: Dataset = { ...data, releases: data.releases.filter((r) => cases.some((c) => c.release === r)),
+    cases, sample: { from: data.fingerprint, rule, dropped }, fingerprint: "" };
+  sampled.fingerprint = fingerprint(sampled);
+  validateDataset(sampled);
+  return sampled;
 }
 
 /** Lexically ranked candidates first (once each), then the rest of the pool in its own order. */
@@ -353,6 +399,7 @@ async function main(): Promise<void> {
     ranking: { type: "string" }, labels: { type: "string" }, python: { type: "string" },
     model: { type: "string" }, revision: { type: "string" }, repeats: { type: "string" },
     releases: { type: "string" }, claims: { type: "string" }, target: { type: "string", multiple: true }, html: { type: "string" },
+    split: { type: "string" }, "min-pool": { type: "string" }, "max-pool-chars": { type: "string" }, "per-repo": { type: "string" },
   } });
   const [command] = positionals;
   assert.ok(values.out, "Pass --out <file>");
@@ -385,6 +432,14 @@ async function main(): Promise<void> {
     });
     const ranking = JSON.parse(await readFile(values.out, "utf8")) as Ranking;
     compare(data, ranking);
+  } else if (command === "sample") {
+    const split = values.split ?? "holdout";
+    assert.ok(split === "holdout" || split === "development", "--split is holdout or development");
+    const sampled = sampleCases(data, { split, minPool: positive(values["min-pool"], data.budget.maxHunks + 1),
+      maxPoolChars: positive(values["max-pool-chars"], 40000), perRepo: positive(values["per-repo"], 6) });
+    await writeFile(values.out, JSON.stringify(sampled, null, 2) + "\n");
+    console.log(JSON.stringify({ claims: sampled.cases.length, releases: sampled.releases.length,
+      repos: new Set(sampled.cases.map((c) => c.release.split("@")[0])).size, sample: sampled.sample, fingerprint: sampled.fingerprint }));
   } else if (command === "compare") {
     assert.ok(values.ranking, "Pass --ranking <laya.json>");
     const ranking = JSON.parse(await readFile(values.ranking, "utf8")) as Ranking;
@@ -393,7 +448,7 @@ async function main(): Promise<void> {
     await writeFile(values.out, JSON.stringify(result, null, 2) + "\n");
     if (values.html) await writeFile(values.html, comparisonHtml(data, ranking, labels));
     console.log(JSON.stringify({ scope: result.scope, claims: result.claims, labeled: result.labeled, runs: result.runs.map((r) => r.bySplit) }, null, 2));
-  } else throw new Error("Commands: prepare | review | rank | compare. See docs/retrieval-lab.md");
+  } else throw new Error("Commands: prepare | sample | review | rank | compare. See docs/retrieval-lab.md");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
