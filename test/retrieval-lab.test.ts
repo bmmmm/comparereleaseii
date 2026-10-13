@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { candidatesFor, lexicalFill, sampleCases, signTestP, blindOrder, labelExport, agreeLabels, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
+import { candidatesFor, lexicalFill, sampleCases, signTestP, blindOrder, labelExport, agreeLabels, arbitrationHtml, layaState, layaParts, workerInput, fingerprint, validateDataset, layaSelection, compare, reviewHtml, comparisonHtml } from "../scripts/retrieval-lab.ts";
 import type { Candidate, Dataset, LabCase, Ranking, Labels } from "../scripts/retrieval-lab.ts";
 import type { Claim } from "../src/types.ts";
 
@@ -444,4 +444,23 @@ test("two label sets agree claim by claim; kappa counts every hunk decision", ()
     { ...b, cases: [b.cases[0]!, { id: "second", relevant: ["other"], rationale: "x" }] },
     { ...b, cases: [b.cases[0]!, { id: "second", relevant: [x, x], rationale: "x" }] },
   ]) assert.throws(() => agreeLabels(data, a, broken, ["claude", "codex"]));
+});
+
+test("arbitration shows only disputed claims, fixes agreed hunks and escapes everything", () => {
+  const { data } = fixture();
+  data.cases[0]!.release = "<img src=x>";
+  data.cases.push({ ...data.cases[0]!, id: "calm" });
+  data.fingerprint = fingerprint(data);
+  const [x, y] = candidates.map((h) => h.id) as [string, string];
+  const a: Labels = { fingerprint: data.fingerprint, cases: [
+    { id: "case", relevant: [x, y], rationale: "<b>both</b>" }, { id: "calm", relevant: [x], rationale: "one" }] };
+  const b: Labels = { fingerprint: data.fingerprint, cases: [
+    { id: "case", relevant: [x], rationale: "only x" }, { id: "calm", relevant: [x], rationale: "one" }] };
+  const html = arbitrationHtml(data, a, b, ["claude", "codex"]);
+  assert.ok(html.includes('data-id="case"') && !html.includes('data-id="calm"'));
+  assert.ok(html.includes(`data-agreed="${x}"`));
+  assert.equal([...html.matchAll(/type="radio"[^>]*value="yes" data-hunk="([0-9a-f]+)"/g)].map((m) => m[1]).join(), y);
+  assert.ok(html.includes("only claude"));
+  assert.ok(html.includes("&lt;b&gt;both&lt;/b&gt;") && !html.includes("<img src=x>"));
+  assert.ok(html.includes("1 disputed claims"));
 });

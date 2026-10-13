@@ -365,6 +365,51 @@ export function reviewHtml(data: Dataset, only?: Set<string>): string {
       document.getElementById('status').textContent=cases.length+' reviewed cases exported.';};</script></html>`;
 }
 
+/**
+ * The user's arbitration of disputed claims: hunks both labelers marked are
+ * fixed, hunks neither marked are folded away, and every hunk only one of
+ * them marked needs an explicit yes or no before the export works. Still
+ * blind to arms and scores; it shows the two labelers because arbitrating
+ * between them is the task.
+ */
+export function arbitrationHtml(data: Dataset, a: Labels, b: Labels, names: [string, string]): string {
+  const { disputed } = agreeLabels(data, a, b, names);
+  const byId = (set: Labels, id: string) => set.cases.find((l) => l.id === id)!;
+  const body = disputed.map((id) => {
+    const c = data.cases.find((c) => c.id === id)!;
+    const [x, y] = [new Set(byId(a, id).relevant), new Set(byId(b, id).relevant)];
+    const pool = blindOrder(c.candidates);
+    const show = (h: Candidate, note: string, control: string) =>
+      `<details${control ? " open" : ""}><summary>${control}<span class="note">${esc(note)}</span> ${esc(h.path)}</summary><pre>${esc(h.hunk)}</pre></details>`;
+    const contested = pool.filter((h) => x.has(h.id) !== y.has(h.id)).map((h) => show(h, `only ${x.has(h.id) ? names[0] : names[1]}`,
+      `<label><input type="radio" name="${esc(id)}:${esc(h.id)}" value="yes" data-hunk="${esc(h.id)}"> relevant</label> <label><input type="radio" name="${esc(id)}:${esc(h.id)}" value="no" data-hunk="${esc(h.id)}"> not relevant</label> `));
+    const agreed = pool.filter((h) => x.has(h.id) && y.has(h.id));
+    const neither = pool.filter((h) => !x.has(h.id) && !y.has(h.id));
+    return `<article data-id="${esc(id)}" data-agreed="${esc(agreed.map((h) => h.id).join(" "))}">
+      <h2>${esc(c.release)}</h2><p class="claim">${esc(c.claim.text)}</p>
+      <p class="why">${esc(names[0])}: ${esc(byId(a, id).rationale)}<br>${esc(names[1])}: ${esc(byId(b, id).rationale)}</p>
+      <h3>Disputed (${contested.length})</h3>${contested.join("")}
+      <h3>Both: relevant (${agreed.length})</h3>${agreed.map((h) => show(h, "both", "")).join("")}
+      <h3>Both: not relevant (${neither.length})</h3>${neither.map((h) => show(h, "neither", "")).join("")}
+      <p><label>Note (optional) <input class="rationale" size="80"></label></p></article>`;
+  }).join("\n");
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>Retrieval lab · label arbitration</title>
+    <style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 20px;background:#fafafa;color:#18212b}article{margin:30px 0;padding:24px;background:white;border:1px solid #ccd3da;border-radius:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}details{padding:8px;border-top:1px solid #e5e9ed}.note{display:inline-block;min-width:7em;font-size:13px;color:#5b6773}.claim{font-weight:600}.why{font-size:14px;color:#3d4852}</style>
+    <h1>Label arbitration · ${disputed.length} disputed claims</h1><p>Decide every disputed hunk: is it evidence for testing the claim, including contradictory evidence? Mere repeated wording is not evidence. Selection methods and model scores are hidden.</p>
+    <button id="export">Download arbitrated labels</button> <span id="status"></span>${body}
+    <script>document.getElementById('export').onclick=()=>{
+      const cases=[];let open=0;
+      for(const a of document.querySelectorAll('article')){
+        const relevant=a.dataset.agreed?a.dataset.agreed.split(' '):[];
+        const names=new Set([...a.querySelectorAll('input[type=radio]')].map(r=>r.name));
+        for(const n of names){const v=a.querySelector('input[name="'+CSS.escape(n)+'"]:checked');if(!v){open++;continue;}if(v.value==='yes')relevant.push(v.dataset.hunk);}
+        cases.push({id:a.dataset.id,relevant,rationale:'user arbitration'+(a.querySelector('.rationale').value.trim()?': '+a.querySelector('.rationale').value.trim():''),labeler:'user'});}
+      if(open){document.getElementById('status').textContent=open+' disputed hunks still undecided.';return;}
+      const url=URL.createObjectURL(new Blob([JSON.stringify({fingerprint:'${data.fingerprint}',cases},null,2)],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;link.download='arbitrated-labels.json';link.click();URL.revokeObjectURL(url);
+      document.getElementById('status').textContent=cases.length+' arbitrated claims exported.';};</script></html>`;
+}
+
 export function comparisonHtml(data: Dataset, ranking: Ranking, labels?: Labels): string {
   const result = compare(data, ranking, labels);
   const showHunks = (hunks: Hunk[]): string => hunks.map((h) =>
@@ -527,6 +572,12 @@ async function main(): Promise<void> {
     await writeFile(values.out, JSON.stringify(sampled, null, 2) + "\n");
     console.log(JSON.stringify({ claims: sampled.cases.length, releases: sampled.releases.length,
       repos: new Set(sampled.cases.map((c) => c.release.split("@")[0])).size, sample: sampled.sample, fingerprint: sampled.fingerprint }));
+  } else if (command === "arbitrate") {
+    assert.ok(values.a && values.b, "Pass --a <name=labels.json> --b <name=labels.json>");
+    const [nameA, fileA] = values.a.split("=") as [string, string];
+    const [nameB, fileB] = values.b.split("=") as [string, string];
+    await writeFile(values.out, arbitrationHtml(data, JSON.parse(await readFile(fileA, "utf8")) as Labels,
+      JSON.parse(await readFile(fileB, "utf8")) as Labels, [nameA, nameB]));
   } else if (command === "agree") {
     assert.ok(values.a && values.b, "Pass --a <name=labels.json> --b <name=labels.json>");
     const [nameA, fileA] = values.a.split("=") as [string, string];
@@ -545,7 +596,7 @@ async function main(): Promise<void> {
     await writeFile(values.out, JSON.stringify(result, null, 2) + "\n");
     if (values.html) await writeFile(values.html, comparisonHtml(data, ranking, labels));
     console.log(JSON.stringify({ scope: result.scope, claims: result.claims, labeled: result.labeled, runs: result.runs.map((r) => r.bySplit) }, null, 2));
-  } else throw new Error("Commands: prepare | sample | review | label-export | agree | rank | compare. See docs/retrieval-lab.md");
+  } else throw new Error("Commands: prepare | sample | review | label-export | agree | arbitrate | rank | compare. See docs/retrieval-lab.md");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
