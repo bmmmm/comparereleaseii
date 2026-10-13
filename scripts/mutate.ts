@@ -94,8 +94,26 @@ const MUTANTS: Mutant[] = [
   {
     guard: "retrieval lab rejects an unknown dataset version",
     file: "scripts/retrieval-lab.ts",
-    find: 'assert.equal(data.version, 1, "Unsupported lab dataset version");',
+    find: 'assert.ok(data.version === 1 || data.version === 2, "Unsupported lab dataset version");',
     replace: 'assert.ok(true, "Unsupported lab dataset version");',
+  },
+  {
+    guard: "retrieval lab: an excluded version-2 case stores no pool",
+    file: "scripts/retrieval-lab.ts",
+    find: 'if (data.version === 2 && c.excluded) assert.equal(c.candidates.length, 0, "An excluded case stores no pool");',
+    replace: 'if (false) assert.equal(c.candidates.length, 0, "An excluded case stores no pool");',
+  },
+  {
+    guard: "retrieval lab: the worker gets no pairs for an excluded case",
+    file: "scripts/retrieval-lab.ts",
+    find: "candidates: c.excluded ? [] : c.candidates.map((h) => ({ id: h.id, state: layaState(c.claim, h) }))",
+    replace: "candidates: c.candidates.map((h) => ({ id: h.id, state: layaState(c.claim, h) }))",
+  },
+  {
+    guard: "retrieval lab: blind review never shows an excluded case",
+    file: "scripts/retrieval-lab.ts",
+    find: "const body = data.cases.filter((c) => !c.excluded).map(",
+    replace: "const body = data.cases.map(",
   },
   {
     guard: "retrieval lab rejects labels naming another case",

@@ -30,7 +30,11 @@ patches that the current loader missed are excluded from Laya. Load failures
 are recorded separately. No production loader workaround is applied.
 
 The dataset retains the original claim, complete candidate hunks, current
-selection, control selection, release inventory and exclusions. Its hash
+selection, control selection, release inventory and exclusions. An excluded
+claim keeps only its pool size, not its pool, and the fenced pair Laya reads
+is built at rank time instead of stored — together that brought a
+whole-corpus dataset (123 releases, 561 claims) from a heap exhaustion to
+14 MB (dataset version 2; version 1 files remain readable). Its hash
 binds rankings and labels to the exact input. Candidate pools intentionally
 include hunks with no lexical overlap. Changelogs are excluded because notes
 repeating themselves are not evidence. Claims, paths and hunks are fenced

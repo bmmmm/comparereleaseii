@@ -14,19 +14,24 @@ import type { Claim, DiffFile, ReleaseData, Report } from "../src/types.ts";
 import { dedupeReports } from "./corpus-aggregate.ts";
 
 type Hunk = { path: string; hunk: string };
-export type Candidate = Hunk & { id: string; state: string };
+// The fenced worker input is derived at rank time (`layaState`), never stored:
+// storing it doubled every hunk and a whole-corpus dataset outgrew a JS string.
+export type Candidate = Hunk & { id: string };
 export interface LabCase {
   id: string;
   release: string;
   split: "development" | "holdout";
   claim: Claim;
   candidates: Candidate[];
+  /** Hunks in the claim's pool. An excluded case stores none of them, only this count. */
+  poolSize?: number;
   baseline: Hunk[];
   expanded: Hunk[];
   excluded: string | null;
 }
 export interface Dataset {
-  version: 1;
+  /** 1: candidates carried a stored `state` and excluded cases kept their pools. Still readable. */
+  version: 1 | 2;
   source: string;
   releases: string[];
   budget: { maxHunks: number; maxEvidenceChars: number; maxCandidates: number };
@@ -57,21 +62,31 @@ export function fingerprint(data: Omit<Dataset, "fingerprint"> | Dataset): strin
   return digest({ version, source, releases, budget, cases, loads });
 }
 
-export function candidatesFor(claim: Claim, files: DiffFile[]): Candidate[] {
+export function candidatesFor(files: DiffFile[]): Candidate[] {
   const unique = new Map<string, Candidate>();
   for (const file of files) {
     if (!file.patch || isChangelogPath(file.path)) continue;
     for (const hunk of file.patch.split(/^(?=@@)/m).filter((h) => h.startsWith("@@"))) {
       const id = digest([file.path, hunk]);
-      unique.set(id, { id, path: file.path, hunk, state:
-        untrustedBlock("CLAIM", claim.text) + "\n" + untrustedBlock("DIFF", `${file.path}\n${hunk}`) });
+      unique.set(id, { id, path: file.path, hunk });
     }
   }
   return [...unique.values()];
 }
 
+/** What Laya reads for one pair: claim and diff, each fenced as untrusted. */
+export function layaState(claim: Claim, h: Hunk): string {
+  return untrustedBlock("CLAIM", claim.text) + "\n" + untrustedBlock("DIFF", `${h.path}\n${h.hunk}`);
+}
+
+/** The worker's input: only eligible cases carry pairs, each with its fenced state. */
+export function workerInput(data: Dataset) {
+  return { fingerprint: data.fingerprint, cases: data.cases.map((c) => ({ id: c.id, excluded: c.excluded,
+    candidates: c.excluded ? [] : c.candidates.map((h) => ({ id: h.id, state: layaState(c.claim, h) })) })) };
+}
+
 export function validateDataset(data: Dataset): void {
-  assert.equal(data.version, 1, "Unsupported lab dataset version");
+  assert.ok(data.version === 1 || data.version === 2, "Unsupported lab dataset version");
   assert.ok(data.cases.length > 0, "No claims in the dataset");
   assert.equal(data.fingerprint, fingerprint(data), "Dataset content changed; prepare it again");
   for (const value of Object.values(data.budget)) assert.ok(Number.isSafeInteger(value) && value > 0, "Invalid budget");
@@ -79,6 +94,7 @@ export function validateDataset(data: Dataset): void {
   for (const c of data.cases) {
     assert.equal(new Set(c.candidates.map((h) => h.id)).size, c.candidates.length, "Duplicate candidates");
     for (const h of c.candidates) assert.equal(h.id, digest([h.path, h.hunk]), "Candidate content changed");
+    if (data.version === 2 && c.excluded) assert.equal(c.candidates.length, 0, "An excluded case stores no pool");
   }
 }
 
@@ -162,8 +178,9 @@ const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;",
 
 export function reviewHtml(data: Dataset): string {
   validateDataset(data);
-  const body = data.cases.map((c) => `<article data-id="${esc(c.id)}"><h2>${esc(c.release)} · ${esc(c.split)}</h2>
-    <p>${esc(c.claim.text)}</p><p>${esc(c.excluded ?? "Eligible for Laya")}</p>
+  // An excluded case can never be a paired measurement, so it is never labeled.
+  const body = data.cases.filter((c) => !c.excluded).map((c) => `<article data-id="${esc(c.id)}"><h2>${esc(c.release)} · ${esc(c.split)}</h2>
+    <p>${esc(c.claim.text)}</p>
     <label><input type="checkbox" class="reviewed"> I reviewed the entire candidate pool</label>
     <p><label>Evidence rationale <input class="rationale" size="80"></label></p>
     ${c.candidates.map((h) => `<details><summary><label><input type="checkbox" value="${esc(h.id)}" class="relevant"> Relevant evidence</label> ${esc(h.path)}</summary><pre>${esc(h.hunk)}</pre></details>`).join("\n")}</article>`).join("\n");
@@ -237,7 +254,7 @@ async function prepare(reportsDir: string, releases: number, claims: number, tar
       if (!added) break;
     }
   }
-  const data: Dataset = { version: 1, source: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  const data: Dataset = { version: 2, source: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     releases: selected.map((r) => `${r.repoLabel}@${r.headRef}`),
     budget: { maxHunks: 6, maxEvidenceChars: 20000, maxCandidates: 32 }, cases: [], loads: [], fingerprint: "" };
   for (const report of selected) {
@@ -265,7 +282,7 @@ async function prepare(reportsDir: string, releases: number, claims: number, tar
             if (firstParent.some((f) => f.patch) && !(await range.commitFiles(commit.sha)).some((f) => f.patch)) excluded = "merge-diff-unread";
           }
         }
-        const candidates = candidatesFor(claim, pool);
+        const candidates = candidatesFor(pool);
         if (!excluded && !candidates.length) excluded = "empty-pool";
         if (!excluded && candidates.length > data.budget.maxCandidates) excluded = "candidate-limit";
         const baseline = await claimEvidence(releaseData, claim, data.budget);
@@ -274,7 +291,7 @@ async function prepare(reportsDir: string, releases: number, claims: number, tar
         const extended = [...lexical, ...candidates.filter((h) => !lexical.some((l) => l.path === h.path && l.hunk === h.hunk))];
         frozen.push({ id: digest([release, claim.id, claim.text]), release,
           split: parseInt(digest(report.repoLabel).slice(0, 8), 16) % 2 ? "holdout" : "development",
-          claim, candidates, baseline: baseline.hunks,
+          claim, candidates: excluded ? [] : candidates, poolSize: candidates.length, baseline: baseline.hunks,
           expanded: capHunks(extended.slice(0, data.budget.maxHunks), data.budget.maxEvidenceChars), excluded });
       }
       data.cases.push(...frozen);
@@ -317,9 +334,11 @@ async function main(): Promise<void> {
     assert.ok(values.revision, "Pin --revision to a model commit");
     assert.ok(/^[a-f0-9]{40}$/.test(values.revision), "Model revision must be a full commit hash");
     assert.ok(data.cases.some((c) => !c.excluded), "No cases eligible for Laya");
+    const worker = `${values.out}.worker.json`;
+    await writeFile(worker, JSON.stringify(workerInput(data)) + "\n");
     await new Promise<void>((resolve, reject) => {
       const child = spawn(values.python!, [new URL("laya-rank.py", import.meta.url).pathname,
-        "--input", values.input!, "--out", values.out!, "--model", values.model ?? "aac6fef/laya-multilingual-mlx",
+        "--input", worker, "--out", values.out!, "--model", values.model ?? "aac6fef/laya-multilingual-mlx",
         "--revision", values.revision!, "--repeats", String(positive(values.repeats, 3))], { stdio: ["ignore", "inherit", "inherit"] });
       const timer = setTimeout(() => { child.kill(); reject(new Error("Laya experiment timed out after 30 minutes")); }, 30 * 60_000);
       child.on("error", (err) => { clearTimeout(timer); reject(err); });
