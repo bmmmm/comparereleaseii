@@ -13,12 +13,9 @@ pnpm eval                        # golden-set eval; needs a judge engine
 pnpm mutate                      # mutation harness: every listed guard's test must kill its mutant
 pnpm sweep <reports dir>         # threshold sweep: Pareto front per hand-set bar. Reports, never writes
 pnpm mutate-notes <dir> --generate  # + the model-written inverted-claim class (needs an engine)
-#   --cases <n> bounds the releases (default 12; the whole corpus is ~111)
-#   --parallel <n> analyses n releases at once (default 4)
-#   finished releases are cached beside the clones (XDG cache, NOT the
-#   checkout — a removed worktree would take 12 minutes of work with it), so
-#   an interrupted run resumes; --no-resume re-measures. The key covers src/
-#   and the mutations, so a patched threshold never reuses another bar's numbers
+#   --cases <n> (default 12) · --parallel <n> (default 4) · --no-resume
+#   results are cached in the XDG cache keyed by src/ + mutations, so an
+#   interrupted run resumes and a patched threshold never reuses old numbers
 pnpm corpus-stats <reports dir>  # aggregate a watch home's reports; anonymous unless --named
 pnpm corpus-clones <reports dir> # which releases the clone cache cannot answer, and clone them
 pnpm corpus-bump-origins <dir>   # the from-version distribution SCORING.md's pin rule rests on
@@ -33,7 +30,7 @@ not add a dependency, a build step, or a framework.
 
 ## Module map
 
-Full path → responsibility table (38 modules): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Full path → responsibility table: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Entry points: `src/types.ts` (data model, read first), `src/cli.ts` (flags,
 orchestration), `src/check.ts` (one release end to end, shared by the CLI and
 watch mode).
@@ -54,18 +51,13 @@ watch mode).
   headings, commit subjects, file paths, diff hunks, tags, refs — is written by
   the party under examination. In a prompt it goes inside the untrusted markers
   (`untrustedBlock` in `src/judge.ts`); in HTML it goes through `esc()`, and in
-  an `href` through the URL helpers as well. The same holds for a PR body in a
-  workflow: `.github/scripts/pr-intake.mjs` quotes it into a fence before it
-  reaches the job summary, so the author cannot forge the verdict table a
-  reviewer reads. There is no field here that is "obviously safe", and the list
-  of sinks is not closed — a new one inherits the rule, it does not get an
-  exemption.
+  an `href` through the URL helpers as well; a PR body is fenced by
+  `.github/scripts/pr-intake.mjs` before it reaches the job summary. No field
+  is "obviously safe", and a new sink inherits the rule.
 - No claim may reach `verified` because the notes agree with the commit
   message. Both come from the same hand; only the diff is evidence.
 - Change scoring and you change the README's validation table. Re-measure the
-  five releases listed there and update it in the same commit — a table of
-  scores the current code no longer produces is exactly the drift this tool
-  exists to catch.
+  five releases listed there and update it in the same commit.
 - Comment only what the code cannot say — a constraint, a workaround, a
   surprising behaviour. The existing comments are the model: they explain *why*.
 - Match the surrounding style. No new abstraction layer for a single call site.
@@ -77,23 +69,17 @@ watch mode).
 - **`pnpm mutate` owns `src/` while it runs.** It patches a file, runs the
   suite, writes the original back — from the copy it read at the start. Editing
   a source file or running `pnpm test` during a mutation run therefore either
-  loses the edit or fails a test against someone else's mutant. Let it finish;
-  the full set is about seven minutes — most mutants die against their own
-  module's test file in under a second, and the ~17 that need the full suite
-  cost ~17 s each (the run prints which path killed, and how long it took).
-- **`pnpm sweep` owns `src/` the same way, for far longer.** The dial IS the
-  literal in the source, so a sweep holds a patched threshold for the whole of
-  each measurement — an hour or more over a full corpus. Two consequences, both
-  seen on 2026-08-09: a `pnpm test` during a sweep fails against the dial's
-  current value and looks like a broken suite, and `git add -A` commits that
-  value. Check `git diff src/` before staging anything while one runs, and
-  never stage `-A` blind. A sweep killed mid-run restores from its own snapshot
-  on SIGINT/SIGTERM; a sweep whose process is lost some other way leaves the
-  dial where it was — `git diff src/` says so, and `git checkout` fixes it.
+  loses the edit or fails a test against someone else's mutant. Let it finish
+  (about seven minutes).
+- **`pnpm sweep` owns `src/` the same way, for an hour or more.** The dial IS
+  the literal in the source: a `pnpm test` during a sweep fails against the
+  dial's current value, and `git add -A` commits it. Check `git diff src/`
+  before staging anything while one runs. A sweep killed by SIGINT/SIGTERM
+  restores itself; one lost any other way leaves the dial patched —
+  `git diff src/` says so, `git checkout` fixes it.
 - **A/B against the forge: measure serially, and filter warnings.** Fanning
   parallel checks at one GitHub account trips the rate limit, and a run that
-  loses commit diffs to it is not a data point — before 0.10.1 it scored
-  *better* for the loss. Any before/after comparison drops runs whose report
+  loses commit diffs to it is not a data point. Any before/after comparison drops runs whose report
   carries a load warning before it counts anything, and compares two
   `git worktree` checkouts rather than the live tree, which moves under an
   edit.
@@ -118,9 +104,8 @@ watch mode).
 - **A script that prints a large result makes exactly ONE final write and no
   `process.exit` after it.** On macOS a pipe stdout is non-blocking:
   `console.log` + `process.exit` truncates at 64 KiB (test/stdout.test.ts).
-  This cost two sweep runs in August 2026 and was reintroduced verbatim in a
-  brand-new script the same month — the pattern to copy is the single
-  conditional `console.log` at the end of `scripts/anchored-weak-census.ts`.
+  Copy the single conditional `console.log` at the end of
+  `scripts/anchored-weak-census.ts`.
 - **Never widen the diff beyond the task.** Adjacent problems go in the PR's
   "Out of scope" section or into a new issue.
 
