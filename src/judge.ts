@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { localServerBase, localServerKey } from "./env.ts";
 import { commandExists, run } from "./util.ts";
 import { withVerdictCache } from "./cache.ts";
@@ -21,11 +23,19 @@ export function makeClaudeCliEngine(model: string): JudgeEngine {
   return {
     name: `claude-cli/${model}`,
     async judge(prompt: string): Promise<string> {
-      // cwd is a temp dir so the nested claude session loads no project context.
+      // cwd is an empty dir so the nested claude session loads no project
+      // context. Not tmpdir() itself: claude indexes its cwd at start
+      // (`rg --files --hidden`), and a shared temp dir with 240k files cost
+      // ~300% CPU per call, four calls in parallel (measured 2026-10-31).
+      // One fixed dir, not one per call: claude makes a ~/.claude/projects
+      // dir for every cwd it sees, even with --no-session-persistence, which
+      // keeps the transcripts out of it.
+      const cwd = join(tmpdir(), "crii-judge");
+      await mkdir(cwd, { recursive: true });
       const { stdout } = await run(
         "claude",
-        ["-p", "--model", model, "--output-format", "json"],
-        { input: prompt, cwd: tmpdir() },
+        ["-p", "--model", model, "--output-format", "json", "--no-session-persistence"],
+        { input: prompt, cwd },
       );
       const outer = JSON.parse(stdout) as { result?: string; is_error?: boolean };
       if (outer.is_error || typeof outer.result !== "string") {

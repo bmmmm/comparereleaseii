@@ -68,6 +68,13 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Fixed
 
+- **The claude-cli judge no longer burns CPU indexing the temp dir.** Each
+  `claude -p` ran with the shared system temp dir as its cwd, and claude
+  indexes its cwd at start (`rg --files --hidden`): with 240k files there,
+  every call cost ~300% CPU, four in parallel. Calls now run in one empty
+  directory (`$TMPDIR/crii-judge`) and keep no transcript
+  (`--no-session-persistence`): the temp dir's project folder had
+  collected 6k of them.
 - **Laya models are never picked as a judge.** Local discovery could
   auto-select or calibrate a Laya model, which ranks typed decisions and
   does not generate text; it is now filtered out of discovery, and naming

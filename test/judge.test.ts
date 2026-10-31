@@ -4,6 +4,7 @@
 // had no coverage — a broken adapter fails every judged claim at once.
 import { test, type TestContext } from "node:test";
 import assert from "node:assert/strict";
+import { realpathSync } from "node:fs";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -43,6 +44,29 @@ test("claude-cli engine surfaces is_error instead of parsing the result", async 
   await stubClaude(t, JSON.stringify({ result: "Credit balance too low", is_error: true }));
   const engine = makeClaudeCliEngine("haiku");
   await assert.rejects(() => engine.judge("prompt"), /claude -p returned an error/);
+});
+
+test("claude-cli engine runs in one fixed empty dir, keeping no transcript", async (t) => {
+  // claude indexes its cwd at start (the shared temp dir cost ~300% CPU a
+  // call) and makes a ~/.claude/projects dir for each cwd it sees.
+  const dir = await mkdtemp(join(tmpdir(), "claude-stub-"));
+  await writeFile(
+    join(dir, "claude"),
+    `#!/bin/sh\ncat >/dev/null\nprintf '{"result":"%s|%s|%s","is_error":false}' "$(pwd -P)" "$(ls -A | wc -l | tr -d ' ')" "$*"\n`,
+  );
+  await chmod(join(dir, "claude"), 0o755);
+  const orig = process.env.PATH;
+  process.env.PATH = `${dir}:${orig}`;
+  t.after(() => {
+    process.env.PATH = orig;
+  });
+  const engine = makeClaudeCliEngine("haiku");
+  const [cwd, entries, args] = (await engine.judge("prompt")).split("|");
+  assert.notEqual(cwd, realpathSync(tmpdir()));
+  assert.equal(entries, "0");
+  assert.match(args, /--no-session-persistence/);
+  const [again] = (await engine.judge("prompt")).split("|");
+  assert.equal(again, cwd);
 });
 
 test("api engine returns the text block and reports HTTP errors with status", async (t) => {
