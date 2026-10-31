@@ -243,6 +243,15 @@ export function isChangelogPath(path: string): boolean {
   return /(^|\/)changelogs?(\/|\.)|(^|\/)CHANGELOG/i.test(path);
 }
 
+/**
+ * A file that carries release notes rather than code: a changelog, or the
+ * syndication feed that republishes them. Its added lines are the claims
+ * under examination, so a claim whose only evidence is such a file has none.
+ */
+export function isNotesCarrierPath(path: string): boolean {
+  return isChangelogPath(path) || /(^|\/)(feed|atom|rss)\.xml$|\.(rss|atom)$/i.test(path);
+}
+
 export function lexicalMatch(claim: Claim, files: DiffFile[]): LexicalMatch {
   const identifiers = extractIdentifiers(claim);
   if (!identifiers.length) return { files: [], matchedTerms: [], score: 0 };

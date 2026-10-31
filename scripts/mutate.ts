@@ -1340,6 +1340,48 @@ const MUTANTS: Mutant[] = [
     find: "for (const { report } of order) {",
     replace: "for (const { report } of order.slice(0, 1)) {",
   },
+  {
+    guard: "prefilter: a claim whose pool is only notes carriers skips the judge",
+    file: "src/verify.ts",
+    find: "return !data.truncated && pool.length > 0 && pool.every((f) => isNotesCarrierPath(f.path));",
+    replace: "return false;",
+  },
+  {
+    guard: "prefilter: one non-notes file in the pool keeps the judge in charge",
+    file: "src/verify.ts",
+    find: "pool.every((f) => isNotesCarrierPath(f.path));",
+    replace: "pool.some((f) => isNotesCarrierPath(f.path));",
+  },
+  {
+    guard: "prefilter: an empty pool (a lost diff) is not 'nothing but notes'",
+    file: "src/verify.ts",
+    find: "!data.truncated && pool.length > 0 && pool.every(",
+    replace: "!data.truncated && pool.every(",
+  },
+  {
+    guard: "prefilter: a truncated diff is not 'nothing but notes'",
+    file: "src/verify.ts",
+    find: "!data.truncated && pool.length > 0 && pool.every(",
+    replace: "pool.length > 0 && pool.every(",
+  },
+  {
+    guard: "prefilter: a deterministic verified is never lowered to no-evidence",
+    file: "src/verify.ts",
+    find: 'if (useJudge && route.fallback.verdict !== "verified" && onlyNotesCarriers(route.hunkPool, data)) {',
+    replace: "if (useJudge && onlyNotesCarriers(route.hunkPool, data)) {",
+  },
+  {
+    guard: "prefilter: --judge off keeps the deterministic reading",
+    file: "src/verify.ts",
+    find: 'if (useJudge && route.fallback.verdict !== "verified" && onlyNotesCarriers(route.hunkPool, data)) {',
+    replace: 'if (route.fallback.verdict !== "verified" && onlyNotesCarriers(route.hunkPool, data)) {',
+  },
+  {
+    guard: "prefilter: the syndication feed counts as a notes carrier",
+    file: "src/match.ts",
+    find: "(feed|atom|rss)\\.xml$|",
+    replace: "(atom|rss)\\.xml$|",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

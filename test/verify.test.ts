@@ -506,14 +506,24 @@ test("a changelog-only commit does not become evidence for a vague claim", async
     deletions: 0,
     patch: "@@ -1,2 +1,4 @@\n # Changelog\n+\n+- Updates and fixes",
   };
+  // Not a changelog-only commit any more (that one never reaches the judge —
+  // see the prefilter tests below): the changelog hunk must still stay out of
+  // the evidence when something else sits beside it.
+  const ciFile = {
+    path: ".github/workflows/ci.yml",
+    status: "modified",
+    additions: 1,
+    deletions: 1,
+    patch: "@@ -3,1 +3,1 @@\n-  runs-on: ubuntu-22.04\n+  runs-on: ubuntu-24.04",
+  };
   const data = {
     repoLabel: "t/t",
     baseRef: "v1",
     headRef: "v2",
     notes: "",
     commits: [linked],
-    files: [changelogFile],
-    commitFiles: async () => [changelogFile],
+    files: [changelogFile, ciFile],
+    commitFiles: async () => [changelogFile, ciFile],
     warnings: [] as string[],
   };
   const prompts: string[] = [];
@@ -532,7 +542,6 @@ test("a changelog-only commit does not become evidence for a vague claim", async
   assert.ok(claimPrompts.length > 0);
   for (const p of claimPrompts) {
     assert.ok(!p.includes("--- CHANGELOG.md"), "changelog hunk leaked into judge evidence");
-    assert.ok(p.includes("(no matching hunks found)"));
   }
 });
 
@@ -1785,4 +1794,95 @@ test("a bump claim documents the commit that moves its pin — and only that one
     true,
     "a commit moving some other pin is not documented by this claim",
   );
+});
+
+// The pool a judge would read is the publisher quoting itself. 1297 of 1298
+// claims in anthropics/claude-code releases whose diff is CHANGELOG.md plus
+// feed.xml came back `no-evidence` after one model call each.
+function notesFile(path: string): { path: string; status: string; additions: number; deletions: number; patch: string } {
+  return { path, status: "modified", additions: 1, deletions: 0, patch: "@@ -1,1 +1,2 @@\n # Notes\n+- Add the frobnicate command" };
+}
+
+function prefilterRelease(files: ReturnType<typeof notesFile>[], extra: { truncated?: boolean } = {}) {
+  return {
+    repoLabel: "t/t",
+    baseRef: "v1",
+    headRef: "v2",
+    notes: "",
+    commits: [] as Commit[],
+    files,
+    commitFiles: async () => files,
+    warnings: [] as string[],
+    ...extra,
+  };
+}
+
+const PREFILTER_OPTS = { concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+function countingEngine(answer: string): { engine: JudgeEngine; calls: () => number } {
+  let n = 0;
+  return {
+    engine: { name: "count", judge: async () => (n++, answer) },
+    calls: () => n,
+  };
+}
+
+test("prefilter: a claim whose whole diff is CHANGELOG.md and feed.xml gets no-evidence without a judge call", async () => {
+  const { engine, calls } = countingEngine(
+    '{"verdict":"verified","confidence":0.9,"files":["CHANGELOG.md"],"reasoning":"the changelog says so"}',
+  );
+  const data = prefilterRelease([notesFile("CHANGELOG.md"), notesFile("feed.xml")]);
+  const claims = [claim("Add the frobnicate command"), { ...claim("Fix the widget"), id: 1 }];
+  for (const judgeMode of ["auto", "all"] as const) {
+    const results = await verifyClaims(data, claims, { ...PREFILTER_OPTS, judgeMode, engine, escalateEngine: null });
+    assert.deepEqual(results.map((r) => r.verdict), ["no-evidence", "no-evidence"], judgeMode);
+    assert.ok(results.every((r) => r.judged === false && !r.judgeFailed));
+  }
+  assert.equal(calls(), 0, "the judge was asked about notes quoting themselves");
+});
+
+test("prefilter: one file that is not a notes carrier puts the judge back in charge", async () => {
+  const { engine, calls } = countingEngine('{"verdict":"no_evidence","confidence":0.8,"files":[],"reasoning":"r"}');
+  const code = { ...notesFile("src/frobnicate.ts"), patch: "@@ -1,1 +1,2 @@\n export {};\n+export const frobnicate = 1;" };
+  const data = prefilterRelease([notesFile("CHANGELOG.md"), notesFile("feed.xml"), code]);
+  await verifyClaims(data, [claim("Add the frobnicate command")], { ...PREFILTER_OPTS, judgeMode: "auto", engine, escalateEngine: null });
+  assert.ok(calls() > 0);
+});
+
+test("prefilter: an unreadable or truncated diff is not 'nothing but notes'", async () => {
+  const { engine, calls } = countingEngine('{"verdict":"no_evidence","confidence":0.8,"files":[],"reasoning":"r"}');
+  const opts = { ...PREFILTER_OPTS, judgeMode: "auto" as const, engine, escalateEngine: null };
+  await verifyClaims(prefilterRelease([]), [claim("Add the frobnicate command")], opts);
+  const afterEmpty = calls();
+  assert.ok(afterEmpty > 0, "an empty pool (a lost diff) must still reach the judge");
+  await verifyClaims(prefilterRelease([notesFile("CHANGELOG.md")], { truncated: true }), [claim("Add the frobnicate command")], opts);
+  assert.ok(calls() > afterEmpty, "a truncated diff hides files; the judge must still read it");
+});
+
+test("prefilter: --judge off is untouched, and a deterministic verified is never lowered", async () => {
+  const data = prefilterRelease([notesFile("CHANGELOG.md"), notesFile("feed.xml")]);
+  const off = await verifyClaims(data, [claim("Add the frobnicate command")], {
+    ...PREFILTER_OPTS, judgeMode: "off", engine: null, escalateEngine: null,
+  });
+  // The prefilter lives on the judge path only: without a judge the verdict is
+  // the one the deterministic route always gave.
+  const { engine } = countingEngine("{}");
+  const on = await verifyClaims(data, [claim("Add the frobnicate command")], {
+    ...PREFILTER_OPTS, judgeMode: "auto", engine, escalateEngine: null,
+  });
+  assert.equal(off[0].verdict, "no-evidence");
+  assert.equal(off[0].reasoning.includes("carries the release notes"), false);
+  assert.notEqual(on[0].verdict, "verified");
+  assert.ok(on[0].reasoning.includes("carries the release notes"));
+
+  // A generated entry is true by construction; the prefilter only ever takes a
+  // claim down to no-evidence from a verdict that was not already settled.
+  const pr = { ...claim("Add the frobnicate command by @x in #7", [7]) };
+  const linked: Commit = { sha: "abc123def", subject: "Add the frobnicate command (#7)", body: "", author: "dev", prNumbers: [7] };
+  const anchored = { ...data, commits: [linked] };
+  const kept = await verifyClaims(anchored, [pr], {
+    ...PREFILTER_OPTS, judgeMode: "all", engine, escalateEngine: null,
+  });
+  assert.equal(kept[0].verdict, "verified");
+  assert.equal(kept[0].generated, true);
 });

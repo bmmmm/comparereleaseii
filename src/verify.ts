@@ -5,6 +5,7 @@ import {
   assertsRemoval,
   functionsOf,
   isChangelogPath,
+  isNotesCarrierPath,
   lexicalMatch,
   rankHunks,
   removesAny,
@@ -679,6 +680,15 @@ function relatedCommits(claim: Claim, commits: Commit[]): Commit[] {
     .map((x) => x.c);
 }
 
+/**
+ * The pool is non-empty and every file in it only restates release notes. An
+ * empty pool is an unreadable diff (a rate limit degrades to `[]`) and a
+ * truncated one hides files, so neither may pass for "nothing but notes".
+ */
+function onlyNotesCarriers(pool: DiffFile[], data: ReleaseData): boolean {
+  return !data.truncated && pool.length > 0 && pool.every((f) => isNotesCarrierPath(f.path));
+}
+
 export async function verifyClaims(
   data: ReleaseData,
   claims: Claim[],
@@ -745,6 +755,27 @@ export async function verifyClaims(
     // newly, about 3 % on top of 1924 judged. The bump route is untouched —
     // a pin delta is evidence, not overlap — and with `--judge off` nothing
     // moves at all, so the deterministic contract holds.
+    //
+    // One reading is settled before the judge is asked: a claim whose whole
+    // pool is files that carry release notes (CHANGELOG.md, feed.xml). That
+    // diff is the publisher quoting itself, so there is nothing for a model to
+    // read — measured on anthropics/claude-code, 1297 of 1298 claims in such
+    // releases came back `no-evidence` after a call each. It can only ever
+    // take a claim DOWN to `no-evidence`: a route that already stands on its
+    // own (`verified`, e.g. a generated entry) keeps it.
+    if (useJudge && route.fallback.verdict !== "verified" && onlyNotesCarriers(route.hunkPool, data)) {
+      results.set(claim.id, {
+        claim,
+        verdict: "no-evidence",
+        confidence: 0.7,
+        reasoning:
+          "The only diff behind this claim is a file that carries the release notes themselves (changelog or feed) — the notes cannot be evidence for the notes.",
+        evidence: route.evidence,
+        judged: false,
+        generated: route.generated,
+      });
+      continue;
+    }
     if (
       useJudge &&
       (opts.judgeMode === "all" ||
