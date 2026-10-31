@@ -1340,6 +1340,30 @@ const MUTANTS: Mutant[] = [
     find: "for (const { report } of order) {",
     replace: "for (const { report } of order.slice(0, 1)) {",
   },
+  {
+    guard: "claude-cli turns the inherited tools off",
+    file: "src/judge.ts",
+    find: '          "--tools",\n          "",\n',
+    replace: "",
+  },
+  {
+    guard: "claude-cli turns the inherited skills off",
+    file: "src/judge.ts",
+    find: '          "--disable-slash-commands",\n',
+    replace: "",
+  },
+  {
+    guard: "claude-cli ignores the operator's MCP servers",
+    file: "src/judge.ts",
+    find: '          "--strict-mcp-config",\n',
+    replace: "",
+  },
+  {
+    guard: "claude-cli loads no settings sources",
+    file: "src/judge.ts",
+    find: '          "--setting-sources",\n          "",\n',
+    replace: "",
+  },
 ];
 
 // Same file set as `pnpm test` — a bare `--test test/` would also pick up

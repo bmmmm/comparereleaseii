@@ -34,7 +34,25 @@ export function makeClaudeCliEngine(model: string): JudgeEngine {
       await mkdir(cwd, { recursive: true });
       const { stdout } = await run(
         "claude",
-        ["-p", "--model", model, "--output-format", "json", "--no-session-persistence"],
+        [
+          "-p",
+          "--model",
+          model,
+          "--output-format",
+          "json",
+          "--no-session-persistence",
+          // A nested session inherits the whole interactive setup: tool
+          // schemas, skills, MCP servers, user CLAUDE.md. The judge answers
+          // one prompt and needs none of it. Measured 2026-10-31, same
+          // prompt, haiku: 31065 context tokens bare, 4867 with these four.
+          // Not `--bare`: it reads only ANTHROPIC_API_KEY, never OAuth.
+          "--tools",
+          "",
+          "--disable-slash-commands",
+          "--strict-mcp-config",
+          "--setting-sources",
+          "",
+        ],
         { input: prompt, cwd },
       );
       const outer = JSON.parse(stdout) as { result?: string; is_error?: boolean };
