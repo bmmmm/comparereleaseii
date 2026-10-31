@@ -1167,6 +1167,48 @@ const MUTANTS: Mutant[] = [
     replace: '? "contradicted"',
   },
   {
+    guard: "build metadata (+incompatible) is not a prerelease segment of a version",
+    file: "src/reconcile.ts",
+    find: '.split("+")[0].split(/[.-]/)',
+    replace: ".split(/[.+-]/)",
+  },
+  {
+    guard: "a judged contradiction on a version the diff moved past is demoted to partial",
+    file: "src/verify.ts",
+    find: 'if (verdict.verdict === "contradicted" && p.claim.bump) {',
+    replace: "if (false) {",
+  },
+  {
+    guard: "the demotion needs a line below the claimed version AND one above it",
+    file: "src/reconcile.ts",
+    find: "if (below && above) return",
+    replace: "if (above) return",
+  },
+  {
+    guard: "the claimed version must lie strictly below where the package arrived",
+    file: "src/reconcile.ts",
+    find: "compareVersions(v, claimed.to) === 1)",
+    replace: "compareVersions(v, claimed.to) !== -1)",
+  },
+  {
+    guard: "the claimed version must lie strictly above where the package started",
+    file: "src/reconcile.ts",
+    find: "compareVersions(v, claimed.to) === -1)",
+    replace: "compareVersions(v, claimed.to) !== 1)",
+  },
+  {
+    guard: "a package name matches as a token, not as a substring of another",
+    file: "src/reconcile.ts",
+    find: "${escaped}(?![\\\\w-])`",
+    replace: "${escaped}`",
+  },
+  {
+    guard: "lockfile lines are no evidence a package moved past the claimed version",
+    file: "src/reconcile.ts",
+    find: "if (!file.patch || /\\.(lock|sum)$|-lock\\.(json|ya?ml)$/.test(file.path)) continue;",
+    replace: "if (!file.patch) continue;",
+  },
+  {
     guard: "versions that cannot be ordered leave the bump claim unresolved",
     file: "src/reconcile.ts",
     find: "if (!/^\\d+$/.test(x) || !/^\\d+$/.test(y)) return null;",

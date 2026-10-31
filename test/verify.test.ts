@@ -1886,3 +1886,43 @@ test("prefilter: --judge off is untouched, and a deterministic verified is never
   assert.equal(kept[0].verdict, "verified");
   assert.equal(kept[0].generated, true);
 });
+
+// ---------- a judged bump claim the range diff explains (forge issue #26) ----------
+
+test("a judged `contradicted` on a version the package passed through is partial; a real miss stays contradicted", async () => {
+  // opencloud-eu/web v8.2.0: "update pnpm to v11.28.5" against a diff that
+  // writes pnpm@11.28.4 → pnpm@11.28.8. The notes list every hop, the range
+  // diff shows the end state. The judge calls that a contradiction and the
+  // release is capped at 35; nobody wrote anything false.
+  let calls = 0;
+  const engine: JudgeEngine = {
+    name: "stub",
+    async judge() {
+      calls++;
+      return '{"verdict":"contradicted","confidence":0.9,"files":["package.json"],"reasoning":"the diff names another version"}';
+    },
+  };
+  const opts = { judgeMode: "all" as const, engine, concurrency: 1, maxHunks: 4, maxEvidenceChars: 4000 };
+  const data = releaseData([
+    {
+      path: "package.json",
+      patch: '@@ -80,3 +80,3 @@\n-  "packageManager": "pnpm@11.28.4",\n+  "packageManager": "pnpm@11.28.8",\n',
+    },
+  ]);
+  const text = "chore(deps): update pnpm to v11.28.5 (#3571)";
+  const bumped = (to: string) => ({ ...claim(text.replace("11.28.5", to), [3571]), bump: { name: "pnpm", to: `v${to}` } });
+
+  const [hop] = await verifyClaims(data as never, [bumped("11.28.5")], opts);
+  assert.equal(hop.verdict, "partial");
+  assert.equal(hop.judged, true);
+  assert.match(hop.reasoning, /11\.28\.4 → 11\.28\.8/);
+  assert.equal(calls, 1, "no second look: the verdict it exists to double-check is gone");
+
+  // The package never gets near the claimed version: still a contradiction.
+  const [miss] = await verifyClaims(data as never, [bumped("12.0.0")], opts);
+  assert.equal(miss.verdict, "contradicted");
+
+  // And without a bump claim the judge's word stands untouched.
+  const [plain] = await verifyClaims(data as never, [claim(text, [3571])], opts);
+  assert.equal(plain.verdict, "contradicted");
+});

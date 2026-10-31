@@ -6,11 +6,12 @@
 // files, the same identifier currency substance coverage spends — no LLM,
 // no I/O, same inputs, same join. Informational, never scored.
 import { extractIdentifiers } from "./match.ts";
-import { sameName } from "./pins.ts";
+import { sameName, sideLines } from "./pins.ts";
 import type {
   BumpJoin,
   BumpResolution,
   Claim,
+  ClaimBump,
   ClaimResult,
   DiffFile,
   Finding,
@@ -45,9 +46,13 @@ function matchScore(identifiers: string[], codeSpans: string[], finding: Finding
   return score;
 }
 
-/** Segments of a version literal — the v-prefix is spelling, not content. */
+/** Segments of a version literal — the v-prefix is spelling, not content,
+ * and neither is build metadata: `v29.8.1+incompatible` is `v29.8.1` (semver
+ * ignores everything after `+` in precedence). Read as a prerelease segment it
+ * sorted below its own release and a Go module bump on that suffix came out
+ * `contradicted`. */
 function segments(v: string): string[] {
-  return v.replace(/^v/i, "").split(/[.+-]/).filter(Boolean);
+  return v.replace(/^v/i, "").split("+")[0].split(/[.-]/).filter(Boolean);
 }
 
 /**
@@ -178,6 +183,46 @@ export function resolveBumpClaims(
     });
   });
   return out;
+}
+
+const VERSION_LITERAL = /v?\d+(?:\.\d+)+(?:-[\w.]+)?/g;
+
+/** The versions a changed line writes after `name`, in order. */
+function versionsAfter(line: string, name: string): string[] {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const at = line.search(new RegExp(`(?<![\\w@/.-])${escaped}(?![\\w-])`, "i"));
+  return at < 0 ? [] : (line.slice(at + name.length).match(VERSION_LITERAL) ?? []);
+}
+
+/**
+ * Whether the release diff moved the claimed package past the version the
+ * note names: a `-` line of one file writes a version below it, a `+` line of
+ * the same file one above. That is a range diff showing the end state of
+ * several bumps while the notes list each hop — the note names a version the
+ * package passed through, not one it never had. Null otherwise: a package
+ * whose lines never move, or move to somewhere else entirely, is not this.
+ *
+ * Reads the changed lines themselves rather than the pin join, because the
+ * lines that cause it (`"packageManager": "pnpm@11.28.8"`, a compose
+ * `image: traefik:v3.7.16`, a volta `node`) are not pins the join extracts.
+ * Lockfiles are skipped: they repeat transitive copies of a name.
+ */
+export function movedPast(
+  claimed: ClaimBump,
+  files: DiffFile[],
+): { from: string; to: string; file: string } | null {
+  const names = [claimed.name, claimed.name.replace(/\.js$/i, "")].filter((n) => n.length > 1);
+  for (const file of files) {
+    if (!file.patch || /\.(lock|sum)$|-lock\.(json|ya?ml)$/.test(file.path)) continue;
+    for (const name of names) {
+      const seen = (sign: "+" | "-") =>
+        sideLines(file.patch!, sign).flatMap((l) => versionsAfter(l, name));
+      const below = seen("-").find((v) => compareVersions(v, claimed.to) === -1);
+      const above = seen("+").find((v) => compareVersions(v, claimed.to) === 1);
+      if (below && above) return { from: below, to: above, file: file.path };
+    }
+  }
+  return null;
 }
 
 /**
