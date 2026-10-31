@@ -69,6 +69,30 @@ test("claude-cli engine runs in one fixed empty dir, keeping no transcript", asy
   assert.equal(again, cwd);
 });
 
+test("claude-cli engine switches off the inherited tools, skills, MCP servers and settings", async (t) => {
+  // Each nested call used to carry ~31k tokens of the operator's own setup
+  // (77% of all judge context, measured over 6046 sessions). The empty
+  // strings are the point: `--tools ""` is none, a bare `--tools` is a usage
+  // error, so the stub prints every argument in brackets.
+  const dir = await mkdtemp(join(tmpdir(), "claude-stub-"));
+  await writeFile(
+    join(dir, "claude"),
+    `#!/bin/sh\ncat >/dev/null\nargs=""\nfor a in "$@"; do args="$args<$a>"; done\nprintf '{"result":"%s","is_error":false}' "$args"\n`,
+  );
+  await chmod(join(dir, "claude"), 0o755);
+  const orig = process.env.PATH;
+  process.env.PATH = `${dir}:${orig}`;
+  t.after(() => {
+    process.env.PATH = orig;
+  });
+  const args = await makeClaudeCliEngine("haiku").judge("prompt");
+  assert.match(args, /<--tools><>/);
+  assert.match(args, /<--disable-slash-commands>/);
+  assert.match(args, /<--strict-mcp-config>/);
+  assert.match(args, /<--setting-sources><>/);
+  assert.doesNotMatch(args, /<--bare>/);
+});
+
 test("api engine returns the text block and reports HTTP errors with status", async (t) => {
   const replies: Response[] = [
     new Response(JSON.stringify({ content: [{ type: "text", text: "inner" }] }), { status: 200 }),
