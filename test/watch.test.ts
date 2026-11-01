@@ -1987,3 +1987,60 @@ test("a rule that matched nothing still carries an empty ruleHits — not an abs
   assert.equal(c.flagged, false, "an empty ruleHits is not a hit");
   assert.equal(c.scoreLevel, 90, "three past checks — the level now compares");
 });
+
+for (const scenario of ["rule", "score", "config notify", "cli notify", "quiet"] as const) {
+  test(`watch warns about missing notify once per run: ${scenario}`, async (t) => {
+    const dir = await tempDir(t, "crii-watch-notify-");
+    await writeFile(join(dir, "gh"), `#!/usr/bin/env node
+const releases = [3, 2, 1].map(n => ({
+  tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors", draft: false, prerelease: false,
+  published_at: "2026-07-0" + n + "T00:00:00Z"
+}));
+const endpoint = process.argv[3];
+if (endpoint.includes("/releases/tags/")) {
+  console.log(JSON.stringify(releases.find(r => endpoint.endsWith(r.tag_name))));
+} else if (endpoint.includes("/releases?")) {
+  console.log(JSON.stringify(releases));
+} else if (endpoint.includes("/compare/")) {
+  console.log(JSON.stringify({ total_commits: 0, commits: [], files: [
+    { filename: "src/auth/token.ts", status: "modified", additions: 1, deletions: 1,
+      patch: "@@ -1 +1 @@\\n-old\\n+new" }
+  ] }));
+} else if (endpoint.endsWith("/languages")) {
+  console.log('{"TypeScript":100}');
+} else {
+  console.error("unexpected endpoint: " + endpoint);
+  process.exitCode = 1;
+}
+`, { mode: 0o755 });
+    const stateFile = join(dir, "state.json");
+    await writeFile(stateFile, JSON.stringify({ version: 1, repos: {
+      "o/r": { lastPublishedAt: "2026-07-01T00:00:00Z", lastTag: "v1", history: [] }
+    } }));
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${dir}:${previousPath}`;
+    const errors: string[] = [];
+    const mocked = mock.method(console, "error", (...args: unknown[]) => errors.push(args.join(" ")));
+    try {
+      const ec = await runWatch({
+        repos: [{ repo: "o/r", judge: "off", engine: "off", baseline: 0,
+          ...(scenario === "score" ? { notifyBelow: 101 } : {}),
+          ...(scenario !== "quiet" && scenario !== "score"
+            ? { rules: [{ name: "auth", paths: ["src/auth"] }] } : {}) }],
+        ...(scenario === "config notify" ? { notify: "true" } : {}),
+      }, {
+        configPath: join(dir, "watch.json"), stateFile, reportsDir: join(dir, "reports"), cache: false,
+        ...(scenario === "cli notify" ? { notify: "true" } : {}),
+      });
+      assert.equal(ec, 0, errors.join("\n"));
+      const state = JSON.parse(await readFile(stateFile, "utf8")) as WatchState;
+      assert.equal(state.repos["o/r"].history.length, 2, "both new releases were checked");
+      assert.equal(state.repos["o/r"].history.filter(h => h.flagged).length, scenario === "quiet" ? 0 : 2);
+      assert.equal(errors.filter(line => /warning:.*no notify/i.test(line)).length,
+        scenario === "rule" || scenario === "score" ? 1 : 0, errors.join("\n"));
+    } finally {
+      mocked.mock.restore();
+      process.env.PATH = previousPath;
+    }
+  });
+}
