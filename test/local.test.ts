@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   assertCloneUrl,
@@ -120,8 +120,8 @@ test("extractChangelogSection matches bare and v-prefixed headings", () => {
   assert.ok(!unreleased?.includes("Shipped"));
 });
 
-test("loadLocalRange with the empty tree covers the full history", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
+test("loadLocalRange with the empty tree covers the full history", async (t) => {
+  const repo = await tempDir(t, "crii-local-test-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -144,8 +144,8 @@ test("loadLocalRange with the empty tree covers the full history", async () => {
   assert.ok(range.commits.every((c) => c.email === "test@example.invalid"));
 });
 
-test("a commit body carrying field separators cannot desync commit parsing", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-local-sep-"));
+test("a commit body carrying field separators cannot desync commit parsing", async (t) => {
+  const repo = await tempDir(t, "crii-local-sep-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -192,11 +192,11 @@ test("assertCloneUrl refuses what git would run instead of clone", () => {
   }
 });
 
-test("--repo-url checks a forge nobody wrote an API client for", async () => {
+test("--repo-url checks a forge nobody wrote an API client for", async (t) => {
   // The whole point of 4.2a: a clone answers the diff, the commits, the
   // subjects, the authors and the tags. Only the notes live on the forge, so
   // they come from the CHANGELOG section — and this test never touches one.
-  const origin = await mkdtemp(join(tmpdir(), "crii-origin-"));
+  const origin = await tempDir(t, "crii-origin-");
   const git = (...args: string[]) => exec("git", ["-C", origin, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -213,7 +213,7 @@ test("--repo-url checks a forge nobody wrote an API client for", async () => {
   await git("commit", "-qam", "Add rotate and change parseToken");
   await git("tag", "1.1.0");
 
-  const clone = join(await mkdtemp(join(tmpdir(), "crii-clone-")), "app");
+  const clone = join(await tempDir(t, "crii-clone-"), "app");
   const url = `file://${origin}`;
   await ensureClone(url, clone);
   // Second call is the cached path — fetch, not clone, and still fine.
@@ -234,8 +234,8 @@ test("--repo-url checks a forge nobody wrote an API client for", async () => {
   assert.ok(!data.baseNotes?.includes("parseToken"), "base notes are the base's section only");
 });
 
-test("a fetch that fails costs freshness, not the cached clone", async () => {
-  const origin = await mkdtemp(join(tmpdir(), "crii-origin2-"));
+test("a fetch that fails costs freshness, not the cached clone", async (t) => {
+  const origin = await tempDir(t, "crii-origin2-");
   const git = (...args: string[]) => exec("git", ["-C", origin, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -245,7 +245,7 @@ test("a fetch that fails costs freshness, not the cached clone", async () => {
   await git("commit", "-q", "-m", "first");
   await git("tag", "1.0.0");
 
-  const clone = join(await mkdtemp(join(tmpdir(), "crii-clone2-")), "app");
+  const clone = join(await tempDir(t, "crii-clone2-"), "app");
   await ensureClone(`file://${origin}`, clone);
 
   // Whatever makes the update fail — offline, expired token, a credential
@@ -257,8 +257,8 @@ test("a fetch that fails costs freshness, not the cached clone", async () => {
   assert.match(stdout, /1\.0\.0/, "the cached clone survived and still answers");
 });
 
-test("loadLocalRelease skips prerelease tags when picking the base for a stable head", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
+test("loadLocalRelease skips prerelease tags when picking the base for a stable head", async (t) => {
+  const repo = await tempDir(t, "crii-local-test-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -351,8 +351,8 @@ index 111..222 100644
   assert.equal(file.deletions, 1);
 });
 
-test("the repo label resolves the path before taking its basename", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-label-"));
+test("the repo label resolves the path before taking its basename", async (t) => {
+  const repo = await tempDir(t, "crii-label-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -369,8 +369,8 @@ test("the repo label resolves the path before taking its basename", async () => 
   assert.equal(dotted.repoLabel, repo.split("/").pop());
 });
 
-test("a bare tag finds its v-prefixed changelog heading", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-vprefix-"));
+test("a bare tag finds its v-prefixed changelog heading", async (t) => {
+  const repo = await tempDir(t, "crii-vprefix-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");
@@ -386,8 +386,8 @@ test("a bare tag finds its v-prefixed changelog heading", async () => {
   assert.ok(data.notes.includes("First"), `notes not found: ${JSON.stringify(data.notes)}`);
 });
 
-test("commitFiles reads a merge commit against its first parent, as the GitHub source does", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-local-test-"));
+test("commitFiles reads a merge commit against its first parent, as the GitHub source does", async (t) => {
+  const repo = await tempDir(t, "crii-local-test-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q", "-b", "main");
   await git("config", "user.email", "test@example.invalid");

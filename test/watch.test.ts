@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test, mock } from "node:test";
+import { after, test, mock } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import {
   configuredEntries,
@@ -57,8 +58,7 @@ import {
   type WatchRepoConfig,
 } from "../src/watch-state.ts";
 import type { ClaimResult, Finding, PromiseCheck, ReleaseSurface, Report, Verdict } from "../src/types.ts";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 
 function rel(tag: string, publishedAt: string, extra: Partial<ReleaseInfo> = {}): ReleaseInfo {
@@ -196,8 +196,8 @@ test("an empty release list that contradicts the state is a load failure, not 'u
 // the poll cursor untouched. The pure function above could be left uncalled
 // and every test still pass — this drives `runWatch` end to end with a fake
 // `gh` on PATH, the same pattern github.test.ts uses.
-test("a watch tick whose listing comes back empty against recorded state fails loud", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "crii-watch-empty-"));
+test("a watch tick whose listing comes back empty against recorded state fails loud", async (t) => {
+  const dir = await tempDir(t, "crii-watch-empty-");
   await writeFile(join(dir, "gh"), "#!/usr/bin/env bash\necho '[]'\n", { mode: 0o755 });
   const statePath = join(dir, "state.json");
   await writeFile(
@@ -966,8 +966,8 @@ test("the index row says which rule moved, and marks a judge-based hit", () => {
 // `--notify` runs a shell string on purpose. The report path handed to it is
 // not the operator's — it carries a repo key and a tag from the config and the
 // forge — so it must arrive as an argument, never as shell source.
-test("the notify command cannot be extended by the report path", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "notify-"));
+test("the notify command cannot be extended by the report path", async (t) => {
+  const dir = await tempDir(t, "notify-");
   const marker = join(dir, "pwned");
   const seen = join(dir, "seen.txt");
   const hostile = join(dir, `v1.0.0"; touch ${marker}; echo ".json`);
@@ -1559,7 +1559,7 @@ test("the index states what scores measure — the entry page must not read as a
 // config entry with `label: "../.."` wrote its reports outside the reports
 // directory. The fix is one call, it is not visible in any output, and no
 // test held it: deleting `safeSegment` here passed the whole suite.
-test("a label that tries to climb out of the reports directory cannot", async () => {
+test("a label that tries to climb out of the reports directory cannot", async (t) => {
   const results: never[] = [];
   const report: Report = {
     repoLabel: "o/r",
@@ -1583,7 +1583,7 @@ test("a label that tries to climb out of the reports directory cannot", async ()
     engine: "off",
   };
   const repoState: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
-  const reportsDir = await mkdtemp(join(tmpdir(), "crii-reports-"));
+  const reportsDir = await tempDir(t, "crii-reports-");
 
   const { dirKey, jsonPath } = await writeReportFiles({
     report,
@@ -1773,7 +1773,7 @@ async function check(opts: {
     ...opts.rel,
   };
   const repoState: RepoState = opts.repoState ?? { lastPublishedAt: null, lastTag: null, history: [] };
-  const reportsDir = await mkdtemp(join(tmpdir(), "crii-checkAndRecord-"));
+  const reportsDir = await tempDir({ after }, "crii-checkAndRecord-");
   mock.timers.enable({ apis: ["Date"], now: new Date(FIXED_NOW) });
   try {
     const outcome = await checkAndRecord({
@@ -1990,6 +1990,63 @@ test("a rule that matched nothing still carries an empty ruleHits — not an abs
   assert.equal(c.scoreLevel, 90, "three past checks — the level now compares");
 });
 
+for (const scenario of ["rule", "score", "config notify", "cli notify", "quiet"] as const) {
+  test(`watch warns about missing notify once per run: ${scenario}`, async (t) => {
+    const dir = await tempDir(t, "crii-watch-notify-");
+    await writeFile(join(dir, "gh"), `#!/usr/bin/env node
+const releases = [3, 2, 1].map(n => ({
+  tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors", draft: false, prerelease: false,
+  published_at: "2026-07-0" + n + "T00:00:00Z"
+}));
+const endpoint = process.argv[3];
+if (endpoint.includes("/releases/tags/")) {
+  console.log(JSON.stringify(releases.find(r => endpoint.endsWith(r.tag_name))));
+} else if (endpoint.includes("/releases?")) {
+  console.log(JSON.stringify(releases));
+} else if (endpoint.includes("/compare/")) {
+  console.log(JSON.stringify({ total_commits: 0, commits: [], files: [
+    { filename: "src/auth/token.ts", status: "modified", additions: 1, deletions: 1,
+      patch: "@@ -1 +1 @@\\n-old\\n+new" }
+  ] }));
+} else if (endpoint.endsWith("/languages")) {
+  console.log('{"TypeScript":100}');
+} else {
+  console.error("unexpected endpoint: " + endpoint);
+  process.exitCode = 1;
+}
+`, { mode: 0o755 });
+    const stateFile = join(dir, "state.json");
+    await writeFile(stateFile, JSON.stringify({ version: 1, repos: {
+      "o/r": { lastPublishedAt: "2026-07-01T00:00:00Z", lastTag: "v1", history: [] }
+    } }));
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${dir}:${previousPath}`;
+    const errors: string[] = [];
+    const mocked = mock.method(console, "error", (...args: unknown[]) => errors.push(args.join(" ")));
+    try {
+      const ec = await runWatch({
+        repos: [{ repo: "o/r", judge: "off", engine: "off", baseline: 0,
+          ...(scenario === "score" ? { notifyBelow: 101 } : {}),
+          ...(scenario !== "quiet" && scenario !== "score"
+            ? { rules: [{ name: "auth", paths: ["src/auth"] }] } : {}) }],
+        ...(scenario === "config notify" ? { notify: "true" } : {}),
+      }, {
+        configPath: join(dir, "watch.json"), stateFile, reportsDir: join(dir, "reports"), cache: false,
+        ...(scenario === "cli notify" ? { notify: "true" } : {}),
+      });
+      assert.equal(ec, 0, errors.join("\n"));
+      const state = JSON.parse(await readFile(stateFile, "utf8")) as WatchState;
+      assert.equal(state.repos["o/r"].history.length, 2, "both new releases were checked");
+      assert.equal(state.repos["o/r"].history.filter(h => h.flagged).length, scenario === "quiet" ? 0 : 2);
+      assert.equal(errors.filter(line => /warning:.*no notify/i.test(line)).length,
+        scenario === "rule" || scenario === "score" ? 1 : 0, errors.join("\n"));
+    } finally {
+      mocked.mock.restore();
+      process.env.PATH = previousPath;
+    }
+  });
+}
+
 for (const backfilled of [false, true]) {
   test(`only a changed rule match list flags the next release (backfilled: ${backfilled})`, async () => {
     const rules: WatchRule[] = [{ name: "auth", paths: ["src/auth"] }];
@@ -2064,8 +2121,8 @@ test("repeat comparison keeps mixed new hits, respects judge provenance, and nev
   assert.doesNotMatch(toWatchIndexHtml(state, "t"), /class="rule"/, "a repeated hit has no alert badge");
 });
 
-test("a live watch notifies and announces only new rule hits across three releases", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "crii-watch-rule-repeat-"));
+test("a live watch notifies and announces only new rule hits across three releases", async (t) => {
+  const dir = await tempDir(t, "crii-watch-rule-repeat-");
   await writeFile(join(dir, "gh"), `#!/usr/bin/env node
 const releases = [4, 3, 2, 1].map(n => ({
   tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors",

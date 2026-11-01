@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addGoldenCase, goldenCaseName, looksLikeSecurity } from "../src/golden.ts";
 import {
@@ -84,7 +84,7 @@ async function fixture(
   reportOver: Partial<Report> = {},
   golden: GoldenCase[] = [],
 ): Promise<{ reportPath: string; goldenFile: string }> {
-  const dir = await mkdtemp(join(tmpdir(), "golden-"));
+  const dir = await tempDir({ after }, "golden-");
   const reportPath = join(dir, "report.json");
   const goldenFile = join(dir, "golden.json");
   await writeFile(reportPath, JSON.stringify(report(reportOver), null, 2));
@@ -294,8 +294,8 @@ test("a report checked from a local clone says which flag names the clone", asyn
   );
 });
 
-test("something that is not a report says so instead of half-reading it", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "golden-"));
+test("something that is not a report says so instead of half-reading it", async (t) => {
+  const dir = await tempDir(t, "golden-");
   const notJson = join(dir, "a.json");
   const notReport = join(dir, "b.json");
   const goldenFile = join(dir, "golden.json");

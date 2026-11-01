@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   parseSelection,
@@ -109,8 +109,8 @@ test("removeRepo: removes every entry for the repo, reports the count", () => {
   assert.equal(removeRepo(config, "c/z"), 0);
 });
 
-test("config round-trip: unknown top-level keys survive an add", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+test("config round-trip: unknown top-level keys survive an add", async (t) => {
+  const dir = await tempDir(t, "wl-");
   const path = join(dir, "watch.json");
   await writeFile(
     path,
@@ -130,15 +130,15 @@ test("config round-trip: unknown top-level keys survive an add", async () => {
   assert.deepEqual(written.repos, [{ repo: "a/x", notesFile: "notes.md" }, { repo: "b/y" }]);
 });
 
-test("loadConfig: missing file yields an empty config, existed=false", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+test("loadConfig: missing file yields an empty config, existed=false", async (t) => {
+  const dir = await tempDir(t, "wl-");
   const { config, existed } = await loadConfig(join(dir, "nope.json"));
   assert.equal(existed, false);
   assert.deepEqual(config.repos, []);
 });
 
-test("loadConfig: broken JSON names the file in the error", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+test("loadConfig: broken JSON names the file in the error", async (t) => {
+  const dir = await tempDir(t, "wl-");
   const path = join(dir, "watch.json");
   await writeFile(path, '{ "repos": [ }');
   await assert.rejects(loadConfig(path), (err: Error) => {
@@ -148,8 +148,8 @@ test("loadConfig: broken JSON names the file in the error", async () => {
   });
 });
 
-test("loadConfig: rejects non-object configs and non-array repos instead of coercing", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+test("loadConfig: rejects non-object configs and non-array repos instead of coercing", async (t) => {
+  const dir = await tempDir(t, "wl-");
   for (const bad of ['["a/x"]', "null", '"hello"', '{ "repos": { "a/x": {} } }']) {
     const path = join(dir, "bad.json");
     await writeFile(path, bad);
@@ -157,8 +157,8 @@ test("loadConfig: rejects non-object configs and non-array repos instead of coer
   }
 });
 
-test("requireConfig: a run needs a config that exists, and one shaped like a config", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+test("requireConfig: a run needs a config that exists, and one shaped like a config", async (t) => {
+  const dir = await tempDir(t, "wl-");
   // loadConfig tolerates a missing file — `watch add` creates one. A run does
   // not: it has nothing to do, and the message has to say where to look.
   await assert.rejects(
@@ -173,8 +173,8 @@ test("requireConfig: a run needs a config that exists, and one shaped like a con
   assert.deepEqual((await requireConfig(good)).repos, [{ repo: "a/x" }]);
 });
 
-test("loadConfig: missing repos key becomes an empty array, keys survive", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "wl-"));
+test("loadConfig: missing repos key becomes an empty array, keys survive", async (t) => {
+  const dir = await tempDir(t, "wl-");
   const path = join(dir, "watch.json");
   await writeFile(path, '{ "notify": "cmd" }');
   const { config } = await loadConfig(path);

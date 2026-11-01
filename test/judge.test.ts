@@ -2,10 +2,11 @@
 // Engine-adapter tests: every network engine through a fetch mock, the
 // claude CLI through a stub binary on PATH. These are the money paths that
 // had no coverage — a broken adapter fails every judged claim at once.
-import { test, type TestContext } from "node:test";
+import { after, test, type TestContext } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { realpathSync } from "node:fs";
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -17,9 +18,12 @@ import {
 } from "../src/judge.ts";
 import { calibrateModels } from "../src/calibrate.ts";
 
+// The engine creates a fixed crii-judge cwd beneath tmpdir(); own that parent too.
+process.env.TMPDIR = await tempDir({ after }, "crii-judge-test-");
+
 /** Put a fake `claude` on PATH that swallows stdin and prints a canned reply. */
 async function stubClaude(t: TestContext, outerJson: string): Promise<void> {
-  const dir = await mkdtemp(join(tmpdir(), "claude-stub-"));
+  const dir = await tempDir(t, "claude-stub-");
   await writeFile(join(dir, "response.json"), outerJson);
   await writeFile(
     join(dir, "claude"),
@@ -49,7 +53,7 @@ test("claude-cli engine surfaces is_error instead of parsing the result", async 
 test("claude-cli engine runs in one fixed empty dir, keeping no transcript", async (t) => {
   // claude indexes its cwd at start (the shared temp dir cost ~300% CPU a
   // call) and makes a ~/.claude/projects dir for each cwd it sees.
-  const dir = await mkdtemp(join(tmpdir(), "claude-stub-"));
+  const dir = await tempDir(t, "claude-stub-");
   await writeFile(
     join(dir, "claude"),
     `#!/bin/sh\ncat >/dev/null\nprintf '{"result":"%s|%s|%s","is_error":false}' "$(pwd -P)" "$(ls -A | wc -l | tr -d ' ')" "$*"\n`,
@@ -74,7 +78,7 @@ test("claude-cli engine switches off the inherited tools, skills, MCP servers an
   // (77% of all judge context, measured over 6046 sessions). The empty
   // strings are the point: `--tools ""` is none, a bare `--tools` is a usage
   // error, so the stub prints every argument in brackets.
-  const dir = await mkdtemp(join(tmpdir(), "claude-stub-"));
+  const dir = await tempDir(t, "claude-stub-");
   await writeFile(
     join(dir, "claude"),
     `#!/bin/sh\ncat >/dev/null\nargs=""\nfor a in "$@"; do args="$args<$a>"; done\nprintf '{"result":"%s","is_error":false}' "$args"\n`,
