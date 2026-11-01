@@ -2005,8 +2005,9 @@ if (endpoint.includes("/releases/tags/")) {
   console.log(JSON.stringify(releases));
 } else if (endpoint.includes("/compare/")) {
   console.log(JSON.stringify({ total_commits: 0, commits: [], files: [
-    { filename: "src/auth/token.ts", status: "modified", additions: 1, deletions: 1,
-      patch: "@@ -1 +1 @@\\n-old\\n+new" }
+    // A different file per release keeps the rule hit new — a repeat would not flag.
+    { filename: endpoint.endsWith("v3") ? "src/auth/session.ts" : "src/auth/token.ts",
+      status: "modified", additions: 1, deletions: 1, patch: "@@ -1 +1 @@\\n-old\\n+new" }
   ] }));
 } else if (endpoint.endsWith("/languages")) {
   console.log('{"TypeScript":100}');
