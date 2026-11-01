@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
   computeCoverage,
   isGeneratedEntry,
@@ -193,10 +191,10 @@ test("parseJudgeResponse: need-protocol and verdicts", () => {
   assert.ok(!("need" in verdict));
 });
 
-test("withVerdictCache: second call with the same prompt hits the disk", async () => {
+test("withVerdictCache: second call with the same prompt hits the disk", async (t) => {
   // Own cache home: the real one may not exist (or may be refused) on the
   // machine running the suite, and a test must not write into the user's.
-  process.env.XDG_CACHE_HOME = mkdtempSync(join(tmpdir(), "crii-cache-"));
+  process.env.XDG_CACHE_HOME = await tempDir(t, "crii-cache-");
   let calls = 0;
   const engine = withVerdictCache({
     name: "test-stub",

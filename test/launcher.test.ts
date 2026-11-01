@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,25 +18,21 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
  * arrives in ran v0.1.1's scoring rules out of a stale dist/, and the only
  * symptom was a wrong number.
  */
-test("the launcher prefers the working tree over a stale build", () => {
-  const dir = mkdtempSync(join(tmpdir(), "comparereleaseii-launcher-"));
-  try {
-    mkdirSync(join(dir, "bin"));
-    mkdirSync(join(dir, "src"));
-    mkdirSync(join(dir, "dist"));
-    copyFileSync(join(ROOT, "bin/comparerelease.mjs"), join(dir, "bin/comparerelease.mjs"));
-    writeFileSync(join(dir, "src/cli.ts"), 'const which: string = "src";\nconsole.log(which);\n');
-    writeFileSync(join(dir, "dist/cli.js"), 'console.log("dist");\n');
+test("the launcher prefers the working tree over a stale build", async (t) => {
+  const dir = await tempDir(t, "comparereleaseii-launcher-");
+  mkdirSync(join(dir, "bin"));
+  mkdirSync(join(dir, "src"));
+  mkdirSync(join(dir, "dist"));
+  copyFileSync(join(ROOT, "bin/comparerelease.mjs"), join(dir, "bin/comparerelease.mjs"));
+  writeFileSync(join(dir, "src/cli.ts"), 'const which: string = "src";\nconsole.log(which);\n');
+  writeFileSync(join(dir, "dist/cli.js"), 'console.log("dist");\n');
 
-    const run = () =>
-      execFileSync(process.execPath, [join(dir, "bin/comparerelease.mjs")], {
-        encoding: "utf8",
-      }).trim();
+  const run = () =>
+    execFileSync(process.execPath, [join(dir, "bin/comparerelease.mjs")], {
+      encoding: "utf8",
+    }).trim();
 
-    assert.equal(run(), "src", "both present: the working tree wins");
-    rmSync(join(dir, "src"), { recursive: true });
-    assert.equal(run(), "dist", "installed tarball: only dist/ exists, and it runs");
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  assert.equal(run(), "src", "both present: the working tree wins");
+  rmSync(join(dir, "src"), { recursive: true });
+  assert.equal(run(), "dist", "installed tarball: only dist/ exists, and it runs");
 });

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { VERSION } from "../src/paths.ts";
 import {
@@ -14,7 +14,7 @@ import {
 
 // cacheDir() resolves XDG_CACHE_HOME at call time, so every test gets its own.
 async function withCacheHome<T>(fn: (verdicts: string) => Promise<T>): Promise<T> {
-  const home = await mkdtemp(join(tmpdir(), "crii-gc-"));
+  const home = await tempDir({ after }, "crii-gc-");
   const verdicts = join(home, "comparereleaseii", "verdicts");
   await mkdir(verdicts, { recursive: true, mode: 0o700 });
   const before = process.env.XDG_CACHE_HOME;

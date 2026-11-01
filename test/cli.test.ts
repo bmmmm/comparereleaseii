@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -12,8 +12,8 @@ const exec = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(ROOT, "src/cli.ts");
 
-test("automatic calibration excludes Laya before making judge requests", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "crii-model-routing-"));
+test("automatic calibration excludes Laya before making judge requests", async (t) => {
+  const dir = await tempDir(t, "crii-model-routing-");
   const preload = join(dir, "fetch.mjs");
   const trace = join(dir, "models.jsonl");
   await writeFile(preload, `
@@ -118,7 +118,7 @@ test("mode flags reject unknown words and name the choices", async () => {
 // there used to be the repo argument of an ordinary check, which would then
 // go and talk to a forge about a repository called "gc".
 test("cache reports the directory it would collect, and rejects a subcommand it has not got", async (t) => {
-  const home = await mkdtemp(join(tmpdir(), "crii-cli-cache-"));
+  const home = await tempDir(t, "crii-cli-cache-");
   const env = { ...process.env, XDG_CACHE_HOME: home };
   const { stdout } = await exec(process.execPath, [CLI, "cache", "stats"], { env });
   assert.match(stdout, /verdict cache — .*verdicts/);

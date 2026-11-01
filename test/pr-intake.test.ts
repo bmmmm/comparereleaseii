@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -14,7 +14,7 @@ const SCRIPT = join(ROOT, ".github/scripts/pr-intake.mjs");
 
 /** Run the intake script over a PR body and return what it wrote to the summary. */
 async function intake(body: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "intake-"));
+  const dir = await tempDir({ after }, "intake-");
   const summary = join(dir, "summary.md");
   await run(process.execPath, [SCRIPT], {
     cwd: dir,

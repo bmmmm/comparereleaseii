@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildSnapshots, cloneHistory, type HistorySource } from "../src/history.ts";
 import { changelogReleases } from "../src/sources/local.ts";
@@ -13,7 +13,7 @@ const exec = promisify(execFile);
 
 // Snapshots are cached on disk, and a cache entry from another run would
 // answer for code this test never called. Give the whole file its own root.
-process.env.XDG_CACHE_HOME = await mkdtemp(join(tmpdir(), "crii-history-cache-"));
+process.env.XDG_CACHE_HOME = await tempDir({ after }, "crii-history-cache-");
 
 const CHANGELOG = `# Changelog
 
@@ -36,7 +36,7 @@ const CHANGELOG = `# Changelog
  * creatordate, and two commits in the same second would tie.
  */
 async function repoWithHistory(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), "crii-history-"));
+  const repo = await tempDir({ after }, "crii-history-");
   const at = (month: number) => {
     const iso = `2026-0${month}-01T12:00:00Z`;
     return { env: { ...process.env, GIT_AUTHOR_DATE: iso, GIT_COMMITTER_DATE: iso } };
@@ -80,8 +80,8 @@ test("changelogReleases reads the release list a clone can see on its own", asyn
   assert.deepEqual(releases.map((r) => r.date), ["2026-03-01", "2026-02-01", "2026-01-01"]);
 });
 
-test("changelogReleases is empty, not an error, without a CHANGELOG", async () => {
-  const repo = await mkdtemp(join(tmpdir(), "crii-history-bare-"));
+test("changelogReleases is empty, not an error, without a CHANGELOG", async (t) => {
+  const repo = await tempDir(t, "crii-history-bare-");
   await exec("git", ["-C", repo, "init", "-q"]);
   assert.deepEqual(await changelogReleases(repo), []);
 });

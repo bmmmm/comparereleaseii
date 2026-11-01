@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, stat } from "node:fs/promises";
-import { tmpdir, hostname } from "node:os";
+import { readFile, writeFile, stat } from "node:fs/promises";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { acquireStateLock } from "../src/watch-lock.ts";
 import { runWatch } from "../src/watch.ts";
 
-const home = async (): Promise<string> => mkdtemp(join(tmpdir(), "crii-lock-"));
+const home = async (): Promise<string> => tempDir({ after }, "crii-lock-");
 
 /** A pid no process can have: macOS and Linux both cap far below this. */
 const DEAD_PID = 2147483647;
