@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   assertRepoSlug,
@@ -129,14 +129,14 @@ test("extractPrNumbers reads the merge dialect of whichever forge cut the commit
   assert.deepEqual(extractPrNumbers("Fix the thing"), []);
 });
 
-test("a rate limit is waited out, not answered with partial data", async () => {
+test("a rate limit is waited out, not answered with partial data", async (t) => {
   // A rate limit is the same request answerable N seconds later, not a
   // missing resource. Answering it with a load failure is what let a
   // partially-read release outscore a fully-read one, so ghApi retries once
   // after the reset — and when the reset is too far out it fails saying so
   // rather than handing back a hole. The fake `gh` fails the first data call
   // and succeeds after; `rate_limit` reports a window that has just reset.
-  const dir = await mkdtemp(join(tmpdir(), "crii-gh-"));
+  const dir = await tempDir(t, "crii-gh-");
   const marker = join(dir, "called");
   const reset = Math.floor(Date.now() / 1000) + 1;
   await writeFile(
@@ -170,8 +170,8 @@ exit 1
   }
 });
 
-test("a rate limit resetting beyond the cap fails naming the wait", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "crii-gh-"));
+test("a rate limit resetting beyond the cap fails naming the wait", async (t) => {
+  const dir = await tempDir(t, "crii-gh-");
   const reset = Math.floor(Date.now() / 1000) + 3600;
   await writeFile(
     join(dir, "gh"),
@@ -202,13 +202,13 @@ exit 1
   }
 });
 
-test("a refusal the rate_limit endpoint does not admit is the secondary limit", async () => {
+test("a refusal the rate_limit endpoint does not admit is the secondary limit", async (t) => {
   // The case that actually happened: twelve parallel workers tripped GitHub's
   // anti-abuse limit while `rate_limit` still reported core at 5000/5000.
   // There is no reset to read, so a run that only trusts the endpoint would
   // give up — but this limit clears in under a minute, so one short wait is
   // the right answer and a hole in the data never is.
-  const dir = await mkdtemp(join(tmpdir(), "crii-gh-"));
+  const dir = await tempDir(t, "crii-gh-");
   const marker = join(dir, "called");
   await writeFile(
     join(dir, "gh"),

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   analyzeRelease,
@@ -138,7 +138,7 @@ test("truncation fallback failing keeps the truncated data and says why", async 
 
 /** A two-release repo with tags and a CHANGELOG — a stand-in for any forge clone. */
 async function taggedRepo(): Promise<string> {
-  const repo = await mkdtemp(join(tmpdir(), "crii-forge-"));
+  const repo = await tempDir({ after }, "crii-forge-");
   const git = (...args: string[]) => exec("git", ["-C", repo, ...args]);
   await git("init", "-q");
   await git("config", "user.email", "test@example.invalid");

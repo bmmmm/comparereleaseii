@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { judgeCallStats, resetJudgeStats, withVerdictCache } from "../src/cache.ts";
 import type { JudgeEngine } from "../src/judge.ts";
 
 // Own cache root: cache.ts resolves XDG_CACHE_HOME at call time.
-process.env.XDG_CACHE_HOME = await mkdtemp(join(tmpdir(), "crii-cache-test-"));
+process.env.XDG_CACHE_HOME = await tempDir({ after }, "crii-cache-test-");
 
 function countingEngine(): JudgeEngine & { calls: number } {
   const engine = {
