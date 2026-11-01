@@ -39,6 +39,8 @@ import {
   recordCheckFailure,
   recordSkip,
   evaluateRules,
+  markRepeatedRuleHits,
+  newRuleHits,
   matchesPathGlob,
   staleRules,
   BASELINE_WINDOW,
@@ -2003,8 +2005,9 @@ if (endpoint.includes("/releases/tags/")) {
   console.log(JSON.stringify(releases));
 } else if (endpoint.includes("/compare/")) {
   console.log(JSON.stringify({ total_commits: 0, commits: [], files: [
-    { filename: "src/auth/token.ts", status: "modified", additions: 1, deletions: 1,
-      patch: "@@ -1 +1 @@\\n-old\\n+new" }
+    // A different file per release keeps the rule hit new — a repeat would not flag.
+    { filename: endpoint.endsWith("v3") ? "src/auth/session.ts" : "src/auth/token.ts",
+      status: "modified", additions: 1, deletions: 1, patch: "@@ -1 +1 @@\\n-old\\n+new" }
   ] }));
 } else if (endpoint.endsWith("/languages")) {
   console.log('{"TypeScript":100}');
@@ -2044,3 +2047,146 @@ if (endpoint.includes("/releases/tags/")) {
     }
   });
 }
+
+for (const backfilled of [false, true]) {
+  test(`only a changed rule match list flags the next release (backfilled: ${backfilled})`, async () => {
+    const rules: WatchRule[] = [{ name: "auth", paths: ["src/auth"] }];
+    const repoState: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+    const run = async (n: number, paths: string[]) => check({
+      report: fabricatedReport({ metrics: {
+        ...fabricatedReport().metrics,
+        files: paths.map(path => ({ path, churn: 1, sensitive: null, coverage: "covered" })),
+      } }),
+      rc: { rules }, repoState, backfilled,
+      rel: { tag: `v${n}`, publishedAt: `2026-06-0${n}T00:00:00Z` },
+    });
+    const first = (await run(1, ["src/auth/a.ts", "src/auth/b.ts"])).outcome;
+    assert.equal(first.flagged, true);
+    const repeat = (await run(2, ["src/auth/b.ts", "src/auth/a.ts"])).outcome;
+    assert.equal(repeat.flagged, false, "the predecessor has the same hit, even in a different input order");
+    assert.deepEqual(repeat.checked.ruleHits, [{
+      rule: "auth", matched: ["src/auth/a.ts", "src/auth/b.ts"], judgeBased: false, repeated: true,
+    }], "the hit stays visible, with only an additive marker");
+    const again = (await run(3, ["src/auth/a.ts", "src/auth/b.ts"])).outcome;
+    assert.equal(again.flagged, false, "a repeat of a repeated hit stays quiet");
+    assert.equal((await run(4, ["src/auth/c.ts"])).outcome.flagged, true, "a changed list fires");
+    assert.equal((await run(5, [])).outcome.flagged, false);
+    assert.equal((await run(6, ["src/auth/c.ts"])).outcome.flagged, true, "absence resets the comparison");
+  });
+}
+
+test("rule repeats compare only the immediate recorded predecessor, not future releases or another repo", async () => {
+  const rules: WatchRule[] = [{ name: "auth", paths: ["src/auth"] }];
+  const run = async (repoState: RepoState, n: number, path: string) => check({
+    report: fabricatedReport({ metrics: { ...fabricatedReport().metrics,
+      files: [{ path, churn: 1, sensitive: null, coverage: "covered" }] } }),
+    rc: { rules }, repoState, rel: { tag: `v${n}`, publishedAt: `2026-06-0${n}T00:00:00Z` },
+  });
+  const repoState: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  await run(repoState, 1, "src/auth/a.ts");
+  await run(repoState, 4, "src/auth/b.ts");
+  assert.equal((await run(repoState, 2, "src/auth/b.ts")).outcome.flagged, true, "future hit is not the predecessor");
+  const third = (await run(repoState, 3, "src/auth/b.ts")).outcome;
+  assert.equal(third.flagged, false, "the newest earlier release wins");
+  const other: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  assert.equal((await run(other, 3, "src/auth/b.ts")).outcome.flagged, true, "another entry has its own history");
+});
+
+test("repeat comparison keeps mixed new hits, respects judge provenance, and never infers a capped legacy tail", () => {
+  const a = { rule: "auth", matched: ["a", "b"], judgeBased: false };
+  const b = { rule: "schema", matched: ["migration: new.sql"], judgeBased: false };
+  const hits = markRepeatedRuleHits([a, b], [{ ...a, matched: ["b", "a"], repeated: true }]);
+  assert.deepEqual(newRuleHits(hits), [b]);
+  assert.equal(hits[0].repeated, true);
+  assert.equal(markRepeatedRuleHits([a], [{ ...a, judgeBased: true }])[0].repeated, undefined);
+  assert.equal(markRepeatedRuleHits([a], undefined)[0].repeated, undefined);
+  assert.deepEqual(a, { rule: "auth", matched: ["a", "b"], judgeBased: false }, "inputs stay untouched");
+  const files = Array.from({ length: MAX_RULE_MATCHES + 2 }, (_, i) => `src/auth/${String(i).padStart(2, "0")}.ts`);
+  const rules: WatchRule[] = [{ name: "auth", paths: ["src/auth"] }];
+  const full = evaluateRules(rules, { files });
+  assert.equal(markRepeatedRuleHits(evaluateRules(rules, { files: [...files].reverse() }), full)[0].repeated, true);
+  const changed = evaluateRules(rules, { files: [...files.slice(0, -1), "src/auth/zz.ts"] });
+  assert.deepEqual(changed[0].matched, full[0].matched, "only the hidden tail changed");
+  assert.equal(markRepeatedRuleHits(changed, full)[0].repeated, undefined, "the full digest catches it");
+  const legacy = full.map(({ matchDigest, ...hit }) => hit);
+  assert.equal(markRepeatedRuleHits(full, legacy)[0].repeated, undefined, "an old capped hit cannot prove equality");
+  assert.equal(markRepeatedRuleHits(legacy, full)[0].repeated, undefined);
+  const base = { score: 95, exitCode: 0, criticalFlags: 0, past: [], runs: [] };
+  const repeat = { ...a, repeated: true };
+  assert.equal(alertDecision({ ...base, ruleHits: [repeat] }).flagged, false);
+  assert.equal(alertDecision({ ...base, ruleHits: [repeat], criticalFlags: 1 }).flagged, true, "other alert reasons survive");
+  const c = { ...checked("v2", 95, false), ruleHits: [repeat] };
+  const state: WatchState = { version: 1, repos: { "o/r": {
+    lastPublishedAt: "t", lastTag: "v2", latest: c, history: [c],
+  } } };
+  assert.doesNotMatch(toWatchIndexHtml(state, "t"), /class="rule"/, "a repeated hit has no alert badge");
+});
+
+test("a live watch notifies and announces only new rule hits across three releases", async (t) => {
+  const dir = await tempDir(t, "crii-watch-rule-repeat-");
+  await writeFile(join(dir, "gh"), `#!/usr/bin/env node
+const releases = [4, 3, 2, 1].map(n => ({
+  tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors",
+  draft: false, prerelease: false, published_at: "2026-07-0" + n + "T00:00:00Z"
+}));
+const endpoint = process.argv[3];
+if (endpoint.includes("/releases/tags/")) {
+  console.log(JSON.stringify(releases.find(r => endpoint.endsWith(r.tag_name))));
+} else if (endpoint.includes("/releases?")) {
+  console.log(JSON.stringify(releases));
+} else if (endpoint.includes("/compare/")) {
+  console.log(JSON.stringify({ total_commits: 0, commits: [], files: [
+    { filename: endpoint.endsWith("v4") ? "src/auth/new.ts" : "src/auth/token.ts",
+      status: "modified", additions: 1, deletions: 1, patch: "@@ -1 +1 @@\\n-old\\n+new" }
+  ] }));
+} else if (endpoint.endsWith("/languages")) {
+  console.log('{"TypeScript":100}');
+} else {
+  console.error("unexpected endpoint: " + endpoint);
+  process.exitCode = 1;
+}
+`, { mode: 0o755 });
+  const notifications = join(dir, "notifications");
+  await writeFile(join(dir, "notify"), '#!/usr/bin/env bash\nprintf "%s\\n" "$1" >> "' + notifications + '"\n', { mode: 0o755 });
+  const stateFile = join(dir, "state.json");
+  await writeFile(stateFile, JSON.stringify({ version: 1, repos: { "o/r": {
+    lastPublishedAt: "2026-07-01T00:00:00Z", lastTag: "v1", history: [],
+  } } }));
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  const errors: string[] = [];
+  const mocked = mock.method(console, "error", (...args: unknown[]) => errors.push(args.join(" ")));
+  try {
+    const ec = await runWatch({ repos: [{ repo: "o/r", judge: "off", engine: "off", baseline: 0,
+      rules: [{ name: "auth", paths: ["src/auth"] }] }], notify: "notify",
+    }, { configPath: join(dir, "watch.json"), stateFile, reportsDir: join(dir, "reports"), cache: false });
+    assert.equal(ec, 0, errors.join("\n"));
+    const delivered = (await readFile(notifications, "utf8")).trim().split("\n");
+    assert.equal(delivered.length, 2, "only the first and changed hits notify");
+    assert.ok(delivered[0].endsWith("/v2.json"));
+    assert.ok(delivered[1].endsWith("/v4.json"));
+    const repeated = errors.find(line => line.startsWith("o/r: v3 →"));
+    assert.ok(repeated, errors.join("\n"));
+    assert.doesNotMatch(repeated, /FLAGGED|rules moved/);
+    assert.equal(errors.filter(line => line.includes("rules moved: auth")).length, 2);
+    const state = JSON.parse(await readFile(stateFile, "utf8")) as WatchState;
+    assert.equal(state.repos["o/r"].history[1].ruleHits![0].repeated, true);
+  } finally {
+    mocked.mock.restore();
+    process.env.PATH = previousPath;
+  }
+});
+
+test("undated rule checks use check time and never compare a tag with itself", async () => {
+  const hit = { rule: "auth", matched: ["src/auth/a.ts"], judgeBased: false };
+  const report = fabricatedReport({ metrics: { ...fabricatedReport().metrics,
+    files: [{ path: "src/auth/a.ts", churn: 1, sensitive: null, coverage: "covered" }] } });
+  const repoState: RepoState = { lastPublishedAt: null, lastTag: null, history: [
+    { ...checked("v3", 90, false), publishedAt: "2026-09-01T00:00:00Z", ruleHits: [hit] },
+    { ...checked("v1", 90, false), publishedAt: null, checkedAt: "2026-08-08T00:00:00Z", ruleHits: [] },
+  ] };
+  const args = { report, rc: { rules: [{ name: "auth", paths: ["src/auth"] }] }, repoState,
+    rel: { tag: "v2", publishedAt: null } };
+  assert.equal((await check(args)).outcome.flagged, true, "a future release cannot suppress an undated check");
+  assert.equal((await check(args)).outcome.flagged, true, "rechecking a tag does not use itself as predecessor");
+});

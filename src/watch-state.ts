@@ -4,6 +4,7 @@
 // no I/O, no network, no rendering — which is what makes every rule here
 // unit-testable and lets both the renderers and the orchestrator depend on
 // this module without depending on each other.
+import { createHash } from "node:crypto";
 import type { RepoLink } from "./check.ts";
 import type { CarriedPromise } from "./promises.ts";
 import type {
@@ -239,7 +240,8 @@ export interface CheckedRelease {
    */
   backfilled?: boolean;
   /**
-   * Watch rules this release moved. Present — possibly empty — on every
+   * Watch rules that matched this release, including marked repeats.
+   * Present — possibly empty — on every
    * check made while the entry had rules, absent otherwise: the history
    * page counts the checks that CARRY the field to decide whether a rule
    * has been silent long enough to suspect its anchors, and a check made
@@ -786,6 +788,35 @@ export interface RuleHit {
   /** Nothing but finding kinds fired this hit, so it rests on judge output
    * alone. The renderers say so — that difference is why `votes` exists. */
   judgeBased: boolean;
+  /** Same rule and match list as the preceding recorded release of this
+   * watch entry. Visible in history, but does not trigger an alert. */
+  repeated?: boolean;
+  /** Full sorted match list's digest when `matched` had to be capped.
+   * Equal visible prefixes must not hide a change beyond the cap. */
+  matchDigest?: string;
+}
+
+/** Mark repeats against this entry's preceding recorded release, never a
+ * search across older hits: a release without the hit resets it. */
+export function markRepeatedRuleHits(hits: RuleHit[], previous: RuleHit[] | undefined): RuleHit[] {
+  return hits.map((hit) => {
+    const prior = previous?.find((p) => p.rule === hit.rule);
+    if (!prior) return hit;
+    const sameMatches = hit.matchDigest || prior.matchDigest
+      ? hit.matchDigest !== undefined && hit.matchDigest === prior.matchDigest
+      : hit.matched.length <= MAX_RULE_MATCHES && prior.matched.length <= MAX_RULE_MATCHES &&
+        JSON.stringify([...new Set(hit.matched)].sort(byCodeUnit)) ===
+          JSON.stringify([...new Set(prior.matched)].sort(byCodeUnit));
+    return sameMatches && hit.judgeBased === prior.judgeBased
+      ? { ...hit, repeated: true }
+      : hit;
+  });
+}
+
+/** The hits that can flag a release and appear in its alert. Older state
+ * files have no repeat marker, so their hits retain their original meaning. */
+export function newRuleHits(hits: RuleHit[] | undefined): RuleHit[] {
+  return (hits ?? []).filter((hit) => !hit.repeated);
 }
 
 /** Matched entries kept per hit; the cut is declared inside the list. */
@@ -863,10 +894,14 @@ export function evaluateRules(rules: WatchRule[] | undefined, facts: ReleaseFact
       .filter((f) => (rule.findingKinds ?? []).includes(f.kind))
       .map((f) => `finding: ${f.kind} — ${clipFinding(f.text)}`);
     if (!deterministic.length && !judged.length) continue;
+    const matched = [...new Set([...deterministic, ...judged])].sort(byCodeUnit);
     hits.push({
       rule: rule.name,
-      matched: capMatches([...deterministic, ...judged]),
+      matched: capMatches(matched),
       judgeBased: deterministic.length === 0,
+      ...(matched.length > MAX_RULE_MATCHES
+        ? { matchDigest: createHash("sha256").update(JSON.stringify(matched)).digest("hex") }
+        : {}),
     });
   }
   return hits;
@@ -954,9 +989,9 @@ export function alertDecision(args: {
   const drifted = hasDrifted([...args.past, { score: args.score }]);
   const streak = judgeSofteningStreak(args.runs);
   const softened = streak >= SOFTENING_STREAK;
-  // One hit is enough: a subscription is not a threshold. The operator
+  // One new hit is enough: a subscription is not a threshold. The operator
   // named this area, so the release reaches them whatever the score did.
-  const fired = args.ruleHits ?? [];
+  const fired = newRuleHits(args.ruleHits);
   return {
     flagged:
       isFlagged(args.score, args.exitCode, args.criticalFlags, args.notifyBelow, scoreLevel) ||
