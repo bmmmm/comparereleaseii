@@ -873,6 +873,12 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
         if (outcome.flagged) {
           flaggedTotal++;
           if (notifyCmd) await runNotify(notifyCmd, outcome.jsonPath);
+          else if (flaggedTotal === 1) {
+            console.error(
+              "watch: warning: flagged releases found, but no notify command is configured — " +
+                "set notify in the watch config or pass --notify to deliver alerts.",
+            );
+          }
         }
         // Persist after every successful check so a crash never re-alerts.
         await saveState(statePath, state);
