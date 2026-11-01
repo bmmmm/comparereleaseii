@@ -1989,8 +1989,8 @@ test("a rule that matched nothing still carries an empty ruleHits — not an abs
 });
 
 for (const scenario of ["rule", "score", "config notify", "cli notify", "quiet"] as const) {
-  test(`watch warns about missing notify once per run: ${scenario}`, async () => {
-    const dir = await mkdtemp(join(tmpdir(), "crii-watch-notify-"));
+  test(`watch warns about missing notify once per run: ${scenario}`, async (t) => {
+    const dir = await tempDir(t, "crii-watch-notify-");
     await writeFile(join(dir, "gh"), `#!/usr/bin/env node
 const releases = [3, 2, 1].map(n => ({
   tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors", draft: false, prerelease: false,
