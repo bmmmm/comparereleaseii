@@ -6,7 +6,7 @@
 // findings means no reconciliation at all.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compareVersions, reconcile, resolveBumpClaims } from "../src/reconcile.ts";
+import { compareVersions, movedPast, reconcile, resolveBumpClaims } from "../src/reconcile.ts";
 import { analyzeRelease, type CheckSettings } from "../src/check.ts";
 import type { JudgeEngine } from "../src/judge.ts";
 import type {
@@ -620,4 +620,64 @@ test("a claimed version below where the pin started is not overtaken — it is w
     pin({ name: "foo", from: "1.0.0", to: "2.0.0", file: "package.json" }),
   ]);
   assert.equal(insideCase[0].status, "overtaken");
+});
+
+// ---------- version spelling and aggregated bumps (forge issue #26) ----------
+
+test("build metadata is not part of a version's order", () => {
+  // traefik v3.7.14: the note says `docker/cli to v29.8.1`, go.mod says
+  // `v29.8.1+incompatible`. The suffix read as a prerelease, sorted below its
+  // own release, and the note came out contradicted — score capped at 35.
+  assert.equal(compareVersions("v29.8.1+incompatible", "v29.8.1"), 0);
+  assert.equal(compareVersions("v29.8.2+incompatible", "v29.8.1"), 1);
+  assert.equal(compareVersions("v29.8.1-rc1", "v29.8.1"), -1, "a real prerelease still sorts below");
+  const c = bumpClaim("**[docker]** Bump github.com/docker/cli to v29.8.1 (#13934)", {
+    name: "github.com/docker/cli",
+    to: "v29.8.1",
+  });
+  const [b] = resolveBumpClaims([c], [
+    pin({ name: "github.com/docker/cli", from: "v29.7.2+incompatible", to: "v29.8.1+incompatible", file: "go.mod" }),
+  ]);
+  assert.equal(b.status, "confirmed");
+});
+
+function patchFile(path: string, patch: string): DiffFile {
+  return { path, status: "modified", additions: 1, deletions: 1, patch };
+}
+
+test("movedPast: a version the package passed through is found, anything else is not", () => {
+  const pnpm = patchFile(
+    "package.json",
+    '@@ -80,3 +80,3 @@\n-  "packageManager": "pnpm@11.28.4+sha512.aaaa",\n+  "packageManager": "pnpm@11.28.8+sha512.bbbb",\n',
+  );
+  // The issue's case: notes list 11.28.5, the range diff shows the end state.
+  assert.deepEqual(movedPast({ name: "pnpm", to: "v11.28.5" }, [pnpm]), {
+    from: "11.28.4",
+    to: "11.28.8",
+    file: "package.json",
+  });
+  // At or below where it started, at or past where it arrived: not a hop of this move.
+  assert.equal(movedPast({ name: "pnpm", to: "v11.28.4" }, [pnpm]), null);
+  assert.equal(movedPast({ name: "pnpm", to: "v11.28.8" }, [pnpm]), null);
+  assert.equal(movedPast({ name: "pnpm", to: "v11.29.0" }, [pnpm]), null);
+  // Another package on those lines.
+  assert.equal(movedPast({ name: "yarn", to: "v11.28.5" }, [pnpm]), null);
+  assert.equal(movedPast({ name: "pn", to: "v11.28.5" }, [pnpm]), null, "a name is a token, not a substring");
+
+  // The package stays where it was: that is a claim about nothing.
+  const axios = patchFile(
+    "package.json",
+    '@@ -5,3 +5,3 @@\n   "axios": "^1.15.0",\n-  "zod": "^3.1.0",\n+  "zod": "^3.9.0",\n',
+  );
+  assert.equal(movedPast({ name: "axios", to: "v1.15.2" }, [axios]), null);
+
+  // A compose image tag and a `.js` product name spelled without it.
+  const compose = patchFile("docker-compose.yml", "@@ -1 +1 @@\n-    image: traefik:v3.7.13\n+    image: traefik:v3.7.16\n");
+  assert.ok(movedPast({ name: "traefik", to: "v3.7.15" }, [compose]));
+  const volta = patchFile("package.json", '@@ -1 +1 @@\n-    "node": "24.19.0"\n+    "node": "24.21.0"\n');
+  assert.ok(movedPast({ name: "node.js", to: "v24.20.0" }, [volta]));
+
+  // A lockfile repeats names for transitive copies: not evidence.
+  const lock = patchFile("pnpm-lock.yaml", "@@ -1 +1 @@\n-  pnpm@11.28.4\n+  pnpm@11.28.8\n");
+  assert.equal(movedPast({ name: "pnpm", to: "v11.28.5" }, [lock]), null);
 });

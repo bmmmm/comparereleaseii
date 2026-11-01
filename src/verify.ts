@@ -15,6 +15,7 @@ import {
 } from "./match.ts";
 import { commitSurface } from "./substance.ts";
 import { pinBumps, sameName } from "./pins.ts";
+import { movedPast } from "./reconcile.ts";
 import { sensitiveCategory } from "./metrics.ts";
 import {
   buildJudgePrompt,
@@ -824,6 +825,22 @@ export async function verifyClaims(
         );
         const finalHunks = judged.hunks;
         let verdict = judged.verdict;
+        // Before the second look: a version-number disagreement the diff
+        // explains is not the severe verdict that look exists to double-check.
+        if (verdict.verdict === "contradicted" && p.claim.bump) {
+          const moved = movedPast(p.claim.bump, data.files);
+          if (moved) {
+            verdict = {
+              ...verdict,
+              verdict: "partial",
+              reasoning:
+                `The note names ${p.claim.bump.name} ${p.claim.bump.to}, but the diff moves it ` +
+                `${moved.from} → ${moved.to} (${moved.file}) — past that version. The release ` +
+                "aggregates several bumps of the package and the note describes one of them; " +
+                `the exact version is not in the diff. (Judge: ${verdict.reasoning})`,
+            };
+          }
+        }
         let escalated = false;
         let cast: JudgeVerdict[] | null = null;
         const evidencePaths = [
