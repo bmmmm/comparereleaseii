@@ -20,6 +20,24 @@ interface Mutant {
 
 const MUTANTS: Mutant[] = [
   {
+    guard: "watch rule repeats do not alert",
+    file: "src/watch-state.ts",
+    find: "return (hits ?? []).filter((hit) => !hit.repeated);",
+    replace: "return hits ?? [];",
+  },
+  {
+    guard: "watch rule repeats are marked against the predecessor",
+    file: "src/watch-state.ts",
+    find: "? { ...hit, repeated: true }",
+    replace: "? { ...hit, repeated: false }",
+  },
+  {
+    guard: "watch rule capped tails participate in repeat equality",
+    file: "src/watch-state.ts",
+    find: "hit.matchDigest !== undefined && hit.matchDigest === prior.matchDigest",
+    replace: "true",
+  },
+  {
     guard: "Laya is rejected before a text judge can be built",
     file: "src/judge.ts",
     find: "if (isLayaModel(model)) {",

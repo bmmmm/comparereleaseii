@@ -293,7 +293,8 @@ spellings are `--lens` and `--no-findings`.
 
 A score answers "do these notes match this diff". `rules` answers a
 different question — "did the part I care about move at all?" — and a hit
-flags the release on its own, whatever the score says:
+flags the release on its own when its match list differs from the preceding
+recorded release of the same watch entry, whatever the score says:
 
 ```json
 { "repo": "opencloud-eu/opencloud",
@@ -339,6 +340,21 @@ through — the subscription is silently off, and a quiet dashboard reads as
 entry's list **replaces** the defaults' list; it does not extend it. A repo
 that needs the shared rules plus one of its own repeats the shared ones in
 its own list.
+
+An identical hit for the same rule on the immediately preceding recorded
+release does not flag or notify again on its own. Comparison uses publication
+order (check time when undated), never a future release during backfill or a
+hit from another watch entry. A release without that hit resets it; a changed
+match list fires again. Without recorded predecessor hits the first check
+fires normally. Historical records are not rewritten when backfill inserts
+an earlier release.
+
+The state keeps every `ruleHits` entry and adds `repeated: true` to repeats.
+The repo history labels these **repeated — no rule alert**; the dashboard and
+live run message name only new hits. Capped lists additionally carry a
+`matchDigest` of the complete sorted list, so a changed hidden tail still
+fires. Old capped hits without that digest cannot prove equality and fire
+once more. Per-release `--json` reports and claim verdicts are unchanged.
 
 The dashboard row names the rules a release moved, and the repo's history
 page lists what matched — the paths, the migration files, the added host,
@@ -413,8 +429,8 @@ A release is flagged when any of these hold:
   count, and the Atom feed names it per check — a reader told only the score
   is told the flattering half. After fixing the engine, re-check with
   `--no-cache`.
-- a **rule** fired: the release moved an area this entry subscribes to
-  (`rules`, above). One hit is enough — a subscription is not a threshold,
+- a **rule** fired with a new match list: the release moved an area this
+  entry subscribes to (`rules`, above). One hit is enough — a subscription is not a threshold,
   and the score has no say in it. The row and the history page name the rule
   and what matched, and a hit resting on finding kinds alone is marked as
   judge-based wherever it appears.

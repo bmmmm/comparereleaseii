@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, chmodSync, writeFileSync } from "node:fs";
+import { mkdirSync, chmodSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,11 +20,11 @@ async function withCacheHome<T>(dir: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-test("the cache never lands in the shared temp dir", async () => {
+test("the cache never lands in the shared temp dir", async (t) => {
   // Every key is computable from public data (notes + diff are published), so
   // a world-writable /tmp lets anyone plant the verdict for a release before
   // it is checked.
-  const home = mkdtempSync(join(tmpdir(), "crii-home-"));
+  const home = await tempDir(t, "crii-home-");
   const dir = await withCacheHome(home, async () => cacheDir("verdicts"));
   assert.ok(dir, "a private cache directory is available");
   assert.ok(dir!.startsWith(home), "and it is the one we pointed at");
@@ -33,8 +34,8 @@ test("the cache never lands in the shared temp dir", async () => {
   );
 });
 
-test("a cache directory writable by others is refused, not used", async () => {
-  const home = mkdtempSync(join(tmpdir(), "crii-home-"));
+test("a cache directory writable by others is refused, not used", async (t) => {
+  const home = await tempDir(t, "crii-home-");
   const hostile = join(home, "comparereleaseii", "verdicts");
   mkdirSync(hostile, { recursive: true });
   chmodSync(hostile, 0o777);
@@ -55,8 +56,8 @@ test("the verdict key is bound to the tool version", () => {
   );
 });
 
-test("a cache entry from another version or engine is ignored", async () => {
-  const home = mkdtempSync(join(tmpdir(), "crii-home-"));
+test("a cache entry from another version or engine is ignored", async (t) => {
+  const home = await tempDir(t, "crii-home-");
   await withCacheHome(home, async () => {
     const dir = await cacheDir("verdicts");
     assert.ok(dir);
@@ -88,10 +89,8 @@ test("safeSegment keeps a hostile ref name inside one path component", () => {
   assert.equal(safeSegment(""), "_");
 });
 
-test("cloneDirFor keys every spelling of the same repo to one directory", async () => {
-  process.env.XDG_CACHE_HOME ??= await (await import("node:fs/promises")).mkdtemp(
-    (await import("node:path")).join((await import("node:os")).tmpdir(), "crii-paths-"),
-  );
+test("cloneDirFor keys every spelling of the same repo to one directory", async (t) => {
+  process.env.XDG_CACHE_HOME ??= await tempDir(t, "crii-paths-");
   const { cloneDirFor } = await import("../src/paths.ts");
   const a = await cloneDirFor("https://github.com/o/r.git");
   const b = await cloneDirFor("https://github.com/o/r");

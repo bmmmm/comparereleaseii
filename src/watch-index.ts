@@ -7,7 +7,7 @@ import { esc } from "./util.ts";
 import { SCORE_MINOR, SCORE_SOLID, scoreClass } from "./theme.ts";
 import { reportDirOf } from "./watch-detail.ts";
 import type { UnverifiableKind } from "./types.ts";
-import { judgeSofteningStreak, SOFTENING_STREAK } from "./watch-state.ts";
+import { judgeSofteningStreak, newRuleHits, SOFTENING_STREAK } from "./watch-state.ts";
 import type { CheckedRelease, RepoState, WatchState, WatchedEntry } from "./watch-state.ts";
 
 /** Short enough for a table cell; the title carries the explanation. */
@@ -42,11 +42,12 @@ function softeningTag(rs: RepoState): string {
  * negotiable anyway.
  */
 function ruleTag(l: CheckedRelease): string {
-  if (!l.ruleHits?.length) return "";
-  const names = l.ruleHits.map((h) => `${esc(h.rule)}${h.judgeBased ? "*" : ""}`).join(", ");
-  const judged = l.ruleHits.some((h) => h.judgeBased);
+  const hits = newRuleHits(l.ruleHits);
+  if (!hits.length) return "";
+  const names = hits.map((h) => `${esc(h.rule)}${h.judgeBased ? "*" : ""}`).join(", ");
+  const judged = hits.some((h) => h.judgeBased);
   const title =
-    `this release moved: ${l.ruleHits.map((h) => h.rule).join(", ")}` +
+    `this release moved: ${hits.map((h) => h.rule).join(", ")}` +
     (judged ? " — * marks a hit that rests on judge output (findings) alone" : "");
   return ` <span class="rule" title="${esc(title)}">&#9873; ${names}</span>`;
 }

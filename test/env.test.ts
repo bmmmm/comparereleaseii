@@ -2,11 +2,10 @@
 // Where the local server's key and address come from: the environment, then
 // the package .env, then ~/.env — and the two spellings (OPENAI_*, OMLX_*).
 // Every file here is a fixture in a temp dir; the real .env files are never read.
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
+import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dotenvValue, localServerBase, localServerKey, resolveFrom } from "../src/env.ts";
 
@@ -19,8 +18,8 @@ const KEYS = [
   "HOME",
 ];
 
-function isolated(): { dir: string; restore: () => Promise<void> } {
-  const dir = mkdtempSync(join(tmpdir(), "comparerelease-env-"));
+async function isolated(t: TestContext): Promise<{ dir: string; restore: () => Promise<void> }> {
+  const dir = await tempDir(t, "comparerelease-env-");
   const prev: Record<string, string | undefined> = {};
   for (const k of KEYS) {
     prev[k] = process.env[k];
@@ -36,13 +35,12 @@ function isolated(): { dir: string; restore: () => Promise<void> } {
         if (prev[k] === undefined) delete process.env[k];
         else process.env[k] = prev[k];
       }
-      await rm(dir, { recursive: true, force: true });
     },
   };
 }
 
-test("dotenvValue: export prefix, quotes and CR are stripped; a missing file is undefined", () => {
-  const dir = mkdtempSync(join(tmpdir(), "comparerelease-dotenv-"));
+test("dotenvValue: export prefix, quotes and CR are stripped; a missing file is undefined", async (t) => {
+  const dir = await tempDir(t, "comparerelease-dotenv-");
   const f = join(dir, ".env");
   writeFileSync(f, "FOO=bar\nexport OMLX_API_KEY=\"k-1\"\r\nOMLX_URL='http://x/v1'\nOMLX_API_KEY_OLD=nope\n");
   assert.equal(dotenvValue(f, "OMLX_API_KEY"), "k-1");
@@ -51,8 +49,8 @@ test("dotenvValue: export prefix, quotes and CR are stripped; a missing file is 
   assert.equal(dotenvValue(join(dir, "none"), "FOO"), undefined);
 });
 
-test("resolveFrom: environment first, then the files in order", () => {
-  const dir = mkdtempSync(join(tmpdir(), "comparerelease-order-"));
+test("resolveFrom: environment first, then the files in order", async (t) => {
+  const dir = await tempDir(t, "comparerelease-order-");
   const a = join(dir, "a.env");
   const b = join(dir, "b.env");
   writeFileSync(a, "X=from-a\n");
@@ -63,8 +61,8 @@ test("resolveFrom: environment first, then the files in order", () => {
   assert.equal(resolveFrom("Z", [a, b], {}), undefined);
 });
 
-test("the package .env beats ~/.env, and OMLX_* fills in for OPENAI_*", async () => {
-  const iso = isolated();
+test("the package .env beats ~/.env, and OMLX_* fills in for OPENAI_*", async (t) => {
+  const iso = await isolated(t);
   try {
     writeFileSync(join(iso.dir, "pkg.env"), "OMLX_API_KEY=omlx-comparereleaseii-sub\n");
     writeFileSync(
@@ -82,8 +80,8 @@ test("the package .env beats ~/.env, and OMLX_* fills in for OPENAI_*", async ()
   }
 });
 
-test("nothing configured anywhere: neither base nor key", async () => {
-  const iso = isolated();
+test("nothing configured anywhere: neither base nor key", async (t) => {
+  const iso = await isolated(t);
   try {
     assert.equal(localServerBase(), undefined);
     assert.equal(localServerKey(), undefined);

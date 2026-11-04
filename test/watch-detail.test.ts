@@ -395,7 +395,7 @@ test("the history page shows what moved a rule, escaped, and marks the judge-bas
         { rule: "sec", matched: ["finding: security — auth moved"], judgeBased: true },
       ],
     }),
-    check("v2", 90, { ruleHits: [] }),
+    check("v2", 90, { ruleHits: [{ rule: "schema", matched: ["migration: db/<img src=x>.sql"], judgeBased: false, repeated: true }] }),
   ];
   const entry: WatchedEntry = {
     ...ENTRY,
@@ -406,6 +406,7 @@ test("the history page shows what moved a rule, escaped, and marks the judge-bas
   };
   const html = toRepoDetailHtml(entry, state(history), null, "t");
   assert.match(html, /Watch rules/);
+  assert.match(html, /repeated — no rule alert/, "repeated hits stay visible without claiming an alert");
   assert.match(html, /db\/&lt;img src=x&gt;\.sql/, "a matched path is escaped");
   assert.doesNotMatch(html, /<img src=x/, "no raw payload");
   assert.match(html, /judge-based/, "the finding-kind hit says what it rests on");

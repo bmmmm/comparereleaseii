@@ -374,7 +374,8 @@ function rulesSection(entry: WatchedEntry, history: CheckedRelease[]): string {
         const judged = hit.judgeBased
           ? ` <span class="notice" title="nothing but finding kinds fired this rule, and findings are what the judge engine read off the diff — this hit rests on model output, not on the deterministic pass">judge-based</span>`
           : "";
-        return `<div class="flag" style="border-left-color:${RULE_COLOR}"><span class="chip" style="background:${RULE_COLOR}">${esc(hit.rule)}</span> <b>${esc(h.tag)}</b>${judged}<div class="files">${hit.matched.map((m) => esc(m)).join(" &middot; ")}</div></div>`;
+        const repeated = hit.repeated ? ` <span class="note">repeated — no rule alert</span>` : "";
+        return `<div class="flag" style="border-left-color:${RULE_COLOR}"><span class="chip" style="background:${RULE_COLOR}">${esc(hit.rule)}</span> <b>${esc(h.tag)}</b>${judged}${repeated}<div class="files">${hit.matched.map((m) => esc(m)).join(" &middot; ")}</div></div>`;
       }),
     )
     .join("");
@@ -387,7 +388,7 @@ function rulesSection(entry: WatchedEntry, history: CheckedRelease[]): string {
   const configured = entry.rules?.length
     ? `<p class="note">subscribed: ${entry.rules.map((r) => esc(r.name)).join(", ")}</p>`
     : "";
-  return `<h2>Watch rules <span class="note">— areas this watch subscribes to; a hit flags the release on its own</span></h2>
+  return `<h2>Watch rules <span class="note">— areas this watch subscribes to; a new hit flags the release on its own</span></h2>
 ${configured}${staleNote}${entries || `<p class="note">no release on record moved one of these rules.</p>`}`;
 }
 

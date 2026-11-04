@@ -48,6 +48,8 @@ import {
   eligibleRelease,
   entryKey,
   evaluateRules,
+  markRepeatedRuleHits,
+  newRuleHits,
   pickBackfillReleases,
   pickNewReleases,
   recordCheckFailure,
@@ -544,12 +546,19 @@ export async function checkAndRecord(args: {
   // Evaluated for every check, backfilled ones included — the record says
   // what moved. Whether that record NOTIFIES is the run loop's business,
   // and backfill never notifies.
+  const predecessor = past.filter(
+    (h) => h.tag !== rel.tag && (h.publishedAt ?? h.checkedAt) < (rel.publishedAt ?? checkedAt),
+  ).reduce<CheckedRelease | undefined>(
+    (latest, h) => !latest || (h.publishedAt ?? h.checkedAt) > (latest.publishedAt ?? latest.checkedAt)
+      ? h : latest,
+    undefined,
+  );
   const ruleHits = rc.rules?.length
-    ? evaluateRules(rc.rules, {
+    ? markRepeatedRuleHits(evaluateRules(rc.rules, {
         files: report.metrics.files.map((f) => f.path),
         surface: report.surface,
         findings: report.findings?.findings,
-      })
+      }), predecessor?.ruleHits)
     : undefined;
   const { flagged, drifted, softeningStreak, scoreLevel } = alertDecision({
     score: report.metrics.scores.overall,
@@ -857,6 +866,7 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
         state.repos[key] = repoState;
         codes.push(outcome.ec);
         checked++;
+        const freshHits = newRuleHits(outcome.checked.ruleHits);
         console.error(
           `${key}: ${rel.tag} → score ${outcome.checked.score} (${outcome.checked.scoreLabel})` +
             (outcome.flagged ? " — FLAGGED" : "") +
@@ -864,8 +874,8 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
             (outcome.softeningStreak
               ? ` (${outcome.softeningStreak} checks in a row fell back to the deterministic reading — the judge has not been answering, and that fallback is the milder one; these scores read better than the evidence supports)`
               : "") +
-            (outcome.checked.ruleHits?.length
-              ? ` (rules moved: ${outcome.checked.ruleHits
+            (freshHits.length
+              ? ` (rules moved: ${freshHits
                   .map((h) => `${h.rule}${h.judgeBased ? " — from findings, i.e. judge output" : ""}`)
                   .join(", ")})`
               : ""),
@@ -873,6 +883,12 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
         if (outcome.flagged) {
           flaggedTotal++;
           if (notifyCmd) await runNotify(notifyCmd, outcome.jsonPath);
+          else if (flaggedTotal === 1) {
+            console.error(
+              "watch: warning: flagged releases found, but no notify command is configured — " +
+                "set notify in the watch config or pass --notify to deliver alerts.",
+            );
+          }
         }
         // Persist after every successful check so a crash never re-alerts.
         await saveState(statePath, state);
