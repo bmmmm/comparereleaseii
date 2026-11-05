@@ -27,6 +27,14 @@ export interface DiffFile {
   additions: number;
   deletions: number;
   patch?: string;
+  /**
+   * The forge listed the file but cut its diff short: the compare API spends
+   * a diff budget in file order and reports every file past it as 0/0 with no
+   * patch, text or not. Nothing is known about the content — only the source.
+   */
+  patchOmitted?: boolean;
+  /** The forge names the file's content as git's empty blob: nothing to review. */
+  empty?: boolean;
 }
 
 export interface ReleaseData {

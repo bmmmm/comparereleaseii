@@ -303,7 +303,13 @@ export function lockfileSources(file: DiffFile): string[] {
 export function opacityIssue(file: DiffFile): string | null {
   if (BENIGN_BINARY.test(file.path)) return null;
   if (OPAQUE_BINARY.test(file.path)) return "binary file";
-  if (!file.patch && file.status !== "renamed" && file.additions + file.deletions === 0) {
+  if (
+    !file.patch &&
+    !file.patchOmitted &&
+    !file.empty &&
+    file.status !== "renamed" &&
+    file.additions + file.deletions === 0
+  ) {
     return "no reviewable patch";
   }
   if (/\.(js|css|map)$/.test(file.path) && file.patch) {

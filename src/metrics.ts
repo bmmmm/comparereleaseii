@@ -139,8 +139,22 @@ import {
  * now scored worse than a squash-workflow repo for byte-identical notes.
  * The validation table stands: all four rows and the fabricated negative
  * control are bit-identical under --judge off.
+ *
+ * 9 — the GitHub source stops handing the risk flags files it knows nothing
+ * about. The compare API spends a diff budget in file order and lists every
+ * file past it as 0/0 with no patch; each one read as an `opaque-change`
+ * critical ("no reviewable patch"), and so did an empty file (git's empty
+ * blob). Those files are now marked (`markOmittedPatches`, `empty` in
+ * `src/sources/github.ts`), the cut sets `truncated`, and the partial-clone
+ * fallback loads the real diff. No weight or threshold moved — the input did:
+ * this repository's own v0.14.0 against v0.4.0 went from 86 such flags to 1
+ * (risk 0 → 80, overall 45 → 80) and against v0.5.0 from 41 to 0 (risk
+ * 0 → 90, overall 45 → 83), judge off. Not measured on the corpus. Every
+ * fixture and golden case is unchanged; what moves is any release the
+ * compare cut short, so a generation-8 and a generation-9 score of one are
+ * not the same measurement.
  */
-export const SCORING_GENERATION = 8;
+export const SCORING_GENERATION = 9;
 
 // Woodpecker is spelled both ways: a `.woodpecker/` directory and a single
 // `.woodpecker.yml`/`.yaml`/`.star` file beside it. Only the directory form
