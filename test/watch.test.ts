@@ -2190,3 +2190,66 @@ test("undated rule checks use check time and never compare a tag with itself", a
   assert.equal((await check(args)).outcome.flagged, true, "a future release cannot suppress an undated check");
   assert.equal((await check(args)).outcome.flagged, true, "rechecking a tag does not use itself as predecessor");
 });
+
+// The run log is the only record of when a run and each release check
+// happened, so its three line types are pinned against an injected clock.
+async function loggedRun(
+  t: Parameters<typeof tempDir>[0],
+  mode: "watch" | "backfill",
+): Promise<string[]> {
+  const dir = await tempDir(t, "crii-watch-clock-");
+  await writeFile(join(dir, "gh"), `#!/usr/bin/env node
+const releases = [3, 2, 1].map(n => ({
+  tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors", draft: false, prerelease: false,
+  published_at: "2026-07-0" + n + "T00:00:00Z"
+}));
+const endpoint = process.argv[3];
+if (endpoint.includes("/releases/tags/")) {
+  console.log(JSON.stringify(releases.find(r => endpoint.endsWith(r.tag_name))));
+} else if (endpoint.includes("/releases?")) {
+  console.log(JSON.stringify(releases));
+} else if (endpoint.includes("/compare/")) {
+  console.log(JSON.stringify({ total_commits: 0, commits: [], files: [] }));
+} else if (endpoint.endsWith("/languages")) {
+  console.log('{"TypeScript":100}');
+} else {
+  console.error("unexpected endpoint: " + endpoint);
+  process.exitCode = 1;
+}
+`, { mode: 0o755 });
+  const stateFile = join(dir, "state.json");
+  await writeFile(stateFile, JSON.stringify({ version: 1, repos: mode === "watch"
+    ? { "o/r": { lastPublishedAt: "2026-07-02T00:00:00Z", lastTag: "v2", history: [] } } : {} }));
+  // 20:15:00Z, then +1s per reading: one source for the whole run.
+  let ticks = 0;
+  const now = () => new Date(Date.UTC(2026, 10, 4, 20, 15, 0) + 1000 * ticks++);
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  const errors: string[] = [];
+  const mocked = mock.method(console, "error", (...args: unknown[]) => errors.push(args.join(" ")));
+  try {
+    const config = { repos: [{ repo: "o/r", judge: "off" as const, engine: "off" as const, baseline: 0 }] };
+    const base = { configPath: join(dir, "watch.json"), stateFile, reportsDir: join(dir, "reports"), cache: false, now };
+    const ec = mode === "watch"
+      ? await runWatch(config, base)
+      : await runBackfill(config, { ...base, releases: 1, yes: true, only: [] });
+    assert.equal(ec, 0, errors.join("\n"));
+  } finally {
+    mocked.mock.restore();
+    process.env.PATH = previousPath;
+  }
+  return errors;
+}
+
+for (const mode of ["watch", "backfill"] as const) {
+  test(`${mode} log: run start, timed checking line, finished + duration`, async (t) => {
+    const errors = await loggedRun(t, mode);
+    assert.match(errors[0], new RegExp(`^${mode}: run started 2026-11-04T20:15:00\\.000Z$`));
+    const checking = errors.filter(l => l.includes(": checking "));
+    assert.equal(checking.length, 1, errors.join("\n"));
+    assert.match(checking[0], /^o\/r: checking v\d… \(2026-11-04T20:15:\d\dZ\)$/);
+    const summary = errors.find(l => l.startsWith(`${mode}: `) && l.includes(" · exit 0"));
+    assert.ok(summary, errors.join("\n"));
+    assert.match(summary, / · exit 0 · finished 2026-11-04T20:15:\d\d\.000Z · \d+s$/);
+  });
+}
