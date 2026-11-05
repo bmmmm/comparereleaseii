@@ -137,7 +137,12 @@ interface GhFile {
   additions: number;
   deletions: number;
   patch?: string;
+  /** Blob of the file's content (the old one for a removed file). */
+  sha?: string;
 }
+
+/** git's empty blob — an empty file has nothing for a reviewer to miss. */
+const EMPTY_BLOB = "e69de29bb2d1d6434b8b29ae279c299240e9b4b391";
 
 /**
  * Which review a commit came from, in whichever dialect the forge speaks.
@@ -177,6 +182,7 @@ function toDiffFile(f: GhFile): DiffFile {
     additions: f.additions,
     deletions: f.deletions,
     patch: f.patch,
+    ...(f.sha === EMPTY_BLOB ? { empty: true } : {}),
   };
 }
 
@@ -379,7 +385,7 @@ export async function loadGithubRelease(opts: {
     let p = commitCache.get(sha);
     if (!p) {
       p = ghJson<{ files: GhFile[] }>(`repos/${repo}/commits/${encodeURIComponent(sha)}`).then((r) =>
-        r.files.map(toDiffFile),
+        markOmittedPatches(r.files.map(toDiffFile)),
       );
       // A transient failure must not poison the cache for the rest of the
       // run — a later phase (coverage, suggest) may retry and succeed.

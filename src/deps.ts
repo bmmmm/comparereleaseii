@@ -306,6 +306,7 @@ export function opacityIssue(file: DiffFile): string | null {
   if (
     !file.patch &&
     !file.patchOmitted &&
+    !file.empty &&
     file.status !== "renamed" &&
     file.additions + file.deletions === 0
   ) {

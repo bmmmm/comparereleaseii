@@ -8,6 +8,7 @@ import {
   assertRepoSlug,
   extractPrNumbers,
   ghApi,
+  loadGithubRelease,
   markOmittedPatches,
   pickBaseRelease,
   rateLimitHooks,
@@ -272,4 +273,61 @@ test("a compare cut short by the diff budget is not opaque; a real blob before t
   // Nothing spent budget, so nothing was cut: a compare of two blobs keeps both.
   const blobs = markOmittedPatches([nil("bin/tool", "added"), nil("bin/other", "added")]);
   assert.deepEqual(blobs.map(opacityIssue), ["no reviewable patch", "no reviewable patch"]);
+});
+
+test("loadGithubRelease: empty files and budget-cut commit diffs are not opaque", async (t) => {
+  // What the forge sends: an empty file is git's empty blob, 0/0 and no patch
+  // like a binary; the commit endpoint cuts its file list on the same budget.
+  const empty = "e69de29bb2d1d6434b8b29ae279c299240e9b4b391";
+  const patched = { status: "modified", additions: 2, deletions: 0, changes: 2, patch: "@@ -1 +1,3 @@\n+a\n+b" };
+  const compare = {
+    total_commits: 1,
+    commits: [{ sha: "c1", commit: { message: "m", author: { name: "a" } }, author: null }],
+    files: [
+      { filename: "README.md", sha: "1".repeat(40), ...patched },
+      { filename: "docs/.nojekyll", sha: empty, status: "added", additions: 0, deletions: 0, changes: 0 },
+      { filename: "tools/helper", sha: "2".repeat(40), status: "added", additions: 0, deletions: 0, changes: 0 },
+      { filename: "src/z.ts", sha: "3".repeat(40), ...patched },
+    ],
+  };
+  const commit = {
+    files: [
+      { filename: "README.md", sha: "1".repeat(40), ...patched },
+      { filename: "src/a.ts", sha: "4".repeat(40), status: "modified", additions: 0, deletions: 0, changes: 0 },
+      { filename: "src/b.ts", sha: "5".repeat(40), status: "added", additions: 0, deletions: 0, changes: 0 },
+    ],
+  };
+  const dir = await tempDir(t, "crii-gh-");
+  await writeFile(join(dir, "compare.json"), JSON.stringify(compare));
+  await writeFile(join(dir, "commit.json"), JSON.stringify(commit));
+  await writeFile(
+    join(dir, "gh"),
+    `#!/usr/bin/env bash
+case "$2" in
+  */compare/*) cat "${join(dir, "compare.json")}" ;;
+  */commits/*) cat "${join(dir, "commit.json")}" ;;
+  */releases/tags/*) echo '{"tag_name":"v2","name":"v2","body":"","prerelease":false,"draft":false}' ;;
+  *) echo "unexpected $2" >&2; exit 1 ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  try {
+    const data = await loadGithubRelease({ repo: "o/r", tag: "v2", base: "v1" });
+    assert.deepEqual(
+      data.files.map((f) => [f.path, opacityIssue(f)]).filter(([, o]) => o),
+      [["tools/helper", "no reviewable patch"]],
+      "the empty file is not opaque; the extensionless blob still is",
+    );
+    assert.equal(data.truncated, false, "nothing was cut from the compare");
+    const files = await data.commitFiles("c1");
+    assert.deepEqual(
+      files.filter((f) => f.patchOmitted).map((f) => f.path),
+      ["src/a.ts", "src/b.ts"],
+    );
+  } finally {
+    process.env.PATH = previousPath;
+  }
 });

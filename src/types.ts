@@ -33,6 +33,8 @@ export interface DiffFile {
    * patch, text or not. Nothing is known about the content — only the source.
    */
   patchOmitted?: boolean;
+  /** The forge names the file's content as git's empty blob: nothing to review. */
+  empty?: boolean;
 }
 
 export interface ReleaseData {

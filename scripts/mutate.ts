@@ -32,6 +32,24 @@ const MUTANTS: Mutant[] = [
     replace: "if (cut === files.length) return files;",
   },
   {
+    guard: "an empty file is not an opaque change",
+    file: "src/deps.ts",
+    find: "    !file.empty &&\n",
+    replace: "",
+  },
+  {
+    guard: "the forge's empty blob marks a file empty",
+    file: "src/sources/github.ts",
+    find: "f.sha === EMPTY_BLOB ? { empty: true } : {}",
+    replace: "{}",
+  },
+  {
+    guard: "a commit diff cut by the forge's budget is marked like the compare",
+    file: "src/sources/github.ts",
+    find: "markOmittedPatches(r.files.map(toDiffFile)),",
+    replace: "r.files.map(toDiffFile),",
+  },
+  {
     guard: "watch rule repeats do not alert",
     file: "src/watch-state.ts",
     find: "return (hits ?? []).filter((hit) => !hit.repeated);",
