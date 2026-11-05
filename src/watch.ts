@@ -320,9 +320,10 @@ async function writeIndexFiles(
   reportsDir: string,
   state: WatchState,
   configured: WatchedEntry[],
+  clock: () => Date = () => new Date(),
 ): Promise<void> {
   await mkdir(reportsDir, { recursive: true });
-  const now = new Date().toISOString();
+  const now = clock().toISOString();
   await writeFile(join(reportsDir, "index.html"), toWatchIndexHtml(state, now, configured));
   await writeFile(join(reportsDir, "feed.xml"), toWatchAtomFeed(state, now, configured));
   for (const e of configured) {
@@ -499,6 +500,8 @@ export async function checkAndRecord(args: {
    * network, no `gh`/git subprocess and no judge; see test/watch.test.ts.
    */
   loadAndAnalyze?: typeof loadAndAnalyzeRelease;
+  /** The run's clock — one time source for a whole run. */
+  now?: () => Date;
 }): Promise<CheckOutcome> {
   const { key, rc, rel, repoState, target } = args;
   const settings = await settingsFor(rc, {
@@ -541,7 +544,7 @@ export async function checkAndRecord(args: {
   const past = repoState.history.filter(
     (h) => (h.publishedAt ?? h.checkedAt) < (rel.publishedAt ?? "￿"),
   );
-  const checkedAt = new Date().toISOString();
+  const checkedAt = (args.now ?? (() => new Date()))().toISOString();
   const unjudged = unjudgedClaims(report.results);
   // Evaluated for every check, backfilled ones included — the record says
   // what moved. Whether that record NOTIFIES is the run loop's business,
@@ -641,6 +644,8 @@ interface RunWatchOptions {
   stateFile?: string;
   reportsDir?: string;
   cache: boolean;
+  /** Injectable clock; defaults to the wall clock. */
+  now?: () => Date;
 }
 
 /**
@@ -776,6 +781,9 @@ export function nothingNewMessage(
 }
 
 async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<number> {
+  const clock = opts.now ?? (() => new Date());
+  const startedAt = clock();
+  console.error(`watch: run started ${startedAt.toISOString()}`);
   resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
   const notifyCmd = opts.notify ?? config.notify;
@@ -788,7 +796,7 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
   let flaggedTotal = 0;
 
   const configured = configuredEntries(config);
-  const writeIndex = () => writeIndexFiles(reportsDir, state, configured);
+  const writeIndex = () => writeIndexFiles(reportsDir, state, configured, clock);
 
   for (const entry of config.repos) {
     const rc: WatchRepoConfig = { ...config.defaults, ...entry };
@@ -837,12 +845,13 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
 
     let target: ForgeTarget | undefined;
     for (const rel of fresh) {
-      console.error(`${key}: checking ${rel.tag}…`);
+      console.error(`${key}: checking ${rel.tag}… (${isoSeconds(clock())})`);
       try {
         // The clone is per repo, not per release — the first fresh release
         // pays it, later ones in the same batch reuse it.
         if (rc.repoUrl && !target) target = await prepareForgeTarget(rc.repoUrl, { forge });
         const outcome = await checkAndRecord({
+          now: clock,
           key,
           rc,
           rel,
@@ -896,7 +905,7 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
       } catch (err) {
         const msg = (err as Error).message;
         codes.push(2);
-        const move = recordCheckFailure(repoState, rel, msg, new Date().toISOString());
+        const move = recordCheckFailure(repoState, rel, msg, clock().toISOString());
         state.repos[key] = repoState;
         if (move === "retry") {
           console.error(
@@ -919,9 +928,18 @@ async function watchLocked(config: WatchConfig, opts: RunWatchOptions): Promise<
   await saveState(statePath, state);
   const exit = worstExit(codes);
   console.error(
-    `watch: ${config.repos.length} repos · ${checked} new release(s) checked · ${flaggedTotal} flagged · ${judgeBalance()}index ${join(reportsDir, "index.html")} · exit ${exit}`,
+    `watch: ${config.repos.length} repos · ${checked} new release(s) checked · ${flaggedTotal} flagged · ${judgeBalance()}index ${join(reportsDir, "index.html")} · exit ${exit}${finishedSuffix(startedAt, clock())}`,
   );
   return exit;
+}
+
+/** Whole-second UTC stamp for the per-release log line. */
+const isoSeconds = (d: Date): string => d.toISOString().replace(/\.\d{3}Z$/, "Z");
+
+/** Summary-line tail: when the run ended and how long it took, in seconds. */
+function finishedSuffix(started: Date, finished: Date): string {
+  const secs = Math.max(0, Math.round((finished.getTime() - started.getTime()) / 1000));
+  return ` · finished ${finished.toISOString()} · ${secs}s`;
 }
 
 /** The run's judge bill, for the summary line — the cost question every
@@ -1049,6 +1067,8 @@ export interface BackfillOptions {
   only: string[];
   /** Injection seam for tests — production asks on the terminal. */
   confirm?: (question: string) => Promise<boolean>;
+  /** Injectable clock; defaults to the wall clock. */
+  now?: () => Date;
 }
 
 /**
@@ -1193,13 +1213,16 @@ export function announceBackfill(
 }
 
 async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promise<number> {
+  const clock = opts.now ?? (() => new Date());
+  const startedAt = clock();
+  console.error(`backfill: run started ${startedAt.toISOString()}`);
   resetJudgeStats();
   const { configDir, reportsDir, statePath } = resolveWatchPaths(config, opts);
   const historyLimit = config.historyLimit ?? DEFAULT_HISTORY_LIMIT;
   const state = await loadState(statePath);
   const engines = makeEngineResolver();
   const configured = configuredEntries(config);
-  const writeIndex = () => writeIndexFiles(reportsDir, state, configured);
+  const writeIndex = () => writeIndexFiles(reportsDir, state, configured, clock);
 
   const entries = config.repos
     .map((entry) => ({ ...config.defaults, ...entry }) as WatchRepoConfig)
@@ -1272,9 +1295,10 @@ async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promi
       let attempts = deterministicFailure ? 1 : 0;
       if (!deterministicFailure) {
         for (attempts = 1; attempts <= MAX_CHECK_ATTEMPTS; attempts++) {
-          console.error(`${key}: checking ${rel.tag}…`);
+          console.error(`${key}: checking ${rel.tag}… (${isoSeconds(clock())})`);
           try {
             outcome = await checkAndRecord({
+              now: clock,
               key,
               rc,
               rel,
@@ -1320,7 +1344,7 @@ async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promi
       }
       // Give up on this release: recorded as unchecked, never retried — the
       // wedge guard for broken old releases.
-      recordSkip(repoState, rel, Math.min(attempts, MAX_CHECK_ATTEMPTS), lastError, new Date().toISOString());
+      recordSkip(repoState, rel, Math.min(attempts, MAX_CHECK_ATTEMPTS), lastError, clock().toISOString());
       gaveUp++;
       consecutiveFailures++;
       codes.push(1);
@@ -1342,7 +1366,7 @@ async function backfillLocked(config: WatchConfig, opts: BackfillOptions): Promi
   await saveState(statePath, state);
   const exit = worstExit(codes);
   console.error(
-    `backfill: ${checked} release(s) checked · ${flaggedTotal} flagged (recorded, never notified) · ${gaveUp} given up · ${judgeBalance()}index ${join(reportsDir, "index.html")} · exit ${exit}`,
+    `backfill: ${checked} release(s) checked · ${flaggedTotal} flagged (recorded, never notified) · ${gaveUp} given up · ${judgeBalance()}index ${join(reportsDir, "index.html")} · exit ${exit}${finishedSuffix(startedAt, clock())}`,
   );
   return exit;
 }
