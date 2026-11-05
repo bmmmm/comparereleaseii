@@ -180,6 +180,25 @@ function toDiffFile(f: GhFile): DiffFile {
   };
 }
 
+/**
+ * Mark the files whose patch the compare API dropped for its diff budget.
+ *
+ * The budget runs out in file order, and from there on every file comes back
+ * 0/0 with no patch — measured on this repository's v0.1.0...v0.14.0: the
+ * last 94 of 169 files, `src/deps.ts` (+317) among them, none patched after
+ * the cut. A 0/0 file without a patch *before* the cut is a binary, an empty
+ * file or a mode change, so only that trailing run is marked, and only after
+ * a file that actually spent budget (changes > 0).
+ */
+export function markOmittedPatches(files: DiffFile[]): DiffFile[] {
+  let cut = files.length;
+  while (cut > 0 && !files[cut - 1].patch && files[cut - 1].additions + files[cut - 1].deletions === 0) {
+    cut--;
+  }
+  if (cut === files.length || cut === 0) return files;
+  return files.map((f, i) => (i >= cut ? { ...f, patchOmitted: true } : f));
+}
+
 export async function fetchCompare(
   repo: string,
   base: string,
@@ -192,7 +211,7 @@ export async function fetchCompare(
   }>(`repos/${assertRepoSlug(repo)}/compare/${ref(base)}...${ref(head)}`);
   return {
     commits: cmp.commits.map(toCommit),
-    files: cmp.files.map(toDiffFile),
+    files: markOmittedPatches(cmp.files.map(toDiffFile)),
     totalCommits: cmp.total_commits,
   };
 }
@@ -345,6 +364,13 @@ export async function loadGithubRelease(opts: {
     truncated = true;
     warnings.push(
       `Compare API caps file lists at 300 — diff may be incomplete, use a local clone (--local) for full coverage.`,
+    );
+  }
+  const omitted = cmp.files.filter((f) => f.patchOmitted).length;
+  if (omitted) {
+    truncated = true;
+    warnings.push(
+      `Compare API: ${omitted} files: patch omitted by the forge (diff budget exhausted) — use a local clone (--local) for full coverage.`,
     );
   }
 

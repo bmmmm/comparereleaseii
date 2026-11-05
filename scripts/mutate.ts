@@ -20,6 +20,18 @@ interface Mutant {
 
 const MUTANTS: Mutant[] = [
   {
+    guard: "a patch the forge dropped for its diff budget is not an opaque change",
+    file: "src/deps.ts",
+    find: "    !file.patchOmitted &&\n",
+    replace: "",
+  },
+  {
+    guard: "only a run after a file that spent diff budget counts as omitted",
+    file: "src/sources/github.ts",
+    find: "if (cut === files.length || cut === 0) return files;",
+    replace: "if (cut === files.length) return files;",
+  },
+  {
     guard: "watch rule repeats do not alert",
     file: "src/watch-state.ts",
     find: "return (hits ?? []).filter((hit) => !hit.repeated);",

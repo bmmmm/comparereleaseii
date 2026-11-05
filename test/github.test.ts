@@ -8,11 +8,14 @@ import {
   assertRepoSlug,
   extractPrNumbers,
   ghApi,
+  markOmittedPatches,
   pickBaseRelease,
   rateLimitHooks,
   ref,
   type GhRelease,
 } from "../src/sources/github.ts";
+import { opacityIssue } from "../src/deps.ts";
+import type { DiffFile } from "../src/types.ts";
 
 function rel(tag_name: string, opts: { draft?: boolean; prerelease?: boolean } = {}): GhRelease {
   return { tag_name, name: tag_name, body: "", draft: opts.draft ?? false, prerelease: opts.prerelease ?? false };
@@ -239,4 +242,34 @@ exit 1
     rateLimitHooks.sleep = realSleep;
     process.env.PATH = previousPath;
   }
+});
+
+test("a compare cut short by the diff budget is not opaque; a real blob before the cut still is", () => {
+  // Shape of GitHub's compare response once its diff budget runs out (this
+  // repo's v0.1.0...v0.14.0): patched files, then a trailing run of 0/0 files
+  // without a patch — text files that really changed.
+  const nil = (path: string, status = "modified"): DiffFile => ({ path, status, additions: 0, deletions: 0 });
+  const files = markOmittedPatches([
+    { path: "README.md", status: "modified", additions: 3, deletions: 1, patch: "@@ -1 +1,3 @@\n+a\n+b\n+c\n-d" },
+    nil("tools/helper", "added"), // an extensionless binary: genuinely unreviewable
+    nil("vendor/lib.so", "added"),
+    // Too large on its own: no patch, but the counts survive — budget spent.
+    { path: "CHANGELOG.md", status: "modified", additions: 1564, deletions: 70 },
+    { path: "docs/guide.md", status: "added", additions: 40, deletions: 0, patch: "@@ -0,0 +1,40 @@\n+x" },
+    nil("src/deps.ts"),
+    nil("src/new.ts", "added"),
+    nil("test/deps.test.ts"),
+  ]);
+  const flagged = files.map((f) => [f.path, opacityIssue(f)]).filter(([, o]) => o);
+  assert.deepEqual(flagged, [
+    ["tools/helper", "no reviewable patch"],
+    ["vendor/lib.so", "binary file"],
+  ]);
+  assert.deepEqual(
+    files.filter((f) => f.patchOmitted).map((f) => f.path),
+    ["src/deps.ts", "src/new.ts", "test/deps.test.ts"],
+  );
+  // Nothing spent budget, so nothing was cut: a compare of two blobs keeps both.
+  const blobs = markOmittedPatches([nil("bin/tool", "added"), nil("bin/other", "added")]);
+  assert.deepEqual(blobs.map(opacityIssue), ["no reviewable patch", "no reviewable patch"]);
 });
