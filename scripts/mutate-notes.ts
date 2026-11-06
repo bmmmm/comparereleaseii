@@ -26,7 +26,7 @@
 //
 // It runs with the judge off. Every expectation above is settled by the
 // deterministic stages, so the harness is keyless and reproducible — the same
-// reason `scripts/mutate.ts` can run nightly without a secret. What it
+// reason `scripts/mutate.ts` can run in CI without a secret. What it
 // measures is therefore the deterministic floor: if a class is missed here, no
 // model is involved in the miss.
 //

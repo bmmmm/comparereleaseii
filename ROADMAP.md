@@ -520,7 +520,8 @@ Plan, results and raw numbers: `git show 2237188` (removed from `docs/` on
 - **No npm, no repo secrets** (2026-07-26): releasing is a local routine
   (dogfood gate, `--calibrate` drift check, tag on both forges) — no
   standing supply-chain surface for one convenience installer, no
-  secret-carrying CI; the nightly keyless job covers mutants, not judges.
+  secret-carrying CI; the keyless mutation job (on demand) covers mutants,
+  not judges.
 - **The judge never sees commit messages while reading diff substance**
   (2026-08-02): messages anchor it on the claim — changelog circularity,
   generalized. Enforced in code and mutants; reconciliation (Block 4) is

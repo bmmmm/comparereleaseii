@@ -29,6 +29,9 @@ All notable changes to comparereleaseii are documented here. The format follows 
 
 ### Changed
 
+- **The mutation workflow runs on demand only.** `mutation-tests` lost its
+  nightly schedule and keeps manual dispatch; `pnpm mutate` runs the same
+  harness locally. A schedule spent runner time nobody had asked for.
 - **The findings pass reads what matters first.** It read 7 of codex
   0.157.0's 1091 changed files, and none of them was the one that flipped a
   default. Vendored paths no longer enter the plan (corpus: vendored files
