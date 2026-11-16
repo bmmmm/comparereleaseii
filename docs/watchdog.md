@@ -21,6 +21,12 @@ juanfont/headscale: v0.30.0 → score 94 (solid)
 watch: 4 repos · 1 new release(s) checked · 0 flagged · judge calls: 3 fresh · 0 from cache · index reports/index.html · exit 0
 ```
 
+The log on stderr carries UTC timestamps (ISO 8601) so a run and each checked
+release can be placed in time: the first line is `watch: run started <time>`
+(`backfill: run started <time>` for backfill), each `<repo>: checking <tag>…`
+line ends with the check's start time in parentheses, and the summary line ends
+with `· finished <time> · <seconds>s`.
+
 Each checked release writes `reports/<repo>/<tag>.{html,md,json}` and
 regenerates `reports/index.html` — a one-page overview with red rows for
 flagged releases; every row links to its full report (click anywhere in the
