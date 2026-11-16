@@ -146,6 +146,19 @@ test("within a subsystem a test is read after every source file, boost or not", 
   );
 });
 
+test("a test reads after a smaller source file, and never takes the sensitive boost", () => {
+  const files = [
+    file("src/ui/plain_test.go", "@@ -1 +1 @@\n-a\n+b\n", 300, 0),
+    file("src/ui/gateway_auth_tests.rs", "@@ -1 +1 @@\n-a\n+b\n", 100, 0),
+    file("src/ui/layout.rs", "@@ -1 +1 @@\n-a\n+b\n", 1, 0),
+  ];
+  const [plan] = planFindings(files, 21000);
+  assert.deepEqual(
+    plan.files.map((f) => f.path),
+    ["src/ui/layout.rs", "src/ui/plain_test.go", "src/ui/gateway_auth_tests.rs"],
+  );
+});
+
 test("a directory holding most of the release groups by its second segment", () => {
   const paths = [
     "codex-rs/core/src/a.rs",

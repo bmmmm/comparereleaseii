@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { commitSurface, releaseSurface } from "../src/substance.ts";
+import { commitSurface, defaultsClass, releaseSurface } from "../src/substance.ts";
 import { fileCategory } from "../src/metrics.ts";
 import type { Claim, DiffFile } from "../src/types.ts";
 
@@ -510,4 +510,12 @@ test("the enclosing key names a generic owner only, and only within its own brac
     2,
   );
   assert.deepEqual(releaseSurface([neighbour]).defaults?.map((d) => d.name), ["default_enabled"]);
+});
+
+test("a test path is never a defaults file, even where fileCategory calls it config or source", () => {
+  for (const p of ["src/mocks/config.toml", "mocks/settings.json", "src/net_tests.rs"]) {
+    assert.equal(defaultsClass(p), null, p);
+  }
+  assert.equal(defaultsClass("src/net.rs"), "source");
+  assert.equal(defaultsClass("config/app.toml"), "config");
 });

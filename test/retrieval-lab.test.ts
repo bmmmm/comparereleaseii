@@ -475,3 +475,61 @@ test("arbitration shows only disputed claims, fixes agreed hunks and escapes eve
   assert.ok(html.includes("&lt;b&gt;both&lt;/b&gt;") && !html.includes("<img src=x>"));
   assert.ok(html.includes("1 disputed claims"));
 });
+
+test("a version-1 excluded case that still stores a pool gives the worker no pairs", () => {
+  const { data } = fixture();
+  data.version = 1;
+  data.cases.push({ ...data.cases[0]!, id: "old-excluded", excluded: "merge-diff-unread" });
+  data.fingerprint = fingerprint(data);
+  validateDataset(data);
+  assert.ok(data.cases[1]!.candidates.length > 0);
+  assert.deepEqual(workerInput(data).cases.map((c) => [c.id, c.candidates.length]), [["case", 2], ["old-excluded", 0]]);
+});
+
+test("the fingerprint covers the sample record, and only when there is one", () => {
+  const { data } = fixture();
+  const rule = { perRepo: 1 } as unknown as NonNullable<Dataset["sample"]>["rule"];
+  const dropped = {} as unknown as NonNullable<Dataset["sample"]>["dropped"];
+  const one = { ...data, sample: { from: "a", rule, dropped } } as Dataset;
+  const two = { ...data, sample: { from: "b", rule, dropped } } as Dataset;
+  assert.notEqual(fingerprint(one), fingerprint(data));
+  assert.notEqual(fingerprint(one), fingerprint(two));
+  assert.equal(fingerprint({ ...data, sample: undefined }), fingerprint(data));
+});
+
+test("a labeler that skips an eligible claim is refused for that reason", () => {
+  const { data } = fixture();
+  data.cases.push({ ...data.cases[0]!, id: "second" });
+  data.fingerprint = fingerprint(data);
+  const x = candidates[0]!.id;
+  const full: Labels = { fingerprint: data.fingerprint, cases: [
+    { id: "case", relevant: [x], rationale: "r" }, { id: "second", relevant: [x], rationale: "r" }] };
+  const partial: Labels = { ...full, cases: [full.cases[0]!] };
+  assert.throws(() => agreeLabels(data, full, partial, ["a", "b"]), /must answer every eligible case exactly once/);
+});
+
+test("claims are agreed only on identical hunk sets, not when one set contains the other", () => {
+  const { data } = fixture();
+  const [x] = candidates.map((h) => h.id) as [string];
+  const a: Labels = { fingerprint: data.fingerprint, cases: [{ id: "case", relevant: [], rationale: "none" }] };
+  const b: Labels = { fingerprint: data.fingerprint, cases: [{ id: "case", relevant: [x], rationale: "one" }] };
+  assert.deepEqual(agreeLabels(data, a, b, ["a", "b"]).disputed, ["case"]);
+  assert.deepEqual(agreeLabels(data, b, a, ["a", "b"]).disputed, ["case"]);
+  assert.equal(agreeLabels(data, a, a, ["a", "b"]).agreedClaims, 1);
+});
+
+test("Python windowing keeps a pair that fits as one window, whatever the token count of its parts", () => {
+  const code = `import importlib.util
+spec = importlib.util.spec_from_file_location("worker", "scripts/laya-rank.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+head, tail = "H", "T"
+lines = ["aaaa", "bbbb", "cccc"]
+whole = head + "\\n" + "\\n".join(lines) + tail
+# A tokenizer is not additive: the whole state fits although a part would not.
+count = lambda text: 1 if text == whole else 100
+assert module.pack_windows(head, lines, tail, count, 5) == [whole]
+`;
+  const result = spawnSync("python3", ["-B", "-c", code], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+});

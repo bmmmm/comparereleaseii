@@ -1676,10 +1676,16 @@ function candidatesFor(file: string): string[] {
   const base = file.split("/").pop()!.replace(/\.ts$/, "");
   const own = `test/${base}.test.ts`;
   const picked = KILLER_HINTS[file] ?? [own];
-  return picked.filter((f) => testFiles.includes(f));
+  return picked.filter((f) => mutatedFiles.includes(f));
 }
 
-function runSuite(files: string[] = testFiles): boolean {
+// test/mutants.test.ts asserts that every `find` still stands in its file, so
+// it is red by construction while a mutant is applied — it must not count as a
+// kill (issue #39). Only the baseline run keeps it.
+const MUTANT_GATE = "test/mutants.test.ts";
+const mutatedFiles = testFiles.filter((f) => f !== MUTANT_GATE);
+
+function runSuite(files: string[] = mutatedFiles): boolean {
   const res = spawnSync("node", ["--test", ...files], { encoding: "utf8" });
   return res.status === 0;
 }
@@ -1692,7 +1698,7 @@ if (!selected.length) {
 }
 
 console.error("Checking the suite is green before mutating…");
-if (!runSuite()) {
+if (!runSuite(testFiles)) {
   console.error("Baseline suite is red — fix the tests before measuring mutants.");
   process.exit(1);
 }
