@@ -8,6 +8,7 @@ import {
   loadReference,
   gateCalibration,
   printCalibration,
+  rankCalibrations,
   GOLDEN_CATEGORIES,
   type Calibration,
   type CalibrationOutcome,
@@ -373,4 +374,45 @@ test("gateCalibration: long-context and format issues cap at escalate-only", () 
   const part = gateCalibration(calOf([{ category: "partial", pass: false, name: "p1" }]));
   assert.equal(part.verdict, "escalate-only");
   assert.match(part.reasons.join("; "), /partial: 0\/1.*p1/);
+});
+
+test("a verified verdict is a rubber-stamp only where the case did not expect it", async () => {
+  const cal = await runCalibration(
+    { name: "stamper", judge: async () => verdictJson("verified") },
+    8,
+  );
+  const expecting = cal.outcomes.filter((o) => o.expected.includes("verified"));
+  const not = cal.outcomes.filter((o) => !o.expected.includes("verified"));
+  assert.ok(expecting.length > 0 && not.length > 0, "the golden set must hold both kinds");
+  for (const o of expecting) assert.equal(o.overVerified, false, `${o.name} expected verified`);
+  for (const o of not.filter((o) => o.got === "verified")) {
+    assert.equal(o.overVerified, true, `${o.name} did not expect verified`);
+  }
+});
+
+test("gateCalibration: a failed lifted field case is named but never moves the verdict", () => {
+  const gate = gateCalibration(calOf([{}, { category: "field", name: "lifted-1", pass: false }]));
+  assert.equal(gate.verdict, "sole-judge");
+  assert.deepEqual(gate.fieldFailures, ["lifted-1"]);
+  assert.equal(gate.fieldTotal, 1);
+  // The same failure in a gating category does move it.
+  assert.equal(gateCalibration(calOf([{}, { category: "partial", pass: false }])).verdict, "escalate-only");
+});
+
+test("rankCalibrations: passes first, then fewer rubber-stamps, then known speed over none", () => {
+  const named = (engine: string, c: Calibration): Calibration => ({ ...c, engine });
+  const three = named("three", calOf([{}, {}, {}]));
+  const two = named("two", calOf([{}, {}, { pass: false }]));
+  assert.deepEqual(rankCalibrations([two, three]).map((c) => c.engine), ["three", "two"]);
+  assert.deepEqual(rankCalibrations([three, two]).map((c) => c.engine), ["three", "two"]);
+
+  const clean = named("clean", calOf([{}, {}]));
+  const stamped = named("stamped", calOf([{}, { overVerified: true }]));
+  assert.deepEqual(rankCalibrations([stamped, clean]).map((c) => c.engine), ["clean", "stamped"]);
+  assert.deepEqual(rankCalibrations([clean, stamped]).map((c) => c.engine), ["clean", "stamped"]);
+
+  const timed = named("timed", { ...calOf([{}, {}]), avgMs: 900 });
+  const cached = named("cached", { ...calOf([{}, {}]), avgMs: null });
+  assert.deepEqual(rankCalibrations([cached, timed]).map((c) => c.engine), ["timed", "cached"]);
+  assert.deepEqual(rankCalibrations([timed, cached]).map((c) => c.engine), ["timed", "cached"]);
 });

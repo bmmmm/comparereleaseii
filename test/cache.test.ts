@@ -2,9 +2,18 @@
 import { after, test } from "node:test";
 import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
-import { chmod, mkdir } from "node:fs/promises";
+import { chmod, mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { judgeCallStats, resetJudgeStats, withVerdictCache } from "../src/cache.ts";
+import {
+  cacheBytes,
+  judgeCallStats,
+  pruneVerdictCache,
+  resetJudgeStats,
+  verdictCacheKey,
+  verdictCacheStats,
+  withVerdictCache,
+} from "../src/cache.ts";
+import { VERSION } from "../src/paths.ts";
 import type { JudgeEngine } from "../src/judge.ts";
 
 // Own cache root: cache.ts resolves XDG_CACHE_HOME at call time.
@@ -75,4 +84,65 @@ test("a failing cache write warns once instead of silently re-judging forever", 
     console.error = orig;
     await chmod(verdicts, 0o700);
   }
+});
+
+const verdictsDir = (): string =>
+  join(process.env.XDG_CACHE_HOME!, "comparereleaseii", "verdicts");
+
+/** The first cached call sweeps the directory once per process; take that
+ * out of the way so an entry planted afterwards is read, not swept. */
+async function swept(): Promise<void> {
+  await withVerdictCache(countingEngine()).judge("sweep primer");
+  await mkdir(verdictsDir(), { recursive: true, mode: 0o700 });
+}
+
+/** Plants an entry under the key (engine, prompt) with arbitrary content. */
+async function plant(engine: string, prompt: string, entry: object): Promise<void> {
+  await writeFile(join(verdictsDir(), `${verdictCacheKey(engine, prompt)}.json`), JSON.stringify(entry));
+}
+
+test("an entry under the right key is served only to the engine that wrote it", async () => {
+  await swept();
+  await plant("stub", "engine prompt", { version: VERSION, engine: "someone-else", response: "planted" });
+  const engine = countingEngine();
+  assert.equal(await withVerdictCache(engine).judge("engine prompt"), "answer for engine prompt");
+  assert.equal(engine.calls, 1, "a verdict written by another engine was served");
+});
+
+test("an entry stamped by another tool version is a miss even under a matching key", async () => {
+  await swept();
+  await plant("stub", "version prompt", { version: "0.0.0-other", engine: "stub", response: "planted" });
+  const engine = countingEngine();
+  assert.equal(await withVerdictCache(engine).judge("version prompt"), "answer for version prompt");
+  assert.equal(engine.calls, 1, "a verdict from another tool version was served");
+});
+
+test("an entry whose response is not a string is a miss, not a verdict", async () => {
+  await swept();
+  await plant("stub", "shape prompt", { version: VERSION, engine: "stub", response: 42 });
+  const engine = countingEngine();
+  assert.equal(await withVerdictCache(engine).judge("shape prompt"), "answer for shape prompt");
+  assert.equal(engine.calls, 1, "a non-string response was served as a verdict");
+});
+
+test("the same prompt asked of two engines is two cache entries", async () => {
+  assert.notEqual(verdictCacheKey("engine-a", "p"), verdictCacheKey("engine-b", "p"));
+  assert.notEqual(verdictCacheKey("a", "bp"), verdictCacheKey("ab", "p"));
+  assert.equal(verdictCacheKey("engine-a", "p"), verdictCacheKey("engine-a", "p"));
+});
+
+test("the sweep's own marker is never counted or removed as a cache entry", async () => {
+  await swept();
+  await pruneVerdictCache({ ifStale: true });
+  const names = await readdir(verdictsDir());
+  assert.ok(names.includes("gc.state"), "the sweep left no marker — the test proves nothing");
+  const stats = await verdictCacheStats();
+  assert.equal(stats.entries, names.filter((n) => n.endsWith(".json")).length);
+  assert.ok(!stats.byVersion.some((v) => v.version === null), "the marker was read as a foreign entry");
+});
+
+test("cacheBytes switches to MB at exactly one million bytes", () => {
+  assert.equal(cacheBytes(1e6), "1.0 MB");
+  assert.equal(cacheBytes(999_999), "1000 kB");
+  assert.equal(cacheBytes(1500), "2 kB");
 });

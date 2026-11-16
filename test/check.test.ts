@@ -473,3 +473,137 @@ test("a pin on the checked repo itself never self-expands", async () => {
   assert.equal(report.components, undefined);
   assert.equal(report.pins?.[0].firstParty, true, "the pin itself still renders as first-party");
 });
+
+// ---------- analyzeRelease: the switches that shape the report ----------
+
+const OFF: CheckSettings = {
+  judgeMode: "off",
+  engine: null,
+  escalateEngine: null,
+  concurrency: 1,
+  reverse: false,
+  baseline: 0,
+};
+
+/** One release with a commit that no note line anchors, plus the file it touched. */
+function undocumentedCommit(): ReleaseData {
+  const file: DiffFile = {
+    path: "src/scheduler.ts",
+    status: "modified",
+    additions: 40,
+    deletions: 10,
+    patch: "@@ -1,2 +1,3 @@\n-old\n+export function reschedule() { return 1; }\n+const x = 2;\n",
+  };
+  return {
+    ...releaseData(),
+    commits: [
+      { sha: "e".repeat(40), subject: "Rework scheduler internals", body: "", author: "dev", prNumbers: [] },
+    ],
+    files: [file],
+    commitFiles: async () => [file],
+  };
+}
+
+test("release notes with no claims abort the check", async () => {
+  await assert.rejects(
+    analyzeRelease({ ...releaseData(), notes: "" }, CONTEXT, null, OFF),
+    /No claims found/,
+  );
+});
+
+test("a baseline of zero releases never reads the history source", async () => {
+  let listed = 0;
+  const history = {
+    cacheKey: "test:check-zero",
+    slug: "o/r",
+    listReleases: async () => {
+      listed++;
+      return [];
+    },
+    loadRange: async () => ({ commits: [], files: [] }),
+  };
+  await analyzeRelease(releaseData(), CONTEXT, null, { ...OFF, history, baseline: 0 });
+  assert.equal(listed, 0, "baseline 0 must not even list releases");
+  await analyzeRelease(releaseData(), CONTEXT, null, { ...OFF, history, baseline: 3 });
+  assert.equal(listed, 1, "the control: a positive baseline does read it");
+});
+
+test("reverse coverage runs only when asked for", async () => {
+  const forward = await analyzeRelease(undocumentedCommit(), CONTEXT, null, { ...OFF, reverse: true });
+  assert.ok(forward.uncovered.length > 0, "the fixture must leave a commit undocumented");
+  assert.equal(forward.reverseChecked, true);
+
+  const off = await analyzeRelease(undocumentedCommit(), CONTEXT, null, { ...OFF, reverse: false });
+  assert.equal(off.reverseChecked, false);
+  assert.deepEqual(off.uncovered, []);
+});
+
+test("findings: false skips the findings pass even with an engine and a diff", async () => {
+  const engine = {
+    name: "stub",
+    judge: async () =>
+      '{"verdict":"no_evidence","confidence":0.5,"files":[],"reasoning":"x","findings":[]}',
+  };
+  const on = await analyzeRelease(undocumentedCommit(), CONTEXT, null, {
+    ...OFF,
+    judgeMode: "auto",
+    engine,
+  });
+  assert.ok(on.findings, "the control: an engine and a diff run the findings pass");
+  const off = await analyzeRelease(undocumentedCommit(), CONTEXT, null, {
+    ...OFF,
+    judgeMode: "auto",
+    engine,
+    findings: false,
+  });
+  assert.equal(off.findings, undefined);
+});
+
+test("a release with no pins, no promises and no diff carries none of those fields", async () => {
+  const report = await analyzeRelease(releaseData(), CONTEXT, null, OFF);
+  assert.equal(report.pins, undefined);
+  assert.equal(report.promises, undefined);
+  assert.equal(report.surface, undefined);
+});
+
+test("a compare API that did not truncate never triggers the clone fallback", async () => {
+  const calls: string[] = [];
+  const { data } = await loadGithubReleaseData(
+    "o/r",
+    {},
+    {
+      loadGithubRelease: async () => releaseData(),
+      fetchGithubContext: async () => CONTEXT,
+      cloneDirFor: async () => {
+        calls.push("dir");
+        return "/tmp/fake-clone";
+      },
+      ensureClone: async () => {
+        calls.push("clone");
+      },
+      loadLocalRange: async () => {
+        calls.push("range");
+        return { commits: [], files: [], commitFiles: async () => [] };
+      },
+    },
+  );
+  assert.deepEqual(calls, []);
+  assert.deepEqual(data.warnings, []);
+});
+
+test("an explicit notes file replaces the published notes on the GitHub route", async () => {
+  const dir = await tempDir({ after }, "crii-notes-file-");
+  const notesFile = join(dir, "notes.md");
+  await writeFile(notesFile, "- Added `frobnicate` flag\n");
+  const deps = {
+    loadGithubRelease: async () => releaseData(),
+    fetchGithubContext: async () => CONTEXT,
+    cloneDirFor: async () => null,
+    ensureClone: async () => {},
+    loadLocalRange: async () => ({ commits: [], files: [], commitFiles: async () => [] }),
+  };
+  const withFile = await loadGithubReleaseData("o/r", { notesFile }, deps);
+  assert.equal(withFile.data.notes, "- Added `frobnicate` flag\n");
+  const without = await loadGithubReleaseData("o/r", {}, deps);
+  assert.equal(without.data.notes, releaseData().notes);
+});
