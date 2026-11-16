@@ -2309,3 +2309,25 @@ test("emptyListingWarning reads a skipped release or a bare history as a seen re
   };
   assert.ok(emptyListingWarning("o/r", [], { ...base, history: [checked] }));
 });
+
+test("a release published exactly at the poll cursor is neither new nor skipped", () => {
+  const at = "2026-06-01T00:00:00Z";
+  const releases = [
+    { tag: "v1.0.0", publishedAt: at, draft: false, prerelease: false },
+    { tag: "v1.1.0", publishedAt: "2026-06-02T00:00:00Z", draft: false, prerelease: false },
+  ] as Parameters<typeof pickNewReleases>[0];
+  assert.deepEqual(pickNewReleases(releases, at).map((r) => r.tag), ["v1.1.0"]);
+  assert.equal(countSkipped(releases, at, { cap: 0 }), 1);
+});
+
+test("isFlagged: a score exactly at the notify bar is not flagged", () => {
+  assert.equal(isFlagged(65, 0, 0), false);
+  assert.equal(isFlagged(64, 0, 0), true);
+  assert.equal(isFlagged(50, 0, 0, 50), false);
+});
+
+test("hasDrifted reads a verdict from exactly six checks in the window", () => {
+  const h = (...scores: number[]) => scores.map((score) => ({ score }));
+  assert.equal(hasDrifted(h(90, 90, 90, 60, 60, 60)), true);
+  assert.equal(hasDrifted(h(90, 90, 90, 60, 60)), false);
+});

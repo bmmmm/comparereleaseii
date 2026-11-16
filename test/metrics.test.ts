@@ -894,3 +894,110 @@ test("buildFlags holds the version bump against the commits' markers", () => {
     false,
   );
 });
+
+function anomalyData(churn: number): ReleaseData {
+  const data = releaseData(["src/engine.ts"]);
+  data.files = [{ path: "src/engine.ts", status: "modified", additions: churn, deletions: 0 }];
+  return data;
+}
+
+test("baselineFlags: churn is an anomaly only above three times the median, and only with three snapshots", () => {
+  const anomaly = (churn: number, releases = 5) =>
+    baselineFlags(anomalyData(churn), null, baselineOf(0.5, releases)).find(
+      (f) => f.kind === "size-anomaly",
+    );
+  // The median is 100: exactly 3× is not "above".
+  assert.equal(anomaly(300), undefined);
+  assert.equal(anomaly(301)?.severity, "info");
+  // Three snapshots already count as history; two do not.
+  assert.equal(anomaly(500, 3)?.kind, "size-anomaly");
+  assert.equal(anomaly(500, 2), undefined);
+});
+
+test("baselineFlags: a first binary is only first while the repo has never shipped one", () => {
+  const data = releaseData([]);
+  data.files = [{ path: "dist/tool.exe", status: "added", additions: 0, deletions: 0 }];
+  const firstBinary = (everBinary: boolean) => {
+    const base = baselineOf(0.5);
+    base.everBinary = everBinary;
+    return baselineFlags(data, null, base).find((f) => f.kind === "first-binary");
+  };
+  assert.equal(firstBinary(false)?.severity, "critical");
+  assert.equal(firstBinary(true), undefined);
+  // And no binary at all is no flag, whatever the history says.
+  const none = baselineOf(0.5);
+  assert.equal(baselineFlags(releaseData(["src/a.ts"]), null, none).length, 0);
+});
+
+test("classifyUnverifiable: the bars are inclusive where the repo sits exactly on them", () => {
+  const fork = releaseData(["src/browser.ts", "config/prefs.js"]);
+  // Exactly two of three change claims missing: not MORE than two thirds.
+  const twoOfThree = [result("no-evidence"), result("no-evidence"), result("verified")];
+  assert.equal(classifyUnverifiable(fork, twoOfThree, [], baselineOf(0.05)), null);
+  // A median lexical coverage exactly at the 0.25 bar still reads as out-of-repo.
+  const missing = [result("no-evidence"), result("no-evidence"), result("no-evidence")];
+  assert.equal(classifyUnverifiable(fork, missing, [], baselineOf(0.25))?.kind, "out-of-repo");
+  assert.equal(classifyUnverifiable(fork, missing, [], baselineOf(0.26)), null);
+});
+
+test("a security-headed claim alone blocks the out-of-repo carve-out, as does an advisory alone", () => {
+  const fork = releaseData(["src/browser.ts"]);
+  const base = baselineOf(0.05);
+  const missing = () => [result("no-evidence"), result("no-evidence"), result("no-evidence")];
+  const withAdvisory = missing();
+  withAdvisory[0] = { ...withAdvisory[0], claim: { ...withAdvisory[0].claim, advisories: ["CVE-2026-0001"] } };
+  assert.equal(classifyUnverifiable(fork, withAdvisory, [], base), null);
+  const withHeading = missing();
+  withHeading[0] = { ...withHeading[0], claim: { ...withHeading[0].claim, section: "Security" } };
+  assert.equal(classifyUnverifiable(fork, withHeading, [], base), null);
+});
+
+test("an undocumented auth path at exactly the well-documented share is still critical", () => {
+  const files: FileInsight[] = [
+    { path: "src/auth/session.go", churn: 40, sensitive: "auth/crypto", coverage: "undocumented" },
+  ];
+  const flags = buildFlags(releaseData(["src/auth/session.go"]), [], null, files, 0.6);
+  assert.equal(flags.find((f) => f.kind === "undocumented-sensitive")?.severity, "critical");
+});
+
+test("a vague note only raises a surplus flag for notable surplus", () => {
+  const vague = (notable: boolean): ClaimResult => ({
+    ...result("partial"),
+    surplus: [{ description: "touches the lockfile", file: "pnpm-lock.yaml", notable }],
+  });
+  const kinds = (r: ClaimResult) =>
+    buildFlags(releaseData([]), [r], null, [], null).map((f) => f.kind);
+  assert.equal(kinds(vague(false)).includes("vague-claim-surplus"), false);
+  assert.equal(kinds(vague(true)).includes("vague-claim-surplus"), true);
+});
+
+test("completeness ignores merge commits and reads a churn-free release as fully documented", async () => {
+  const { computeMetrics } = await import("../src/metrics.ts");
+  const f = (additions: number) => [
+    { path: "src/engine.ts", status: "modified", additions, deletions: 0 },
+  ];
+  const ratio = (
+    commitFiles: Array<[string, number]>,
+    covered: string[],
+    merges: string[],
+  ) =>
+    computeMetrics({
+      data: releaseData(["src/engine.ts"]),
+      results: [],
+      coverage: {
+        uncovered: [],
+        coveredShas: new Set(covered),
+        evidenceFiles: new Set(),
+        commitFiles: new Map(commitFiles.map(([sha, n]) => [sha, f(n)])),
+        mergeShas: new Set(merges),
+        unreadableShas: new Set(),
+      },
+      context: { languages: null, codeBytes: null, releaseCadenceDays: null },
+    }).churnCoveredRatio;
+  // The merge's 100 lines of churn are not part of the denominator.
+  assert.equal(ratio([["m1", 100], ["c1", 10]], ["c1"], ["m1"]), 1);
+  // Nothing but a merge: no churn to document, which reads as complete.
+  assert.equal(ratio([["m1", 100]], [], ["m1"]), 1);
+  // Control: an uncovered ordinary commit does count.
+  assert.equal(ratio([["u1", 30], ["c1", 10]], ["c1"], []), 0.25);
+});
