@@ -3,10 +3,12 @@ import { test } from "node:test";
 import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import {
+  capHunks,
   computeCoverage,
   isGeneratedEntry,
   isVagueClaim,
   medianVerdict,
+  mergeCommitShas,
   resolveVotes,
   verifyClaims,
 } from "../src/verify.ts";
@@ -22,7 +24,7 @@ import {
   type JudgeVerdict,
 } from "../src/judge.ts";
 import { withVerdictCache } from "../src/cache.ts";
-import type { BumpJoin, BumpResolution, Claim, ClaimBump, Commit } from "../src/types.ts";
+import type { BumpJoin, BumpResolution, Claim, ClaimBump, ClaimResult, Commit } from "../src/types.ts";
 
 function claim(text: string, prNumbers: number[] = []): Claim {
   return {
@@ -1923,4 +1925,155 @@ test("a judged `contradicted` on a version the package passed through is partial
   // And without a bump claim the judge's word stands untouched.
   const [plain] = await verifyClaims(data as never, [claim(text, [3571])], opts);
   assert.equal(plain.verdict, "contradicted");
+});
+
+// ---------- decision points the mutation harness found unwatched ----------
+
+function recordingEngine(answer: string): { engine: JudgeEngine; prompts: string[] } {
+  const prompts: string[] = [];
+  return {
+    engine: { name: "rec", judge: async (prompt: string) => (prompts.push(prompt), answer) },
+    prompts,
+  };
+}
+
+const REC_OPTS = { concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+
+test("a verified under a security heading gets its second look without any advisory id", async () => {
+  const verified = '{"verdict":"verified","confidence":0.9,"files":[],"reasoning":"ok"}';
+  const data = releaseData([{ path: "src/a.ts", patch: "@@ -1,1 +1,2 @@\n x\n+y\n" }]);
+  const calls = async (section: string): Promise<number> => {
+    const { engine, prompts } = recordingEngine(verified);
+    const c = { ...claim("Tightened the zebra handling"), section };
+    await verifyClaims(data, [c], { ...REC_OPTS, judgeMode: "all", engine, escalateEngine: null });
+    return prompts.length;
+  };
+  assert.equal(await calls("Security fixes"), 3, "a security section is reviewed twice more");
+  assert.equal(await calls("What's Changed"), 1, "the same verdict elsewhere is one call");
+});
+
+test("the judge is shown related commits only when they share real overlap, and at most three", async () => {
+  const mk = (n: number, subject: string): Commit => ({
+    sha: String(n).repeat(40), subject, body: "", author: "dev", prNumbers: [],
+  });
+  const data = {
+    ...releaseData([{ path: "src/a.ts", patch: "@@ -1,1 +1,2 @@\n x\n+y\n" }]),
+    commits: [
+      mk(2, "alpha bravo charlie uno"),
+      mk(3, "alpha bravo charlie dos"),
+      mk(4, "alpha bravo charlie tres"),
+      mk(5, "alpha bravo charlie cuatro"),
+    ],
+  };
+  const { engine, prompts } = recordingEngine('{"verdict":"no_evidence","confidence":0.5,"files":[],"reasoning":"r"}');
+  await verifyClaims(data, [claim("Rework alpha bravo charlie delta echo")], {
+    ...REC_OPTS, judgeMode: "all", engine, escalateEngine: null,
+  });
+  const linked = prompts[0].split("Linked commits:")[1] ?? "";
+  assert.ok(linked.includes("alpha bravo charlie uno"), "real overlap is shown");
+  assert.ok(!linked.includes("cuatro"), "the fourth related commit is cut");
+
+  // One shared word out of five is similarity 0.2 — a coincidence. Alone, so
+  // the cap above cannot be what hides it.
+  const sliver = {
+    ...data,
+    commits: [mk(1, "Rework golf hotel india juliet"), mk(2, "alpha bravo charlie uno")],
+  };
+  const second = recordingEngine('{"verdict":"no_evidence","confidence":0.5,"files":[],"reasoning":"r"}');
+  await verifyClaims(sliver, [claim("Rework alpha bravo charlie delta echo")], {
+    ...REC_OPTS, judgeMode: "all", engine: second.engine, escalateEngine: null,
+  });
+  const shown = second.prompts[0].split("Linked commits:")[1] ?? "";
+  assert.ok(shown.includes("alpha bravo charlie uno"));
+  assert.ok(!shown.includes("golf hotel"), "a sliver of overlap is no related commit");
+});
+
+test("capHunks stops at a budget spent exactly instead of appending an empty hunk", () => {
+  const out = capHunks([{ path: "a", hunk: "x".repeat(10) }, { path: "b", hunk: "y".repeat(5) }], 10);
+  assert.deepEqual(out.map((h) => h.path), ["a"]);
+});
+
+test("a claim with exactly one content token is vague", () => {
+  assert.equal(isVagueClaim(claim("Frobnicate")), true);
+});
+
+test("a range of nothing but merge commits keeps them countable; a mixed one hides only the merges", () => {
+  const mk = (n: string, subject: string): Commit => ({ sha: n.repeat(40), subject, body: "", author: "d", prNumbers: [] });
+  const merges = [mk("a", "Merge pull request #1 from x/y"), mk("b", "Merge branch 'main'")];
+  assert.deepEqual([...mergeCommitShas(merges)], []);
+  assert.deepEqual([...mergeCommitShas([...merges, mk("c", "Fix the thing")])], [merges[0].sha, merges[1].sha]);
+});
+
+function coverageFixture(commits: Commit[], filesBySha: Record<string, DiffFileLike[]>) {
+  return {
+    repoLabel: "t/t", baseRef: "v1", headRef: "v2", notes: "",
+    commits,
+    files: Object.values(filesBySha).flat(),
+    commitFiles: async (sha: string) => filesBySha[sha] ?? [],
+    warnings: [] as string[],
+  };
+}
+type DiffFileLike = { path: string; status: string; additions: number; deletions: number; patch: string };
+
+function settled(c: Claim, verdict: ClaimResult["verdict"], commitShas: string[], files: string[]): ClaimResult {
+  return {
+    claim: c, verdict, confidence: 0.9, reasoning: "",
+    evidence: { commitShas, files, matchedTerms: [], methods: [] },
+    judged: false, generated: false,
+  };
+}
+
+const COV_A: Commit = { sha: "a".repeat(40), subject: "Alpha work", body: "", author: "d", prNumbers: [] };
+const COV_B: Commit = { sha: "b".repeat(40), subject: "Beta work", body: "", author: "d", prNumbers: [] };
+const COV_FILE = (path: string, patch: string, additions = 3): DiffFileLike =>
+  ({ path, status: "modified", additions, deletions: 0, patch });
+
+test("a commit whose diff came back empty is not documented by a claim that cites files elsewhere", async () => {
+  // `[].every(...)` is true: without the explicit length guard an anchored
+  // claim's evidence "cites every file" of a commit that has none.
+  const a = COV_FILE("src/a.ts", "@@ -1 +1 @@\n+nothing relevant\n");
+  const data = coverageFixture([COV_A, COV_B], { [COV_A.sha]: [a], [COV_B.sha]: [] });
+  const c = claim("Reworked the zebra");
+  const coverage = await computeCoverage(data, [c], [settled(c, "verified", [COV_A.sha], ["src/a.ts"])]);
+  assert.deepEqual(coverage.uncovered.map((u) => u.commit.sha), [COV_B.sha]);
+});
+
+test("only a verified or partial verdict lends its evidence commits to coverage", async () => {
+  const f = COV_FILE("src/a.ts", "@@ -1 +1 @@\n+nothing relevant\n");
+  const data = coverageFixture([COV_A], { [COV_A.sha]: [f] });
+  const c = claim("Reworked the zebra");
+  const uncoveredFor = async (verdict: ClaimResult["verdict"]) =>
+    (await computeCoverage(data, [c], [settled(c, verdict, [COV_A.sha], [])])).uncovered.length;
+  assert.equal(await uncoveredFor("no-evidence"), 1);
+  assert.equal(await uncoveredFor("contradicted"), 1);
+  assert.equal(await uncoveredFor("verified"), 0);
+  assert.equal(await uncoveredFor("partial"), 0);
+});
+
+test("a carried-over line that was judged (not skipped) still documents the commit it names", async () => {
+  const f = COV_FILE("src/a.ts", "@@ -1 +1 @@\n+nothing relevant\n");
+  const data = coverageFixture([COV_A], { [COV_A.sha]: [] });
+  const c = { ...claim("Reworked the zebra"), shas: [COV_A.sha.slice(0, 8)], carriedOverFrom: "v1" };
+  const judged = (await computeCoverage(data, [c], [settled(c, "no-evidence", [], [])])).uncovered.length;
+  const skippedToo = (await computeCoverage(data, [c], [settled(c, "skipped", [], [])])).uncovered.length;
+  assert.equal(judged, 0, "it anchors a commit in this range, so it is an assertion about this release");
+  assert.equal(skippedToo, 1, "standing text that was skipped documents nothing");
+  void f;
+});
+
+test("the uncovered list leads with the biggest silent commit", async () => {
+  const small = COV_FILE("src/a.ts", "@@ -1 +1 @@\n+x\n", 2);
+  const big = COV_FILE("src/b.ts", "@@ -1 +1 @@\n+y\n", 90);
+  const data = coverageFixture([COV_A, COV_B], { [COV_A.sha]: [small], [COV_B.sha]: [big] });
+  const coverage = await computeCoverage(data, [], []);
+  assert.deepEqual(coverage.uncovered.map((u) => u.commit.sha), [COV_B.sha, COV_A.sha]);
+});
+
+test("an unanchored claim whose one prose identifier is in the diff is partial, not no-evidence", async () => {
+  const data = releaseData([{ path: "src/a.ts", patch: "@@ -1,1 +1,2 @@\n x\n+call some_ident()\n" }]);
+  const opts = { judgeMode: "off" as const, engine: null, concurrency: 1, maxHunks: 4, maxEvidenceChars: 10000 };
+  const [one] = await verifyClaims(data, [claim("Rework some_ident handling")], opts);
+  assert.equal(one.verdict, "partial");
+  const [none] = await verifyClaims(data, [claim("Rework other_ident handling")], opts);
+  assert.equal(none.verdict, "no-evidence");
 });

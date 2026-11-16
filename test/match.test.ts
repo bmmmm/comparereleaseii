@@ -5,6 +5,9 @@ import {
   assertsRemoval,
   extractIdentifiers,
   anchorMatch,
+  functionsOf,
+  hunkFunctions,
+  isNotesCarrierPath,
   lexicalMatch,
   looksLikeIdentifier,
   rankHunks,
@@ -215,4 +218,69 @@ test("rankHunks prefers path matches over incidental content hits", () => {
   const ranked = rankHunks(claim("SSRF via the icon endpoint"), files, 2);
   assert.ok(ranked.length >= 1);
   assert.equal(ranked[0].path, "src/api/icons.rs");
+});
+
+// ---------- decision points the mutation harness found unwatched ----------
+
+function diffFile(path: string, patch: string, status = "modified"): DiffFile {
+  return { path, status, additions: 1, deletions: 0, patch };
+}
+
+test("a sha anchors a commit only as a prefix of its own sha", () => {
+  const commits = [commit("abc123def456", "Fix")];
+  assert.equal(anchorMatch(claim("see c123d", { shas: ["c123d"] }), commits).commits.length, 0);
+  assert.equal(anchorMatch(claim("see abc12", { shas: ["abc12"] }), commits).commits.length, 1);
+});
+
+test("functionsOf stops at its cap", () => {
+  const patch = "@@ -1,1 +1,2 @@ fn alpha(\n+a\n@@ -9,1 +9,2 @@ fn bravo(\n+b\n@@ -20,1 +20,2 @@ fn charlie(\n+c\n";
+  assert.deepEqual(functionsOf([diffFile("a.rs", patch)], 2), ["alpha", "bravo"]);
+});
+
+test("an identifier present in several files is scored and listed once", () => {
+  const c = claim("Rework `frobnicate_token`", { codeSpans: ["frobnicate_token"] });
+  const m = lexicalMatch(c, [
+    diffFile("a.ts", "@@ -1 +1 @@\n+frobnicate_token()\n"),
+    diffFile("b.ts", "@@ -1 +1 @@\n+frobnicate_token()\n"),
+  ]);
+  assert.equal(m.files.length, 2);
+  assert.deepEqual(m.matchedTerms, ["frobnicate_token"]);
+  assert.equal(m.score, 3);
+});
+
+test("a changelog file is no lexical evidence for the claim it restates", () => {
+  const c = claim("Rework `frobnicate_token`", { codeSpans: ["frobnicate_token"] });
+  const m = lexicalMatch(c, [diffFile("CHANGELOG.md", "@@ -1 +1 @@\n+- Rework frobnicate_token\n")]);
+  assert.equal(m.score, 0);
+  assert.deepEqual(m.files, []);
+});
+
+test("diff file headers are not changed lines a term can match", () => {
+  const c = claim("Rework `zzqq_marker`", { codeSpans: ["zzqq_marker"] });
+  const patch = "--- a/old.ts\n+++ b/zzqq_marker.ts\n@@ -1 +1 @@\n-a\n+b\n";
+  assert.equal(lexicalMatch(c, [diffFile("src/other.ts", patch)]).score, 0);
+});
+
+test("rankHunks returns only hunks that share something with the claim", () => {
+  const ranked = rankHunks(claim("Reworked the zebra crossing"), [
+    diffFile("src/a.ts", "@@ -1,1 +1,2 @@\n x\n+zebra crossing\n"),
+    diffFile("src/b.ts", "@@ -1,1 +1,2 @@\n x\n+nothing alike here\n"),
+  ]);
+  assert.deepEqual(ranked.map((r) => r.path), ["src/a.ts"]);
+});
+
+test("a control keyword in a hunk header is not a touched function", () => {
+  assert.deepEqual(hunkFunctions("@@ -1,1 +1,2 @@ if (ready) {\n+x\n"), []);
+});
+
+test("a syndication file counts as a notes carrier whatever its extension spelling", () => {
+  assert.equal(isNotesCarrierPath("docs/releases.atom"), true);
+  assert.equal(isNotesCarrierPath("docs/releases.rss"), true);
+  assert.equal(isNotesCarrierPath("src/atom.ts"), false);
+});
+
+test("a file the release adds is not a removal just because its path names the term", () => {
+  const added = [diffFile("src/frob_thing.ts", "", "added")];
+  assert.equal(removesAny(["frob_thing"], added), false);
+  assert.equal(removesAny(["frob_thing"], [diffFile("src/frob_thing.ts", "", "removed")]), true);
 });
