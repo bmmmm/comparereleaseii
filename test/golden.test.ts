@@ -329,3 +329,35 @@ test("the shipped golden set still loads with the lifted-case field in the type"
     assert.ok(Array.isArray(gc.expected));
   }
 });
+
+test("a report that names no base ref is not a report", async () => {
+  const { reportPath, goldenFile } = await fixture({ baseRef: "" });
+  await assert.rejects(
+    addGoldenCase({ reportPath, claimId: 3, verdict: "verified", goldenFile, load: async () => releaseOf() }),
+    /not a comparereleaseii report/,
+  );
+  assert.deepEqual(await read(goldenFile), [], "nothing was written");
+});
+
+test("allPaths is stored only when the release has files beyond the hunks", async () => {
+  const { reportPath, goldenFile } = await fixture();
+  const one = { ...releaseOf(), files: releaseOf().files.slice(0, 1) };
+  const added = await addGoldenCase({
+    reportPath,
+    claimId: 3,
+    verdict: "verified",
+    goldenFile,
+    load: async () => one,
+  });
+  assert.equal(added.case.hunks.length, 1);
+  assert.equal("allPaths" in added.case, false, "one path, one hunk: the list would repeat the hunks");
+});
+
+test("a case name carries no leading or trailing dash from punctuation at the edges", () => {
+  const edgy = report({ repoLabel: "/o/r", headRef: "v1.0." });
+  assert.equal(goldenCaseName(edgy, 2), "o-r-v1-0-claim2");
+});
+
+test("a CVE mention alone marks a claim as security-looking", () => {
+  assert.equal(looksLikeSecurity(claimResult({ section: "CVE-2026-1234 fixes" })), true);
+});

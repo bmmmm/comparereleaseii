@@ -243,3 +243,42 @@ test("a dependency-bump line carries its pin as a claim trait", () => {
   assert.deepEqual(claims[1].bump, { name: "@types/node", to: "v22.20.0" });
   assert.equal(claims[2].bump, undefined);
 });
+
+test("a paragraph of exactly fifteen characters is a claim, fourteen is not", () => {
+  assert.equal(parseClaims("Exactly fifteen").length, 1);
+  assert.equal(parseClaims("Exactly fiftee").length, 0);
+});
+
+test("a paragraph under a thanks or contributors heading stays meta even with a PR anchor", () => {
+  const claims = parseClaims("## New Contributors\n\nEveryone who landed #123 during this cycle.\n");
+  assert.equal(claims.length, 1);
+  assert.deepEqual(claims[0].prNumbers, [123]);
+  assert.equal(claims[0].kind, "meta");
+});
+
+test("an identifier alone does not make a paragraph under an ordinary heading checkable", () => {
+  const claims = parseClaims("## Changes\n\nThe `parse_config` function was reworked for clarity.\n");
+  assert.equal(claims.length, 1);
+  assert.equal(claims[0].kind, "meta");
+});
+
+test("only a seven-character hex word with a digit and a letter is a commit sha", () => {
+  const shas = (s: string): string[] => parseClaims(`- ${s}`)[0].shas;
+  assert.deepEqual(shas("Fixed the crash in abc123 while parsing"), [], "six characters");
+  assert.deepEqual(shas("Reverted the defaced banner for 1234567 users"), [], "no digit, no letter");
+  assert.deepEqual(shas("Fixed the crash in abc1234 while parsing"), ["abc1234"]);
+});
+
+test("a repeated sentence of exactly four words counts as standing text, three do not", () => {
+  const head = parseClaims("- Improved overall startup speed\n- Fixed memory leak\n- Something entirely new here\n");
+  markCarriedOver(head, "- Improved overall startup speed\n- Fixed memory leak\n", "v1.0.0");
+  assert.equal(head[0].carriedOverFrom, "v1.0.0");
+  assert.equal(head[1].carriedOverFrom, undefined, "three words is a coincidence, not a carry-over");
+  assert.equal(head[2].carriedOverFrom, undefined);
+});
+
+test("a two-dash line is not a setext underline", () => {
+  const claims = parseClaims("Some heading text\n--\nBody of the paragraph that follows it.\n");
+  assert.equal(claims.length, 1);
+  assert.equal(claims[0].section, "Notes");
+});

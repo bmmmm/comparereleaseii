@@ -122,3 +122,58 @@ test("the lock does not need the watch home to exist yet", async () => {
   assert.ok((await stat(`${state}.lock`)).isFile());
   await lock.release();
 });
+
+test("a lock from another machine is stale at exactly a day, live a millisecond sooner", async () => {
+  const dir = await home();
+  const now = Date.parse("2026-08-05T12:00:00Z");
+  const foreign = (startedAt: string) =>
+    JSON.stringify({ pid: 1234, host: "some-other-box", startedAt, command: "watch" });
+
+  const young = join(dir, "young.json");
+  await writeFile(`${young}.lock`, foreign("2026-08-04T12:00:00.001Z"));
+  const denied = await acquireStateLock(young, now);
+  assert.equal(denied.ok, false, "one millisecond short of a day is still inside the window");
+
+  const exact = join(dir, "exact.json");
+  await writeFile(`${exact}.lock`, foreign("2026-08-04T12:00:00Z"));
+  const taken = await acquireStateLock(exact, now);
+  assert.ok(taken.ok, "a day to the millisecond is past the window");
+  await taken.release();
+});
+
+test("a lock from another machine whose start time cannot be read is kept alive", async () => {
+  const state = join(await home(), "watch-state.json");
+  await writeFile(
+    `${state}.lock`,
+    JSON.stringify({ pid: 1234, host: "some-other-box", startedAt: "not a date", command: "watch" }),
+  );
+  const res = await acquireStateLock(state);
+  assert.equal(res.ok, false, "no age to judge by means no grounds to take it over");
+});
+
+test("a lock file that names no host is no holder and is taken over", async () => {
+  const state = join(await home(), "watch-state.json");
+  await writeFile(`${state}.lock`, JSON.stringify({ pid: DEAD_PID, startedAt: new Date().toISOString() }));
+  const taken = await acquireStateLock(state);
+  assert.ok(taken.ok);
+  await taken.release();
+});
+
+test("release keeps a lock whose holder differs in pid alone or in start time alone", async () => {
+  const dir = await home();
+  const now = Date.parse("2026-08-05T12:00:00Z");
+  const startedAt = new Date(now).toISOString();
+  const takenOver = async (name: string, other: { pid: number; startedAt: string }) => {
+    const state = join(dir, name);
+    const mine = await acquireStateLock(state, now);
+    assert.ok(mine.ok);
+    const text = JSON.stringify({ ...other, host: hostname(), command: "backfill" });
+    await writeFile(`${state}.lock`, text);
+    await mine.release();
+    assert.equal(await readFile(`${state}.lock`, "utf8"), text);
+  };
+  // Same start time, other process — only the pid tells them apart.
+  await takenOver("pid.json", { pid: process.pid + 1, startedAt });
+  // Same pid, later start — a pid reused by a newer run.
+  await takenOver("start.json", { pid: process.pid, startedAt: new Date(now + 1000).toISOString() });
+});

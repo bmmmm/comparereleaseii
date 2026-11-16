@@ -207,3 +207,44 @@ test("promises inform but never score: flag is info, numbers unchanged", async (
   assert.equal(withPromise.promises?.[0].status, "broken");
   assert.deepEqual(withPromise.metrics.scores, without.metrics.scores, "promises moved the score");
 });
+
+test("targetReached compares part by part and over the longer of the two versions", () => {
+  assert.equal(targetReached("1.3", "v1.2.0"), false, "an equal major must not decide it");
+  assert.equal(targetReached("1.3", "v1.3"), true);
+  assert.equal(targetReached("2.0.1", "v2.0"), false, "the missing patch part reads as 0, below 1");
+  assert.equal(targetReached("2.0", "v2.0.1"), true);
+});
+
+test("a diff header line is not an addition and proves no promise", () => {
+  const data = dataWith({
+    baseNotes: "## Roadmap\n\n- The `fancyExport` command is planned for 2.0\n",
+    files: [
+      {
+        path: "src/other.ts",
+        status: "modified",
+        additions: 0,
+        deletions: 0,
+        patch: "--- a/src/other.ts\n+++ b/src/fancyExport.ts\n@@ -1,2 +1,2 @@\n context",
+      },
+    ],
+  });
+  const [p] = checkPromises(data);
+  assert.equal(p.status, "broken", "the identifier appears only in a header, never as added code");
+});
+
+test("a changelog entry never proves the promise it restates", () => {
+  const data = dataWith({
+    baseNotes: PROMISE_NOTES,
+    files: [
+      {
+        path: "CHANGELOG.md",
+        status: "modified",
+        additions: 0,
+        deletions: 1,
+        patch: "@@ -1,2 +1,1 @@\n context\n-- The `legacyAuth` helper will be removed in v2.0",
+      },
+    ],
+  });
+  const [p] = checkPromises(data);
+  assert.equal(p.status, "broken");
+});
