@@ -2253,3 +2253,59 @@ for (const mode of ["watch", "backfill"] as const) {
     assert.match(summary, / · exit 0 · finished 2026-11-04T20:15:\d\d\.000Z · \d+s$/);
   });
 }
+
+test("validateWatchConfig takes historyLimit at the baseline minimum and only whole numbers", () => {
+  const withLimit = (historyLimit: number) =>
+    validateWatchConfig({ repos: [{ repo: "owner/name" }], historyLimit });
+  withLimit(3);
+  assert.throws(() => withLimit(2), /historyLimit.*integer ≥ 3/s);
+  assert.throws(() => withLimit(3.5), /historyLimit.*integer/s);
+});
+
+test("validateWatchConfig accepts minCoverage 0 and 100 and rejects 101", () => {
+  for (const ok of [0, 100]) {
+    validateWatchConfig({ repos: [{ repo: "owner/name", minCoverage: ok }] });
+  }
+  assert.throws(
+    () => validateWatchConfig({ repos: [{ repo: "owner/name", minCoverage: 101 }] }),
+    /minCoverage.*0–100/s,
+  );
+});
+
+test("validateWatchConfig rejects a whitespace-only rule name", () => {
+  assert.throws(
+    () =>
+      validateWatchConfig({
+        repos: [{ repo: "owner/name", rules: [{ name: "   ", paths: ["src"] }] }],
+      }),
+    /non-empty "name"/s,
+  );
+});
+
+test("emptyListingWarning reads a skipped release or a bare history as a seen release", () => {
+  const base: RepoState = { lastPublishedAt: null, lastTag: null, history: [] };
+  const skipped = {
+    tag: "v1.0.0",
+    publishedAt: null,
+    attempts: 3,
+    lastError: "x",
+    skippedAt: "2026-07-20T00:00:00Z",
+  };
+  assert.ok(emptyListingWarning("o/r", [], { ...base, skipped: [skipped] }));
+  assert.equal(emptyListingWarning("o/r", [], { ...base, skipped: [] }), null);
+  const checked: CheckedRelease = {
+    tag: "v1.0.0",
+    publishedAt: null,
+    checkedAt: "2026-07-20T00:00:00Z",
+    score: 90,
+    scoreLabel: "solid",
+    exitCode: 0,
+    criticalFlags: 0,
+    flagCount: 0,
+    flagged: false,
+    engine: "off",
+    verdicts: { verified: 0, partial: 0, noEvidence: 0, contradicted: 0 },
+    report: "v1.0.0.md",
+  };
+  assert.ok(emptyListingWarning("o/r", [], { ...base, history: [checked] }));
+});
