@@ -4,9 +4,15 @@ import { tempDir } from "./temp-dir.ts";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { writeFile } from "node:fs/promises";
+import { readdir, readFile as readFileFs, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { buildSnapshots, cloneHistory, type HistorySource } from "../src/history.ts";
+import {
+  buildSnapshots,
+  cloneHistory,
+  summarizeBaseline,
+  type HistorySource,
+  type ReleaseSnapshot,
+} from "../src/history.ts";
 import { changelogReleases } from "../src/sources/local.ts";
 
 const exec = promisify(execFile);
@@ -224,4 +230,122 @@ test("a snapshot cached by a different tool version is rebuilt, not served", asy
   }
   const cached = await buildSnapshots(source, { count: 5 });
   assert.equal(cached[0].lexicalCoverage, 0.456, "same-version cache entry was not served");
+});
+
+const emptyRange = { commits: [], files: [] };
+
+function fakeSource(
+  cacheKey: string,
+  tags: string[],
+  loadRange: HistorySource["loadRange"] = async () => emptyRange,
+  notes = "",
+): HistorySource {
+  return {
+    cacheKey,
+    slug: "team/app",
+    listReleases: async () => tags.map((tag) => ({ tag, notes, date: null })),
+    loadRange,
+  };
+}
+
+function snap(over: Partial<ReleaseSnapshot>): ReleaseSnapshot {
+  return {
+    tag: "v1",
+    base: "v0",
+    date: null,
+    commits: 0,
+    files: 0,
+    additions: 0,
+    deletions: 0,
+    claims: 0,
+    anchoredCoverage: 1,
+    lexicalCoverage: 1,
+    sensitiveTouched: [],
+    binaries: 0,
+    newDeps: [],
+    authors: [],
+    ...over,
+  };
+}
+
+test("a cached snapshot without lexical coverage is rebuilt even under the current version", async () => {
+  let loads = 0;
+  const source = fakeSource("test:history-nolex", ["v2", "v1"], async () => {
+    loads++;
+    return emptyRange;
+  });
+  await buildSnapshots(source, { count: 5 });
+  assert.equal(loads, 1);
+  await buildSnapshots(source, { count: 5 });
+  assert.equal(loads, 1, "an intact entry of this version must be served");
+
+  const dir = join(process.env.XDG_CACHE_HOME!, "comparereleaseii", "snapshots");
+  const mine = (await readdir(dir)).filter((f) => f.includes("history-nolex"));
+  assert.equal(mine.length, 1);
+  const entry = JSON.parse(await readFileFs(join(dir, mine[0]), "utf8"));
+  assert.equal(typeof entry.version, "string");
+  delete entry.lexicalCoverage;
+  await writeFile(join(dir, mine[0]), JSON.stringify(entry));
+  await buildSnapshots(source, { count: 5 });
+  assert.equal(loads, 2, "an entry that lost a field was served instead of rebuilt");
+});
+
+test("coverage ratios: empty ranges are fully anchored, claims that miss the diff score zero", async () => {
+  const [empty] = await buildSnapshots(fakeSource("test:history-ratio-empty", ["v2", "v1"], undefined, "- Added `parseToken` to the API"), { count: 1 });
+  assert.equal(empty.anchoredCoverage, 1, "no commits means nothing was left unanchored");
+  assert.equal(empty.lexicalCoverage, 0, "a change claim with no diff to match is not covered");
+
+  const [noClaims] = await buildSnapshots(fakeSource("test:history-ratio-none", ["v2", "v1"], undefined, ""), { count: 1 });
+  assert.equal(noClaims.claims, 0);
+  assert.equal(noClaims.lexicalCoverage, 1, "no change claims leaves nothing uncovered");
+
+  const hit = async () => ({
+    commits: [],
+    files: [
+      { path: "src/auth.ts", status: "modified", additions: 1, deletions: 0, patch: "@@ -1 +1,2 @@\n+export const parseToken = 1;\n" },
+    ],
+  });
+  const [covered] = await buildSnapshots(fakeSource("test:history-ratio-hit", ["v2", "v1"], hit, "- Added `parseToken` to the API\n- Added `rotateKey` for rotation"), { count: 1 });
+  assert.equal(covered.lexicalCoverage, 0.5, "one of two change claims appears in the diff");
+});
+
+test("a baseline stops at the number of past releases asked for", async () => {
+  const source = fakeSource("test:history-count", ["v5", "v4", "v3", "v2", "v1"]);
+  const two = await buildSnapshots(source, { count: 2 });
+  assert.deepEqual(two.map((s) => s.tag), ["v5", "v4"]);
+  assert.deepEqual(await buildSnapshots(source, { count: 0 }), []);
+});
+
+test("baseline medians average the two middle values of an even history", () => {
+  const even = summarizeBaseline([
+    snap({ additions: 10, deletions: 0, lexicalCoverage: 0.2 }),
+    snap({ additions: 30, deletions: 10, lexicalCoverage: 0.6 }),
+  ]);
+  assert.equal(even.medianChurn, 25);
+  assert.equal(even.medianLexicalCoverage, 0.4);
+  const odd = summarizeBaseline([
+    snap({ additions: 5 }),
+    snap({ additions: 100 }),
+    snap({ additions: 7 }),
+  ]);
+  assert.equal(odd.medianChurn, 7);
+  assert.equal(summarizeBaseline([]).medianChurn, 0);
+});
+
+test("a baseline has shipped a binary only when some snapshot did", () => {
+  assert.equal(summarizeBaseline([snap({ binaries: 0 }), snap({ binaries: 0 })]).everBinary, false);
+  assert.equal(summarizeBaseline([snap({ binaries: 0 }), snap({ binaries: 2 })]).everBinary, true);
+  assert.equal(summarizeBaseline([]).everBinary, false);
+});
+
+test("the newest snapshot wins when an email moved between accounts", () => {
+  const baseline = summarizeBaseline([
+    snap({ tag: "newest", emailAccounts: { "a@example.invalid": "new-login", "b@example.invalid": "only-new" } }),
+    snap({ tag: "older", emailAccounts: { "a@example.invalid": "old-login", "c@example.invalid": "only-old" } }),
+  ]);
+  assert.deepEqual(baseline.emailAccounts, {
+    "a@example.invalid": "new-login",
+    "b@example.invalid": "only-new",
+    "c@example.invalid": "only-old",
+  });
 });
