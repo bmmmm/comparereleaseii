@@ -113,3 +113,28 @@ test("out of scope: prereleases, major bumps, non-semver tags", () => {
   assert.equal(bumpMismatchFlags("release-a", "release-b", breaking).length, 0);
   assert.equal(bumpMismatchFlags("2026.07.1", "2026.07.2", breaking).length, 0);
 });
+
+test("a BREAKING CHANGE footer is found on any body line, not only the first", () => {
+  const flags = bumpMismatchFlags("v1.2.3", "v1.2.4", [
+    commit("fix: tidy the parser", "Some context first.\n\nBREAKING CHANGE: the option is gone"),
+  ]);
+  assert.deepEqual(flags.map((f) => f.kind), ["bump-mismatch"]);
+});
+
+test("a feat commit that is itself breaking is reported as breaking, not also as a missing minor bump", () => {
+  const flags = bumpMismatchFlags("v1.2.3", "v1.2.4", [
+    commit("feat!: drop the legacy flag", "", "aaa1111"),
+    commit("fix: tidy the parser", "", "bbb2222"),
+  ]);
+  assert.deepEqual(flags.map((f) => f.kind), ["bump-mismatch"]);
+});
+
+test("exactly a quarter conventional subjects is enough for the feat-in-patch info", () => {
+  const flags = bumpMismatchFlags("v1.2.3", "v1.2.4", [
+    commit("feat: add the export", "", "aaa1111"),
+    commit("Update the docs", "", "bbb2222"),
+    commit("Tidy things up", "", "ccc3333"),
+    commit("Bump the lockfile", "", "ddd4444"),
+  ]);
+  assert.deepEqual(flags.map((f) => f.kind), ["bump-mismatch-feat"]);
+});
