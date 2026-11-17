@@ -681,3 +681,41 @@ test("movedPast: a version the package passed through is found, anything else is
   const lock = patchFile("pnpm-lock.yaml", "@@ -1 +1 @@\n-  pnpm@11.28.4\n+  pnpm@11.28.8\n");
   assert.equal(movedPast({ name: "pnpm", to: "v11.28.5" }, [lock]), null);
 });
+
+// ---------- decision points the mutation harness found unwatched ----------
+
+test("a note whose origin is the version the pin arrived at describes a move outside this release", () => {
+  const c = bumpClaim("bump `foo` from 2.0.0 to 2.0.0", { name: "foo", from: "2.0.0", to: "2.0.0" });
+  const [b] = resolveBumpClaims([c], [pin({ name: "foo", from: "1.0.0", to: "2.0.0", file: "package.json" })]);
+  assert.equal(b.fromCheck, "outside", "at the destination is not a hop that started inside the move");
+});
+
+test("when several files move one pin, the furthest the release went answers the claim", () => {
+  const c = bumpClaim("bump `foo` to 1.9.0", { name: "foo", to: "1.9.0" });
+  const [b] = resolveBumpClaims([c], [
+    pin({ name: "foo", from: "1.0.0", to: "1.4.0", file: "a/package.json" }),
+    pin({ name: "foo", from: "1.0.0", to: "1.5.0", file: "b/package.json" }),
+  ]);
+  assert.equal(b.status, "contradicted");
+  assert.deepEqual(b.observed, { from: "1.0.0", to: "1.5.0", file: "b/package.json" });
+});
+
+test("a package name of one character is too short to look for in changed lines", () => {
+  const p = patchFile("package.json", '@@ -1 +1 @@\n-  "x": "1.0.0"\n+  "x": "2.0.0"\n');
+  assert.equal(movedPast({ name: "x", to: "1.5.0" }, [p]), null);
+});
+
+test("compareVersions: a longer numeric version sorts above its prefix, and a non-zero tail is not ignorable", () => {
+  assert.equal(compareVersions("1.2", "1.2.1"), -1);
+  assert.equal(compareVersions("1.2.1", "1.2"), 1);
+  assert.equal(compareVersions("1.2.1.0", "1.2"), 1, "a zero after a non-zero segment does not erase it");
+  assert.equal(compareVersions("1.2.0.0", "1.2"), 0);
+});
+
+test("without a commit-file map the uncovered list keeps its order and the join does not fail", () => {
+  const r = result(claim({ text: "Adds `resetJudgeStats`", codeSpans: ["resetJudgeStats"] }));
+  const f = finding({ text: "Something else entirely", files: ["src/other.ts"] });
+  const rec = reconcile([r], [f], [uc("a", "first"), uc("b", "second")], null);
+  assert.deepEqual(rec.undocumented, [0]);
+  assert.equal(rec.uncoveredOrder, undefined);
+});
