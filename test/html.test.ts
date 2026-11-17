@@ -382,3 +382,95 @@ test("component sub-check summaries render inside the pin card and keep hostile 
   assert.match(failed, /load failed:/);
   assertNoBreakout(failed);
 });
+
+// Every field below is written by the party under examination.
+const TAG = "<img src=x onerror=1>";
+
+function claim(verdict: ClaimResult["verdict"], over: Partial<ClaimResult> = {}): ClaimResult {
+  return {
+    claim: {
+      id: 0, section: "Changes", text: "A claim", kind: "change",
+      prNumbers: [], shas: [], advisories: [], codeSpans: [],
+    },
+    verdict,
+    confidence: 0.5,
+    evidence: { commitShas: [], files: [], matchedTerms: [], methods: ["none"] },
+    reasoning: "because",
+    judged: false,
+    generated: false,
+    ...over,
+  };
+}
+
+test("findings, flags, warnings, read errors, commit subjects and pin names reach the page as text", () => {
+  const finding = { kind: "behavior" as const, audience: "everyone" as const, text: TAG, files: [], subsystem: "core" };
+  const budget = { maxChars: 10, usedChars: 1, subsystemsRead: 1, subsystemsTotal: 1, filesRead: 1, filesTotal: 1 };
+  const cases: Array<[string, Partial<Report>]> = [
+    ["finding text", { findings: { findings: [finding], budget } }],
+    ["subsystem read error", { findings: { findings: [], budget, errors: [TAG] } }],
+    [
+      "risk flag message",
+      {
+        metrics: {
+          ...report().metrics,
+          flags: [{ severity: "warn", kind: "x", message: TAG, files: [], commitShas: [] }],
+        },
+      },
+    ],
+    ["warning", { warnings: [TAG] }],
+    [
+      "undocumented commit subject",
+      {
+        uncovered: [
+          {
+            commit: { sha: "abc123def456", subject: TAG, body: "", author: "m", prNumbers: [] },
+            additions: 1, deletions: 0, fileCount: 1,
+          },
+        ],
+      },
+    ],
+    ["third-party pin name", { pins: [{ name: TAG, from: "1", to: "2", file: "go.mod", firstParty: false }] }],
+  ];
+  for (const [what, over] of cases) {
+    const html = toHtml(report(over));
+    assert.ok(!html.includes("<img src=x"), `${what} became an element`);
+    assert.ok(html.includes("&lt;img src=x"), `${what} vanished instead of being escaped`);
+  }
+});
+
+test("a score at the solid bar is colored solid, one below it is not", () => {
+  const ring = (overall: number, label: string) =>
+    toHtml(
+      report({
+        metrics: {
+          ...report().metrics,
+          scores: { correctness: overall, completeness: overall, risk: overall, overall, label },
+        },
+      }),
+    ).match(/stroke="(#[0-9a-f]+)" stroke-width="10" stroke-linecap/)?.[1];
+  assert.equal(ring(85, "solid"), "#3fb950");
+  assert.equal(ring(84, "minor gaps"), "#d29922");
+});
+
+test("the aggregate tile of smaller files links nowhere, real tiles link to the diff", () => {
+  const files = Array.from({ length: 131 }, (_, i) => ({
+    path: `src/f${i}.ts`, churn: 1000 - i, sensitive: null, coverage: "evidence" as const,
+  }));
+  const html = toHtml(report({ metrics: { ...report().metrics, files } }));
+  assert.match(html, /<a href="[^"]*#diff-[0-9a-f]{64}"[^>]*><g><rect[^>]*><title>src\/f0\.ts/);
+  assert.ok(html.includes("(1 smaller files)"), "the aggregate tile exists");
+  assert.ok(!/<a [^>]*><g><rect[^>]*><title>\(1 smaller files\)/.test(html), "the aggregate tile is linked");
+});
+
+test("only contradicted and no-evidence claims start expanded", () => {
+  const html = toHtml(
+    report({
+      results: [claim("contradicted"), claim("no-evidence"), claim("verified"), claim("partial")],
+    }),
+  );
+  const tag = (v: string) => html.match(new RegExp(`<details data-v="${v}"[^>]*>`))?.[0] ?? "";
+  assert.ok(tag("contradicted").endsWith(" open>"));
+  assert.ok(tag("no-evidence").endsWith(" open>"));
+  assert.ok(!tag("verified").includes("open"));
+  assert.ok(!tag("partial").includes("open"));
+});
