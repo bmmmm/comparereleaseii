@@ -319,3 +319,63 @@ test("the calendar cell carries count, flag symbol and per-release tooltip — n
   assert.ok(html.includes(">2&#9888;</td>") || html.includes(">2⚠</td>"), "count and flag symbol in the cell");
   assert.match(html, /title="[^"]*v5 \(40, flagged\)[^"]*v6 \(88\)/, "tooltip names each release");
 });
+
+// A change point needs three checks behind it and three before it. The
+// boundary test below sits exactly on both edges: the phase must be at least
+// PHASE_MIN long when it breaks, and the confirming window must end exactly at
+// the last check.
+test("a level shift with exactly three checks before and after it opens a phase", () => {
+  const phases = segmentPhases(series([90, 90, 90, 50, 50, 50]));
+  assert.equal(phases.length, 2, "three confirming checks at the very end are enough");
+  assert.equal(phases[1].start, 3);
+  assert.equal(phases[1].reasons[0].kind, "level-shift");
+});
+
+// The commit-share move is compared with `>=`: a move of exactly the
+// threshold (0.85 − 0.5 = 0.35 in floating point) counts.
+test("a top-identity share move of exactly the concentration threshold opens a phase", () => {
+  const history = Array.from({ length: 10 }, (_, i) =>
+    check(i, 90, {
+      authors: { total: 3, new: 0, top1Share: i < 5 ? 0.5 : 0.85, top1Name: "alice" },
+    }),
+  );
+  const phases = segmentPhases(history);
+  assert.equal(phases.length, 2);
+  assert.equal(phases[1].reasons[0].kind, "concentration");
+  assert.match(phases[1].reasons[0].text, /50% → 85%/);
+});
+
+// Release gaps tripling is a cadence change; exactly tripling counts.
+test("a release interval of exactly three times the median opens a cadence phase", () => {
+  const day = (n: number) => new Date(Date.UTC(2024, 0, 1) + n * 86400000).toISOString();
+  // Ten days apart, then thirty days apart.
+  const offsets = [0, 10, 20, 30, 40, 70, 100, 130, 160, 190, 220, 250];
+  const history = offsets.map((d, i) => check(i, 90, { publishedAt: day(d) }));
+  const phases = segmentPhases(history);
+  assert.equal(phases.length, 2);
+  assert.equal(phases[1].reasons[0].kind, "cadence");
+  assert.match(phases[1].reasons[0].text, /~10 days → ~30 days/);
+});
+
+// Three identities with one top commit share each tie; the one seen first is
+// the stretch's top author. The window after it is all `carol`, so the change
+// is only visible if the tie went to `alice`.
+test("a tie between top authors goes to the identity seen first", () => {
+  const names = ["alice", "bob", "carol", "carol", "carol", "carol", "carol"];
+  const history = names.map((n, i) =>
+    check(i, 90, { authors: { total: 3, new: 0, top1Share: 0.4, top1Name: n } }),
+  );
+  const phases = segmentPhases(history);
+  assert.equal(phases.length, 2);
+  assert.equal(phases[1].reasons[0].kind, "top-change");
+  assert.match(phases[1].reasons[0].text, /alice → carol/);
+});
+
+// The current level is the median of the last FIVE scores of the stretch:
+// 60,60,100,100,100 reads as 100, so a stretch at 75 is a 25-point fall. A
+// four-score window would read 80 and call it a 5-point wobble.
+test("the level a stretch is compared against spans its last five checks", () => {
+  const phases = segmentPhases(series([90, 90, 60, 60, 100, 80, 60, 70, 90]));
+  assert.equal(phases.length, 2);
+  assert.equal(phases[1].reasons[0].kind, "level-shift");
+});

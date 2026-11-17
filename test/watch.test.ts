@@ -58,7 +58,7 @@ import {
   type WatchRepoConfig,
 } from "../src/watch-state.ts";
 import type { ClaimResult, Finding, PromiseCheck, ReleaseSurface, Report, Verdict } from "../src/types.ts";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 
 function rel(tag: string, publishedAt: string, extra: Partial<ReleaseInfo> = {}): ReleaseInfo {
@@ -2330,4 +2330,249 @@ test("hasDrifted reads a verdict from exactly six checks in the window", () => {
   const h = (...scores: number[]) => scores.map((score) => ({ score }));
   assert.equal(hasDrifted(h(90, 90, 90, 60, 60, 60)), true);
   assert.equal(hasDrifted(h(90, 90, 90, 60, 60)), false);
+});
+
+// --- decision points of the watch run, the backfill announcement and the
+// dashboard that no other test sits on the edge of ---
+
+const NEW_CHECK_HIT = { rule: "auth", matched: ["src/auth/a.ts"], judgeBased: false };
+
+function authReport(overrides: Partial<Report> = {}): Report {
+  return fabricatedReport({
+    metrics: {
+      ...fabricatedReport().metrics,
+      files: [{ path: "src/auth/a.ts", churn: 1, sensitive: null, coverage: "covered" }],
+    },
+    ...overrides,
+  });
+}
+
+test("the default fail-on gate does not fail a watched release for a no-evidence claim", async () => {
+  const report = fabricatedReport({ results: [claimResult("no-evidence")] });
+  const { outcome } = await check({ report });
+  assert.equal(outcome.ec, 0);
+  assert.equal(outcome.checked.exitCode, 0);
+  assert.equal(outcome.checked.flagged, false);
+  // The same report fails once the entry opts into the stricter gate — the
+  // default is what is being pinned, not an inability to fail.
+  const strict = await check({ report, rc: { failOn: "no-evidence" } });
+  assert.equal(strict.outcome.ec, 1);
+});
+
+test("an author list whose commits are all zero records a top share of 0", async () => {
+  const report = fabricatedReport({
+    authors: [{ key: "a@x", name: "Alice", commits: 0, sensitiveCommits: 0, binaryCommits: 0 }],
+  });
+  const { outcome } = await check({ report });
+  assert.equal(outcome.checked.authors?.top1Share, 0);
+});
+
+test("a labeled entry's report names the label next to the repo", async () => {
+  const report = fabricatedReport();
+  await check({ report, rc: { label: "draft notes" } });
+  assert.equal(report.repoLabel, "o/r (draft notes)");
+  const plain = fabricatedReport();
+  await check({ report: plain });
+  assert.equal(plain.repoLabel, "o/r", "no label, no suffix");
+});
+
+test("a recheck's baseline excludes checks published at the same instant", async () => {
+  const at = (tag: string, score: number, publishedAt: string): CheckedRelease => ({
+    ...checked(tag, score, false),
+    publishedAt,
+  });
+  const repoState: RepoState = {
+    lastPublishedAt: null,
+    lastTag: null,
+    history: [
+      at("v-a", 90, "2026-05-01T00:00:00Z"),
+      at("v-b", 80, "2026-05-10T00:00:00Z"),
+      at("v-c", 70, "2026-05-20T00:00:00Z"),
+      // The release being rechecked: published 2026-06-01, not in its own past.
+      at("v2.0.0", 10, "2026-06-01T00:00:00Z"),
+    ],
+  };
+  const { outcome } = await check({ report: fabricatedReport(), repoState });
+  assert.equal(outcome.checked.scoreLevel, 80, "median of the three earlier releases, not four");
+});
+
+test("a rechecked undated tag is never its own rule-repeat predecessor", async () => {
+  const repoState: RepoState = {
+    lastPublishedAt: null,
+    lastTag: null,
+    history: [
+      {
+        ...checked("v2", 90, false),
+        publishedAt: null,
+        checkedAt: "2026-08-08T00:00:00Z",
+        ruleHits: [NEW_CHECK_HIT],
+      },
+    ],
+  };
+  const { outcome } = await check({
+    report: authReport(),
+    rc: { rules: [{ name: "auth", paths: ["src/auth"] }] },
+    repoState,
+    rel: { tag: "v2", publishedAt: null },
+  });
+  assert.equal(outcome.flagged, true, "the earlier check of v2 is the same release, not a repeat");
+});
+
+async function fakeGhRun(
+  t: Parameters<typeof tempDir>[0],
+  opts: {
+    count: number;
+    config?: Partial<Parameters<typeof runWatch>[0]>;
+    now?: () => Date;
+    notify?: boolean;
+    flaggingNoNotify?: boolean;
+  },
+): Promise<{ errors: string[]; dir: string; ec: number }> {
+  const dir = await tempDir(t, "crii-watch-edge-");
+  await writeFile(join(dir, "gh"), `#!/usr/bin/env node
+const releases = Array.from({ length: ${opts.count} }, (_, i) => ${opts.count} - i).map(n => ({
+  tag_name: "v" + n, name: "v" + n, body: "- Thanks to all contributors", draft: false, prerelease: false,
+  published_at: "2026-07-0" + n + "T00:00:00Z"
+}));
+const endpoint = process.argv[3];
+if (endpoint.includes("/releases/tags/")) {
+  console.log(JSON.stringify(releases.find(r => endpoint.endsWith(r.tag_name))));
+} else if (endpoint.includes("/releases?")) {
+  console.log(JSON.stringify(releases));
+} else if (endpoint.includes("/compare/")) {
+  console.log(JSON.stringify({ total_commits: 0, commits: [], files: [] }));
+} else if (endpoint.endsWith("/languages")) {
+  console.log('{"TypeScript":100}');
+} else {
+  console.error("unexpected endpoint: " + endpoint);
+  process.exitCode = 1;
+}
+`, { mode: 0o755 });
+  const stateFile = join(dir, "state.json");
+  // v1 is already seen (a first-ever release has no base to compare with),
+  // so v2 and up are "new".
+  await writeFile(stateFile, JSON.stringify({ version: 1, repos: opts.count ? { "o/r": {
+    lastPublishedAt: "2026-07-01T00:00:00Z", lastTag: "v1", history: [],
+  } } : {} }));
+  const previousPath = process.env.PATH;
+  process.env.PATH = `${dir}:${previousPath}`;
+  const errors: string[] = [];
+  const mocked = mock.method(console, "error", (...args: unknown[]) => errors.push(args.join(" ")));
+  try {
+    const config = {
+      repos: [{ repo: "o/r", judge: "off" as const, engine: "off" as const, baseline: 0 }],
+      ...opts.config,
+    };
+    const ec = await runWatch(config, {
+      configPath: join(dir, "watch.json"),
+      stateFile,
+      reportsDir: join(dir, "reports"),
+      cache: false,
+      now: opts.now,
+    });
+    return { errors, dir, ec };
+  } finally {
+    mocked.mock.restore();
+    process.env.PATH = previousPath;
+  }
+}
+
+test("a watch run checks three new releases by default and says how many it skipped", async (t) => {
+  const { errors, ec } = await fakeGhRun(t, { count: 5 });
+  assert.equal(ec, 0, errors.join("\n"));
+  assert.equal(errors.filter((l) => l.includes(": checking ")).length, 3, errors.join("\n"));
+  assert.ok(errors.some((l) => l.includes("1 older new release(s) skipped (maxPerRun 3")), errors.join("\n"));
+});
+
+test("a watch run with nothing beyond the cap prints no skipped line", async (t) => {
+  const { errors } = await fakeGhRun(t, { count: 4 });
+  assert.equal(errors.filter((l) => l.includes(": checking ")).length, 3, errors.join("\n"));
+  assert.ok(!errors.some((l) => l.includes("skipped")), errors.join("\n"));
+});
+
+test("a clock that steps backwards never reports a negative run duration", async (t) => {
+  let ticks = 0;
+  const now = () => new Date(Date.UTC(2026, 10, 4, 20, 15, 0) - 1000 * ticks++);
+  const { errors } = await fakeGhRun(t, { count: 1, now });
+  const summary = errors.find((l) => l.startsWith("watch: 1 repos"));
+  assert.ok(summary, errors.join("\n"));
+  assert.match(summary, / · 0s$/);
+});
+
+test("a watched repo with no release yet gets no history page", async (t) => {
+  const { errors, dir } = await fakeGhRun(t, { count: 0 });
+  assert.ok(errors.some((l) => l.includes("up to date (no releases)")), errors.join("\n"));
+  const names = (await readdir(join(dir, "reports"))).sort();
+  assert.deepEqual(names, ["feed.xml", "index.html"], "no per-repo directory before the first check");
+});
+
+test("announceBackfill: keeping exactly historyLimit checks drops nothing", () => {
+  const rel = (tag: string): ReleaseInfo => ({ tag, publishedAt: "2026-01-01T00:00:00Z", prerelease: false, draft: false });
+  const plans: BackfillPlan[] = [
+    { rc: { repo: "o/r" }, key: "o/r", plan: [rel("v2")], gh: null, forge: null },
+  ];
+  const state: WatchState = {
+    version: 1,
+    repos: { "o/r": { lastPublishedAt: null, lastTag: null, history: [checked("v1", 90, false)] } },
+  };
+  const said: string[] = [];
+  const mocked = mock.method(console, "error", (...args: unknown[]) => said.push(args.join(" ")));
+  try {
+    // 1 recorded + 1 planned = 2 kept, and the limit is 2: nothing is dropped.
+    announceBackfill(plans, [{ repo: "o/r" }], 2, state);
+    assert.ok(!said.some((l) => l.includes("historyLimit")), said.join("\n"));
+    // Judge unset defaults to auto: the cost line speaks of judge time.
+    assert.ok(said.some((l) => l.includes("min judge time")), said.join("\n"));
+    said.length = 0;
+    announceBackfill(plans, [{ repo: "o/r" }], 1, state);
+    assert.ok(said.some((l) => l.includes("historyLimit 1 keeps only the newest 1 of 2")), said.join("\n"));
+  } finally {
+    mocked.mock.restore();
+  }
+});
+
+function indexState(count: number, over: (i: number) => Partial<CheckedRelease> = () => ({})): WatchState {
+  const history = Array.from({ length: count }, (_, i) => ({
+    ...checked(`v${i}`, 90, false),
+    publishedAt: new Date(Date.UTC(2026, 0, 1) + i * 86400000).toISOString(),
+    checkedAt: new Date(Date.UTC(2026, 6, 1) + i * 3600000).toISOString(),
+    ...over(i),
+  }));
+  return {
+    version: 1,
+    repos: {
+      "a/x": {
+        lastPublishedAt: history.at(-1)!.publishedAt,
+        lastTag: history.at(-1)!.tag,
+        latest: history.at(-1),
+        history,
+      },
+    },
+  };
+}
+
+test("the index feed note appears only once the feed is truncated", () => {
+  assert.doesNotMatch(toWatchIndexHtml(indexState(30), "t"), /\(last \d+ of \d+\)/);
+  assert.match(toWatchIndexHtml(indexState(31), "t"), /\(last 30 of 31\)/);
+});
+
+test("the atom feed carries the fifty newest non-backfilled checks", () => {
+  const feed = toWatchAtomFeed(indexState(51), "t");
+  assert.equal(feed.split("<entry>").length - 1, 50);
+  assert.ok(feed.includes("a/x v50"), "the newest is in");
+  assert.ok(!feed.includes("a/x v0 "), "the oldest of 51 is out");
+});
+
+test("the index trend column shows the six newest checks", () => {
+  const html = toWatchIndexHtml(indexState(8), "t");
+  assert.ok(html.includes('title="v2: 90"'), "sixth newest is in");
+  assert.ok(!html.includes('title="v1: 90"'), "seventh newest is out");
+});
+
+test("a score exactly twenty below the repo median reads as ordinary, one more as a drop", () => {
+  const at = (score: number) =>
+    toWatchIndexHtml(indexState(1, () => ({ score, scoreLevel: 80 })), "t");
+  assert.ok(at(60).includes("~median"), "twenty below is not yet a drop");
+  assert.ok(!at(60).includes('class="drop"'));
+  assert.ok(at(59).includes('class="drop"'), "twenty-one below is");
 });
