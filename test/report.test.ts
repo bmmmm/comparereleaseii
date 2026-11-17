@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { exitCode, unverifiableNote, toMarkdown, printTerminal } from "../src/report.ts";
+import {
+  componentBits,
+  defaultChangeEntries,
+  exitCode,
+  printTerminal,
+  scoringGenerationLabel,
+  toMarkdown,
+  topLanguages,
+  unverifiableNote,
+} from "../src/report.ts";
 import { toHtml } from "../src/html.ts";
 import { computeScores } from "../src/metrics.ts";
 import type {
@@ -845,4 +854,87 @@ test("a default change says whether a note names it, in all three renderers", ()
   ] as Array<[string, string]>) {
     assert.doesNotMatch(text, /defaults changed/, `${label} invented a defaults line`);
   }
+});
+
+test("languages are ranked by share of code, largest first, and cut at the limit", () => {
+  const ctx = {
+    languages: { Go: 100, TypeScript: 900, Rust: 500 },
+    codeBytes: 1500,
+    releaseCadenceDays: null,
+  };
+  assert.equal(topLanguages(ctx, 2), "TypeScript 60% · Rust 33%");
+  assert.equal(topLanguages(ctx, 3), "TypeScript 60% · Rust 33% · Go 7%");
+});
+
+test("a default moved in one file has no multiplier; the same move in two does", () => {
+  const d = (file: string) => ({ name: "retries", from: "3", to: "5", file, documented: false });
+  const base = { ...SURFACE };
+  assert.deepEqual(defaultChangeEntries({ ...base, defaults: [d("a.go")] }), ["⚠ retries 3→5"]);
+  assert.deepEqual(defaultChangeEntries({ ...base, defaults: [d("a.go"), d("b.go")] }), [
+    "⚠ retries 3→5 ×2",
+  ]);
+});
+
+test("a component check states a zero score and zero undocumented commits", () => {
+  const bits = componentBits({
+    name: "web",
+    repo: "o/web",
+    from: "1.0",
+    to: "1.1",
+    score: 0,
+    scoreLabel: "suspicious",
+    uncovered: 0,
+  });
+  assert.deepEqual(bits, ["score 0/100 (suspicious)", "0 undocumented"]);
+});
+
+test("scoring generation zero is named; only a report without the marker is silent", () => {
+  assert.equal(scoringGenerationLabel({ ...report(null), scoringGeneration: 0 }), "scoring generation 0");
+  assert.equal(scoringGenerationLabel(report(null)), null);
+});
+
+test("the evidence line abbreviates only past two shas and three files", () => {
+  const exact = report(null);
+  exact.results = [
+    {
+      ...claimResult("partial"),
+      evidence: {
+        commitShas: ["aaaaaaaa11111111", "bbbbbbbb22222222"],
+        files: ["a.ts", "b.ts", "c.ts"],
+        matchedTerms: [],
+        methods: ["lexical"],
+      },
+    },
+  ];
+  const line = (r: Report) => toMarkdown(r).split("\n").find((l) => l.includes("evidence:"));
+  assert.equal(line(exact), "  - evidence: lexical · aaaaaaaa,bbbbbbbb · a.ts, b.ts, c.ts");
+
+  const over = report(null);
+  over.results = [
+    {
+      ...exact.results[0],
+      evidence: {
+        ...exact.results[0].evidence,
+        commitShas: [...exact.results[0].evidence.commitShas, "cccccccc33333333"],
+        files: ["a.ts", "b.ts", "c.ts", "d.ts"],
+      },
+    },
+  ];
+  assert.equal(line(over), "  - evidence: lexical · aaaaaaaa,bbbbbbbb… · a.ts, b.ts, c.ts +1 more");
+});
+
+test("--fail-on none ignores a contradicted claim", () => {
+  const r = report(null);
+  r.results = [claimResult("contradicted")];
+  assert.equal(exitCode(r, "none"), 0);
+  assert.equal(exitCode(r, "contradicted"), 1);
+});
+
+test("the markdown not-verifiable note sits under no-evidence claims only", () => {
+  const r = report(SOURCELESS);
+  r.results = [claimResult("no-evidence"), claimResult("partial")];
+  const notes = toMarkdown(r)
+    .split("\n")
+    .filter((l) => l.includes("not verifiable:"));
+  assert.equal(notes.length, 1);
 });
