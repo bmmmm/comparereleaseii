@@ -129,3 +129,38 @@ test("cron line: schedule, PATH prefix, quoted paths, log redirect", () => {
   assert.ok(line.includes("'/srv/release-watch/watch.json'"), "config quoted");
   assert.ok(line.endsWith(">> '/srv/release-watch/watch.log' 2>&1"), "log redirect last");
 });
+
+test("expandHome leaves ~user paths to the shell's own rules", () => {
+  assert.equal(expandHome("~root/x"), "~root/x");
+  assert.equal(expandHome("~x"), "~x");
+});
+
+test("scheduleSpec: four minutes is still polling; 24 hours spelled out is daily", () => {
+  assert.equal(scheduleSpec("4m"), null);
+  assert.deepEqual(scheduleSpec("5m"), { seconds: 300, cron: "*/5 * * * *" });
+  assert.deepEqual(scheduleSpec("24 hours"), scheduleSpec("daily"));
+  assert.deepEqual(scheduleSpec("12 h"), { seconds: 43_200, cron: "17 */12 * * *" });
+});
+
+test("applyJudgeChoice keeps an adopted escalate and a local model's settings", () => {
+  const adopted: Partial<WatchRepoConfig> = { escalate: "off" };
+  applyJudgeChoice(adopted, { engine: "api", note: "" });
+  assert.equal(adopted.escalate, "off", "a user's escalate choice survives a re-pick");
+
+  const local: Partial<WatchRepoConfig> = { model: "qwen3.5", openaiUrl: "http://127.0.0.1:8010/v1" };
+  applyJudgeChoice(local, { engine: "openai", openaiUrl: "http://127.0.0.1:8010/v1", note: "" });
+  assert.deepEqual(local, {
+    engine: "openai",
+    escalate: "auto",
+    model: "qwen3.5",
+    openaiUrl: "http://127.0.0.1:8010/v1",
+  });
+});
+
+test("judgeOptions: an empty ANTHROPIC_API_KEY or OPENAI_BASE_URL offers nothing", () => {
+  const opts = judgeOptions({
+    hasClaude: false,
+    env: { ANTHROPIC_API_KEY: "", OPENAI_BASE_URL: "" },
+  });
+  assert.deepEqual(opts.map((o) => o.engine), ["off"]);
+});

@@ -11,6 +11,10 @@ import {
   addRepoUrl,
   removeRepo,
   loadConfig,
+  REPO_RE,
+  runWatchAdd,
+  runWatchList,
+  runWatchRemove,
   requireConfig,
   saveConfig,
   type RepoCandidate,
@@ -204,4 +208,81 @@ test("URL spellings normalize: .git and trailing slash are the same repo", () =>
   assert.equal(config.repos.length, 1);
   assert.equal(removeRepo(config, "https://gitea.com/gitea/tea.git"), 1);
   assert.equal(config.repos.length, 0);
+});
+
+test("mergeCandidates: an archived repo with an active twin is not counted as dropped", () => {
+  const { candidates, archivedDropped } = mergeCandidates([
+    [cand("o/twin", { archived: true }), cand("o/gone", { archived: true })],
+    [cand("o/twin")],
+  ]);
+  assert.deepEqual(candidates.map((x) => x.repo), ["o/twin"]);
+  assert.equal(archivedDropped, 1, "only o/gone vanished from the list");
+});
+
+test("addRepos: the same repo twice in one call is stored once", () => {
+  const config: WatchConfig = { repos: [] };
+  const res = addRepos(config, ["o/a", "o/a"]);
+  assert.deepEqual(res, { added: ["o/a"], skipped: ["o/a"] });
+  assert.deepEqual(config.repos, [{ repo: "o/a" }]);
+});
+
+test("addRepoUrl: several trailing slashes collapse into the stored spelling", () => {
+  const config: WatchConfig = { repos: [] };
+  assert.equal(addRepoUrl(config, "https://forge.example/o/r//"), true);
+  assert.deepEqual(config.repos, [{ repoUrl: "https://forge.example/o/r" }]);
+  assert.equal(addRepoUrl(config, "https://forge.example/o/r///"), false);
+});
+
+test("REPO_RE: matches the whole string, one owner and one repo segment", () => {
+  assert.ok(REPO_RE.test("o/r.js-x_1"));
+  assert.ok(!REPO_RE.test("a/b/c"));
+  assert.ok(!REPO_RE.test("x a/b"));
+  assert.ok(!REPO_RE.test("a/b c"));
+});
+
+test("loadConfig: a path that exists but cannot be read as a file is an error", async (t) => {
+  const dir = await tempDir(t, "crii-wl-");
+  await assert.rejects(loadConfig(dir), (err: NodeJS.ErrnoException) => err.code === "EISDIR");
+});
+
+test("runWatchAdd: refuses a malformed slug before it asks the forge anything", async (t) => {
+  const dir = await tempDir(t, "crii-wl-");
+  const path = join(dir, "watch.json");
+  await assert.rejects(
+    runWatchAdd({ configPath: path, repo: "has space/x" }),
+    /watch add expects owner\/repo/,
+  );
+  await assert.rejects(runWatchAdd({ configPath: path }), /watch add expects owner\/repo/);
+  await assert.rejects(readFile(path), { code: "ENOENT" }, "nothing was written");
+});
+
+test("runWatchRemove: a missing config is an error, a miss leaves the file byte-identical", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const dir = await tempDir(t, "crii-wl-");
+  const path = join(dir, "watch.json");
+  await assert.rejects(runWatchRemove({ configPath: path, repo: "o/a" }), /does not exist/);
+  await assert.rejects(readFile(path), { code: "ENOENT" });
+
+  const compact = '{"repos":[{"repo":"o/a"}]}';
+  await writeFile(path, compact);
+  assert.equal(await runWatchRemove({ configPath: path, repo: "o/other" }), 0);
+  assert.equal(await readFile(path, "utf8"), compact, "no rewrite when nothing matched");
+});
+
+test("runWatchList: prints per-repo options after the name, never the name as an option", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const lines: string[] = [];
+  t.mock.method(console, "log", (line: string) => lines.push(line));
+  const dir = await tempDir(t, "crii-wl-");
+  const path = join(dir, "watch.json");
+  await writeFile(
+    path,
+    JSON.stringify({ repos: [{ repo: "o/a", notifyBelow: 50 }, { repoUrl: "https://f.example/o/b" }, { repo: "o/c" }] }),
+  );
+  assert.equal(await runWatchList({ configPath: path }), 0);
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /^o\/a\b.*notifyBelow=50/);
+  assert.doesNotMatch(lines[0], /repo=/);
+  assert.doesNotMatch(lines[1], /repoUrl=/);
+  assert.equal(lines[2], "o/c", "no options, no trailing padding");
 });

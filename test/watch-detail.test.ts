@@ -443,3 +443,68 @@ test("a rule silent across every check on record is reported as possibly stale",
     /silent across every check/,
   );
 });
+
+test("a drop of exactly twenty below the repo's median carries no drop mark", () => {
+  const at = (score: number) =>
+    toRepoDetailHtml(ENTRY, state([check("v1", score, { scoreLevel: 80 })]), 80, "t");
+  assert.doesNotMatch(at(60), /class="dropmark"/);
+  assert.match(at(59), /class="dropmark"/);
+});
+
+test("reportDirOf distrusts empty and backslash segments, not only dot segments", () => {
+  const fallback = reportDirOf({}, "o/r");
+  assert.equal(reportDirOf({ latest: { report: "o-r//v1.html" } }, "o/r"), fallback);
+  assert.equal(reportDirOf({ latest: { report: "a\\b/v1.html" } }, "o/r"), fallback);
+  assert.equal(reportDirOf({ latest: { report: "a/b/v1.html" } }, "o/r"), "a/b");
+});
+
+test("a repo named by a forge URL gets no github.com link built from it", () => {
+  const forge: WatchedEntry = { key: "f", repo: "https://forge.example/o/r" };
+  const html = toRepoDetailHtml(forge, state([check("v1", 90)]), 90, "t");
+  assert.doesNotMatch(html, /href="https:\/\/github\.com\/https/);
+  assert.doesNotMatch(html, /class="repo"/);
+  const slug = toRepoDetailHtml(ENTRY, state([check("v1", 90)]), 90, "t");
+  assert.match(slug, /class="repo" href="https:\/\/github\.com\/o\/r"/);
+});
+
+test("the chart cuts a tag at thirteen characters, not at twelve", () => {
+  const twelve = toRepoDetailHtml(ENTRY, state([check("abcdefghijkl", 90)]), 90, "t");
+  assert.match(twelve, />abcdefghijkl<\/text>/);
+  const thirteen = toRepoDetailHtml(ENTRY, state([check("abcdefghijklm", 90)]), 90, "t");
+  assert.match(thirteen, />abcdefghijk…<\/text>/);
+});
+
+test("a single forge login is not an attribution change; two are", () => {
+  const author = (logins: Array<string | null>) => ({
+    ...state([check("v1", 80)]),
+    authors: [
+      { key: "a@x", name: "Ann", logins, firstSeen: "v1", lastSeen: "v1", releases: 1, commits: 1, sensitiveCommits: 0, binaryCommits: 0 },
+    ],
+  });
+  const one = toRepoDetailHtml(ENTRY, author(["ann"]), 80, "t");
+  assert.match(one, /@ann/);
+  assert.doesNotMatch(one, /attribution changed across releases/);
+  assert.match(toRepoDetailHtml(ENTRY, author(["ann", "bob"]), 80, "t"), /attribution changed across releases/);
+});
+
+test("one broken promise reads singular, two read plural", () => {
+  const one = toRepoDetailHtml(ENTRY, state([check("v1", 80, { brokenPromises: 1 })]), 80, "t");
+  assert.match(one, /1 broken promise</);
+  const two = toRepoDetailHtml(ENTRY, state([check("v1", 80, { brokenPromises: 2 })]), 80, "t");
+  assert.match(two, /2 broken promises</);
+});
+
+test("a series of one scoring generation carries no generation note", () => {
+  const same = [check("v1", 80, { scoringGeneration: 3 }), check("v2", 81, { scoringGeneration: 3 })];
+  assert.doesNotMatch(toRepoDetailHtml(ENTRY, state(same), 80, "t"), /scoring generations/);
+  const mixed = [check("v1", 80, { scoringGeneration: 2 }), check("v2", 81, { scoringGeneration: 3 })];
+  assert.match(toRepoDetailHtml(ENTRY, state(mixed), 80, "t"), /spans 2 scoring generations/);
+});
+
+test("the score chart thins its tag labels once there are more than eight releases", () => {
+  const nine = Array.from({ length: 9 }, (_, i) => check(`v${i + 1}`, 80));
+  const html = toRepoDetailHtml(ENTRY, state(nine), 80, "t");
+  const chart = html.slice(html.indexOf('aria-label="Trust score'), html.indexOf("</svg>"));
+  const labels = [...chart.matchAll(/class="axis" text-anchor="(?:start|middle|end)">(v\d)<\/text>/g)].map((m) => m[1]);
+  assert.deepEqual(labels, ["v1", "v3", "v5", "v7", "v9"]);
+});
