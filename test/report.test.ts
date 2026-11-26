@@ -856,6 +856,73 @@ test("a default change says whether a note names it, in all three renderers", ()
   }
 });
 
+test("a privacy hit says where and whether a note names it, in all three renderers", () => {
+  const r: Report = {
+    ...report(null),
+    surface: {
+      ...SURFACE,
+      privacy: [
+        {
+          kind: "sink",
+          signal: "posthog",
+          file: "apps/server/src/telemetry/AnalyticsService.ts",
+          line: 21,
+          snippet: 'posthogHost: Config.string("T3CODE_POSTHOG_HOST")',
+          documented: true,
+        },
+        {
+          kind: "credential",
+          signal: "~/.codex/auth.json",
+          file: "apps/server/src/telemetry/Identify.ts",
+          line: 30,
+          snippet: "const p = `${home}/.codex/auth.json`;",
+          documented: false,
+        },
+      ],
+    },
+  };
+  for (const [label, text] of [
+    ["terminal", terminalOf(r)],
+    ["markdown", toMarkdown(r)],
+    ["html", toHtml(r)],
+  ] as Array<[string, string]>) {
+    const flagged = text.search(/⚠ credential `?~\/\.codex\/auth\.json`? at `?apps\/server\/src\/telemetry\/Identify\.ts:30/);
+    const plain = text.search(/sink `?posthog/);
+    assert.ok(flagged >= 0, `${label} drops the ⚠ credential read with its place`);
+    assert.ok(plain >= 0, `${label} drops the documented sink`);
+    assert.ok(flagged < plain, `${label} does not put the undocumented hit first`);
+    assert.doesNotMatch(text, /⚠ sink/, `${label} flags a hit a note names`);
+    assert.match(text, /privacy &(amp;)? telemetry \(⚠ = no note names it\)/, `${label} leaves the ⚠ unexplained`);
+    assert.match(text, /\.codex\/auth\.json`;/, `${label} drops the evidence line`);
+  }
+  // A snippet full of backticks stays one code span in Markdown.
+  assert.match(toMarkdown(r), /``\s?const p = `\$\{home\}\/\.codex\/auth\.json`;\s?``/);
+
+  // The snippet is a source line from the party under examination.
+  const hostile: Report = {
+    ...report(null),
+    surface: {
+      ...SURFACE,
+      privacy: [
+        { kind: "sink", signal: "posthog", file: "a.ts", line: 1, snippet: "<img src=x onerror=1>\u001b]0;pwned\u0007", documented: false },
+      ],
+    },
+  };
+  assert.ok(!terminalOf(hostile).includes("\u001b]0;pwned"), "terminal passes a snippet's escape sequence through");
+  assert.ok(!toHtml(hostile).includes("<img"), "html renders a snippet as markup");
+  assert.ok(toHtml(hostile).includes("&lt;img"), "html drops the hostile snippet instead of escaping it");
+
+  // A surface recorded before the field existed says nothing about privacy.
+  const old = { ...report(null), surface: SURFACE };
+  for (const [label, text] of [
+    ["terminal", terminalOf(old)],
+    ["markdown", toMarkdown(old)],
+    ["html", toHtml(old)],
+  ] as Array<[string, string]>) {
+    assert.doesNotMatch(text, /privacy &(amp;)? telemetry/, `${label} invented a privacy line`);
+  }
+});
+
 test("languages are ranked by share of code, largest first, and cut at the limit", () => {
   const ctx = {
     languages: { Go: 100, TypeScript: 900, Rust: 500 },

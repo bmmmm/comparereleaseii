@@ -140,6 +140,12 @@ Beyond the score, the report states — informational, never scored:
 - **What shipped** — file categories, changed symbols, config surface
   (env vars, flags, keys) and moved **default values**, marked `⚠` when no
   note names them. Works with `--judge off`.
+- **Privacy & telemetry** — added code that reads another tool's credentials
+  (`~/.codex/auth.json`, `~/.claude.json`, …), ships to an analytics or
+  tracing sink (vendor SDKs, `ingest.`/`telemetry.` hosts, OTLP exporters),
+  builds a stable user or device id, or adds a telemetry switch — each with
+  file and line, `⚠` when no note names it. "Telemetry" in a note never
+  covers a credential read. Works with `--judge off`.
 - **Version pins** — dependency bumps as `(name, from → to)`; the notes' own
   bump claims are checked against both numbers. First-party pins (same owner,
   or `--component NAME=owner/repo`) get a depth-1 sub-check of the component's

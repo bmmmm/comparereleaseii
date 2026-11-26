@@ -334,6 +334,33 @@ export interface ReleaseSurface {
    * recorded before the field existed.
    */
   defaults?: DefaultChange[];
+  /**
+   * Privacy-relevant code the release adds: reads of another tool's
+   * credential or account file, telemetry sinks, stable user/device
+   * identifiers, telemetry switches. Absent in surfaces recorded before the
+   * field existed.
+   */
+  privacy?: PrivacyHit[];
+}
+
+export type PrivacyKind = "credential" | "sink" | "identifier" | "switch";
+
+/**
+ * One privacy signal on an added line — the first occurrence of its
+ * (kind, signal) pair in the release. Informational, never scored.
+ */
+export interface PrivacyHit {
+  kind: PrivacyKind;
+  /** Normalized name: `~/.codex/auth.json`, `posthog`, `distinct_id`, an env var. */
+  signal: string;
+  file: string;
+  /** New-side line number of the first occurrence. */
+  line: number;
+  /** That line, trimmed and capped — written by the party under examination. */
+  snippet: string;
+  /** Some claim names the signal. A credential read counts only when the
+   * file itself is named: "anonymous usage data" does not document it. */
+  documented: boolean;
 }
 
 export type FindingKind = "breaking" | "security" | "behavior" | "feature" | "internal";

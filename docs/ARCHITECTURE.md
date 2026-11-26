@@ -28,6 +28,7 @@ orchestration.
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
 | `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL/workflow-`uses:` bumps, first-party classification — and the claim side, `detectBumpClaim` |
 | `src/substance.ts` | What actually shipped: category rollup, changed symbols, config surface, moved defaults (same key, different literal — documented or not), migrations, routes |
+| `src/privacy.ts` | The release surface's privacy part: credential reads, telemetry sinks, stable identifiers and telemetry switches in added lines, each with file, line and whether a note names it |
 | `src/findings.ts` | Typed findings: the diff read per subsystem within a hard budget, blind to commit messages |
 | `src/reconcile.ts` | The late join of claims and findings: confirmed, undocumented, unsupported — plus the pin join that settles bump claims; deterministic, never scored |
 | `src/report.ts` | Terminal/markdown output, exit codes |

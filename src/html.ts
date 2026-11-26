@@ -9,6 +9,7 @@ import {
   componentBits,
   configSurfaceEntries,
   defaultChangeEntries,
+  privacyEntries,
   countVerdicts,
   findingTagger,
   lensFindings,
@@ -337,12 +338,16 @@ function surfaceHtml(s: ReleaseSurface): string {
     .join("");
   const cfg = configSurfaceEntries(s);
   const defs = defaultChangeEntries(s);
+  const priv = privacyEntries(s);
   const facts = [
     s.symbols.length
       ? `symbols: ${esc(s.symbols.join(", "))}${s.moreSymbols ? ` (+${s.moreSymbols} more)` : ""}`
       : "",
     cfg.length ? `config surface: ${esc(cfg.join(", "))}` : "",
     defs.length ? `defaults changed (⚠ = no note names it): ${esc(defs.join(", "))}` : "",
+    priv.length
+      ? `privacy &amp; telemetry (⚠ = no note names it):<ul>${priv.map((p) => `<li><code>${esc(p)}</code></li>`).join("")}</ul>`
+      : "",
     s.migrations.length ? `migrations: ${esc(s.migrations.join(", "))}` : "",
     s.apiRoutes.length ? `api surface: ${esc(s.apiRoutes.join(", "))}` : "",
   ]

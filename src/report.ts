@@ -8,6 +8,7 @@ import type {
   ClaimResult,
   ComponentCheck,
   DefaultChange,
+  PrivacyHit,
   Finding,
   FindingKind,
   PinBump,
@@ -126,6 +127,33 @@ export function defaultChangeEntries(
     ...all.filter((x) => !x.d.documented).map((x) => `⚠ ${entry(x)}`),
     ...all.filter((x) => x.d.documented).map(entry),
   ];
+}
+
+/**
+ * The privacy surface, undocumented first, one entry per hit: kind, signal,
+ * where, and the line itself — the evidence a reader checks without opening
+ * the diff. `⚠` marks a hit no note names.
+ */
+export function privacyEntries(
+  s: ReleaseSurface,
+  wrap: (value: string) => string = (v) => v,
+): string[] {
+  const hits = s.privacy ?? [];
+  const entry = (h: PrivacyHit): string =>
+    `${h.kind} ${wrap(h.signal)} at ${wrap(`${h.file}:${h.line}`)}: ${wrap(h.snippet)}`;
+  return [
+    ...hits.filter((h) => !h.documented).map((h) => `⚠ ${entry(h)}`),
+    ...hits.filter((h) => h.documented).map(entry),
+  ];
+}
+
+/** A Markdown code span that survives backticks in the value — snippets
+ * are source lines, and template literals are full of them. */
+export function mdCode(v: string): string {
+  const longest = Math.max(0, ...[...v.matchAll(/`+/g)].map((m) => m[0].length));
+  if (!longest) return `\`${v}\``;
+  const fence = "`".repeat(longest + 1);
+  return `${fence} ${v} ${fence}`;
 }
 
 /** What to call a pin: a first-party component goes by its repo's own name
@@ -550,6 +578,14 @@ export function printTerminal(report: Report): void {
         ),
       );
     }
+    const priv = privacyEntries(surf);
+    if (priv.length) {
+      const shown = priv.slice(0, 10);
+      const tone = surf.privacy?.some((h) => !h.documented) ? c.yellow : c.dim;
+      console.log(tone("  privacy & telemetry (⚠ = no note names it):"));
+      for (const p of shown) console.log(tone(`    ${safe(p)}`));
+      if (priv.length > shown.length) console.log(tone(`    … +${priv.length - shown.length} more`));
+    }
     if (surf.migrations.length) {
       console.log(
         c.dim(
@@ -789,6 +825,11 @@ export function toMarkdown(report: Report): string {
     if (cfg.length) lines.push(`- config surface: ${cfg.join(", ")}`);
     const defs = defaultChangeEntries(surf, (v) => `\`${v}\``);
     if (defs.length) lines.push(`- defaults changed (⚠ = no note names it): ${defs.join(", ")}`);
+    const priv = privacyEntries(surf, mdCode);
+    if (priv.length) {
+      lines.push("- privacy & telemetry (⚠ = no note names it):");
+      for (const p of priv) lines.push(`  - ${p}`);
+    }
     if (surf.migrations.length) {
       lines.push(`- migrations: ${surf.migrations.map((m) => `\`${m}\``).join(", ")}`);
     }

@@ -7,6 +7,7 @@
 import { extractIdentifiers, hunkFunctions } from "./match.ts";
 import { fileCategory } from "./metrics.ts";
 import { sideLines } from "./pins.ts";
+import { privacySurface } from "./privacy.ts";
 import type { Claim, ConfigDelta, DefaultChange, DiffFile, ReleaseSurface } from "./types.ts";
 
 /** Environment-variable reads, per language idiom. Go struct tags carry
@@ -502,6 +503,7 @@ export function releaseSurface(files: DiffFile[], claims: Claim[] = []): Release
     migrations: files.filter((f) => fileCategory(f.path) === "migrations").map((f) => f.path),
     apiRoutes: files.filter(isRoute).map((f) => f.path),
     defaults,
+    privacy: privacySurface(files, claims),
   };
 }
 

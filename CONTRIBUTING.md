@@ -43,6 +43,7 @@ that way — a dependency needs a strong argument.
 | `src/deps.ts` | Dependency manifests in a diff: added packages, lockfile sources, opaque binaries |
 | `src/pins.ts` | Version-pin delta: manifest/Makefile/Dockerfile/URL/workflow-`uses:` bumps, first-party classification — and the claim side, `detectBumpClaim` |
 | `src/substance.ts` | What actually shipped: category rollup, changed symbols, config surface, migrations, routes |
+| `src/privacy.ts` | Privacy surface: credential reads, telemetry sinks, stable ids and switches in added lines |
 | `src/findings.ts` | Typed findings: the diff read per subsystem within a hard budget, blind to commit messages |
 | `src/reconcile.ts` | The late join of claims and findings: confirmed, undocumented, unsupported — plus the pin join that settles bump claims; deterministic, never scored |
 | `src/report.ts` | Terminal and markdown output, exit codes |
